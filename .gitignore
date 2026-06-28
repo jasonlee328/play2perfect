@@ -1,0 +1,38 @@
+# Claude Code session files
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environments
+.venv/
+.venv_*/
+venv/
+env/
+
+# Training / experiment outputs
+train_dir/
+outputs/
+wandb/
+videos/
+evals/
+runs/
+
+# Downloaded artifacts
+pretrained_policy/
+pretrained_assembly/
+
+# Large media — ignore stray videos but keep the docs teaser
+*.mp4
+!docs/media/*.mp4
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/

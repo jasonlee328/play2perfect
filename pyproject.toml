@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "play2perfect"
+version = "0.1.0"
+description = "Official implementation of Play2Perfect: a 2-stage RL pipeline for contact-rich assembly"
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Kushal Kedia", email = "kk837@cornell.edu" },
+]
+keywords = ["robotics", "rl", "assembly", "manipulation"]
+classifiers = [
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3.11",
+]
+
+# NOTE: Isaac Sim / Isaac Lab and torch are installed separately into a Python 3.11
+# venv (see docs/isaacsim_installation.md). Install this package with `--no-deps`.
+dependencies = [
+    "gym==0.23.1",
+    "omegaconf",
+    "hydra-core>=1.2",
+    "termcolor",
+    "jinja2",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "trimesh",
+    "yourdfpy",
+    "viser",
+    "requests",
+    "tqdm",
+    "tyro",
+    "huggingface_hub",
+    "imageio",
+    "imageio[ffmpeg]",
+    "opencv-python",
+    "pillow",
+    "transforms3d",
+    "wandb",
+    "tensorboard",
+]
+
+[project.optional-dependencies]
+ros = [
+    "rospkg",
+]
+dev = [
+    "ipykernel",
+    "ruff",
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+include = [
+    "isaacsimenvs*",
+    "evaluation*",
+    "deployment*",
+]
