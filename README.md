@@ -7,7 +7,7 @@ contact-rich robotic assembly.
 
 📄 **Paper:** https://arxiv.org/abs/2606.26428
 
-https://github.com/user-attachments/assets/d7e55375-e9e2-4ec0-aa0e-98a5b08bf138
+https://github.com/user-attachments/assets/6bfafdbc-41f4-472a-aeaa-444f7e50076b
 
 ## Overview
 
