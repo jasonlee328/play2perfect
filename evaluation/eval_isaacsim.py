@@ -425,6 +425,13 @@ def _sim_get_state(env, done_pending: bool = False):
     )
 
 
+def _load_student_agent_cfg(task: str):
+    """Registry fallback for checkpoints saved before the cfg was embedded."""
+    from isaaclab_tasks.utils.parse_cfg import load_cfg_from_registry
+
+    return load_cfg_from_registry(task.split(":")[-1], "rl_games_student_cfg_entry_point")
+
+
 def _student_frame(env):
     """Grab the student's depth image as (uint8 HxW, stats) for the viser panel.
 
@@ -454,9 +461,12 @@ def _student_frame(env):
 def _sim_episode(
     conn, env, wrapped, player, *, deterministic: bool,
     student_cam: bool = False, student_cam_every: int = 2,
+    student=None,
 ):
     player.reset()
     obs = player.env_reset(wrapped)
+    if student is not None:
+        student.reset()
 
     retract_ok = False
     peak_successes = 0
@@ -483,9 +493,18 @@ def _sim_episode(
             continue
 
         t0 = time.time()
-        action = player.get_action(obs, is_deterministic=deterministic)
+        if student is None:
+            action = player.get_action(obs, is_deterministic=deterministic)
+        else:
+            # The student reads get_student_obs() directly, so the env keeps its
+            # {policy, critic} contract and `wrapped` stays valid -- we just
+            # substitute the action. env_step still advances the sim and returns
+            # the teacher-shaped obs, which the student ignores.
+            action = student.act(env.unwrapped if hasattr(env, "unwrapped") else env)
         obs, _rew, dones, _infos = player.env_step(wrapped, action)
         done = _done0(dones)
+        if student is not None and bool(dones.reshape(-1).any()):
+            student.reset(dones.reshape(-1).bool().to(student.device))
         step += 1
 
         cur_succ = _tensor_int(env._successes[0])
@@ -538,6 +557,7 @@ def sim_worker(
     extra_overrides: dict[str, object],
     student_cam: bool = False,
     student_cam_every: int = 2,
+    student_checkpoint: str | None = None,
 ) -> None:
     app = None
     env = None
@@ -550,6 +570,9 @@ def sim_worker(
         AppLauncher.add_app_launcher_args(launcher_parser)
         launcher_args, _ = launcher_parser.parse_known_args([])
         launcher_args.headless = bool(headless)
+        # Driving the student implies its camera.
+        if student_checkpoint:
+            student_cam = True
         # student_obs spawns a TiledCamera, which requires a camera-enabled app.
         launcher_args.enable_cameras = bool(student_cam)
         app = AppLauncher(launcher_args).app
@@ -609,6 +632,22 @@ def sim_worker(
         print(f"=> initialized player weights from '{checkpoint_path}'", flush=True)
         player.has_batch_dimension = True
 
+        student = None
+        if student_checkpoint:
+            from isaacsimenvs.distillation.student_policy import StudentPolicy
+
+            student = StudentPolicy(
+                student_checkpoint,
+                num_envs=env.num_envs,
+                action_dim=int(env.cfg.action_space),
+                proprio_dim=int(env.get_student_obs()["proprio"].shape[-1]),
+                device=rl_device,
+                agent_cfg=_load_student_agent_cfg(task),
+            )
+            print(f"[worker] driving the STUDENT from {student_checkpoint} "
+                  f"(grad_steps={student.grad_steps}, "
+                  f"spatial_pool={student.spatial_pool})", flush=True)
+
         player.reset()
         obs = player.env_reset(wrapped)
         del obs
@@ -620,6 +659,7 @@ def sim_worker(
                 result = _sim_episode(
                     conn, env, wrapped, player, deterministic=deterministic,
                     student_cam=student_cam, student_cam_every=student_cam_every,
+                    student=student,
                 )
                 if result == "quit":
                     break
@@ -676,6 +716,7 @@ def _worker_main(args) -> int:
         extra_overrides=extra_overrides,
         student_cam=args.student_cam,
         student_cam_every=args.student_cam_every,
+        student_checkpoint=args.student_checkpoint,
     )
     return 0
 
@@ -707,6 +748,13 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-headless", action="store_true")
     parser.add_argument("--rl-device", default="cuda:0")
     parser.add_argument("--sim-device", default="cuda:0")
+    parser.add_argument(
+        "--student-checkpoint", default=None,
+        help="Drive the DISTILLED STUDENT from this Dagger checkpoint instead of "
+             "the rl_games teacher, e.g. runs/distill_v2/student_final.pth. "
+             "Implies --student-cam, so you watch the policy and its depth input "
+             "side by side.",
+    )
     parser.add_argument(
         "--student-cam", action="store_true",
         help="Show the depth-distillation student's camera input in a viser "
@@ -814,6 +862,7 @@ def _run_viewer(args) -> int:
             self.keep_dr = bool(args.keep_dr)
             self.student_cam = bool(args.student_cam)
             self.student_cam_every = int(args.student_cam_every)
+            self.student_checkpoint = args.student_checkpoint
             super().__init__(*demo_args, **demo_kwargs)
             self._sl_insertion_tol.value = float(args.insertion_success_tolerance)
             self._sl_retract_tol.value = float(args.retract_success_tolerance)
@@ -905,9 +954,11 @@ def _run_viewer(args) -> int:
                 "--override-json",
                 json.dumps(worker_overrides),
             ]
-            if self.student_cam:
+            if self.student_cam or self.student_checkpoint:
                 cmd += ["--student-cam",
                         "--student-cam-every", str(self.student_cam_every)]
+            if self.student_checkpoint:
+                cmd += ["--student-checkpoint", str(self.student_checkpoint)]
             if self.deterministic:
                 cmd.append("--deterministic")
             if self.sdf:

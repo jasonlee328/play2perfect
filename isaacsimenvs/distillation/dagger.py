@@ -100,6 +100,7 @@ was computed.
 
 from __future__ import annotations
 
+import copy
 import time
 from collections import deque
 
@@ -137,6 +138,7 @@ class Dagger:
         self.device = torch.device(device)
         self.log_every = int(log_every)
 
+        self._agent_cfg = copy.deepcopy(agent_cfg)
         params = agent_cfg["params"]
         cfg = params["config"]
         self.num_envs = int(env.num_envs)
@@ -495,6 +497,12 @@ class Dagger:
             "optimizer": self.optimizer.state_dict(),
             "iter": self.iter,
             "grad_steps": self.grad_steps,
+            # The agent config travels with the weights. Without it a checkpoint
+            # cannot be rebuilt without remembering which flags produced it --
+            # get spatial_pool wrong and the state_dict load fails on a shape
+            # mismatch, or worse, silently succeeds with the wrong geometry.
+            "agent_cfg": self._agent_cfg,
+            "num_envs": self.num_envs,
         }
 
     def save(self, path: str) -> None:
