@@ -212,6 +212,7 @@ class Dagger:
         )
         self.iter = 0
         self.grad_steps = 0
+        self._obs = None       # persists across distill() calls; see distill()
         self.history: list[dict] = []
         self._recent = deque(maxlen=self.log_every)
 
@@ -237,6 +238,14 @@ class Dagger:
                 "False the env keeps the {policy, critic} contract."
             )
         return int(obs["proprio"].shape[-1])
+
+    def reset_student_states(self) -> None:
+        self._states = [
+            s.to(self.device) for s in self.student_net.get_default_rnn_state()
+        ]
+        self._prev_actions = torch.zeros(
+            self.num_envs, self.action_dim, device=self.device
+        )
 
     def _goal_ratio(self) -> float:
         """Fraction of subgoals reached, averaged over envs.
@@ -382,8 +391,16 @@ class Dagger:
         max_iters = int(max_iters if max_iters is not None else self.max_iters)
         self.student_model.train()
 
-        obs, _ = self.env.reset()
-        self.teacher.reset_states()
+        # Reset only on the FIRST call. distill.py invokes this once per
+        # checkpoint chunk, so an unconditional reset restarted every episode
+        # every --save-every steps -- truncating rollouts on a boundary that has
+        # nothing to do with training, and zeroing the env while the student's
+        # LSTM carried straight through it.
+        if self._obs is None:
+            self._obs, _ = self.env.reset()
+            self.teacher.reset_states()
+            self.reset_student_states()
+        obs = self._obs
         self.optimizer.zero_grad(set_to_none=True)
 
         window_loss = 0.0
@@ -447,6 +464,7 @@ class Dagger:
                     ).unsqueeze(-1).to(self._prev_actions.dtype)
 
             self.iter += 1
+            self._obs = obs
 
             # --- gradient step every seq_length env steps ----------------
             if self.iter % self.seq_length == 0:

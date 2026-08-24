@@ -298,6 +298,16 @@ class PegDynamicDemo:
             self._btn_load = self.server.gui.add_button("Load / reload env")
             self._btn_load.on_click(lambda _: self._load_env())
             self._md_status = self.server.gui.add_markdown("**Status:** Ready")
+            if getattr(self, "student_checkpoint", None):
+                # The policy dropdown above still selects a TEACHER checkpoint,
+                # which gets loaded but never asked for an action. Say so, or it
+                # reads as though the teacher is what you are watching.
+                self.server.gui.add_markdown(
+                    "**Driving:** distilled STUDENT\n\n"
+                    f"`{self.student_checkpoint}`\n\n"
+                    "*The Policy dropdown selects a teacher checkpoint that is "
+                    "loaded but unused in this mode.*"
+                )
 
         with self.server.gui.add_folder("Episode Controls", expand_by_default=True):
             self._btn_run = self.server.gui.add_button("Run Episode")
