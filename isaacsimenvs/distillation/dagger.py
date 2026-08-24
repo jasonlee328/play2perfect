@@ -22,12 +22,25 @@ the conv activations. At 256 envs x 16 steps that is on the order of a couple of
 GB on top of the env. Lower ``seq_length`` before lowering ``num_envs`` if it
 does not fit -- ``num_envs`` is the batch size here.
 
-Deviations from the DEXTRAH source
-----------------------------------
-1. **No DDP.** Upstream hard-requires ``WORLD_SIZE``/``RANK``/``LOCAL_RANK``
+Defaults match DEXTRAH; the alternatives below are opt-in
+---------------------------------------------------------
+``PreciseAssemblyStudent.yaml`` carries DEXTRAH's values, so an unflagged run
+reproduces DEXTRAH's configuration. Items 2, 3, 5, 6 below are *available*
+alternatives, off by default, selected individually or as a group with
+``distill.py --port-deviations``. Items 1, 4, 7 are not optional -- DEXTRAH's
+code either does not run here or is dead.
+
+Where DEXTRAH's committed code contradicts its own written intent -- a 15k-
+iteration beta warmup it clobbers to zero, a ``seq_length`` it reads then
+overwrites with 1 -- the committed behaviour is what "matching DEXTRAH" means
+here, since that is what was actually trained and published.
+
+Alternatives, with the measurement behind each
+----------------------------------------------
+1. **No DDP.** *(not optional)*  Upstream hard-requires ``WORLD_SIZE``/``RANK``/``LOCAL_RANK``
    (``distillation.py:101-103``) and wraps in DDP. Single-GPU only here.
 
-2. **The teacher-driven warmup is honored.** Upstream writes
+2. **Teacher-driven warmup** *(opt-in: ``--beta-warmup-grad-steps``)*.  Upstream writes
    ``if log_counter < 15_000: beta = 1.`` and then unconditionally clobbers it
    with ``beta = 0.`` two lines later (``:376``). DEXTRAH gets away with
    ``beta=0`` because its geometric fabric bounds the reachable state set: 11
@@ -38,7 +51,7 @@ Deviations from the DEXTRAH source
    trajectory, so its labels there are worthless. **This is the single most
    important deviation.**
 
-3. **``seq_length`` is honored.** Upstream reads the config value and then
+3. **Honoring ``seq_length``** *(opt-in: ``--seq-length``)*.  Upstream reads the config value and then
    overwrites it with 1 (``:177``), so the recurrent weights never learn to
    write a predictively-useful hidden state. Two consequences worth stating:
    with ``seq_length=16``, N env steps buy N/16 gradient steps, not N; and the
@@ -46,20 +59,20 @@ Deviations from the DEXTRAH source
    was both units at once and taking it as env steps would have cut the warmup
    16x.
 
-4. **Dropped:** the per-step ``torch.cuda.empty_cache()`` (``:540``) and the
+4. **Dropped** *(not optional; dead code)*:  the per-step ``torch.cuda.empty_cache()`` (``:540``) and the
    done-time flush at ``:572`` (unreachable at ``seq_length == 1``, and
    redundant with the periodic step otherwise).
 
-5. **``mus`` are not weighted by the teacher's ``sigmas``.** Upstream uses
+5. **Uniform ``mus`` weighting** *(opt-in: ``--mu-weight-mode uniform``)*.  Upstream uses
    ``weights = (1 / actions_teacher['sigmas'][0]) ** 2``. Those sigmas index
    only on the SAPG block id, never on the observation, so they are a constant
    29-vector -- and for the block with the best success rate they span 1054x,
    i.e. 1.1e6x in ``1/sigma^2``, which would silently zero the loss on whichever
    joints that block happens to be noisy on. See
-   ``isaacsimenvs/distillation/teacher.py``. Default here is uniform;
-   ``mu_weight_mode="inv_sigma2"`` reproduces upstream for comparison.
+   ``isaacsimenvs/distillation/teacher.py``. Default is ``inv_sigma2``
+   (DEXTRAH's); ``uniform`` is the alternative.
 
-6. **The ``sigmas`` matching term is off by default** (``sigma_loss_coef: 0.0``).
+6. **Disabling the ``sigmas`` matching term** *(opt-in: ``--sigma-loss-coef 0``)* (``sigma_loss_coef: 0.0``).
    The plan's loss is ``weighted L2 on mus + L2 on sigmas + aux``, but measured
    at init the sigma term carries **2806 of a 2806 total** -- roughly 450x the
    ``mus`` term -- because the teacher's block-50 sigmas reach 170 while the
@@ -71,9 +84,9 @@ Deviations from the DEXTRAH source
    grad 338). But it makes ``total`` useless as a progress signal, and what it
    *does* train is the student's sigma toward a per-block SAPG exploration
    hyperparameter that describes the teacher's training schedule, not the task.
-   Raise the coefficient only if you have a reason to want that.
+   Default is 1.0 (DEXTRAH's). Set 0.0 to get a readable progress signal.
 
-7. **``dones`` are threaded and hidden state is masked, not indexed.** Upstream
+7. **``dones`` threaded, hidden state masked not indexed** *(not optional)*.  Upstream
    never puts ``dones`` in the student batch dict, which is harmless only at
    ``seq_length == 1``. Zeroing is done with a multiplicative mask rather than
    in-place index assignment, so it stays inside the autograd graph.

@@ -110,19 +110,18 @@ params:
     learning_rate: 1e-4      # DEXTRAH's constant LR, tuned at 256 envs
     grad_norm: 1.0
     truncate_grads: True
-    seq_length: 16           # BPTT length. DEXTRAH read its config then
-                             # overwrote it with 1, which stops the recurrent
-                             # weights from ever learning a useful hidden
-                             # state; Phase 5 honors this value.
+    # DEFAULTS BELOW MATCH DEXTRAH'S ACTUAL BEHAVIOUR, not this port's opinion
+    # of it. Where DEXTRAH's committed code contradicts its own written intent
+    # (a 15k beta warmup it clobbers to 0, a seq_length it reads then overwrites
+    # with 1), the committed behaviour wins here. `distill.py --port-deviations`
+    # switches the whole group to this port's alternatives; each also has its own
+    # flag. Rationale for every alternative is in isaacsimenvs/distillation/
+    # dagger.py, with the measurements behind it.
+    seq_length: 1            # DEXTRAH: reads config, then `self.seq_length = 1`
+                             # (distillation.py:177). BPTT length 1.
     aux_coeff: 10.0          # DEXTRAH's weight on the summed aux losses
-    mu_weight_mode: uniform  # NOT 1/sigma_T^2: those sigmas index only on the
-                             # SAPG block id and span 1054x (teacher.py).
-    sigma_loss_coef: 0.0     # off. At init the sigma-matching term is ~2806 vs
-                             # mu's ~6, because teacher block-50 sigmas reach
-                             # 170 while the student starts at exp(0)=1. It
-                             # cannot reach the trunk (fixed_sigma + mu*0.0), so
-                             # it only buries the progress signal and trains the
-                             # student's sigma toward a SAPG hyperparameter.
+    mu_weight_mode: inv_sigma2   # DEXTRAH: weights = (1/teacher_sigmas[0])**2
+    sigma_loss_coef: 1.0     # DEXTRAH includes the L2-on-sigmas term
     # Teacher-driven warmup, in GRADIENT steps (not env steps). DEXTRAH
     # hardcodes beta=0, which is only safe because its geometric fabric bounds
     # the reachable state set; play2perfect commands 29 raw joint targets and
@@ -130,8 +129,11 @@ params:
     # env steps AND gradient steps at once because they forced seq_length=1.
     # At seq_length=16 those differ 16x, and student competence tracks gradient
     # steps -- so that is the unit here. 15000 grad steps = 240k env steps.
-    beta_warmup_grad_steps: 15000
-    beta_anneal_grad_steps: 2000   # linear beta 1 -> 0 after the warmup
+    beta_warmup_grad_steps: 0      # DEXTRAH: `beta = 0.` unconditionally
+                                   # (distillation.py:376), clobbering the
+                                   # 15000-iteration warmup written two lines
+                                   # above it. The student steers from step 0.
+    beta_anneal_grad_steps: 0
     max_iters: 100000
 
     # --- inert: PPO settings kept for Runner compatibility ---

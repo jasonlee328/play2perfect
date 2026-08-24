@@ -81,7 +81,7 @@ def main() -> None:
         help="Frozen teacher weights. Run `python download_checkpoints.py` first.",
     )
     parser.add_argument(
-        "--teacher-block-id", default="50.0",
+        "--teacher-block-id", default=None,
         help="SAPG block-id column appended to the teacher's obs. 50.0 (default) "
              "measured 96.9%%, 0.0 measured 95.4%%, 'ramp' reproduces rl_games' "
              "per-env linspace. See isaacsimenvs/distillation/teacher.py.",
@@ -109,19 +109,29 @@ def main() -> None:
     )
     parser.add_argument("--beta-anneal-grad-steps", type=int, default=None)
     parser.add_argument(
-        "--keep-bad-inits", action="store_true",
-        help="Do NOT terminate episodes where the peg has been dropped on the "
-             "table. Off by default: ~14%% of tight_insertion first episodes "
-             "start unstable (measured 143/1024), eval_offline discards them, "
-             "but DAgger visits them and the teacher's labels there are "
-             "worthless. Terminating early stops the student training on a "
-             "teacher flailing at an object that already fell.",
+        "--drop-bad-inits", action="store_true",
+        help="Terminate episodes where the peg has been dropped on the table. "
+             "OFF by default, matching DEXTRAH (and this env's own default). "
+             "~14%% of tight_insertion first episodes start unstable (measured "
+             "143/1024); eval_offline discards those trials but DAgger visits "
+             "them, and the teacher's labels on an already-dropped peg are "
+             "worthless.",
     )
     parser.add_argument(
         "--spatial-pool", choices=("avgpool", "flatten"), default=None,
         help="Encoder pooling. avgpool (DEXTRAH default) discards the 3x8 "
              "spatial map; flatten keeps it. Try flatten if hole_pos RMSE "
              "stalls well above 2 mm while the mu loss converges.",
+    )
+    parser.add_argument(
+        "--port-deviations", action="store_true",
+        help="Switch from DEXTRAH's behaviour (the default) to this port's "
+             "alternatives, as a group: seq_length=16, beta warmup 15000 grad "
+             "steps, mu_weight_mode=uniform, sigma_loss_coef=0.0, teacher "
+             "block_id=50.0, and terminate dropped-peg episodes. Each also has "
+             "its own flag; explicit flags win over this preset. See "
+             "isaacsimenvs/distillation/dagger.py for the measurement behind "
+             "each one.",
     )
     # --- run management ---
     parser.add_argument("--out-dir", default=None, help="Checkpoint + log dir.")
@@ -169,7 +179,11 @@ def main() -> None:
         # *visits* them, and the teacher's labels on an already-dropped peg are
         # worthless -- during the beta=1 warmup that is 14% of teacher-driven
         # data teaching nonsense. Terminating early ends them in a few steps.
-        env_cfg.precise_assembly.enable_dropped_on_table_term = not args_cli.keep_bad_inits
+        # DEXTRAH does not terminate dropped-peg episodes; neither does this
+        # env by default. See --drop-bad-inits for why you might want to.
+        env_cfg.precise_assembly.enable_dropped_on_table_term = bool(
+            args_cli.drop_bad_inits or args_cli.port_deviations
+        )
 
         # hole_pos is the primary aux target and random-goal envs replace it
         # with a (0, 0, -1) sentinel; the env raises on the combination, so fail
@@ -187,6 +201,22 @@ def main() -> None:
         scfg = student_cfg["params"]["config"]
         scfg["num_actors"] = int(args_cli.num_envs)
         scfg["device"] = scfg["device_name"] = args_cli.rl_device
+
+        # Preset first, so explicit flags below still override it. The YAML
+        # itself carries DEXTRAH's values, so with no flags this runs DEXTRAH's
+        # configuration.
+        if args_cli.port_deviations:
+            scfg["mu_weight_mode"] = "uniform"
+            scfg["sigma_loss_coef"] = 0.0
+            scfg["seq_length"] = 16
+            scfg["beta_warmup_grad_steps"] = 15_000
+            scfg["beta_anneal_grad_steps"] = 2_000
+            print(
+                "[distill] --port-deviations: seq_length=16, warmup=15000 grad "
+                "steps, uniform mu weights, sigma_loss_coef=0.0, block_id=50.0, "
+                "dropped-peg episodes terminated",
+                flush=True,
+            )
         for flag, key in [
             ("seq_length", "seq_length"),
             ("lr", "learning_rate"),
@@ -225,7 +255,13 @@ def main() -> None:
         env = gym.make(args_cli.task, cfg=env_cfg)
         uenv = env.unwrapped  # Dagger reads _get_observations() directly
 
+        # Default "ramp" is what rl_games' BasePlayer actually appends
+        # (player.py:93) and what eval_offline measured 96.9% with. The constant
+        # 50.0 measured 96.9% too and is label-consistent across envs, which is
+        # why --port-deviations selects it.
         block_id = args_cli.teacher_block_id
+        if block_id is None:
+            block_id = "50.0" if args_cli.port_deviations else "ramp"
         block_id = block_id if block_id == "ramp" else float(block_id)
         teacher = Teacher(
             teacher_agent_cfg, str(ckpt),

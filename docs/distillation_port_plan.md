@@ -694,3 +694,56 @@ drops.
 Also note §0's throughput table counted iterations as gradient steps, which was
 true only under DEXTRAH's clobbered `seq_length=1`. At `seq_length=16` the
 "100k iterations ≈ 1.6 h" line buys 6,250 gradient steps.
+
+---
+
+## 7. Reversal: DEXTRAH's configuration is now the default
+
+This plan's §2 Phase 5 tells the port *not* to keep DEXTRAH's `beta = 0.` and
+*not* to keep `seq_length = 1`. Those were this document's calls, and the port
+followed them. **That is now inverted**, on the instruction that everything
+should be as close to DEXTRAH as possible.
+
+`PreciseAssemblyStudent.yaml` carries DEXTRAH's values, so an unflagged
+`distill.py` run reproduces DEXTRAH's configuration:
+
+| knob | default (DEXTRAH) | alternative |
+|---|---|---|
+| `seq_length` | **1** (`distillation.py:177`) | 16 |
+| `beta_warmup_grad_steps` | **0** (`:376` clobbers 15000) | 15000 |
+| `mu_weight_mode` | **`inv_sigma2`** (`:505`) | `uniform` |
+| `sigma_loss_coef` | **1.0** | 0.0 |
+| teacher `block_id` | **`ramp`** (`player.py:93`) | 50.0 |
+| dropped-peg termination | **off** | on |
+| `spatial_pool` | **`avgpool`** | `flatten` |
+
+`--port-deviations` switches the group; each has its own flag. Where DEXTRAH's
+committed code contradicts its own written intent, the committed behaviour is
+what "matching DEXTRAH" means, since that is what was trained and published.
+
+**Three deviations cannot be turned off, because DEXTRAH's code does not run
+here at all:**
+1. the rl_games env wrapper (`RlGamesVecEnvWrapper` requires a `"policy"` obs
+   key; the student contract has none),
+2. the teacher's bare `network.build()` (needs `coef_cond` wiring that only
+   `PpoPlayerContinuous` supplies),
+3. the hardcoded 320×240 RGB image geometry (this env is 90×160 mono depth).
+
+Plus `aux_info` targets, which are `hole_pos`-centred rather than DEXTRAH's
+`object_pos` — §1 of this plan already required that.
+
+### First A/B, 8 envs / 160 env steps
+
+| | DEXTRAH defaults | `--port-deviations` |
+|---|---|---|
+| gradient steps | **160** | 10 |
+| `hole_rmse` | 172 → **109 mm** | 530 → 274 mm |
+| `total` | 2451 (sigma-dominated) | 7.2 |
+
+DEXTRAH's `seq_length=1` gives **16× more gradient steps for the same env
+steps**, and at this scale that dominates everything else. Not a controlled
+comparison of BPTT length — it is a comparison of gradient-step counts — but it
+is a real wall-clock advantage, and it undercuts §2's confidence that honoring
+`seq_length` is straightforwardly better. Note `total` is ~2451 and flat under
+DEXTRAH's loss because the sigma term dominates; watch `mu` and `hole_rmse`
+instead.
