@@ -638,3 +638,59 @@ mono depth.
 2 mm means the inherited architecture was fine. Stalling at 20–50 mm while `mu`
 descends means the encoder can localize *what* but not *where* — and
 `--spatial-pool flatten` is the first thing to change.
+
+---
+
+## 6. Post-port fixes and the first real measurements
+
+Three problems found by auditing the finished port, all fixed.
+
+**The β warmup was 16× shorter than intended.** `beta_warmup_iters: 15000` came
+from DEXTRAH, where `log_counter` increments per env step *and* `seq_length=1`,
+so env steps and gradient steps were the same number. Honoring `seq_length=16`
+split them, and the constant carried over unchanged — giving **937 gradient
+steps** of teacher-driven warmup instead of 15,000. That undercuts the deviation
+that exists specifically to keep a cold student off the wheel. The schedule is
+now keyed on gradient steps (`beta_warmup_grad_steps` /
+`beta_anneal_grad_steps`), and the entry point prints both units at startup.
+
+**The 11–14% bad-init risk (§3.2) was never wired.** `tight_insertion` starts
+~14% of episodes with the peg fallen or ungraspable (measured 143/1024 in the
+Phase 2 gate). `eval_offline` discards those trials; DAgger *visits* them, and
+the teacher's labels on an already-dropped peg are worthless — during β=1 that is
+14% of teacher-driven data teaching nonsense. `distill.py` now sets
+`enable_dropped_on_table_term = True` by default (`--keep-bad-inits` opts out).
+
+**Throughput reporting was fabricated** across chunked checkpoint saves — fixed
+in Phase 6.
+
+### First measurements at the real configuration
+
+256 envs, `seq_length=16`, camera on:
+
+| | |
+|---|---|
+| peak GPU memory | **10,396 MiB of 32,607** (32%) |
+| throughput | **20.1 env steps/s** (plan projected 17.4) |
+| gradient steps/s | 1.26 |
+
+So the retained-graph memory concern was unfounded — `seq_length` forward graphs
+at 256 envs cost far less than feared, and there is headroom for
+`spatial_pool: flatten` or a larger `seq_length`.
+
+**But the warmup now has a real wall-clock price:**
+
+| warmup | env steps | wall clock |
+|---|---|---|
+| 15,000 grad steps (DEXTRAH's number) | 240,000 | **3.3 h** |
+| 5,000 | 80,000 | 1.1 h |
+| 2,000 | 32,000 | 0.44 h |
+
+Default stays at DEXTRAH's 15,000 for fidelity, but 3.3 hours before the student
+ever steers is a real cost. Consider `--beta-warmup-grad-steps 2000` for the
+first exploratory run and lengthen it only if the student destabilizes when β
+drops.
+
+Also note §0's throughput table counted iterations as gradient steps, which was
+true only under DEXTRAH's clobbered `seq_length=1`. At `seq_length=16` the
+"100k iterations ≈ 1.6 h" line buys 6,250 gradient steps.

@@ -102,8 +102,21 @@ def main() -> None:
     parser.add_argument("--aux-coeff", type=float, default=None)
     parser.add_argument("--sigma-loss-coef", type=float, default=None)
     parser.add_argument("--mu-weight-mode", choices=("uniform", "inv_sigma2"), default=None)
-    parser.add_argument("--beta-warmup-iters", type=int, default=None)
-    parser.add_argument("--beta-anneal-iters", type=int, default=None)
+    parser.add_argument(
+        "--beta-warmup-grad-steps", type=int, default=None,
+        help="Teacher-driven warmup length in GRADIENT steps (not env steps). "
+             "At seq_length=16, 15000 grad steps = 240k env steps.",
+    )
+    parser.add_argument("--beta-anneal-grad-steps", type=int, default=None)
+    parser.add_argument(
+        "--keep-bad-inits", action="store_true",
+        help="Do NOT terminate episodes where the peg has been dropped on the "
+             "table. Off by default: ~14%% of tight_insertion first episodes "
+             "start unstable (measured 143/1024), eval_offline discards them, "
+             "but DAgger visits them and the teacher's labels there are "
+             "worthless. Terminating early stops the student training on a "
+             "teacher flailing at an object that already fell.",
+    )
     parser.add_argument(
         "--spatial-pool", choices=("avgpool", "flatten"), default=None,
         help="Encoder pooling. avgpool (DEXTRAH default) discards the 3x8 "
@@ -150,6 +163,14 @@ def main() -> None:
         env_cfg.student_obs.enabled = True
         env_cfg.student_obs.emit_in_observations = True
 
+        # Plan risk #2. tight_insertion discards ~14% of first episodes as
+        # unstable inits (measured 143/1024 in the Phase 2 gate): the peg falls
+        # or is ungraspable at reset. eval_offline drops those trials, but DAgger
+        # *visits* them, and the teacher's labels on an already-dropped peg are
+        # worthless -- during the beta=1 warmup that is 14% of teacher-driven
+        # data teaching nonsense. Terminating early ends them in a few steps.
+        env_cfg.precise_assembly.enable_dropped_on_table_term = not args_cli.keep_bad_inits
+
         # hole_pos is the primary aux target and random-goal envs replace it
         # with a (0, 0, -1) sentinel; the env raises on the combination, so fail
         # here with a message that names the flag instead.
@@ -172,8 +193,8 @@ def main() -> None:
             ("aux_coeff", "aux_coeff"),
             ("sigma_loss_coef", "sigma_loss_coef"),
             ("mu_weight_mode", "mu_weight_mode"),
-            ("beta_warmup_iters", "beta_warmup_iters"),
-            ("beta_anneal_iters", "beta_anneal_iters"),
+            ("beta_warmup_grad_steps", "beta_warmup_grad_steps"),
+            ("beta_anneal_grad_steps", "beta_anneal_grad_steps"),
         ]:
             val = getattr(args_cli, flag)
             if val is not None:
@@ -226,6 +247,11 @@ def main() -> None:
             f"seq_length={dagger.seq_length} -> {max_iters // max(1, dagger.seq_length)} "
             f"gradient steps over {max_iters} env steps\n"
             f"[distill] teacher block_id={block_id} ckpt={ckpt.name}\n"
+            f"[distill] warmup={dagger.beta_warmup_grad_steps} grad steps "
+            f"(= {dagger.beta_warmup_grad_steps * dagger.seq_length} env steps), "
+            f"anneal={dagger.beta_anneal_grad_steps}\n"
+            f"[distill] drop_on_table_term="
+            f"{env_cfg.precise_assembly.enable_dropped_on_table_term}\n"
             f"[distill] spatial_pool="
             f"{student_cfg['params']['network']['student_image']['spatial_pool']} "
             f"aux_coeff={dagger.aux_coeff} sigma_loss_coef={dagger.sigma_loss_coef} "

@@ -123,10 +123,15 @@ params:
                              # cannot reach the trunk (fixed_sigma + mu*0.0), so
                              # it only buries the progress signal and trains the
                              # student's sigma toward a SAPG hyperparameter.
-    beta_warmup_iters: 15000 # teacher-driven warmup. DEXTRAH hardcodes beta=0,
-                             # which is only safe because its geometric fabric
-                             # bounds the reachable state set. play2perfect
-                             # commands 29 raw joint targets and has no fabric.
+    # Teacher-driven warmup, in GRADIENT steps (not env steps). DEXTRAH
+    # hardcodes beta=0, which is only safe because its geometric fabric bounds
+    # the reachable state set; play2perfect commands 29 raw joint targets and
+    # has no fabric. Their written-but-clobbered threshold was 15000, which was
+    # env steps AND gradient steps at once because they forced seq_length=1.
+    # At seq_length=16 those differ 16x, and student competence tracks gradient
+    # steps -- so that is the unit here. 15000 grad steps = 240k env steps.
+    beta_warmup_grad_steps: 15000
+    beta_anneal_grad_steps: 2000   # linear beta 1 -> 0 after the warmup
     max_iters: 100000
 
     # --- inert: PPO settings kept for Runner compatibility ---

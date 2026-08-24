@@ -40,9 +40,11 @@ Deviations from the DEXTRAH source
 
 3. **``seq_length`` is honored.** Upstream reads the config value and then
    overwrites it with 1 (``:177``), so the recurrent weights never learn to
-   write a predictively-useful hidden state. Note the consequence for the
-   throughput budget: with ``seq_length=16``, N env steps buy N/16 gradient
-   steps, not N.
+   write a predictively-useful hidden state. Two consequences worth stating:
+   with ``seq_length=16``, N env steps buy N/16 gradient steps, not N; and the
+   beta schedule had to move to gradient-step units, since upstream's 15000
+   was both units at once and taking it as env steps would have cut the warmup
+   16x.
 
 4. **Dropped:** the per-step ``torch.cuda.empty_cache()`` (``:540``) and the
    done-time flush at ``:572`` (unreachable at ``seq_length == 1``, and
@@ -128,8 +130,14 @@ class Dagger:
         self.grad_norm = float(cfg.get("grad_norm", 1.0))
         self.truncate_grads = bool(cfg.get("truncate_grads", True))
         self.max_iters = int(cfg.get("max_iters", 100_000))
-        self.beta_warmup_iters = int(cfg.get("beta_warmup_iters", 15_000))
-        self.beta_anneal_iters = int(cfg.get("beta_anneal_iters", 0))
+        # In GRADIENT steps, not env steps. DEXTRAH's `log_counter < 15_000`
+        # was both, because it forced seq_length=1 so the two coincided.
+        # Honoring seq_length=16 splits them: 15000 env steps is only 937
+        # gradient steps, i.e. 16x less warmup than intended, and the warmup is
+        # the deviation that keeps a cold student off the wheel. Student
+        # competence tracks gradient steps, so that is the unit.
+        self.beta_warmup_grad_steps = int(cfg.get("beta_warmup_grad_steps", 15_000))
+        self.beta_anneal_grad_steps = int(cfg.get("beta_anneal_grad_steps", 0))
         self.sigma_loss_coef = float(cfg.get("sigma_loss_coef", 0.0))
         self.mu_weight_mode = str(cfg.get("mu_weight_mode", "uniform"))
         if self.mu_weight_mode not in ("uniform", "inv_sigma2"):
@@ -184,19 +192,20 @@ class Dagger:
         return int(obs["proprio"].shape[-1])
 
     # -- schedule ------------------------------------------------------------
-    def beta(self, it: int) -> float:
+    def beta(self, grad_steps: int) -> float:
         """Probability an env is stepped by the TEACHER rather than the student.
 
+        Keyed on GRADIENT steps, not env steps -- see the note in ``__init__``.
         ``beta=1`` is a pure teacher rollout: the student still trains on every
         label, it just does not yet steer. Deviation 2 above is why this exists
         rather than being pinned to 0.
         """
-        if it < self.beta_warmup_iters:
+        if grad_steps < self.beta_warmup_grad_steps:
             return 1.0
-        if self.beta_anneal_iters > 0:
-            past = it - self.beta_warmup_iters
-            if past < self.beta_anneal_iters:
-                return 1.0 - past / self.beta_anneal_iters
+        if self.beta_anneal_grad_steps > 0:
+            past = grad_steps - self.beta_warmup_grad_steps
+            if past < self.beta_anneal_grad_steps:
+                return 1.0 - past / self.beta_anneal_grad_steps
         return 0.0
 
     # -- one student forward -------------------------------------------------
@@ -273,7 +282,7 @@ class Dagger:
         iter_at_start = self.iter
 
         while self.iter < max_iters:
-            beta = self.beta(self.iter)
+            beta = self.beta(self.grad_steps)
 
             teacher_out = self.teacher.act(obs["teacher_obs"])
             student_res = self.student_step(obs)

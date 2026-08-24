@@ -27,7 +27,7 @@ cli = argparse.ArgumentParser()
 cli.add_argument("--num-envs", type=int, default=8)
 cli.add_argument("--iters", type=int, default=160, help="env steps")
 cli.add_argument("--seq-length", type=int, default=4)
-cli.add_argument("--warmup", type=int, default=40, help="beta=1 env steps")
+cli.add_argument("--warmup", type=int, default=10, help="beta=1 GRADIENT steps")
 cli.add_argument("--checkpoint", default="pretrained_assembly/tight_insertion/model.pth")
 cli.add_argument("--device", default="cuda:0")
 args, _ = cli.parse_known_args()
@@ -93,8 +93,8 @@ teacher = Teacher(
 student_cfg = yaml.safe_load(STUDENT_CFG.read_text())
 student_cfg["params"]["config"].update(
     seq_length=args.seq_length,
-    beta_warmup_iters=args.warmup,
-    beta_anneal_iters=args.warmup,   # exercise the anneal branch too
+    beta_warmup_grad_steps=args.warmup,
+    beta_anneal_grad_steps=args.warmup,   # exercise the anneal branch too
     max_iters=args.iters,
 )
 
@@ -109,6 +109,8 @@ check("aux targets match the env", set(dagger.aux_targets)
 
 print("\n2. beta schedule")
 check("beta=1 during warmup", dagger.beta(0) == 1.0 and dagger.beta(args.warmup - 1) == 1.0)
+check("beta schedule is keyed on gradient steps",
+      dagger.beta_warmup_grad_steps == args.warmup, f"{dagger.beta_warmup_grad_steps}")
 mid = dagger.beta(args.warmup + args.warmup // 2)
 check("beta anneals between", 0.0 < mid < 1.0, f"beta(mid)={mid:.3f}")
 check("beta=0 after anneal", dagger.beta(args.warmup * 3) == 0.0)
