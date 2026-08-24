@@ -59,6 +59,38 @@ if str(REPO_ROOT) not in sys.path:
 # line", which reads like a launcher bug rather than a missing env var.
 os.environ.setdefault("OMNI_KIT_ACCEPT_EULA", "YES")
 
+def _git_provenance() -> dict:
+    """Pin a run to the code that produced it.
+
+    A result nobody can trace back to a commit is not a result. Records the
+    commit, branch and dirty flag, and when the tree is dirty stashes the full
+    diff, since "commit abc123 + these 40 lines" is the only honest description
+    of a run made from an uncommitted working tree.
+    """
+    import subprocess
+
+    def _run(*cmd):
+        try:
+            return subprocess.run(
+                cmd, cwd=str(REPO_ROOT), capture_output=True, text=True, timeout=15
+            ).stdout.strip()
+        except Exception:  # noqa: BLE001
+            return ""
+
+    porcelain = _run("git", "status", "--porcelain")
+    meta = {
+        "commit": _run("git", "rev-parse", "HEAD"),
+        "commit_short": _run("git", "rev-parse", "--short", "HEAD"),
+        "branch": _run("git", "rev-parse", "--abbrev-ref", "HEAD"),
+        "dirty": bool(porcelain),
+        "dirty_files": [ln[3:] for ln in porcelain.splitlines()],
+        "remote": _run("git", "config", "--get", "remote.origin.url"),
+    }
+    if meta["dirty"]:
+        meta["diff"] = _run("git", "diff", "HEAD")
+    return meta
+
+
 DEFAULT_TASK = "Isaacsimenvs-PreciseAssembly-Direct-v0"
 DEFAULT_TEACHER_AGENT = "rl_games_sapg_cfg_entry_point"
 STUDENT_ENTRY_POINT = "rl_games_student_cfg_entry_point"
@@ -272,11 +304,23 @@ def main() -> None:
                 "Run `python download_checkpoints.py` first."
             )
 
+        git = _git_provenance()
+
         out_dir = Path(args_cli.out_dir) if args_cli.out_dir else None
         if out_dir is not None:
             if not out_dir.is_absolute():
                 out_dir = REPO_ROOT / out_dir
             out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "run_meta.json").write_text(json.dumps({
+                "git": {k: v for k, v in git.items() if k != "diff"},
+                "argv": sys.argv,
+                "num_envs": int(args_cli.num_envs),
+                "problem": args_cli.problem,
+                "student_cfg": student_cfg["params"]["config"],
+                "network": student_cfg["params"]["network"],
+            }, indent=2, default=str))
+            if git.get("diff"):
+                (out_dir / "uncommitted.diff").write_text(git["diff"])
 
         env = gym.make(args_cli.task, cfg=env_cfg)
         uenv = env.unwrapped  # Dagger reads _get_observations() directly
@@ -310,6 +354,9 @@ def main() -> None:
                 tags=list(args_cli.wandb_tags),
                 notes=args_cli.wandb_notes,
                 config={
+                    "git_commit": git["commit_short"],
+                    "git_branch": git["branch"],
+                    "git_dirty": git["dirty"],
                     "problem": args_cli.problem,
                     "num_envs": int(args_cli.num_envs),
                     "teacher_block_id": str(block_id),
@@ -327,6 +374,8 @@ def main() -> None:
 
         dagger = Dagger(
             uenv, student_cfg, teacher,
+            run_meta={"git": {k: v for k, v in git.items() if k != "diff"},
+                      "argv": sys.argv},
             device=args_cli.rl_device, log_every=int(args_cli.log_every),
             log_dir=str(out_dir / "summaries") if out_dir is not None else None,
             use_wandb=bool(args_cli.wandb_activate),
@@ -334,7 +383,9 @@ def main() -> None:
 
         max_iters = int(args_cli.iters) if args_cli.iters is not None else dagger.max_iters
         print(
-            f"\n[distill] problem={args_cli.problem} envs={uenv.num_envs} "
+            f"\n[distill] commit={git['commit_short']} branch={git['branch']}"
+            f"{' +DIRTY(' + str(len(git['dirty_files'])) + ' files)' if git['dirty'] else ''}\n"
+            f"[distill] problem={args_cli.problem} envs={uenv.num_envs} "
             f"seq_length={dagger.seq_length} -> {max_iters // max(1, dagger.seq_length)} "
             f"gradient steps over {max_iters} env steps\n"
             f"[distill] teacher block_id={block_id} ckpt={ckpt.name}\n"

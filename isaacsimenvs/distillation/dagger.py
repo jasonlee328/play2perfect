@@ -145,6 +145,7 @@ class Dagger:
         agent_cfg: dict,
         teacher,
         *,
+        run_meta: dict | None = None,
         device: str = "cuda:0",
         log_every: int = 100,
         log_dir: str | None = None,
@@ -162,6 +163,7 @@ class Dagger:
         self.log_every = int(log_every)
 
         self._agent_cfg = copy.deepcopy(agent_cfg)
+        self.run_meta = dict(run_meta or {})
         params = agent_cfg["params"]
         cfg = params["config"]
         self.num_envs = int(env.num_envs)
@@ -578,6 +580,9 @@ class Dagger:
             # cannot be rebuilt without remembering which flags produced it --
             "agent_cfg": self._agent_cfg,
             "num_envs": self.num_envs,
+            # Which commit produced these weights. Without it a checkpoint is
+            # untraceable the moment the tree moves on.
+            "run_meta": self.run_meta,
         }
 
     def save(self, path: str) -> None:

@@ -138,6 +138,13 @@ def main() -> int:
     model.eval()
     net = model.a2c_network
     print(f"\n[eval] {ckpt_path.name}  iter={ck.get('iter')} grad_steps={ck.get('grad_steps')}", flush=True)
+    _rm = (ck.get("run_meta") or {}).get("git") or {}
+    if _rm:
+        print(f"[eval] trained at commit {_rm.get('commit_short')} "
+              f"({_rm.get('branch')}){' +DIRTY' if _rm.get('dirty') else ''}", flush=True)
+    else:
+        print("[eval] checkpoint records no commit (saved before provenance "
+              "was added)", flush=True)
     print(f"[eval] envs={N} depth_aug={args.depth_aug} problem={args.problem}", flush=True)
 
     # ignore-the-image baseline for hole_pos, same formula the trainer logs
