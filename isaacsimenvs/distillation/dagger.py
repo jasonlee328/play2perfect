@@ -152,7 +152,9 @@ class Dagger:
     ) -> None:
         from rl_games.algos_torch.model_builder import ModelBuilder
 
-        from isaacsimenvs.distillation.a2c_aux_cnn import register_student_networks
+        from rl_games.algos_torch import model_builder
+
+        from isaacsimenvs.distillation.a2c_aux_cnn import A2CBuilder
 
         self.env = env
         self.teacher = teacher
@@ -215,7 +217,8 @@ class Dagger:
         yr = float(pih.hole_y_range[1]) - float(pih.hole_y_range[0])
         self.hole_rmse_baseline_mm = ((xr**2 + yr**2) / 12.0) ** 0.5 * 1000.0
 
-        register_student_networks()
+        # run_distillation.py:187 registers from the call site, not the module.
+        model_builder.register_network("a2c_aux_cnn_net", A2CBuilder)
         self.student_model = (
             ModelBuilder()
             .load(params)
@@ -243,6 +246,7 @@ class Dagger:
         self.iter = 0
         self.grad_steps = 0
         self._obs = None       # persists across distill() calls; see distill()
+        self._last_aux: dict = {}
         self.history: list[dict] = []
         self._recent = deque(maxlen=self.log_every)
 
@@ -370,7 +374,15 @@ class Dagger:
             "rnn_masks": None,
         }
         res = self.student_model(batch)
-        self._states = list(res["rnn_states"])
+        # With aux heads the network returns (states, last_aux_out) as
+        # "rnn_states" (a2c_aux_cnn.py:671); distillation.py:773-778 unpacks it
+        # exactly this way.
+        if self.aux_targets:
+            self._states = [s for s in res["rnn_states"][0]]
+            self._last_aux = res["rnn_states"][1]
+        else:
+            self._states = list(res["rnn_states"])
+            self._last_aux = {}
         return res
 
     # -- loss ----------------------------------------------------------------
@@ -397,7 +409,7 @@ class Dagger:
                 student_res["sigmas"] - teacher_out["sigmas"].detach()
             ).pow(2).mean()
 
-        aux_out = self.student_net.get_aux_outputs()
+        aux_out = self._last_aux
         aux_losses = {}
         for name in self.aux_targets:
             target = aux_gt[name].reshape(self.num_envs, -1).detach()
@@ -496,10 +508,14 @@ class Dagger:
             dones = (terminated | truncated).reshape(-1).bool()
 
             if bool(dones.any()):
-                # Multiplicative mask, not in-place indexing: these tensors are
-                # inside the live BPTT graph.
-                keep = (~dones).to(self._states[0].dtype).view(1, -1, 1)
-                self._states = [s * keep for s in self._states]
+                # distillation.py:588: `states[:, all_done_indices] *= 0.` --
+                # in-place. Valid because the gradient step happens every
+                # seq_length steps and seq_length is 1 by default, so no live
+                # graph spans this point.
+                ids = torch.nonzero(dones, as_tuple=False).reshape(-1)
+                with torch.no_grad():
+                    for st in self._states:
+                        st[:, ids] *= 0.0
                 self.teacher.reset_states(dones)
                 if self.update_prev_actions:
                     self._prev_actions = self._prev_actions * (
@@ -560,8 +576,6 @@ class Dagger:
             "grad_steps": self.grad_steps,
             # The agent config travels with the weights. Without it a checkpoint
             # cannot be rebuilt without remembering which flags produced it --
-            # get spatial_pool wrong and the state_dict load fails on a shape
-            # mismatch, or worse, silently succeeds with the wrong geometry.
             "agent_cfg": self._agent_cfg,
             "num_envs": self.num_envs,
         }

@@ -27,11 +27,11 @@ class StudentPolicy:
         proprio_dim: int,
         device: str = "cuda:0",
         agent_cfg: dict | None = None,
-        spatial_pool: str | None = None,
     ) -> None:
+        from rl_games.algos_torch import model_builder
         from rl_games.algos_torch.model_builder import ModelBuilder
 
-        from isaacsimenvs.distillation.a2c_aux_cnn import register_student_networks
+        from isaacsimenvs.distillation.a2c_aux_cnn import A2CBuilder
 
         self.device = torch.device(device)
         self.num_envs = int(num_envs)
@@ -39,18 +39,15 @@ class StudentPolicy:
 
         ck = torch.load(str(checkpoint_path), map_location="cpu", weights_only=False)
         # Newer checkpoints embed the config that produced them; older ones need
-        # it supplied, and getting spatial_pool wrong is a shape mismatch.
+        # it supplied.
         cfg = ck.get("agent_cfg") or agent_cfg
         if cfg is None:
             raise ValueError(
                 "checkpoint has no embedded agent_cfg; pass agent_cfg= explicitly"
             )
-        if spatial_pool is not None:
-            cfg["params"]["network"]["student_image"]["spatial_pool"] = spatial_pool
         self.agent_cfg = cfg
-        self.spatial_pool = cfg["params"]["network"]["student_image"]["spatial_pool"]
 
-        register_student_networks()
+        model_builder.register_network("a2c_aux_cnn_net", A2CBuilder)
         run_cfg = cfg["params"]["config"]
         self.model = (
             ModelBuilder()
@@ -77,6 +74,7 @@ class StudentPolicy:
         self.iter = int(ck.get("iter", -1))
         self.grad_steps = int(ck.get("grad_steps", -1))
 
+        self._last_aux: dict = {}
         self.reset()
 
     def reset(self, env_ids: torch.Tensor | None = None) -> None:
@@ -113,7 +111,14 @@ class StudentPolicy:
             "seq_length": 1,
             "rnn_masks": None,
         })
-        self._states = list(res["rnn_states"])
+        # (states, last_aux_out) when aux heads are present -- a2c_aux_cnn.py:671
+        rs = res["rnn_states"]
+        if isinstance(rs, tuple) and len(rs) == 2 and isinstance(rs[1], dict):
+            self._states = [s for s in rs[0]]
+            self._last_aux = rs[1]
+        else:
+            self._states = list(rs)
+            self._last_aux = {}
         action = torch.clamp(res["mus"], -1.0, 1.0).float()
         self._prev_actions = action
         return action
@@ -125,7 +130,7 @@ class StudentPolicy:
         Useful for a viewer: drawing this next to the true hole shows *why* the
         policy is doing what it is doing.
         """
-        return self.net.get_aux_outputs().get("hole_pos")
+        return self._last_aux.get("hole_pos")
 
 
 __all__ = ["StudentPolicy"]

@@ -645,8 +645,7 @@ def sim_worker(
                 agent_cfg=_load_student_agent_cfg(task),
             )
             print(f"[worker] driving the STUDENT from {student_checkpoint} "
-                  f"(grad_steps={student.grad_steps}, "
-                  f"spatial_pool={student.spatial_pool})", flush=True)
+                  f"(grad_steps={student.grad_steps})", flush=True)
 
         player.reset()
         obs = player.env_reset(wrapped)

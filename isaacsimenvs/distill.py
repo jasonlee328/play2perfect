@@ -40,8 +40,6 @@ Examples::
         --teacher-checkpoint pretrained_assembly/tight_insertion/model.pth \\
         --out-dir runs/distill_tight_insertion
 
-    # Suspect the encoder cannot localize? The one knob most likely to matter.
-    python isaacsimenvs/distill.py --headless --num-envs 256 --spatial-pool flatten
 """
 
 from __future__ import annotations
@@ -130,12 +128,6 @@ def main() -> None:
              "worthless.",
     )
     parser.add_argument(
-        "--spatial-pool", choices=("avgpool", "flatten"), default=None,
-        help="Encoder pooling. avgpool (DEXTRAH default) discards the 3x8 "
-             "spatial map; flatten keeps it. Try flatten if hole_pos RMSE "
-             "stalls well above 2 mm while the mu loss converges.",
-    )
-    parser.add_argument(
         "--port-deviations", action="store_true",
         help="Switch from DEXTRAH's behaviour (the default) to this port's "
              "alternatives, as a group: seq_length=16, beta warmup 15000 grad "
@@ -159,7 +151,7 @@ def main() -> None:
     )
     parser.add_argument("--wandb-group", default=None)
     parser.add_argument("--wandb-name", default=None,
-                        help="Defaults to <problem>-<spatial_pool>-<num_envs>envs.")
+                        help="Defaults to <problem>-<num_envs>envs.")
     parser.add_argument("--wandb-tags", nargs="*", default=[])
     parser.add_argument("--wandb-notes", default="")
     # --- run management ---
@@ -267,10 +259,6 @@ def main() -> None:
             val = getattr(args_cli, flag)
             if val is not None:
                 scfg[key] = val
-        if args_cli.spatial_pool is not None:
-            student_cfg["params"]["network"]["student_image"]["spatial_pool"] = (
-                args_cli.spatial_pool
-            )
         if args_cli.seed is not None:
             student_cfg["params"]["seed"] = int(args_cli.seed)
             torch.manual_seed(int(args_cli.seed))
@@ -313,13 +301,12 @@ def main() -> None:
         if args_cli.wandb_activate:
             import wandb
 
-            pool = student_cfg["params"]["network"]["student_image"]["spatial_pool"]
             wandb.init(
                 project=args_cli.wandb_project,
                 entity=args_cli.wandb_entity,
                 group=args_cli.wandb_group,
                 name=args_cli.wandb_name
-                or f"{args_cli.problem}-{pool}-{args_cli.num_envs}envs",
+                or f"{args_cli.problem}-{args_cli.num_envs}envs",
                 tags=list(args_cli.wandb_tags),
                 notes=args_cli.wandb_notes,
                 config={
@@ -335,7 +322,6 @@ def main() -> None:
                         "mu_weight_mode", "sigma_loss_coef",
                         "beta_warmup_grad_steps", "beta_anneal_grad_steps",
                     )},
-                    "spatial_pool": pool,
                 },
             )
 
@@ -358,9 +344,8 @@ def main() -> None:
             f"[distill] drop_on_table_term="
             f"{env_cfg.precise_assembly.enable_dropped_on_table_term} "
             f"depth_aug={env_cfg.student_obs.use_depth_aug}\n"
-            f"[distill] spatial_pool="
-            f"{student_cfg['params']['network']['student_image']['spatial_pool']} "
-            f"aux_coeff={dagger.aux_coeff} sigma_loss_coef={dagger.sigma_loss_coef} "
+            f"[distill] aux_coeff={dagger.aux_coeff} "
+            f"sigma_loss_coef={dagger.sigma_loss_coef} "
             f"mu_weight={dagger.mu_weight_mode} loss_form={dagger.loss_form}\n"
             f"[distill] out_dir={out_dir}  "
             f"tensorboard={'on' if out_dir else 'off (no --out-dir)'}  "

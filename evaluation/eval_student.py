@@ -57,9 +57,6 @@ def main() -> int:
                         help="Evaluate WITH depth augmentation. Off by default so the "
                              "number is a clean-sensor upper bound, matching how "
                              "eval_offline scores the teacher (keep_dr=False).")
-    parser.add_argument("--spatial-pool", choices=("avgpool", "flatten"), default=None,
-                        help="Only needed for checkpoints saved before the config "
-                             "was embedded in them.")
     parser.add_argument("--out-json", default=None)
     parser.add_argument("--rl-device", default="cuda:0")
     parser.add_argument("--sim-device", default="cuda:0")
@@ -81,7 +78,9 @@ def main() -> int:
         _instantiate_env,
         _load_env_cfg,
     )
-    from isaacsimenvs.distillation.a2c_aux_cnn import register_student_networks
+    from rl_games.algos_torch import model_builder
+
+    from isaacsimenvs.distillation.a2c_aux_cnn import A2CBuilder
 
     ckpt_path = Path(args.checkpoint)
     if not ckpt_path.is_absolute():
@@ -95,10 +94,8 @@ def main() -> int:
     student_cfg = ck.get("agent_cfg")
     if student_cfg is None:
         print("[eval] checkpoint has no embedded agent_cfg; using the registry "
-              "default. If the state_dict fails to load, pass --spatial-pool.")
+              "default.")
         student_cfg = load_cfg_from_registry(TASK, STUDENT_ENTRY_POINT)
-    if args.spatial_pool is not None:
-        student_cfg["params"]["network"]["student_image"]["spatial_pool"] = args.spatial_pool
 
     env_cfg = _load_env_cfg(TASK)
     _apply_env_overrides(
@@ -122,7 +119,7 @@ def main() -> int:
     obs, _ = env.reset()
     print(f"[eval] reset OK; obs keys = {sorted(obs)}", flush=True)
 
-    register_student_networks()
+    model_builder.register_network("a2c_aux_cnn_net", A2CBuilder)
     model = (
         ModelBuilder().load(student_cfg["params"]).build({
             "actions_num": int(env.cfg.action_space),
@@ -141,8 +138,7 @@ def main() -> int:
     model.eval()
     net = model.a2c_network
     print(f"\n[eval] {ckpt_path.name}  iter={ck.get('iter')} grad_steps={ck.get('grad_steps')}", flush=True)
-    pool = student_cfg["params"]["network"]["student_image"]["spatial_pool"]
-    print(f"[eval] envs={N} spatial_pool={pool} depth_aug={args.depth_aug} problem={args.problem}", flush=True)
+    print(f"[eval] envs={N} depth_aug={args.depth_aug} problem={args.problem}", flush=True)
 
     # ignore-the-image baseline for hole_pos, same formula the trainer logs
     pih = env.cfg.precise_assembly
@@ -175,12 +171,16 @@ def main() -> int:
                 "obs": obs["proprio"], "img": obs["img"],
                 "rnn_states": states, "seq_length": 1, "rnn_masks": None,
             })
-        states = list(res["rnn_states"])
+        rs = res["rnn_states"]
+        if isinstance(rs, tuple) and len(rs) == 2 and isinstance(rs[1], dict):
+            states, last_aux = [t for t in rs[0]], rs[1]   # a2c_aux_cnn.py:671
+        else:
+            states, last_aux = list(rs), {}
         action = torch.clamp(res["mus"], -1.0, 1.0).float()
 
         # Track hole_pos accuracy only on envs still in their first episode, so
         # it describes the same trials the success rate does.
-        aux = net.get_aux_outputs()
+        aux = last_aux
         if "hole_pos" in aux:
             live = ~done_once
             if bool(live.any()):
@@ -223,7 +223,6 @@ def main() -> int:
     result = {
         "checkpoint": str(ckpt_path),
         "grad_steps": ck.get("grad_steps"),
-        "spatial_pool": pool,
         "depth_aug": bool(args.depth_aug),
         "num_envs": N,
         "trials": nv,
