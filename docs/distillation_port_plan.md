@@ -242,6 +242,25 @@ Landed as `isaacsimenvs/distillation/teacher.py` (`Teacher`,
 96.935% vs eval_offline's 96.9% — the `mus` path reproduces the teacher to
 within 0.04 pp. **Gate passed.**
 
+**Bit-level equivalence** (`check_phase2_equivalence.py`): the SR agreement
+above is statistical (n≈880, so a ~0.5 pp bug would hide in the noise), so both
+paths were also run side by side in one process on the identical observation
+sequence, with `block_id="ramp"` to match what `BasePlayer` appends:
+
+| | result |
+|---|---|
+| steps compared | 300 |
+| bit-exact action steps | **300 / 300** |
+| max abs action difference | **0.0** |
+| max abs LSTM state difference | **0.0** |
+| appended block column identical | yes |
+
+So `Teacher.act()` is indistinguishable from `player.get_action()`, and the
+96.9% is a property of the teacher rather than of our plumbing. The
+constant-vs-ramp difference is therefore a deliberate choice, not an artifact.
+(The constant itself has no reference implementation to compare against — it is
+validated by success rate, which is the operative property anyway.)
+
 **No rl_games env wrapper.** `teacher_env_info(wrapped)` is not usable here (see
 the Phase 1 correction above): `RlGamesVecEnvWrapper` requires a `"policy"` obs
 key. `teacher_env_info_from_dims()` builds `env_info` from dims + the agent
