@@ -133,6 +133,17 @@ def main() -> None:
              "isaacsimenvs/distillation/dagger.py for the measurement behind "
              "each one.",
     )
+    # --- logging ---
+    # Flag names mirror train.py's wandb block. Tensorboard is written whenever
+    # --out-dir is set, matching DEXTRAH (which writes it unconditionally).
+    parser.add_argument("--wandb-activate", action="store_true")
+    parser.add_argument("--wandb-project", default="isaacsimenvs-distill")
+    parser.add_argument("--wandb-entity", default=None)
+    parser.add_argument("--wandb-group", default=None)
+    parser.add_argument("--wandb-name", default=None,
+                        help="Defaults to <problem>-<spatial_pool>-<num_envs>envs.")
+    parser.add_argument("--wandb-tags", nargs="*", default=[])
+    parser.add_argument("--wandb-notes", default="")
     # --- run management ---
     parser.add_argument("--out-dir", default=None, help="Checkpoint + log dir.")
     parser.add_argument("--save-every", type=int, default=5000, help="Env steps.")
@@ -272,9 +283,40 @@ def main() -> None:
             device=args_cli.rl_device,
             block_id=block_id,
         )
+        if args_cli.wandb_activate:
+            import wandb
+
+            pool = student_cfg["params"]["network"]["student_image"]["spatial_pool"]
+            wandb.init(
+                project=args_cli.wandb_project,
+                entity=args_cli.wandb_entity,
+                group=args_cli.wandb_group,
+                name=args_cli.wandb_name
+                or f"{args_cli.problem}-{pool}-{args_cli.num_envs}envs",
+                tags=list(args_cli.wandb_tags),
+                notes=args_cli.wandb_notes,
+                config={
+                    "problem": args_cli.problem,
+                    "num_envs": int(args_cli.num_envs),
+                    "teacher_block_id": str(block_id),
+                    "port_deviations": bool(args_cli.port_deviations),
+                    "drop_bad_inits": bool(
+                        env_cfg.precise_assembly.enable_dropped_on_table_term
+                    ),
+                    **{k: student_cfg["params"]["config"][k] for k in (
+                        "seq_length", "learning_rate", "aux_coeff",
+                        "mu_weight_mode", "sigma_loss_coef",
+                        "beta_warmup_grad_steps", "beta_anneal_grad_steps",
+                    )},
+                    "spatial_pool": pool,
+                },
+            )
+
         dagger = Dagger(
             uenv, student_cfg, teacher,
             device=args_cli.rl_device, log_every=int(args_cli.log_every),
+            log_dir=str(out_dir / "summaries") if out_dir is not None else None,
+            use_wandb=bool(args_cli.wandb_activate),
         )
 
         max_iters = int(args_cli.iters) if args_cli.iters is not None else dagger.max_iters
@@ -292,7 +334,9 @@ def main() -> None:
             f"{student_cfg['params']['network']['student_image']['spatial_pool']} "
             f"aux_coeff={dagger.aux_coeff} sigma_loss_coef={dagger.sigma_loss_coef} "
             f"mu_weight={dagger.mu_weight_mode}\n"
-            f"[distill] out_dir={out_dir}\n",
+            f"[distill] out_dir={out_dir}  "
+            f"tensorboard={'on' if out_dir else 'off (no --out-dir)'}  "
+            f"wandb={'on' if args_cli.wandb_activate else 'off'}\n",
             flush=True,
         )
 
@@ -313,6 +357,7 @@ def main() -> None:
             if out_dir is not None:
                 dagger.save(str(out_dir / "student_final.pth"))
                 (out_dir / "history.json").write_text(json.dumps(dagger.history, indent=2))
+            dagger.close()
             env.close()
 
         if dagger.history:

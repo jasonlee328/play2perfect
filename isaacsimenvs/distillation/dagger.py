@@ -125,6 +125,8 @@ class Dagger:
         *,
         device: str = "cuda:0",
         log_every: int = 100,
+        log_dir: str | None = None,
+        use_wandb: bool = False,
     ) -> None:
         from rl_games.algos_torch.model_builder import ModelBuilder
 
@@ -202,6 +204,17 @@ class Dagger:
         self.history: list[dict] = []
         self._recent = deque(maxlen=self.log_every)
 
+        # DEXTRAH writes tensorboard unconditionally and has wandb plumbing that
+        # its committed code hardcodes off (`self.use_wandb = False`,
+        # distillation.py:202). Same shape here: tensorboard whenever a log_dir
+        # exists, wandb opt-in.
+        self.writer = None
+        if log_dir is not None:
+            from tensorboardX import SummaryWriter
+
+            self.writer = SummaryWriter(str(log_dir))
+        self.use_wandb = bool(use_wandb)
+
     # -- setup helpers -------------------------------------------------------
     def _infer_proprio_dim(self) -> int:
         """Proprio width, read off the env rather than assumed."""
@@ -213,6 +226,69 @@ class Dagger:
                 "False the env keeps the {policy, critic} contract."
             )
         return int(obs["proprio"].shape[-1])
+
+    def _goal_ratio(self) -> float:
+        """Fraction of subgoals reached, averaged over envs.
+
+        Stands in for DEXTRAH's ``in_success_region``, which is an attribute of
+        their env we do not have. This is the only live signal of actual task
+        performance during training -- every other metric is a loss.
+        """
+        try:
+            succ = self.env._successes.float()
+            maxg = self.env.env_max_goals.float().clamp_min(1.0)
+            return float((succ / maxg).clamp(0.0, 1.0).mean())
+        except AttributeError:
+            return float("nan")
+
+    # -- logging -------------------------------------------------------------
+    def _write_logs(self, rec: dict) -> None:
+        """Emit one record to tensorboard and/or wandb.
+
+        Scalar names follow DEXTRAH where an equivalent exists (`total_loss`,
+        `imitation_loss`, `beta`, `aux_loss_<name>`, `lr`) so its dashboards
+        transfer, plus the metrics this port added.
+        """
+        lr = self.optimizer.param_groups[0]["lr"]
+        scalars = {
+            "total_loss": rec["total"],
+            "imitation_loss": rec["mu"],
+            "sigma_loss": rec["sigma"],
+            "beta": rec["beta"],
+            "lr": lr,
+            "goal_ratio": rec.get("goal_ratio", float("nan")),
+            "hole_rmse_mm": rec.get("hole_rmse_mm", float("nan")),
+            "hole_rmse_vs_baseline": rec.get("hole_rmse_vs_baseline", float("nan")),
+            "grad_steps": self.grad_steps,
+            "steps_per_s": rec["steps_per_s"],
+        }
+        for k, v in rec.items():
+            if k.startswith("aux_"):
+                # DEXTRAH logs aux_loss_<name> but indexes aux_loss[i] with the
+                # OUTER value_size loop variable instead of the per-head index
+                # (distillation.py:692-694), so every head reports the same
+                # number. Indexed by name here.
+                scalars[f"aux_loss_{k[4:]}"] = v
+
+        if self.writer is not None:
+            for k, v in scalars.items():
+                if v == v:  # skip NaN
+                    self.writer.add_scalar(k, v, self.iter)
+            self.writer.flush()
+        if self.use_wandb:
+            import wandb
+
+            wandb.log({**{k: v for k, v in scalars.items() if v == v},
+                       "iteration": self.iter,
+                       "frame": self.iter * self.num_envs})
+
+    def close(self) -> None:
+        if self.writer is not None:
+            self.writer.close()
+        if self.use_wandb:
+            import wandb
+
+            wandb.finish()
 
     # -- schedule ------------------------------------------------------------
     def beta(self, grad_steps: int) -> float:
@@ -366,12 +442,15 @@ class Dagger:
 
             if self.iter % self.log_every == 0:
                 rec = self._summarize(beta, t_start, iter_at_start)
+                rec["goal_ratio"] = self._goal_ratio()
                 self.history.append(rec)
+                self._write_logs(rec)
                 print(
                     f"[dagger] iter {self.iter:>7d} grad {self.grad_steps:>6d} "
                     f"beta {beta:.2f} total {rec['total']:.4f} mu {rec['mu']:.4f} "
                     f"hole_rmse {rec.get('hole_rmse_mm', float('nan')):.1f}mm "
                     f"({rec.get('hole_rmse_vs_baseline', float('nan')):.2f}x base) "
+                    f"goal {rec['goal_ratio'] * 100:.1f}% "
                     f"{rec['steps_per_s']:.1f} steps/s",
                     flush=True,
                 )
