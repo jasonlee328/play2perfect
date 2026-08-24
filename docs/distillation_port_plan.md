@@ -5,8 +5,9 @@ depth-vision behaviour-cloning student, reusing DEXTRAH's DAgger machinery
 (`~/DEXTRAH`, NVlabs, clean at `ebc08ed`).
 
 **Status.** Environment set up and validated; task selected; one latent bug in the
-student camera path found and fixed. **Phase 1 is done and verified**
-(`tools/distillation/check_phase1_obs.py`, 23/23 checks). Phases 2–6 not started.
+student camera path found and fixed. **Phases 1 and 2 are done and verified**
+(`check_phase1_obs.py` 23/23; `check_phase2_teacher.py` gate PASSED at 96.9%;
+`check_phase2_student_env.py` all checks pass). Phases 3–6 not started.
 
 ---
 
@@ -169,20 +170,28 @@ Landed:
   the sky-camera bug.
 
 **Deviation from the original plan:** the `observation_space` Dict override was
-*kept* (and corrected to the new keys) rather than deleted. It is what
-`setup_rlgames_env` keys off to select `_DAggerRlGamesVecEnvWrapper`, which is
-in turn what gives Phase 2's `teacher_env_info()` a correctly-bounded
-`teacher_obs_space`. Deleting it would have made the teacher silently build
-against the *student's* observation space. `aux_info` is deliberately absent
-from the space — it is supervision, not observation. The stale
-`cfg.observation_space = student_dim` mutation *was* removed (it would have
-sized `reset_utils`' `_obs_queue` to 14487 on any post-init reallocation).
+*kept* (and corrected to the new keys) rather than deleted, so the declared
+space matches what the env actually emits. `aux_info` is deliberately absent
+from it — supervision, not observation. The stale `cfg.observation_space =
+student_dim` mutation *was* removed (it would have sized `reset_utils`'
+`_obs_queue` to 14487 on any post-init reallocation).
+
+> **Correction (found in Phase 2).** The original justification given for
+> keeping the Dict — that `register_rlgames_env` needs the `teacher_obs` key to
+> select `_DAggerRlGamesVecEnvWrapper`, and hence to give `teacher_env_info()` a
+> bounded `teacher_obs_space` — was wrong. `RlGamesVecEnvWrapper.__init__`
+> *raises* unless the env exposes a `"policy"` key
+> (`isaaclab_rl/rl_games.py:128-130`), and the student contract emits
+> `proprio`/`img` instead. So that wrapper cannot be constructed at all when
+> `student_obs` is enabled; it would have failed loudly, not silently. Phase 2
+> builds `env_info` directly from dims instead, which is simpler anyway. Keeping
+> an accurate space is still right, just for the plain reason.
 
 Measured en route: the teacher's noisy `keypoints_rel_goal` differs from the
 clean aux label by max 0.00188 — independent confirmation of the 2 mm
 `goal_xy_obs_noise` precision budget above.
 
-### Phase 2 — teacher wrapper *(verify before writing the student)*
+### Phase 2 — teacher wrapper — **DONE, GATE PASSED**
 
 DEXTRAH builds its teacher with a bare `network.build()`. **This will fail here.**
 `PreciseAssemblySAPG.yaml` sets `fixed_sigma: coef_cond`, which makes sigma a
@@ -212,6 +221,69 @@ Thread `player.states` (LSTM) across steps; zero on episode boundaries.
 
 **Gate: teacher `mus` must reproduce 96.9%.** If they are wrong, every downstream
 loss is meaningless but will present as a convergence problem.
+
+---
+
+#### Phase 2 outcome
+
+Landed as `isaacsimenvs/distillation/teacher.py` (`Teacher`,
+`teacher_env_info_from_dims`), gated by
+`tools/distillation/check_phase2_teacher.py` and
+`tools/distillation/check_phase2_student_env.py`.
+
+**Gate result — tight_insertion, 1024 envs, paired initial states:**
+
+| block_id | trials | bad_init | success | goal ratio |
+|---|---|---|---|---|
+| **50.0** (constant) | 881 | 143 | **96.9%** | 97.2% |
+| 0.0 (constant) | 889 | 135 | 95.4% | 95.7% |
+| `ramp` (player-equivalent) | 878 | 146 | 96.6% | 96.9% |
+
+96.935% vs eval_offline's 96.9% — the `mus` path reproduces the teacher to
+within 0.04 pp. **Gate passed.**
+
+**No rl_games env wrapper.** `teacher_env_info(wrapped)` is not usable here (see
+the Phase 1 correction above): `RlGamesVecEnvWrapper` requires a `"policy"` obs
+key. `teacher_env_info_from_dims()` builds `env_info` from dims + the agent
+yaml's `clip_observations`/`clip_actions` instead. The action space must be
+finite or `rescale_actions` NaNs every action.
+
+**The block-id column is a per-env ramp, not a constant.** `BasePlayer` builds
+it as `linspace(50, 0, num_envs)` (`player.py:93`) and appends it in
+`env_reset`/`env_step` (`player.py:208, 258`) — so under eval_offline env *i*
+literally gets a different teacher than env *j*. That is wrong for
+distillation, since the student cannot observe the block id, making an
+env-varying teacher irreducible label noise. The constant 50.0 that
+`deployment/rl_player.py:99` uses turns out to be *better* than the ramp, not a
+compromise. Note the wrapper clips the obs and the block id is appended
+afterwards, so 50.0 must survive a `clip_observations` of 10.0 — do not clip
+after appending.
+
+**`sigmas` are obs-independent, and the selected block's are unusable as loss
+weights.** `sigma = sigma_act(sigma[idxs])` (`network_builder.py:411`) indexes
+only on the block id, so for a fixed `block_id` the returned sigma is a
+*constant 29-vector* — it carries no state-dependent teacher uncertainty at all.
+(Confirmed empirically: 4 envs with different observations returned identical
+sigmas.) The per-block table, with the `1/sigma_T^2` weight DEXTRAH's loss
+implies:
+
+| row | coef_id | sigma_min | sigma_max | sigma_med | w_min | w_max |
+|---|---|---|---|---|---|---|
+| 0 | 50.0 | 0.162 | **170.4** | 1.809 | 3.4e-05 | 3.8e+01 |
+| 1 | 40.0 | 0.151 | 33.16 | 1.609 | 9.1e-04 | 4.4e+01 |
+| 2 | 30.0 | 0.135 | 3.374 | 1.332 | 8.8e-02 | 5.5e+01 |
+| 3 | 20.0 | 0.120 | 1.380 | 0.926 | 5.3e-01 | 6.9e+01 |
+| 4 | 10.0 | 0.114 | 1.194 | 0.801 | 7.0e-01 | 7.7e+01 |
+| 5 | 0.0 | 0.115 | 1.222 | 0.819 | 6.7e-01 | 7.6e+01 |
+
+coef_id is monotone in exploration magnitude — 50.0 is the high-exploration
+block. Its sigma spans **1054x**, i.e. **1.1e6x** in `1/sigma^2`, so DEXTRAH's
+weighting would silently zero the loss on whichever joints that block is noisy
+on. **Phase 5 decision: take `mus` from block 50.0 (best success rate) but do
+NOT weight by its `sigmas`.** Use uniform weights, or borrow a low-exploration
+row (4 or 5, both well-conditioned) if per-joint weighting is wanted. The
+`+ L2 on sigmas` term in DEXTRAH's loss is also near-pointless here — it
+regresses the student's sigma toward a constant.
 
 ### Phase 3 — viser image panel
 
@@ -293,7 +365,7 @@ Loss: weighted L2 on teacher `mus` (weights `1/sigma_T²`) + L2 on `sigmas` +
 
 ## 4. Order of work
 
-~~Phase 1~~ → **Phase 2 (gate on teacher SR)** → Phase 3 → Phase 4 → Phase 5 → Phase 6.
+~~Phase 1~~ → ~~Phase 2 (gate passed)~~ → **Phase 3** → Phase 4 → Phase 5 → Phase 6.
 
 Phases 1 and 2 are independent and can be done in either order; Phase 2 is the one
 that could invalidate assumptions, so it is worth front-loading.
