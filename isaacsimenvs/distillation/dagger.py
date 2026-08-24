@@ -265,7 +265,12 @@ class Dagger:
 
         window_loss = 0.0
         accum: torch.Tensor | None = None
+        # Rate is measured over THIS call's steps: `self.iter` persists across
+        # calls (distill.py chunks the run to checkpoint), so dividing the
+        # cumulative count by this call's elapsed time reports a made-up number
+        # that climbs with every chunk.
         t_start = time.time()
+        iter_at_start = self.iter
 
         while self.iter < max_iters:
             beta = self.beta(self.iter)
@@ -324,7 +329,7 @@ class Dagger:
                 self._states = [s.detach() for s in self._states]
 
             if self.iter % self.log_every == 0:
-                rec = self._summarize(beta, t_start)
+                rec = self._summarize(beta, t_start, iter_at_start)
                 self.history.append(rec)
                 print(
                     f"[dagger] iter {self.iter:>7d} grad {self.grad_steps:>6d} "
@@ -337,14 +342,14 @@ class Dagger:
 
         return self.history
 
-    def _summarize(self, beta: float, t_start: float) -> dict:
+    def _summarize(self, beta: float, t_start: float, iter_at_start: int = 0) -> dict:
         keys = [k for k in self._recent[0] if k != "beta"]
         rec = {k: sum(r[k] for r in self._recent) / len(self._recent) for k in keys}
         rec.update(
             iter=self.iter,
             grad_steps=self.grad_steps,
             beta=beta,
-            steps_per_s=self.iter / max(1e-9, time.time() - t_start),
+            steps_per_s=(self.iter - iter_at_start) / max(1e-9, time.time() - t_start),
         )
         return rec
 

@@ -4,13 +4,15 @@
 depth-vision behaviour-cloning student, reusing DEXTRAH's DAgger machinery
 (`~/DEXTRAH`, NVlabs, clean at `ebc08ed`).
 
-**Status.** Environment set up and validated; task selected; one latent bug in the
-student camera path found and fixed. **Phases 1–5 are done; all checks pass**
-(`check_phase1_obs.py` 23/23; `check_phase2_teacher.py` gate PASSED at 96.9%
-plus bit-exact equivalence; `check_phase2_student_env.py`,
-`check_phase3_student_panel.py`, `check_phase4_student_net.py`,
-`check_phase5_dagger.py` 16/16). Phase 6 not started, and **no real training run
-has happened yet** — Phase 5 is verified as plumbing only.
+**Status.** **All six phases are done and every check passes** — Phase 1 23/23,
+Phase 2 gate PASSED at 96.9% plus bit-exact equivalence, Phase 3 16/16, Phase 4
+41/41, Phase 5 16/16, and `isaacsimenvs/distill.py` runs end to end with
+checkpointing.
+
+**No real training run has happened.** Everything verified so far is plumbing,
+shapes, and self-consistency. The architecture and every hyperparameter are
+inherited from DEXTRAH unverified — see §5. The next step is a 256-env run,
+watching `hole_pos` RMSE against the 2 mm spec.
 
 ---
 
@@ -520,11 +522,48 @@ Also sidestepped: upstream's aux block reads `obs["mask"]`
 verbatim port without segmentation masks would `KeyError` before computing any
 loss.
 
-### Phase 6 — entry point
+### Phase 6 — entry point — **DONE**
 
 `isaacsimenvs/distill.py`, modelled on `train.py`: AppLauncher first (must pass
 `--enable_cameras`), then `gym.make`, register networks, build teacher, run
 `Dagger.distill()`.
+
+---
+
+#### Phase 6 outcome
+
+```bash
+python isaacsimenvs/distill.py --headless --num-envs 256 \
+    --out-dir runs/distill_tight_insertion
+```
+
+`--enable_cameras` is **forced on** rather than validated — forgetting it fails
+deep inside scene setup. `OMNI_KIT_ACCEPT_EULA` is set via `setdefault`, matching
+`eval_isaacsim.py` / `eval_offline.py`; without it Kit dies on an interactive
+prompt with "EOF when reading a line", which reads like a launcher bug.
+
+The student YAML is registered as `rl_games_student_cfg_entry_point` on the
+task, alongside the PPO and SAPG entry points. CLI overrides are exposed for the
+knobs most likely to need changing: `--seq-length`, `--lr`, `--aux-coeff`,
+`--sigma-loss-coef`, `--mu-weight-mode`, `--beta-warmup-iters`,
+`--beta-anneal-iters`, `--spatial-pool`, `--teacher-block-id`.
+
+Verified end to end at 8 envs / 200 steps / `seq_length=4`: 50 gradient steps,
+`total` 6.40 → 2.85, `mu` 5.08 → 2.55, **hole RMSE 311 mm → 142 mm**, ~53
+steps/s, three loadable checkpoints plus `history.json`. Full regression after:
+Phase 1 23/23, Phase 3 16/16, Phase 4 41/41.
+
+Two bugs found by actually running it:
+
+1. `steps_per_s` was computed as `self.iter / elapsed`, but `self.iter` persists
+   across `distill()` calls while `t_start` resets — and `distill.py` chunks the
+   run to checkpoint. The reported rate climbed with every chunk (42.7 → 328.8 →
+   140.5 steps/s). Now measured over the current call's delta.
+2. The missing EULA variable above.
+
+Note `--iters` counts **env steps, not gradient steps**: with `seq_length=16` you
+get `iters/16` gradient steps. The entry point prints both counts at startup so
+the distinction is visible before a long run rather than after it.
 
 ---
 
@@ -547,7 +586,55 @@ loss.
 
 ## 4. Order of work
 
-~~Phase 1~~ → ~~Phase 2 (gate passed)~~ → ~~Phase 3~~ → ~~Phase 4~~ → ~~Phase 5~~ → **Phase 6**.
+~~Phase 1~~ → ~~Phase 2 (gate passed)~~ → ~~Phase 3~~ → ~~Phase 4~~ → ~~Phase 5~~
+→ ~~Phase 6~~. **All phases complete; next is a real training run.**
 
 Phases 1 and 2 are independent and can be done in either order; Phase 2 is the one
 that could invalidate assumptions, so it is worth front-loading.
+
+---
+
+## 5. What is verified, and what is inherited on faith
+
+Worth stating plainly, because "we ported DEXTRAH and DEXTRAH works" is not what
+happened.
+
+**Anchored to something independently verified:**
+- The teacher (Phase 2) — against play2perfect's *own* `eval_offline.py` at
+  96.9%, and bit-exact against rl_games' `PpoPlayerContinuous` over 300 steps.
+  The reference implementation is in this repo, not in DEXTRAH.
+- The obs contract (Phase 1) — dims computed from the env's own
+  `OBS_FIELD_SIZES`.
+- The viser panel (Phase 3) — against the existing eval path.
+
+**Self-consistency only (Phases 4–5):** shapes agree, gradients flow,
+`seq_length=T` equals T threaded single steps, loss descends on a toy run. A
+network with the wrong inductive bias passes all of it.
+
+**Inherited from DEXTRAH, unverified for this task:** the 4-layer CNN, the
+32-feature bottleneck, LSTM 512, MLP `[512,512,256]`, aux MLP `[512,256]`,
+`aux_coeff=10`, `lr=1e-4`. Note the LR justification in §0 ("matches DEXTRAH's
+setup so their constant 1e-4 is in the right regime") is now weaker, because
+honoring `seq_length=16` cut gradient steps 16× for the same env steps.
+
+**DEXTRAH is not an oracle.** Defects found in the two files ported: `beta = 0.`
+clobbering a written 15k warmup (`:376`); `seq_length = 1` overwriting the config
+(`:177`); an unreachable done-time flush (`:572`); `obs["mask"]` read
+unconditionally so a mask-free port would `KeyError` (`:465`); `weights =
+1/sigmas[0]**2` using env 0's sigma for every env (`:505`); beta mixing that
+double-thresholds a boolean and works only because `bool` casts to `{0,1}`
+(`:553`); `use_depth = False` plus hardcoded 320×240 in the file this plan calls
+the mono-depth variant (`a2c_with_aux_cnn.py:390`); an unused ResNet transform;
+a 160-line vendored copy of rl_games' `NetworkBuilder`; a per-step
+`empty_cache()`.
+
+More importantly, DEXTRAH is correct *for DEXTRAH's task*, and the differences
+are the load-bearing ones: its object sits free on a table (so `object_pos` is
+the unknown), its geometric fabric bounds the reachable state set (which is the
+only reason `beta=0` survives), and it runs 320×240 RGB stereo rather than 90×160
+mono depth.
+
+**What would settle it:** one run at 256 envs, watching `hole_pos` RMSE. Toward
+2 mm means the inherited architecture was fine. Stalling at 20–50 mm while `mu`
+descends means the encoder can localize *what* but not *where* — and
+`--spatial-pool flatten` is the first thing to change.

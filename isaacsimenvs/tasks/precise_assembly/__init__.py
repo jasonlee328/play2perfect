@@ -10,6 +10,8 @@ Entry points:
 - ``env_cfg_yaml_entry_point``      → cfg/task/PreciseAssembly.yaml overlay
 - ``rl_games_cfg_entry_point``      → cfg/train/PreciseAssemblyPPO.yaml (baseline)
 - ``rl_games_sapg_cfg_entry_point`` → cfg/train/PreciseAssemblySAPG.yaml (default)
+- ``rl_games_student_cfg_entry_point`` → cfg/train/PreciseAssemblyStudent.yaml
+  (depth student for DAgger distillation; see isaacsimenvs/distill.py)
 """
 
 from __future__ import annotations
@@ -35,5 +37,9 @@ gym.register(
         "env_cfg_yaml_entry_point": str(_CFG_DIR / "task" / "PreciseAssembly.yaml"),
         "rl_games_cfg_entry_point": str(_CFG_DIR / "train" / "PreciseAssemblyPPO.yaml"),
         "rl_games_sapg_cfg_entry_point": str(_CFG_DIR / "train" / "PreciseAssemblySAPG.yaml"),
+        # Depth-vision student for DAgger distillation (isaacsimenvs/distill.py).
+        # Not an rl_games training config: only its `network:` block and a few
+        # `config:` entries are consumed, by our own loop.
+        "rl_games_student_cfg_entry_point": str(_CFG_DIR / "train" / "PreciseAssemblyStudent.yaml"),
     },
 )
