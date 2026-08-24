@@ -249,6 +249,9 @@ class Dagger:
         self.grad_steps = 0
         self._obs = None       # persists across distill() calls; see distill()
         self._last_aux: dict = {}
+        # Rolling window of completed episodes, for the phase-free metrics.
+        self._ep_hist: deque = deque(maxlen=2048)
+        self._ep_full: deque = deque(maxlen=2048)
         self.history: list[dict] = []
         self._recent = deque(maxlen=self.log_every)
 
@@ -283,6 +286,39 @@ class Dagger:
             self.num_envs, self.action_dim, device=self.device
         )
 
+    def _episode_goal_ratio(self) -> float:
+        """Mean subgoal fraction over COMPLETED episodes.
+
+        `_goal_ratio` samples `_successes` mid-episode, so envs early in an
+        episode contribute 0 regardless of ability -- it is diluted by episode
+        phase. This reads `_prev_episode_successes`, which reset_utils copies
+        from `_successes` just before each auto-reset, so it describes finished
+        episodes only. That is the same quantity eval_offline scores the teacher
+        with (96.9%), which makes it the comparable one.
+        """
+        if not self._ep_hist:
+            return float("nan")
+        return sum(self._ep_hist) / len(self._ep_hist)
+
+    def _record_finished_episodes(self, dones: torch.Tensor) -> None:
+        ids = torch.nonzero(dones, as_tuple=False).reshape(-1)
+        if ids.numel() == 0:
+            return
+        try:
+            succ = self.env._prev_episode_successes[ids].float()
+            maxg = self.env.prev_episode_env_max_goals[ids].float().clamp_min(1.0)
+            frac = (succ / maxg).clamp(0.0, 1.0)
+            self._ep_hist.extend(frac.tolist())
+            self._ep_full.extend((succ >= maxg).float().tolist())
+        except AttributeError:
+            pass
+
+    def _episode_success_rate(self) -> float:
+        """Fraction of completed episodes that reached EVERY subgoal."""
+        if not self._ep_full:
+            return float("nan")
+        return sum(self._ep_full) / len(self._ep_full)
+
     def _goal_ratio(self) -> float:
         """Fraction of subgoals reached, averaged over envs.
 
@@ -313,6 +349,8 @@ class Dagger:
             "beta": rec["beta"],
             "lr": lr,
             "goal_ratio": rec.get("goal_ratio", float("nan")),
+            "ep_goal_ratio": rec.get("ep_goal_ratio", float("nan")),
+            "ep_success_rate": rec.get("ep_success_rate", float("nan")),
             "hole_rmse_mm": rec.get("hole_rmse_mm", float("nan")),
             "hole_rmse_vs_baseline": rec.get("hole_rmse_vs_baseline", float("nan")),
             "grad_steps": self.grad_steps,
@@ -510,6 +548,7 @@ class Dagger:
             dones = (terminated | truncated).reshape(-1).bool()
 
             if bool(dones.any()):
+                self._record_finished_episodes(dones)
                 # distillation.py:588: `states[:, all_done_indices] *= 0.` --
                 # in-place. Valid because the gradient step happens every
                 # seq_length steps and seq_length is 1 by default, so no live
@@ -543,6 +582,9 @@ class Dagger:
             if self.iter % self.log_every == 0:
                 rec = self._summarize(beta, t_start, iter_at_start)
                 rec["goal_ratio"] = self._goal_ratio()
+                rec["ep_goal_ratio"] = self._episode_goal_ratio()
+                rec["ep_success_rate"] = self._episode_success_rate()
+                rec["ep_count"] = float(len(self._ep_full))
                 self.history.append(rec)
                 self._write_logs(rec)
                 print(
@@ -551,6 +593,7 @@ class Dagger:
                     f"hole_rmse {rec.get('hole_rmse_mm', float('nan')):.1f}mm "
                     f"({rec.get('hole_rmse_vs_baseline', float('nan')):.2f}x base) "
                     f"goal {rec['goal_ratio'] * 100:.1f}% "
+                    f"epSR {rec['ep_success_rate'] * 100:.1f}% "
                     f"{rec['steps_per_s']:.1f} steps/s",
                     flush=True,
                 )
