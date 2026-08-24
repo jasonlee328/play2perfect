@@ -69,49 +69,87 @@ class PreciseAssemblyEnv(PlayEnv):
     ) -> None:
         self._configure_problem(cfg)
 
+        # `hole_pos` is the depth student's primary aux target, but random-goal
+        # envs carry a (0, 0, -1) "no hole" sentinel rather than a pose (see
+        # `_reset_idx`). Regressing on that would train the encoder toward a
+        # point a metre below the floor for a random subset of envs — a silent
+        # failure that presents as an encoder that will not converge. Checked
+        # before `super().__init__()` so it costs milliseconds, not a full
+        # scene build.
+        _student_cfg = getattr(cfg, "student_obs", None)
+        if _student_cfg is not None and _student_cfg.enabled:
+            _rgf = float(cfg.precise_assembly.random_goal_fraction)
+            if _rgf > 0.0:
+                # Raising before `super().__init__()` leaves DirectRLEnv's
+                # `_is_closed` unset, so its `__del__` throws a confusing
+                # AttributeError over the top of our message at GC time.
+                self._is_closed = True
+                raise ValueError(
+                    "student_obs.enabled requires "
+                    f"precise_assembly.random_goal_fraction == 0.0 (got {_rgf}). "
+                    "Random-goal envs set hole_pos to the (0, 0, -1) sentinel, "
+                    "which is not a valid auxiliary regression label."
+                )
+
         super().__init__(cfg, render_mode, **kwargs)
 
-        # When student_obs is enabled, the env exposes three obs groups via
-        # `_get_observations`: "policy" = student obs (image+proprio, what
-        # the depth-CNN reads), "critic" = state_list (privileged), and
-        # "teacher_obs" = obs_list (proprio + object_state, noisy — what the
-        # frozen state-MLP teacher reads). The default RlGamesVecEnvWrapper
-        # drops keys it doesn't know; use DAggerRlGamesVecEnvWrapper from
-        # `isaacsimenvs.utils.rlgames_utils` to pass "teacher_obs" through to
-        # the agent as `self.obs["teacher"]`.
+        # Depth-distillation obs contract. When student_obs is enabled the env
+        # returns FIVE keys from `_get_observations` (see the method for the
+        # full rationale):
+        #   "proprio"     (N, 87)          student proprioception
+        #   "img"         (N, C, 90, 160)  student depth image, NCHW
+        #   "teacher_obs" (N, 140)         obs_list, noisy — the frozen teacher
+        #   "critic"      (N, 162)         state_list, privileged
+        #   "aux_info"    dict             ground-truth regression *labels*
+        #
+        # The gym space below describes the four tensor keys only. "aux_info"
+        # is deliberately absent: it is supervision, not observation, and the
+        # DAgger loop builds its network batch dict by explicit key so a label
+        # cannot leak into the student's input.
+        #
+        # This space is not read by the DAgger loop itself (it takes the raw
+        # gym env), but it IS what `setup_rlgames_env` keys off to select
+        # `_DAggerRlGamesVecEnvWrapper`, which is in turn what gives
+        # `teacher_env_info()` a correctly-bounded `teacher_obs_space`. Drop
+        # the "teacher_obs" key here and the teacher would silently be built
+        # against the student's observation space.
         student_cfg = getattr(cfg, "student_obs", None)
         if student_cfg is not None and student_cfg.enabled and student_cfg.image_enabled:
             from gymnasium import spaces
             import numpy as _np
             from isaacsimenvs.tasks.play.utils.obs_utils import _student_proprio_dict
 
-            image_numel = (
-                int(student_cfg.image_input_height)
-                * int(student_cfg.image_input_width)
-                * (1 if student_cfg.image_modality.lower() == "depth" else 3)
+            channels = 1 if student_cfg.image_modality.lower() == "depth" else 3
+            img_shape = (
+                channels,
+                int(student_cfg.image_input_height),
+                int(student_cfg.image_input_width),
             )
             proprio_sample = _student_proprio_dict(self)
             proprio_dim = sum(
                 int(proprio_sample[field].reshape(self.num_envs, -1).shape[-1])
                 for field in student_cfg.proprio_list
             )
-            student_dim = image_numel + proprio_dim
-            actor_dim = int(cfg.observation_space)        # original obs_list dim (teacher actor input)
+            actor_dim = int(cfg.observation_space)        # obs_list dim (teacher actor input)
             critic_dim = int(cfg.state_space)             # state_list dim (asymmetric critic input)
 
-            cfg.observation_space = student_dim
-            box = lambda d: spaces.Box(low=-_np.inf, high=_np.inf, shape=(d,))
-            self.observation_space = spaces.Dict({
-                "policy": box(student_dim),
-                "critic": box(critic_dim),
-                "teacher_obs": box(actor_dim),
+            # NOTE: `cfg.observation_space` is deliberately left alone. The
+            # previous code overwrote it with the flattened student dim, which
+            # (a) is meaningless now that img/proprio are separate keys and
+            # (b) would size `reset_utils`' `_obs_queue` to 14487 if the DR
+            # buffers were ever reallocated after __init__.
+            box = lambda shape: spaces.Box(low=-_np.inf, high=_np.inf, shape=shape)
+            space_dict = lambda: spaces.Dict({
+                "proprio": box((proprio_dim,)),
+                "img": box(img_shape),
+                "teacher_obs": box((actor_dim,)),
+                "critic": box((critic_dim,)),
             })
-            self.single_observation_space = spaces.Dict({
-                "policy": box(student_dim),
-                "critic": box(critic_dim),
-                "teacher_obs": box(actor_dim),
-            })
+            self.observation_space = space_dict()
+            self.single_observation_space = space_dict()
             self._teacher_actor_obs_dim = actor_dim
+            self._student_proprio_dim = proprio_dim
+            self._student_img_shape = img_shape
 
         insert_poses = torch.as_tensor(
             self._pih_insert_pose_sequence, dtype=torch.float32, device=self.device
@@ -794,8 +832,43 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.extras["random_goal_success_ratio"] = 0.0
                 self.extras["random_goal_all_goals_hit_ratio"] = 0.0
 
+    def _aux_info(self, clean: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        """Auxiliary regression targets for the depth student.
+
+        These are *labels*, not observations — sim ground truth that never
+        enters the student network. Because they are ground truth they are
+        immune to DAgger covariate shift: correct however far off-distribution
+        the student wanders, unlike the teacher's action labels.
+
+        Target choice deviates from DEXTRAH on purpose. DEXTRAH regresses
+        `object_pos` because its object sits free on a table and its pose is
+        the unknown. Here the object is already grasped, so its pose is
+        largely recoverable from the 87 proprio numbers; the genuinely hidden
+        quantity is the hole, randomized per episode over
+        `precise_assembly.hole_x_range` x `hole_y_range`. So:
+
+          hole_pos           (3)  the primary unknown — what the student must see
+          keypoints_rel_goal (12) the teacher's literal decision input
+          object_pos         (3)  cheap grounding for the encoder
+
+        All positions are env-relative, consistent with `self.hole_pos`.
+        """
+        return {
+            "hole_pos": self.hole_pos,
+            "keypoints_rel_goal": clean["keypoints_rel_goal"],
+            "object_pos": clean["object_pos"],
+        }
+
     def _get_observations(self) -> dict[str, torch.Tensor]:
-        obs = build_observations(self)
+        student_cfg = getattr(self.cfg, "student_obs", None)
+        student_enabled = student_cfg is not None and student_cfg.enabled
+
+        # `aux_out` is filled in place with clean privileged quantities rather
+        # than recomputed here, so the aux labels and the teacher's own
+        # keypoint geometry can never diverge.
+        aux_src: dict[str, torch.Tensor] | None = {} if student_enabled else None
+        obs = build_observations(self, aux_out=aux_src)
+
         if self._goal_kp_obs_slice is not None:
             policy = obs["policy"]
             policy[:, self._goal_kp_obs_slice].view(self.num_envs, -1, 3).sub_(
@@ -804,31 +877,29 @@ class PreciseAssemblyEnv(PlayEnv):
             clip = self.cfg.obs.clamp_abs_observations
             obs["policy"] = policy.clamp(-clip, clip)
 
-        # Depth-distillation contract: when student_obs is enabled, the env
-        # exposes THREE obs groups (consumed by different parts of the dagger
-        # pipeline):
-        #   "policy"      = flattened student obs [image_flat, proprio] →
-        #                   read by the depth-CNN student network
-        #   "critic"      = state_list (privileged) → read by the asymmetric
-        #                   central-value critic
-        #   "teacher_obs" = obs_list (proprio + object state, noisy, what the
-        #                   frozen state-MLP teacher trained on) → read by
-        #                   DAggerA2CAgent for teacher labeling. The
-        #                   DAggerRlGamesVecEnvWrapper passes this through as
-        #                   `self.obs["teacher"]` in the agent.
-        # SAPG appends 1 block-id column to "obs" and "states" only
-        # (a2c_common.py:602-604) — "teacher" is left untouched, and our
-        # `Teacher.get_action()` re-appends the block-id internally.
-        student_cfg = getattr(self.cfg, "student_obs", None)
-        if student_cfg is not None and student_cfg.enabled:
+        # Depth-distillation contract. The image and proprio are returned as
+        # separate keys in their natural shapes, NOT concatenated into one flat
+        # vector as this branch used to do. The flat layout existed only to
+        # satisfy `RlGamesVecEnvWrapper`, which needs a single Box per obs
+        # group — but DEXTRAH's `Dagger` reads `_get_observations()` off the
+        # raw gym env and never wraps it, so the constraint does not apply.
+        # Keeping the image as NCHW removes a flatten -> slice -> reshape round
+        # trip whose only failure mode is a silently scrambled image that still
+        # trains to a plausible-looking loss curve.
+        #
+        #   "teacher_obs" = obs_list, NOISY (and goal-noise-adjusted above) —
+        #                   exactly what the frozen state-MLP teacher trained
+        #                   on. Must stay noisy or the teacher is off its own
+        #                   training distribution.
+        #   "critic"      = state_list, clean and privileged.
+        if student_enabled:
             student = self.get_student_obs()
-            image_flat = student["image"].reshape(self.num_envs, -1)
-            proprio = student["proprio"].reshape(self.num_envs, -1)
-            student_flat = torch.cat([image_flat, proprio], dim=-1)
             obs = {
-                "policy": student_flat,
-                "critic": obs["critic"],
+                "proprio": student["proprio"],
+                "img": student["image"],
                 "teacher_obs": obs["policy"],
+                "critic": obs["critic"],
+                "aux_info": self._aux_info(aux_src),
             }
         return obs
 

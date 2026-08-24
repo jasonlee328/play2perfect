@@ -228,8 +228,21 @@ def _apply_obs_delay(env, policy_tensor: torch.Tensor) -> torch.Tensor:
     return delayed
 
 
-def build_observations(env) -> dict[str, torch.Tensor]:
-    """Assemble actor-critic observations with obs-side DR."""
+def build_observations(
+    env, aux_out: dict[str, torch.Tensor] | None = None
+) -> dict[str, torch.Tensor]:
+    """Assemble actor-critic observations with obs-side DR.
+
+    Args:
+        aux_out: when provided, filled in place with the *clean* (noise-free)
+            privileged quantities that depth distillation regresses as
+            auxiliary targets. They are already computed here to build the
+            critic tensor; passing a dict just keeps them instead of
+            discarding them, so the aux labels can never drift from the
+            geometry the teacher itself sees. Positions are env-relative
+            (``env_origins`` subtracted), matching
+            ``PreciseAssemblyEnv.hole_pos``.
+    """
     dr = env.cfg.domain_randomization
     env_origins = env.scene.env_origins
 
@@ -345,6 +358,14 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     clip = env.cfg.obs.clamp_abs_observations
     policy_tensor = policy_tensor.clamp(-clip, clip)
     state_tensor = state_tensor.clamp(-clip, clip)
+
+    if aux_out is not None:
+        # Deliberately unclamped and noise-free: these are supervision
+        # targets, never network inputs.
+        aux_out["object_pos"] = obj_pos
+        aux_out["keypoints_rel_goal"] = keypoints_rel_goal_clean.reshape(
+            env.num_envs, -1
+        )
 
     return {"policy": policy_tensor, "critic": state_tensor}
 

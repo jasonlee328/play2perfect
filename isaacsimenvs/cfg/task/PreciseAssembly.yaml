@@ -139,3 +139,62 @@ domain_randomization:
   torque_decay: 0.0
   torque_decay_interval: 0.08
   torque_only_when_lifted: true
+
+# Depth-distillation student observations. Disabled by default: enabling this
+# turns on a TiledCamera, which costs ~4.1x sim step time and requires
+# AppLauncher to be started with --enable_cameras.
+#
+# Overlays StudentObsCfg (isaacsimenvs/tasks/play/play_env_cfg.py). Only the
+# knobs that matter for the tight_insertion port are listed here; everything
+# else keeps its configclass default. Note num_envs IS the DAgger batch size —
+# 256 fits comfortably, 1024 OOMs a 32 GB card.
+student_obs:
+  enabled: false
+
+  proprio_list: [joint_pos, joint_vel, prev_action_targets]   # 3 x 29 = 87
+
+  image_enabled: true
+  image_modality: "depth"          # mono depth: matches the a2c_aux_cnn student
+  image_width: 160                 # render resolution
+  image_height: 90
+  image_input_width: 160           # what the CNN receives
+  image_input_height: 90
+  crop_enabled: false
+
+  # window_normalize maps [depth_min_m, depth_max_m] -> [0, 1] and saturates
+  # everything beyond depth_max_m to 1.0. A camera pointed at nothing therefore
+  # yields a CONSTANT image rather than an obvious error — see the camera_quat
+  # note below and the n_unique assertion in the Phase 1 check.
+  depth_preprocess_mode: "window_normalize"
+  depth_min_m: 0.45
+  depth_max_m: 1.25
+  hide_goal_viz: true
+
+  camera_backend: "tiled"
+  camera_mount: "world"
+  camera_convention: "ros"         # +Z is the optical axis
+  # Look-at pose: eye (0, -0.75, 0.95) aimed at the table top (0, 0, 0.53).
+  # The configclass default used to be an identity quaternion, which under the
+  # "ros" convention aims the camera straight up at the sky; every pixel then
+  # fell past depth_max_m and normalized to a constant 1.0. Do not "simplify"
+  # this back to identity.
+  camera_pos: [0.0, -0.75, 0.95]
+  camera_quat_wxyz: [-0.505666, 0.862729, 0.0, 0.0]
+
+  # Matched to the ZED HD1080 calibration on lab serial 15107 at 160x90
+  # (fx=fy=115.67, cx=80.02, cy=47.13). Documented sim2real anchor — move the
+  # camera before touching these.
+  focal_length: 24.0
+  horizontal_aperture: 33.19737869997174
+  horizontal_aperture_offset: 0.0035
+  vertical_aperture_offset: 0.4418
+  clipping_range: [0.1, 5.0]
+  camera_update_period_s: 0.0      # 0 = render every policy step (60 Hz)
+
+  # Sim2real latency modelling — off for the first student. Turn on only after
+  # the no-delay student trains, so a convergence failure is never ambiguous
+  # between "cannot see the hole" and "cannot handle the lag".
+  use_camera_delay: false
+  camera_delay_max: 0
+  use_student_obs_delay: false
+  student_obs_delay_max: 0

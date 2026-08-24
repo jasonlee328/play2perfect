@@ -187,8 +187,21 @@ class StudentObsCfg:
     camera_backend: str = "tiled"  # "tiled" | "standard" | "raycaster"
     camera_mount: str = "world"
     camera_convention: str = "ros"
-    camera_pos: tuple[float, float, float] = (0.0, -1.0, 1.0)
-    camera_quat_wxyz: tuple[float, float, float, float] = (1.0, 0.0, 0.0, 0.0)
+    # Validated look-at pose for the precise-assembly workspace: eye (0, -0.75,
+    # 0.95) aimed at (0, 0, 0.53) = the table top (reset.table_reset_z 0.38 +
+    # TABLE_HALF_HEIGHT 0.15). Derived with isaaclab.utils.math.
+    # create_rotation_matrix_from_view (which returns OPENGL, -Z forward) then
+    # convert_camera_frame_orientation_convention(origin="opengl", target="ros")
+    # to match camera_convention below.
+    #
+    # NOTE: the previous default was an identity quaternion, which under the
+    # "ros" convention (+Z = optical axis) pointed the camera straight UP at the
+    # sky. Every pixel then fell past depth_max_m and window-normalized to a
+    # constant 1.0 — i.e. the student saw a blank image. This path had never
+    # been exercised (student_obs.enabled is False by default and no script
+    # enabled it), so the bug was latent.
+    camera_pos: tuple[float, float, float] = (0.0, -0.75, 0.95)
+    camera_quat_wxyz: tuple[float, float, float, float] = (-0.505666, 0.862729, 0.0, 0.0)
 
     focal_length: float = 24.0
     horizontal_aperture: float = 33.19737869997174
