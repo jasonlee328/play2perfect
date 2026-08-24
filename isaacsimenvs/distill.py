@@ -137,8 +137,14 @@ def main() -> None:
     # Flag names mirror train.py's wandb block. Tensorboard is written whenever
     # --out-dir is set, matching DEXTRAH (which writes it unconditionally).
     parser.add_argument("--wandb-activate", action="store_true")
-    parser.add_argument("--wandb-project", default="isaacsimenvs-distill")
-    parser.add_argument("--wandb-entity", default=None)
+    parser.add_argument("--wandb-project", default="foundation-touch")
+    parser.add_argument(
+        "--wandb-entity", default=None,
+        help="Defaults to wandb's configured default entity, which on a team "
+             "account is the TEAM (ai2-robotics here), not you. Pass your "
+             "username for a personal project, or export WANDB_ENTITY to make "
+             "it stick without hardcoding an account in the repo.",
+    )
     parser.add_argument("--wandb-group", default=None)
     parser.add_argument("--wandb-name", default=None,
                         help="Defaults to <problem>-<spatial_pool>-<num_envs>envs.")
