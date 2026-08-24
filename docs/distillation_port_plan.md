@@ -242,6 +242,12 @@ Landed as `isaacsimenvs/distillation/teacher.py` (`Teacher`,
 96.935% vs eval_offline's 96.9% — the `mus` path reproduces the teacher to
 within 0.04 pp. **Gate passed.**
 
+The camera is irrelevant to this number and to the teacher generally — the
+teacher reads 140 numbers of state and cannot see the render pipeline. The
+camera-on check (`check_phase2_student_env.py`) exists to verify the *Phase 1
+plumbing* — that `obs["teacher_obs"]` is wired correctly and the `coef_cond`
+sigma table is what we think — not to re-measure the teacher.
+
 **Bit-level equivalence** (`check_phase2_equivalence.py`): the SR agreement
 above is statistical (n≈880, so a ~0.5 pp bug would hide in the noise), so both
 paths were also run side by side in one process on the identical observation

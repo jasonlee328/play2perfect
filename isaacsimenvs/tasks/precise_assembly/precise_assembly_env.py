@@ -78,6 +78,19 @@ class PreciseAssemblyEnv(PlayEnv):
         # scene build.
         _student_cfg = getattr(cfg, "student_obs", None)
         if _student_cfg is not None and _student_cfg.enabled:
+            # `_get_observations` emits "img" unconditionally under
+            # `student_obs.enabled`, but `build_student_observations` only
+            # populates "image" when `image_enabled` — so the combination below
+            # used to surface as a KeyError at the first step, with a gym space
+            # that silently disagreed with the obs dict. There is no meaningful
+            # image-free student here (the whole point is a depth encoder), so
+            # reject it up front instead.
+            if not _student_cfg.image_enabled:
+                self._is_closed = True
+                raise ValueError(
+                    "student_obs.enabled requires student_obs.image_enabled. "
+                    "The distillation contract has no image-free variant."
+                )
             _rgf = float(cfg.precise_assembly.random_goal_fraction)
             if _rgf > 0.0:
                 # Raising before `super().__init__()` leaves DirectRLEnv's
@@ -114,7 +127,9 @@ class PreciseAssemblyEnv(PlayEnv):
         # the "teacher_obs" key here and the teacher would silently be built
         # against the student's observation space.
         student_cfg = getattr(cfg, "student_obs", None)
-        if student_cfg is not None and student_cfg.enabled and student_cfg.image_enabled:
+        # image_enabled is guaranteed by the guard above, so this gate matches
+        # `_get_observations`' exactly — one condition, not two that can disagree.
+        if student_cfg is not None and student_cfg.enabled:
             from gymnasium import spaces
             import numpy as _np
             from isaacsimenvs.tasks.play.utils.obs_utils import _student_proprio_dict
