@@ -154,6 +154,15 @@ class Dagger:
         self.beta_warmup_grad_steps = int(cfg.get("beta_warmup_grad_steps", 15_000))
         self.beta_anneal_grad_steps = int(cfg.get("beta_anneal_grad_steps", 0))
         self.sigma_loss_coef = float(cfg.get("sigma_loss_coef", 0.0))
+        # DEXTRAH allocates prev_actions_student as zeros and never assigns to it
+        # again (distillation.py:297 is the only write, :749 the only read), so
+        # the student's `prev_actions` input is permanently zero. Matched by
+        # default; set True to feed the executed action instead.
+        self.update_prev_actions = bool(cfg.get("update_prev_actions", False))
+        # bfloat16 autocast around the teacher/student forwards and the loss,
+        # as DEXTRAH does (distillation.py:445). No GradScaler: bf16 has fp32
+        # dynamic range so loss scaling is unnecessary.
+        self.autocast_bf16 = bool(cfg.get("autocast_bf16", True))
         self.mu_weight_mode = str(cfg.get("mu_weight_mode", "uniform"))
         if self.mu_weight_mode not in ("uniform", "inv_sigma2"):
             raise ValueError(
@@ -387,10 +396,14 @@ class Dagger:
         while self.iter < max_iters:
             beta = self.beta(self.grad_steps)
 
-            teacher_out = self.teacher.act(obs["teacher_obs"])
-            student_res = self.student_step(obs)
-
-            loss, parts = self.compute_loss(student_res, teacher_out, obs["aux_info"])
+            with torch.autocast(
+                device_type="cuda", dtype=torch.bfloat16, enabled=self.autocast_bf16
+            ):
+                teacher_out = self.teacher.act(obs["teacher_obs"])
+                student_res = self.student_step(obs)
+                loss, parts = self.compute_loss(
+                    student_res, teacher_out, obs["aux_info"]
+                )
             accum = loss if accum is None else accum + loss
             parts["beta"] = beta
             self._recent.append(parts)
@@ -411,8 +424,13 @@ class Dagger:
                 ).unsqueeze(-1)
                 action = torch.where(use_teacher, teacher_out["action"], student_action)
 
-            self._prev_actions = action.detach()
-            obs, _rew, terminated, truncated, _extras = self.env.step(action.detach())
+            # Cast back to fp32 at the env boundary: under bf16 autocast the
+            # action inherits bf16, and this env's action pipeline index-puts
+            # into an fp32 buffer (action_utils.py:40), which raises.
+            action = action.detach().float()
+            if self.update_prev_actions:
+                self._prev_actions = action
+            obs, _rew, terminated, truncated, _extras = self.env.step(action)
             dones = (terminated | truncated).reshape(-1).bool()
 
             if bool(dones.any()):
@@ -421,9 +439,10 @@ class Dagger:
                 keep = (~dones).to(self._states[0].dtype).view(1, -1, 1)
                 self._states = [s * keep for s in self._states]
                 self.teacher.reset_states(dones)
-                self._prev_actions = self._prev_actions * (~dones).unsqueeze(-1).to(
-                    self._prev_actions.dtype
-                )
+                if self.update_prev_actions:
+                    self._prev_actions = self._prev_actions * (
+                        ~dones
+                    ).unsqueeze(-1).to(self._prev_actions.dtype)
 
             self.iter += 1
 

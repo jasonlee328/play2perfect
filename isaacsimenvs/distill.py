@@ -109,6 +109,12 @@ def main() -> None:
     )
     parser.add_argument("--beta-anneal-grad-steps", type=int, default=None)
     parser.add_argument(
+        "--no-depth-aug", action="store_true",
+        help="Disable depth augmentation. On by default to match DEXTRAH, which "
+             "augments every step; play2perfect's port of the same five stages "
+             "ships disabled.",
+    )
+    parser.add_argument(
         "--drop-bad-inits", action="store_true",
         help="Terminate episodes where the peg has been dropped on the table. "
              "OFF by default, matching DEXTRAH (and this env's own default). "
@@ -189,6 +195,14 @@ def main() -> None:
         # keeps {policy, critic} so the rl_games player still works.)
         env_cfg.student_obs.enabled = True
         env_cfg.student_obs.emit_in_observations = True
+
+        # DEXTRAH augments the depth image every step -- correlated noise,
+        # normal noise, pixel dropout + random-uniform replacement, and stick
+        # artifacts (distillation.py:387-390, augment_depth at :634).
+        # play2perfect already carries a 1:1 port of those same five stages
+        # (scene_utils.py:615-625), applied inside get_student_obs(), but ships
+        # it off. On to match DEXTRAH.
+        env_cfg.student_obs.use_depth_aug = not args_cli.no_depth_aug
 
         # Plan risk #2. tight_insertion discards ~14% of first episodes as
         # unstable inits (measured 143/1024 in the Phase 2 gate): the peg falls
@@ -335,7 +349,8 @@ def main() -> None:
             f"(= {dagger.beta_warmup_grad_steps * dagger.seq_length} env steps), "
             f"anneal={dagger.beta_anneal_grad_steps}\n"
             f"[distill] drop_on_table_term="
-            f"{env_cfg.precise_assembly.enable_dropped_on_table_term}\n"
+            f"{env_cfg.precise_assembly.enable_dropped_on_table_term} "
+            f"depth_aug={env_cfg.student_obs.use_depth_aug}\n"
             f"[distill] spatial_pool="
             f"{student_cfg['params']['network']['student_image']['spatial_pool']} "
             f"aux_coeff={dagger.aux_coeff} sigma_loss_coef={dagger.sigma_loss_coef} "
