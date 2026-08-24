@@ -716,7 +716,9 @@ def _worker_main(args) -> int:
         extra_overrides=extra_overrides,
         student_cam=args.student_cam,
         student_cam_every=args.student_cam_every,
-        student_checkpoint=args.student_checkpoint,
+        student_checkpoint=(
+            args.student_checkpoint[0] if args.student_checkpoint else None
+        ),
     )
     return 0
 
@@ -749,11 +751,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rl-device", default="cuda:0")
     parser.add_argument("--sim-device", default="cuda:0")
     parser.add_argument(
-        "--student-checkpoint", default=None,
-        help="Drive the DISTILLED STUDENT from this Dagger checkpoint instead of "
-             "the rl_games teacher, e.g. runs/distill_v2/student_final.pth. "
-             "Implies --student-cam, so you watch the policy and its depth input "
-             "side by side.",
+        "--student-checkpoint", nargs="*", default=[],
+        help="Dagger student checkpoint(s) to offer in the Policy dropdown, e.g. "
+             "runs/distill_v2/student_final.pth. They appear as 'student: <run>/"
+             "<name>' entries; selecting one drives the DISTILLED STUDENT instead "
+             "of the rl_games teacher and implies --student-cam. Pass several to "
+             "compare checkpoints from the dropdown without restarting.",
     )
     parser.add_argument(
         "--student-cam", action="store_true",
@@ -847,6 +850,26 @@ def _run_viewer(args) -> int:
         name: (str(spec.config or ""), str(spec.checkpoint))
         for name, spec in policies.items()
     }
+    # Student checkpoints share the dropdown with the teachers. The "student:"
+    # config slot is the marker _load_env keys off -- previously the dropdown
+    # showed only teachers while a student silently drove, so the selected entry
+    # (beam_assembly_step1, alphabetically first) described nothing.
+    student_entries: dict[str, str] = {}
+    for raw in args.student_checkpoint:
+        path = _resolve_path(raw)
+        if not path.is_file():
+            raise FileNotFoundError(f"student checkpoint not found: {path}")
+        label = f"student: {path.parent.name}/{path.stem}"
+        viewer_policies[label] = ("student:", str(path))
+        student_entries[label] = str(path)
+    if student_entries:
+        print(f"[eval_isaacsim] student policies in dropdown: "
+              f"{list(student_entries)}")
+    # Default the dropdown to a student when one was supplied, so the initial
+    # selection matches what will actually drive.
+    initial_policy_name = (
+        next(iter(student_entries)) if student_entries else selected_policy.name
+    )
 
     class IsaacSimPegDynamicDemo(gym_eval.PegDynamicDemo):
         def __init__(self, *demo_args, **demo_kwargs):
@@ -862,7 +885,9 @@ def _run_viewer(args) -> int:
             self.keep_dr = bool(args.keep_dr)
             self.student_cam = bool(args.student_cam)
             self.student_cam_every = int(args.student_cam_every)
-            self.student_checkpoint = args.student_checkpoint
+            self.student_checkpoint = (
+                args.student_checkpoint[0] if args.student_checkpoint else None
+            )
             super().__init__(*demo_args, **demo_kwargs)
             self._sl_insertion_tol.value = float(args.insertion_success_tolerance)
             self._sl_retract_tol.value = float(args.retract_success_tolerance)
@@ -875,6 +900,30 @@ def _run_viewer(args) -> int:
             retract_tol = float(self._sl_retract_tol.value)
             policy_name = self._dd_policy.value
             _config_path, checkpoint_path = self.policies[policy_name]
+            # A "student:" entry means the depth student drives. The worker still
+            # builds an rl_games player to advance the sim, so it needs *a*
+            # teacher checkpoint -- use the one matching the selected problem so
+            # nothing mismatched is loaded, rather than whatever the dropdown
+            # happened to list first.
+            student_ckpt = None
+            if _config_path == "student:":
+                student_ckpt = checkpoint_path
+                teacher = next(
+                    (ck for nm, (_c, ck) in self.policies.items()
+                     if _c != "student:" and nm == problem_name),
+                    None,
+                ) or next(
+                    (ck for _nm, (_c, ck) in self.policies.items() if _c != "student:"),
+                    None,
+                )
+                if teacher is None:
+                    self._md_status.content = (
+                        "**Status:** a student checkpoint needs at least one "
+                        "teacher checkpoint present (--policies-dir) to build the "
+                        "sim driver."
+                    )
+                    return
+                checkpoint_path = teacher
 
             try:
                 self._set_problem_assets(problem_name)
@@ -954,11 +1003,11 @@ def _run_viewer(args) -> int:
                 "--override-json",
                 json.dumps(worker_overrides),
             ]
-            if self.student_cam or self.student_checkpoint:
+            if self.student_cam or student_ckpt:
                 cmd += ["--student-cam",
                         "--student-cam-every", str(self.student_cam_every)]
-            if self.student_checkpoint:
-                cmd += ["--student-checkpoint", str(self.student_checkpoint)]
+            if student_ckpt:
+                cmd += ["--student-checkpoint", str(student_ckpt)]
             if self.deterministic:
                 cmd.append("--deterministic")
             if self.sdf:
@@ -1013,8 +1062,16 @@ def _run_viewer(args) -> int:
 
     if args.dry_run:
         print(f"[eval_isaacsim] worker python: {args.python or _default_isaacsim_python()}")
-        print(f"[eval_isaacsim] selected policy: {selected_policy.name}")
-        print(f"[eval_isaacsim] checkpoint: {selected_policy.checkpoint}")
+        # Report the dropdown's initial selection, which is what will drive --
+        # not selected_policy, which is only the teacher spec.
+        print(f"[eval_isaacsim] initial policy: {initial_policy_name}")
+        print(f"[eval_isaacsim] checkpoint: "
+              f"{viewer_policies[initial_policy_name][1]}")
+        if viewer_policies[initial_policy_name][0] == "student:":
+            print("[eval_isaacsim]   -> distilled STUDENT drives (BC/DAgger, "
+                  "camera input)")
+        else:
+            print("[eval_isaacsim]   -> RL teacher drives (state-based)")
         print(f"[eval_isaacsim] initial problem: {initial_problem}")
         print(f"[eval_isaacsim] port: {args.port}")
         return 0
@@ -1025,7 +1082,7 @@ def _run_viewer(args) -> int:
         headless=not args.no_headless,
         goal_mode=args.goal_mode,
         random_goal_fraction=args.random_goal_fraction,
-        initial_policy=selected_policy.name,
+        initial_policy=initial_policy_name,
         extra_overrides=extra_overrides,
         initial_problem=initial_problem,
     ).run()
