@@ -5,11 +5,12 @@ depth-vision behaviour-cloning student, reusing DEXTRAH's DAgger machinery
 (`~/DEXTRAH`, NVlabs, clean at `ebc08ed`).
 
 **Status.** Environment set up and validated; task selected; one latent bug in the
-student camera path found and fixed. **Phases 1–4 are done and verified**
+student camera path found and fixed. **Phases 1–5 are done; all checks pass**
 (`check_phase1_obs.py` 23/23; `check_phase2_teacher.py` gate PASSED at 96.9%
 plus bit-exact equivalence; `check_phase2_student_env.py`,
-`check_phase3_student_panel.py` and `check_phase4_student_net.py` all pass).
-Phases 5–6 not started.
+`check_phase3_student_panel.py`, `check_phase4_student_net.py`,
+`check_phase5_dagger.py` 16/16). Phase 6 not started, and **no real training run
+has happened yet** — Phase 5 is verified as plumbing only.
 
 ---
 
@@ -448,7 +449,7 @@ only at `seq_length == 1`. At 16, `LSTMWithDones` needs it to zero hidden state
 at episode boundaries *inside* the window. The network now warns once if
 `seq_length > 1` arrives without it.
 
-### Phase 5 — DAgger loop
+### Phase 5 — DAgger loop — **DONE (plumbing verified, not trained)**
 
 Port `distillation.py` → `isaacsimenvs/distillation/dagger.py`. Keep the loop
 shape, with four deliberate deviations:
@@ -474,6 +475,50 @@ shape, with four deliberate deviations:
 Loss: weighted L2 on teacher `mus` (weights `1/sigma_T²`) + L2 on `sigmas` +
 `aux_coeff · Σ aux`. Reduction is `mean` over the env batch
 (`torch_ext.apply_masks` with `mask=None`).
+
+---
+
+#### Phase 5 outcome
+
+`isaacsimenvs/distillation/dagger.py`, smoke-tested by
+`check_phase5_dagger.py` (16/16). 8 envs, 160 env steps, `seq_length=4`:
+total 8.05 → 7.14, `hole_pos` aux 0.0691 → 0.0016, **hole RMSE 446 mm → 68 mm
+in 40 gradient steps**. Plumbing only — it says nothing about reaching 2 mm.
+
+**BPTT needs no second forward pass and no batch layout.** Upstream accumulates
+`total_loss` across steps and steps every `seq_length` iterations, detaching
+hidden state only there (`distillation.py:528-540`). That is genuine
+`seq_length`-step BPTT reusing the rollout's forward as the training forward —
+so the env-major `(N*T, F)` layout trap from Phase 4 never arises. Cost is
+memory: `seq_length` forward graphs live at once, conv activations included.
+Lower `seq_length` before `num_envs`, since `num_envs` *is* the batch size.
+
+**Deviation 3 changes the throughput budget.** With `seq_length=16`, N env steps
+buy N/16 gradient steps, not N. The 100k-iteration ≈ 1.6 h figure in §0 assumed
+one gradient step per env step, i.e. DEXTRAH's clobbered `seq_length=1`.
+
+**The plan's `+ L2 on sigmas` term had to be disabled** (`sigma_loss_coef: 0.0`).
+Measured at init it carries **2806 of a 2806 total** — ~450× the `mus` term —
+because the teacher's block-50 sigmas reach 170 while the student starts at
+`exp(0) = 1`; `(170−1)²/29` alone is ~990. It does *not* corrupt learning:
+`fixed_sigma: True` makes the student's sigma a standalone parameter and the
+network's `sigma = mu * 0.0 + sigma_param` zeroes the gradient path to the trunk
+(verified — trunk grad 0.0, sigma-param grad 338). But it buries the progress
+signal completely, and what it trains is the student's sigma toward a per-block
+SAPG exploration hyperparameter that describes the teacher's training schedule
+rather than the task. This is the *third* place the Phase 2 sigma finding bit.
+
+Other deviations as planned: no DDP, β warmup honored (β=1 for
+`beta_warmup_iters`, optional linear anneal), no per-step `empty_cache()`, no
+dead done-time flush, uniform `mus` weighting with `mu_weight_mode="inv_sigma2"`
+available for comparison, `dones` threaded into the student batch, and hidden
+state zeroed by multiplicative mask rather than in-place indexing so it stays
+inside the live autograd graph.
+
+Also sidestepped: upstream's aux block reads `obs["mask"]`
+(`distillation.py:465`) unconditionally before the per-target loop, so a
+verbatim port without segmentation masks would `KeyError` before computing any
+loss.
 
 ### Phase 6 — entry point
 
@@ -502,7 +547,7 @@ Loss: weighted L2 on teacher `mus` (weights `1/sigma_T²`) + L2 on `sigmas` +
 
 ## 4. Order of work
 
-~~Phase 1~~ → ~~Phase 2 (gate passed)~~ → ~~Phase 3~~ → ~~Phase 4~~ → **Phase 5** → Phase 6.
+~~Phase 1~~ → ~~Phase 2 (gate passed)~~ → ~~Phase 3~~ → ~~Phase 4~~ → ~~Phase 5~~ → **Phase 6**.
 
 Phases 1 and 2 are independent and can be done in either order; Phase 2 is the one
 that could invalidate assumptions, so it is worth front-loading.

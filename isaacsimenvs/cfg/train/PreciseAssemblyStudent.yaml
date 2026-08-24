@@ -115,6 +115,14 @@ params:
                              # weights from ever learning a useful hidden
                              # state; Phase 5 honors this value.
     aux_coeff: 10.0          # DEXTRAH's weight on the summed aux losses
+    mu_weight_mode: uniform  # NOT 1/sigma_T^2: those sigmas index only on the
+                             # SAPG block id and span 1054x (teacher.py).
+    sigma_loss_coef: 0.0     # off. At init the sigma-matching term is ~2806 vs
+                             # mu's ~6, because teacher block-50 sigmas reach
+                             # 170 while the student starts at exp(0)=1. It
+                             # cannot reach the trunk (fixed_sigma + mu*0.0), so
+                             # it only buries the progress signal and trains the
+                             # student's sigma toward a SAPG hyperparameter.
     beta_warmup_iters: 15000 # teacher-driven warmup. DEXTRAH hardcodes beta=0,
                              # which is only safe because its geometric fabric
                              # bounds the reachable state set. play2perfect
