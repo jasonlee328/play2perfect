@@ -249,6 +249,69 @@ check(f"seq_length={T} gives mus (N*T, 29)", tuple(res_t["mus"].shape) == (N * T
 check(f"seq_length={T} aux is (N*T, size)",
       all(tuple(v.shape) == (N * T, want[k]) for k, v in net.get_aux_outputs().items()))
 
+# --- 7b. BPTT batch layout is env-major, verified not assumed --------------
+# The reshape (N*T, F) -> (num_seqs, seq_length, F) requires all T timesteps of
+# env 0 first, then env 1, and so on. A time-major batch -- all envs at t=0,
+# then all envs at t=1, which is how a rollout naturally accumulates -- is
+# silently reinterpreted, mixing envs into fake sequences with no error.
+#
+# Test: give each env an input that is CONSTANT across its T timesteps under the
+# env-major layout. Then a single seq_length=T call must equal T sequential
+# seq_length=1 calls that thread the hidden state. eval() so the image
+# normalizer's running stats stay frozen between the two runs.
+print("\n7b. BPTT batch layout (env-major)")
+model.eval()
+with torch.no_grad():
+    per_env_obs = torch.randn(N, PROPRIO_DIM, device=dev)
+    per_env_img = torch.rand(
+        N, int(si["channels"]), int(si["height"]), int(si["width"])
+    ).to(dev)
+
+    # env-major: row (e*T + t) is env e -> repeat_interleave along the env axis
+    obs_major = per_env_obs.repeat_interleave(T, dim=0)
+    img_major = per_env_img.repeat_interleave(T, dim=0)
+    res_bptt = model({
+        "is_train": True,
+        "prev_actions": torch.zeros(N * T, ACTIONS, device=dev),
+        "obs": obs_major, "img": img_major,
+        "rnn_states": [s.to(dev) for s in net.get_default_rnn_state()],
+        "seq_length": T, "dones": torch.zeros(N * T, device=dev), "rnn_masks": None,
+    })
+    mus_bptt = res_bptt["mus"].reshape(N, T, ACTIONS)
+
+    st = [s.to(dev) for s in net.get_default_rnn_state()]
+    mus_seq = []
+    for _t in range(T):
+        r = model({
+            "is_train": True,
+            "prev_actions": torch.zeros(N, ACTIONS, device=dev),
+            "obs": per_env_obs, "img": per_env_img,
+            "rnn_states": st, "seq_length": 1, "rnn_masks": None,
+        })
+        st = list(r["rnn_states"])
+        mus_seq.append(r["mus"])
+    mus_seq = torch.stack(mus_seq, dim=1)  # (N, T, A)
+
+diff = float((mus_bptt - mus_seq).abs().max())
+check("seq_length=T equals T threaded single steps (env-major layout)",
+      diff < 2e-4, f"max diff = {diff:.3e}")
+# Sanity: the test would actually catch a wrong layout. Under a time-major
+# batch the same inputs must NOT reproduce the sequential result.
+with torch.no_grad():
+    obs_time = per_env_obs.repeat(T, 1)
+    img_time = per_env_img.repeat(T, 1, 1, 1)
+    res_tm = model({
+        "is_train": True,
+        "prev_actions": torch.zeros(N * T, ACTIONS, device=dev),
+        "obs": obs_time, "img": img_time,
+        "rnn_states": [s.to(dev) for s in net.get_default_rnn_state()],
+        "seq_length": T, "dones": torch.zeros(N * T, device=dev), "rnn_masks": None,
+    })
+tm_diff = float((res_tm["mus"].reshape(N, T, ACTIONS) - mus_seq).abs().max())
+check("a time-major batch is genuinely different (test has teeth)",
+      tm_diff > 1e-3, f"max diff = {tm_diff:.3e}")
+model.train()
+
 # --- 8. rejections --------------------------------------------------------
 print("\n8. misconfiguration is rejected loudly")
 import copy  # noqa: E402
@@ -271,6 +334,9 @@ for label, mut in [
     ("missing student_image", lambda p: p.pop("student_image")),
     ("rnn.before_mlp: False", lambda p: p["rnn"].__setitem__("before_mlp", False)),
     ("missing rnn block", lambda p: p.pop("rnn")),
+    ("rnn.concat_input: True", lambda p: p["rnn"].__setitem__("concat_input", True)),
+    ("bad spatial_pool",
+     lambda p: p["student_image"].__setitem__("spatial_pool", "maxpool")),
 ]:
     ok, why = build_raises(mut)
     check(f"rejects {label}", ok, why)

@@ -431,6 +431,23 @@ forward wraps normalization in `no_grad()` — if that ever widened to cover the
 encoder, the CNN would silently never train and it would read as a plateau
 rather than an error.
 
+**Landmine for Phase 5: the BPTT batch must be env-major.** `forward` reshapes
+`(N*T, F) -> (num_seqs, seq_length, F)`, so all `T` timesteps of env 0 must come
+first, then env 1, and so on. A *time-major* batch — all envs at `t=0`, then all
+envs at `t=1`, which is exactly how a rollout naturally accumulates — is
+silently reinterpreted, turning envs into fake timesteps. Nothing raises.
+
+DEXTRAH never hit this because it overwrote `seq_length` with 1
+(`distillation.py:177`); honoring the config value makes it live.
+`check_phase4_student_net.py` now verifies the convention by equivalence — one
+`seq_length=T` call against `T` threaded single steps (matches to 2e-5) — and
+confirms the test has teeth by showing a time-major batch differs by 0.348.
+
+Related: DEXTRAH's student batch dict never contains `dones`, which is harmless
+only at `seq_length == 1`. At 16, `LSTMWithDones` needs it to zero hidden state
+at episode boundaries *inside* the window. The network now warns once if
+`seq_length > 1` arrives without it.
+
 ### Phase 5 — DAgger loop
 
 Port `distillation.py` → `isaacsimenvs/distillation/dagger.py`. Keep the loop

@@ -183,6 +183,14 @@ class A2CAuxCNNBuilder(NetworkBuilder):
                 )
             if not self.is_rnn_before_mlp:
                 raise ValueError("a2c_aux_cnn_net expects rnn.before_mlp: True.")
+            if self.rnn_concat_input:
+                # Upstream only honors this in the `before_mlp: False` path,
+                # which we reject -- so setting it there does nothing. Silently
+                # ignoring a config knob is worse than refusing it.
+                raise ValueError(
+                    "a2c_aux_cnn_net does not implement rnn.concat_input "
+                    "(it is a no-op in the before_mlp: True path)."
+                )
 
             # --- image encoder ------------------------------------------------
             self.img_height = int(self.student_image["height"])
@@ -245,6 +253,7 @@ class A2CAuxCNNBuilder(NetworkBuilder):
                         self.activations_factory.create(self.aux_out_activation),
                     )
             self.last_aux_out: dict[str, torch.Tensor] = {}
+            self._warned_no_dones = False
 
             # --- heads --------------------------------------------------------
             self.value = self._build_value_layer(out_size, self.value_size)
@@ -302,6 +311,27 @@ class A2CAuxCNNBuilder(NetworkBuilder):
 
         # -- forward ------------------------------------------------------------
         def forward(self, obs_dict):
+            """Forward pass.
+
+            **Batch layout contract for ``seq_length > 1``.** Rows are reshaped
+            ``(N*T, F) -> (num_seqs, seq_length, F)``, so the caller must lay the
+            batch out **env-major**: all ``T`` timesteps of env 0, then all ``T``
+            of env 1, and so on. A time-major batch (all envs at t=0, then all
+            envs at t=1 -- which is the *natural* way a rollout accumulates)
+            silently reinterprets envs as timesteps. Nothing raises; you simply
+            train on garbage sequences.
+
+            DEXTRAH never hit this because it overwrote ``seq_length`` with 1
+            (``distillation.py:177``). Honoring the config value, as the port
+            plan requires, makes this live. ``check_phase4_student_net.py``
+            asserts the convention via a seq_length=T vs T-single-steps
+            equivalence test.
+
+            **``dones`` should be supplied** whenever ``seq_length > 1``:
+            ``LSTMWithDones`` uses it to zero the hidden state at episode
+            boundaries *inside* the BPTT window. DEXTRAH's student batch dict
+            omits it entirely, which is harmless only at ``seq_length == 1``.
+            """
             obs = obs_dict["obs"]
             if "img" not in obs_dict:
                 raise KeyError(
@@ -322,9 +352,22 @@ class A2CAuxCNNBuilder(NetworkBuilder):
             trunk_in = torch.cat([obs, img_features], dim=-1)
 
             states = obs_dict.get("rnn_states", None)
+            if states is None:
+                raise KeyError(
+                    "a2c_aux_cnn_net requires 'rnn_states' in obs_dict; the "
+                    "student is recurrent and its hidden state is caller-owned."
+                )
             dones = obs_dict.get("dones", None)
             bptt_len = obs_dict.get("bptt_len", 0)
             seq_length = obs_dict.get("seq_length", 1)
+            if seq_length > 1 and dones is None and not self._warned_no_dones:
+                self._warned_no_dones = True
+                print(
+                    "[a2c_aux_cnn_net] WARNING: seq_length="
+                    f"{seq_length} with no 'dones' in obs_dict. The LSTM hidden "
+                    "state will carry across episode boundaries inside the BPTT "
+                    "window. Pass dones (N*T,) unless that is intended."
+                )
 
             out = trunk_in
             batch_size = out.size()[0]
