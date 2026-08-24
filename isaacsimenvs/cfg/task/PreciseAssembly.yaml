@@ -150,6 +150,9 @@ domain_randomization:
 # 256 fits comfortably, 1024 OOMs a 32 GB card.
 student_obs:
   enabled: false
+  # False = camera + get_student_obs() only, obs contract untouched
+  # (what evaluation/eval_isaacsim.py --student-cam needs).
+  emit_in_observations: true
 
   proprio_list: [joint_pos, joint_vel, prev_action_targets]   # 3 x 29 = 87
 

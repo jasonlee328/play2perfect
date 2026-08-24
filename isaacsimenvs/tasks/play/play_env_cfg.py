@@ -155,6 +155,21 @@ class StudentObsCfg:
 
     enabled: bool = False
 
+    # Whether `_get_observations` returns the distillation obs contract
+    # (proprio / img / teacher_obs / critic / aux_info) instead of the normal
+    # {policy, critic}.
+    #
+    # Set False to get the student camera *without* changing the env's obs
+    # contract: the TiledCamera still spawns and `get_student_obs()` still
+    # works, but `_get_observations` is untouched. That matters because
+    # `RlGamesVecEnvWrapper` raises unless the env exposes a "policy" key
+    # (isaaclab_rl/rl_games.py:128-130), so anything driving a policy through
+    # rl_games — `evaluation/eval_isaacsim.py`, which is how the viser image
+    # panel gets its frames — cannot use the student contract.
+    #
+    # DAgger reads the raw gym env and wants True; viser eval wants False.
+    emit_in_observations: bool = True
+
     # Proprio fields are assembled in this order from the same canonical joint
     # helper used by the teacher observation path.
     proprio_list: tuple[str, ...] = (

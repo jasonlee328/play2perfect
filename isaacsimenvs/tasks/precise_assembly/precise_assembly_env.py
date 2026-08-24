@@ -91,8 +91,11 @@ class PreciseAssemblyEnv(PlayEnv):
                     "student_obs.enabled requires student_obs.image_enabled. "
                     "The distillation contract has no image-free variant."
                 )
+            # Only relevant when aux labels are actually emitted — with
+            # emit_in_observations False there are no aux targets to poison,
+            # and eval_isaacsim exposes a random-goal-fraction slider.
             _rgf = float(cfg.precise_assembly.random_goal_fraction)
-            if _rgf > 0.0:
+            if _rgf > 0.0 and _student_cfg.emit_in_observations:
                 # Raising before `super().__init__()` leaves DirectRLEnv's
                 # `_is_closed` unset, so its `__del__` throws a confusing
                 # AttributeError over the top of our message at GC time.
@@ -129,7 +132,11 @@ class PreciseAssemblyEnv(PlayEnv):
         student_cfg = getattr(cfg, "student_obs", None)
         # image_enabled is guaranteed by the guard above, so this gate matches
         # `_get_observations`' exactly — one condition, not two that can disagree.
-        if student_cfg is not None and student_cfg.enabled:
+        if (
+            student_cfg is not None
+            and student_cfg.enabled
+            and student_cfg.emit_in_observations
+        ):
             from gymnasium import spaces
             import numpy as _np
             from isaacsimenvs.tasks.play.utils.obs_utils import _student_proprio_dict
@@ -876,7 +883,13 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _get_observations(self) -> dict[str, torch.Tensor]:
         student_cfg = getattr(self.cfg, "student_obs", None)
-        student_enabled = student_cfg is not None and student_cfg.enabled
+        # `enabled` alone only means the camera exists and `get_student_obs()`
+        # works; `emit_in_observations` is what swaps the obs contract.
+        student_enabled = (
+            student_cfg is not None
+            and student_cfg.enabled
+            and student_cfg.emit_in_observations
+        )
 
         # `aux_out` is filled in place with clean privileged quantities rather
         # than recomputed here, so the aux labels and the teacher's own

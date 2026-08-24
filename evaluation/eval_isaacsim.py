@@ -425,7 +425,36 @@ def _sim_get_state(env, done_pending: bool = False):
     )
 
 
-def _sim_episode(conn, env, wrapped, player, *, deterministic: bool):
+def _student_frame(env):
+    """Grab the student's depth image as (uint8 HxW, stats) for the viser panel.
+
+    Deliberately reads `get_student_obs()`, not the raw camera: the point of the
+    panel is to show what the student network actually receives, after the
+    preprocess / window-normalize / crop / delay chain. A raw-camera view would
+    hide exactly the bugs worth catching.
+
+    `n_unique` is the load-bearing stat. `window_normalize` saturates everything
+    past `depth_max_m` to 1.0, so a mis-aimed camera yields a valid-looking
+    constant image; n_unique == 1 is that failure, visible at a glance.
+    """
+    import torch
+
+    img = env.get_student_obs()["image"][0]        # (C, H, W), env 0
+    g = img[0].detach().float()                    # mono depth
+    stats = {
+        "n_unique": int(g.unique().numel()),
+        "min": float(g.min()),
+        "max": float(g.max()),
+        "mean": float(g.mean()),
+    }
+    u8 = (g.clamp(0.0, 1.0) * 255.0).to(torch.uint8).cpu().numpy()
+    return u8, stats
+
+
+def _sim_episode(
+    conn, env, wrapped, player, *, deterministic: bool,
+    student_cam: bool = False, student_cam_every: int = 2,
+):
     player.reset()
     obs = player.env_reset(wrapped)
 
@@ -467,6 +496,17 @@ def _sim_episode(conn, env, wrapped, player, *, deterministic: bool):
         state = _sim_get_state(env, done_pending=done)
         conn.send(("state", state, cur_succ, cur_max, step, retract_ok))
 
+        # Throttled: the control loop is 60 Hz, the real ZED is 30 Hz, and the
+        # GUI gains nothing from more. Sent as its own message rather than
+        # appended to the state tuple so the pose stream stays untouched.
+        if student_cam and (step % max(1, student_cam_every) == 0):
+            try:
+                u8, st = _student_frame(env)
+                conn.send(("student_img", u8, st))
+            except Exception as exc:  # never let the panel kill the episode
+                conn.send(("student_img_error", str(exc)[:200]))
+                student_cam = False
+
         sleep = CONTROL_DT - (time.time() - t0)
         if sleep > 0:
             time.sleep(sleep)
@@ -496,6 +536,8 @@ def sim_worker(
     sdf: bool,
     keep_dr: bool,
     extra_overrides: dict[str, object],
+    student_cam: bool = False,
+    student_cam_every: int = 2,
 ) -> None:
     app = None
     env = None
@@ -508,7 +550,8 @@ def sim_worker(
         AppLauncher.add_app_launcher_args(launcher_parser)
         launcher_args, _ = launcher_parser.parse_known_args([])
         launcher_args.headless = bool(headless)
-        launcher_args.enable_cameras = False
+        # student_obs spawns a TiledCamera, which requires a camera-enabled app.
+        launcher_args.enable_cameras = bool(student_cam)
         app = AppLauncher(launcher_args).app
 
         import math as _math
@@ -531,6 +574,15 @@ def sim_worker(
             keep_dr=keep_dr,
             extra_overrides=extra_overrides,
         )
+        if student_cam:
+            # `emit_in_observations=False` keeps `_get_observations` returning
+            # {policy, critic}, so `register_rlgames_env` below can still wrap
+            # the env (RlGamesVecEnvWrapper requires a "policy" key). The
+            # camera and `get_student_obs()` are live either way.
+            cfg.student_obs.enabled = True
+            cfg.student_obs.emit_in_observations = False
+            print("[worker] student camera enabled (obs contract unchanged)", flush=True)
+
         env = _instantiate_env(task, cfg)
 
         agent_cfg = _configure_agent(
@@ -566,7 +618,8 @@ def sim_worker(
             cmd = conn.recv()
             if cmd == "run":
                 result = _sim_episode(
-                    conn, env, wrapped, player, deterministic=deterministic
+                    conn, env, wrapped, player, deterministic=deterministic,
+                    student_cam=student_cam, student_cam_every=student_cam_every,
                 )
                 if result == "quit":
                     break
@@ -621,6 +674,8 @@ def _worker_main(args) -> int:
         sdf=args.sdf,
         keep_dr=args.keep_dr,
         extra_overrides=extra_overrides,
+        student_cam=args.student_cam,
+        student_cam_every=args.student_cam_every,
     )
     return 0
 
@@ -652,6 +707,18 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-headless", action="store_true")
     parser.add_argument("--rl-device", default="cuda:0")
     parser.add_argument("--sim-device", default="cuda:0")
+    parser.add_argument(
+        "--student-cam", action="store_true",
+        help="Show the depth-distillation student's camera input in a viser "
+             "panel. Spawns a TiledCamera (~4x step cost) and streams what "
+             "get_student_obs() returns, i.e. post-preprocess, not the raw "
+             "camera. The env's obs contract is unchanged.",
+    )
+    parser.add_argument(
+        "--student-cam-every", type=int, default=2,
+        help="Send one student frame every N control steps (default 2 = 30 Hz, "
+             "matching the real ZED).",
+    )
     parser.add_argument("--list-policies", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -745,6 +812,8 @@ def _run_viewer(args) -> int:
             self.deterministic = bool(args.deterministic)
             self.sdf = bool(args.sdf)
             self.keep_dr = bool(args.keep_dr)
+            self.student_cam = bool(args.student_cam)
+            self.student_cam_every = int(args.student_cam_every)
             super().__init__(*demo_args, **demo_kwargs)
             self._sl_insertion_tol.value = float(args.insertion_success_tolerance)
             self._sl_retract_tol.value = float(args.retract_success_tolerance)
@@ -836,6 +905,9 @@ def _run_viewer(args) -> int:
                 "--override-json",
                 json.dumps(worker_overrides),
             ]
+            if self.student_cam:
+                cmd += ["--student-cam",
+                        "--student-cam-every", str(self.student_cam_every)]
             if self.deterministic:
                 cmd.append("--deterministic")
             if self.sdf:

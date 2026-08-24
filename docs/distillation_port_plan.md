@@ -5,9 +5,10 @@ depth-vision behaviour-cloning student, reusing DEXTRAH's DAgger machinery
 (`~/DEXTRAH`, NVlabs, clean at `ebc08ed`).
 
 **Status.** Environment set up and validated; task selected; one latent bug in the
-student camera path found and fixed. **Phases 1 and 2 are done and verified**
-(`check_phase1_obs.py` 23/23; `check_phase2_teacher.py` gate PASSED at 96.9%;
-`check_phase2_student_env.py` all checks pass). Phases 3–6 not started.
+student camera path found and fixed. **Phases 1, 2 and 3 are done and verified**
+(`check_phase1_obs.py` 23/23; `check_phase2_teacher.py` gate PASSED at 96.9%
+plus bit-exact equivalence; `check_phase2_student_env.py` and
+`check_phase3_student_panel.py` all checks pass). Phases 4–6 not started.
 
 ---
 
@@ -310,12 +311,54 @@ row (4 or 5, both well-conditioned) if per-joint weighting is wanted. The
 `+ L2 on sigmas` term in DEXTRAH's loss is also near-pointless here — it
 regresses the student's sigma toward a constant.
 
-### Phase 3 — viser image panel
+### Phase 3 — viser image panel — **DONE**
 
 `_viser_demo.py` streams a 17-tuple of poses and never shows camera frames. Add
 `server.gui.add_image` fed from `get_student_obs()["image"]`. Small change,
 highest debugging value in the project — you cannot diagnose a vision policy
 without seeing its input, especially with depth augmentation on.
+
+---
+
+#### Phase 3 outcome
+
+`python evaluation/eval_isaacsim.py --policies-dir pretrained_assembly --student-cam`
+
+**It was not a small change, because Phase 1 and the interactive eval are
+mutually exclusive as written.** `eval_isaacsim`'s worker drives the policy with
+`register_rlgames_env` + `player.env_step(wrapped, ...)`, and
+`RlGamesVecEnvWrapper` raises unless the env exposes a `"policy"` obs key — so
+turning on `student_obs` to get the camera would have taken the whole
+interactive eval down with it. One flag was controlling two independent things:
+*does the camera exist* and *does `_get_observations` return the student
+contract*.
+
+New `StudentObsCfg.emit_in_observations` (default `True`) splits them. With it
+`False`, the TiledCamera spawns and `get_student_obs()` works while
+`_get_observations` keeps returning `{policy, critic}` — so the rl_games player
+is untouched. DAgger wants `True`; viser eval sets `False`. The
+`random_goal_fraction` guard is now gated on it too, since with no aux labels
+emitted there is nothing to poison, and the GUI exposes a random-goal slider.
+
+Frames go over their own `("student_img", uint8, stats)` message rather than
+being appended to the pose tuple, so the existing stream is untouched and the
+image can be throttled independently (default every 2 steps = 30 Hz, matching
+the real ZED). 14.6 KB/frame, ~440 KB/s.
+
+The panel shows `get_student_obs()["image"]` — post-preprocess, post-window-
+normalize, post-crop, post-delay — deliberately *not* the raw camera, since a
+raw view would hide exactly the bugs worth catching. It prints
+`unique / min / max / mean` under the image and shows a **CONSTANT IMAGE**
+banner when `n_unique <= 1`, which is the sky-camera failure mode made visible:
+`window_normalize` saturates everything past `depth_max_m`, so a mis-aimed
+camera renders as a perfectly plausible uniform frame.
+
+Verified by `check_phase3_student_panel.py` (data path up to the socket — the
+widget itself needs a browser): obs contract unchanged at `{policy, critic}`
+140/162, `register_rlgames_env` succeeds with the camera live, frame is
+(90,160) uint8 with `n_unique=971`, pickle round-trip intact, frames change over
+a rollout and none go constant. Phase 1 re-checked at 23/23, and the viser
+`add_image` / `.image` setter calls were smoke-tested against viser 1.1.0.
 
 ### Phase 4 — student network
 
@@ -390,7 +433,7 @@ Loss: weighted L2 on teacher `mus` (weights `1/sigma_T²`) + L2 on `sigmas` +
 
 ## 4. Order of work
 
-~~Phase 1~~ → ~~Phase 2 (gate passed)~~ → **Phase 3** → Phase 4 → Phase 5 → Phase 6.
+~~Phase 1~~ → ~~Phase 2 (gate passed)~~ → ~~Phase 3~~ → **Phase 4** → Phase 5 → Phase 6.
 
 Phases 1 and 2 are independent and can be done in either order; Phase 2 is the one
 that could invalidate assumptions, so it is worth front-loading.

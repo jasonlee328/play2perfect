@@ -327,6 +327,20 @@ class PegDynamicDemo:
             self._cb_target_vol = self.server.gui.add_checkbox("Show target volume", initial_value=False)
             self._cb_target_vol.on_update(lambda _: self._toggle_target_volume())
 
+        # Opt-in (eval_isaacsim --student-cam). Set by the IsaacSim subclass
+        # before super().__init__(), hence getattr rather than an attribute.
+        self._img_student = None
+        self._md_student = None
+        if getattr(self, "student_cam", False):
+            with self.server.gui.add_folder("Student camera (depth)", expand_by_default=True):
+                self._img_student = self.server.gui.add_image(
+                    np.zeros((90, 160, 3), dtype=np.uint8),
+                    label="get_student_obs()['image'] — env 0",
+                )
+                self._md_student = self.server.gui.add_markdown(
+                    "**Frame:** waiting for the first episode ..."
+                )
+
         with self.server.gui.add_folder("Status", expand_by_default=True):
             self._md_task = self.server.gui.add_markdown("**Task:** --")
             self._md_hole = self.server.gui.add_markdown("**Hole pos:** --")
@@ -728,6 +742,26 @@ class PegDynamicDemo:
             print(f"[launcher] table_pose received: "
                   f"pos=({px:.3f},{py:.3f},{pz:.3f}) "
                   f"quat=({qw:.3f},{qx:.3f},{qy:.3f},{qz:.3f})")
+
+        elif tag == "student_img":
+            if self._img_student is not None:
+                u8, st = msg[1], msg[2]
+                # viser wants HxWx3; the student's image is single-channel.
+                self._img_student.image = np.repeat(u8[:, :, None], 3, axis=2)
+                # n_unique == 1 is the sky-camera failure: window_normalize
+                # saturates everything past depth_max_m to a constant, so a
+                # mis-aimed camera looks like a valid uniform image.
+                flat = st["n_unique"] <= 1
+                self._md_student.content = (
+                    ("**⚠ CONSTANT IMAGE — camera sees nothing**\n\n" if flat else "")
+                    + f"**Frame:** unique={st['n_unique']} &nbsp;|&nbsp; "
+                    f"min={st['min']:.3f} max={st['max']:.3f} mean={st['mean']:.3f}"
+                )
+
+        elif tag == "student_img_error":
+            if self._md_student is not None:
+                self._md_student.content = f"**Student camera error:** {msg[1]}"
+            print(f"[launcher] student camera error: {msg[1]}")
 
         elif tag == "state":
             state, successes, max_succ, step = msg[1], msg[2], msg[3], msg[4]
