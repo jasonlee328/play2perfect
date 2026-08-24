@@ -1,0 +1,152 @@
+# Depth-vision student for DAgger distillation from the tight_insertion teacher.
+#
+# Modelled on DEXTRAH's rl_games_ppo_lstm_scratch_cnn_aux.yaml. Only the
+# `network:` block and a few `config:` entries are actually consumed: DAgger
+# builds the model through rl_games' ModelBuilder but runs its own training
+# loop, so the PPO-specific settings below (gamma, e_clip, mini_epochs, ...) are
+# inert. They are kept so the file stays loadable by rl_games' Runner and so the
+# diff against the DEXTRAH original stays readable.
+params:
+  seed: 65
+
+  env:
+    # The student's proprio is already clamped to +-10 by the env
+    # (obs.clamp_abs_observations); this matches. Note DEXTRAH used 5.0.
+    clip_observations: 10.0
+    clip_actions: 1.0
+
+  algo:
+    name: a2c_continuous
+
+  model:
+    name: continuous_a2c_logstd
+
+  network:
+    name: a2c_aux_cnn_net
+    separate: False          # single trunk; the builder rejects True
+
+    # Image geometry. MUST match cfg.student_obs image_input_height/width and
+    # image_modality. DEXTRAH hardcoded 320x240 RGB inside the network file;
+    # check_phase4_student_net.py asserts these against StudentObsCfg.
+    student_image:
+      height: 90
+      width: 160
+      channels: 1            # depth = 1 channel
+      normalize: true        # per-pixel RunningMeanStd over the image
+      # "avgpool" = DEXTRAH's AdaptiveAvgPool2d((1,1)): collapses the final
+      # 128x3x8 map to 128, discarding 2944 of 3072 values. That is
+      # ~translation-invariant, i.e. it keeps *what* is in frame and drops
+      # *where*. "flatten" keeps the 3x8 map (3072 -> 32) instead.
+      #
+      # Default matches DEXTRAH so the first run is the known-good config. The
+      # hole_pos aux head is the instrument: if its error stalls well above the
+      # 2 mm spec while the mu loss converges, switch this to "flatten" first.
+      spatial_pool: avgpool
+
+    space:
+      continuous:
+        mu_activation: None
+        sigma_activation: None
+        mu_init:
+          name: default
+        sigma_init:
+          name: const_initializer
+          val: 0
+        # A learned constant sigma. Note the TEACHER's sigmas are unusable as
+        # loss weights (they index only on the SAPG block id and span 1054x --
+        # see isaacsimenvs/distillation/teacher.py); Phase 5 weights uniformly.
+        fixed_sigma: True
+
+    mlp:
+      units: [512, 512, 256]
+      activation: elu
+      d2rl: False
+      initializer:
+        name: default
+      regularizer:
+        name: None
+
+    rnn:
+      name: lstm
+      units: 512
+      layers: 1
+      before_mlp: True       # builder requires True
+      layer_norm: True
+
+    aux_network:
+      mlp:
+        units: [512, 256]
+        activation: elu
+        out_activation: None  # plain nn.Linear on each head's output
+        d2rl: False
+        initializer:
+          name: default
+        regularizer:
+          name: None
+
+    # Auxiliary regression targets, matching PreciseAssemblyEnv._aux_info().
+    # Deviates from DEXTRAH's {object_pos} on purpose: here the object is
+    # already grasped, so its pose is largely recoverable from the 87 proprio
+    # numbers. The genuinely hidden quantity is the hole.
+    aux_outputs:
+      hole_pos: {size: 3}             # the primary unknown
+      keypoints_rel_goal: {size: 12}  # the teacher's literal decision input
+      object_pos: {size: 3}           # cheap encoder grounding
+
+  load_checkpoint: False
+  load_path: ''
+
+  config:
+    name: precise_assembly_student
+    env_name: rlgpu
+    device: 'cuda:0'
+    device_name: 'cuda:0'
+    multi_gpu: False
+    normalize_input: True    # model-level RunningMeanStd over the 87 proprio
+    normalize_value: True
+    num_actors: -1           # set from num_envs by the entry point
+
+    # --- consumed by the DAgger loop (Phase 5) ---
+    learning_rate: 1e-4      # DEXTRAH's constant LR, tuned at 256 envs
+    grad_norm: 1.0
+    truncate_grads: True
+    seq_length: 16           # BPTT length. DEXTRAH read its config then
+                             # overwrote it with 1, which stops the recurrent
+                             # weights from ever learning a useful hidden
+                             # state; Phase 5 honors this value.
+    aux_coeff: 10.0          # DEXTRAH's weight on the summed aux losses
+    beta_warmup_iters: 15000 # teacher-driven warmup. DEXTRAH hardcodes beta=0,
+                             # which is only safe because its geometric fabric
+                             # bounds the reachable state set. play2perfect
+                             # commands 29 raw joint targets and has no fabric.
+    max_iters: 100000
+
+    # --- inert: PPO settings kept for Runner compatibility ---
+    ppo: True
+    mixed_precision: False
+    reward_shaper:
+      scale_value: 0.01
+    normalize_advantage: True
+    gamma: 0.998
+    tau: 0.95
+    lr_schedule: adaptive
+    schedule_type: standard
+    kl_threshold: 0.016
+    score_to_win: 100000
+    max_epochs: 10000
+    save_best_after: 100
+    save_frequency: 200
+    print_stats: True
+    entropy_coef: 0.0
+    e_clip: 0.2
+    horizon_length: 16
+    minibatch_size: 16384
+    mini_epochs: 4
+    critic_coef: 4
+    clip_value: True
+    bounds_loss_coef: 0.0001
+
+    player:
+      deterministic: True
+      games_num: 100000
+      print_stats: False

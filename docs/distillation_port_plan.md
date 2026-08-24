@@ -5,10 +5,11 @@ depth-vision behaviour-cloning student, reusing DEXTRAH's DAgger machinery
 (`~/DEXTRAH`, NVlabs, clean at `ebc08ed`).
 
 **Status.** Environment set up and validated; task selected; one latent bug in the
-student camera path found and fixed. **Phases 1, 2 and 3 are done and verified**
+student camera path found and fixed. **Phases 1–4 are done and verified**
 (`check_phase1_obs.py` 23/23; `check_phase2_teacher.py` gate PASSED at 96.9%
-plus bit-exact equivalence; `check_phase2_student_env.py` and
-`check_phase3_student_panel.py` all checks pass). Phases 4–6 not started.
+plus bit-exact equivalence; `check_phase2_student_env.py`,
+`check_phase3_student_panel.py` and `check_phase4_student_net.py` all pass).
+Phases 5–6 not started.
 
 ---
 
@@ -360,7 +361,7 @@ widget itself needs a browser): obs contract unchanged at `{policy, critic}`
 a rollout and none go constant. Phase 1 re-checked at 23/23, and the viser
 `add_image` / `.image` setter calls were smoke-tested against viser 1.1.0.
 
-### Phase 4 — student network
+### Phase 4 — student network — **DONE**
 
 Port `dextrah_lab/distillation/a2c_with_aux_cnn.py` (the **mono depth** variant,
 matching play2perfect's `image_modality="depth"` default) to
@@ -378,6 +379,57 @@ New `isaacsimenvs/cfg/train/PreciseAssemblyStudent.yaml`, modelled on
 
 Skip for v1: `stereo_encoder.py`, all `a2c_*_transformer*.py`, `rgb_augs.py`
 (play2perfect already has a depth-aug pipeline; RGB needs texture assets).
+
+---
+
+#### Phase 4 outcome
+
+`isaacsimenvs/distillation/a2c_aux_cnn.py` (registered `a2c_aux_cnn_net`) +
+`isaacsimenvs/cfg/train/PreciseAssemblyStudent.yaml`. 2,650,077 trainable
+parameters. Verified by `check_phase4_student_net.py` — which needs **no
+simulator**, so network iteration is a two-second loop.
+
+Architecture: `img (N,1,90,160)` → per-pixel `RunningMeanStd` → `CustomCNN` → 32
+features, concatenated with the model-level-normalized 87 proprio → 119 → LSTM
+512 → LayerNorm → MLP `[512,512,256]` → mu / sigma / value. Aux heads read
+`cat(mlp_out, trunk_in)` = 375 → `[512,256]` → one `Linear` per target.
+
+Note there are **two independent normalizers**: rl_games' model-level
+`running_mean_std` over the 87 proprio (`normalize_input: True`), and the
+network's own per-pixel one over `(1,90,160)`. DEXTRAH names the latter
+`running_mean_std` as well, which shadows the concept without colliding;
+renamed `img_running_mean_std` here.
+
+**Deviations from the DEXTRAH source:**
+
+1. **The upstream file is not actually the mono-depth variant.** It hardcodes
+   `img_height = 120*2`, `img_width = 160*2` and `use_depth = False` — 320×240
+   RGB. Geometry now comes from a `student_image:` config block, asserted
+   against *both* `StudentObsCfg`'s defaults and the task YAML, since a silent
+   mismatch trains the encoder on the wrong image shape.
+2. RGB branch and the unused ResNet-normalization transform dropped, which also
+   drops the `torchvision` dependency.
+3. `separate: True` rejected rather than carried — it duplicates ~90 lines of
+   RNN plumbing for a config we never use, and DAgger trains no value function.
+4. Uses rl_games' `NetworkBuilder` instead of DEXTRAH's vendored 160-line copy.
+5. **`spatial_pool` is configurable, and this is the architectural risk.**
+   Upstream ends the conv stack with `AdaptiveAvgPool2d((1,1))`. At 90×160 the
+   final map is 128×3×8, so that discards **2944 of 3072 values**. Global
+   average pooling over a translation-equivariant conv stack is approximately
+   translation *invariant* — it keeps *what* is in frame and drops *where* —
+   and our task is hole localization to 2 mm from a ~10×10 px target, i.e.
+   almost purely a "where" problem. The only thing breaking equivariance is
+   LayerNorm's per-position affine parameters, which is a weak mechanism.
+
+   Default stays `avgpool` (DEXTRAH's proven config, per this plan's "do not
+   tune prematurely"), with `spatial_pool: flatten` keeping the 3×8 map
+   (3072 → 32). **The `hole_pos` aux head is the instrument**: if its error
+   stalls well above 2 mm while the mu loss converges, switch this first.
+
+Checks include gradient flow into the first conv layer, because the upstream
+forward wraps normalization in `no_grad()` — if that ever widened to cover the
+encoder, the CNN would silently never train and it would read as a plateau
+rather than an error.
 
 ### Phase 5 — DAgger loop
 
@@ -433,7 +485,7 @@ Loss: weighted L2 on teacher `mus` (weights `1/sigma_T²`) + L2 on `sigmas` +
 
 ## 4. Order of work
 
-~~Phase 1~~ → ~~Phase 2 (gate passed)~~ → ~~Phase 3~~ → **Phase 4** → Phase 5 → Phase 6.
+~~Phase 1~~ → ~~Phase 2 (gate passed)~~ → ~~Phase 3~~ → ~~Phase 4~~ → **Phase 5** → Phase 6.
 
 Phases 1 and 2 are independent and can be done in either order; Phase 2 is the one
 that could invalidate assumptions, so it is worth front-loading.
