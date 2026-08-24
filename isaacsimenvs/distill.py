@@ -103,6 +103,12 @@ def main() -> None:
     parser.add_argument("--sigma-loss-coef", type=float, default=None)
     parser.add_argument("--mu-weight-mode", choices=("uniform", "inv_sigma2"), default=None)
     parser.add_argument(
+        "--loss-form", choices=("l2_norm", "mse"), default=None,
+        help="l2_norm (default) is DEXTRAH's: norm over the action dim, mean "
+             "over the batch. mse was this port's first attempt and stalls as "
+             "the error shrinks, since its gradient decays with the error.",
+    )
+    parser.add_argument(
         "--beta-warmup-grad-steps", type=int, default=None,
         help="Teacher-driven warmup length in GRADIENT steps (not env steps). "
              "At seq_length=16, 15000 grad steps = 240k env steps.",
@@ -254,6 +260,7 @@ def main() -> None:
             ("aux_coeff", "aux_coeff"),
             ("sigma_loss_coef", "sigma_loss_coef"),
             ("mu_weight_mode", "mu_weight_mode"),
+            ("loss_form", "loss_form"),
             ("beta_warmup_grad_steps", "beta_warmup_grad_steps"),
             ("beta_anneal_grad_steps", "beta_anneal_grad_steps"),
         ]:
@@ -354,7 +361,7 @@ def main() -> None:
             f"[distill] spatial_pool="
             f"{student_cfg['params']['network']['student_image']['spatial_pool']} "
             f"aux_coeff={dagger.aux_coeff} sigma_loss_coef={dagger.sigma_loss_coef} "
-            f"mu_weight={dagger.mu_weight_mode}\n"
+            f"mu_weight={dagger.mu_weight_mode} loss_form={dagger.loss_form}\n"
             f"[distill] out_dir={out_dir}  "
             f"tensorboard={'on' if out_dir else 'off (no --out-dir)'}  "
             f"wandb={'on' if args_cli.wandb_activate else 'off'}\n",

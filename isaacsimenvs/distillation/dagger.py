@@ -107,6 +107,27 @@ from collections import deque
 import torch
 
 
+# DEXTRAH's loss primitives, verbatim (distillation.py:47-54). These are L2
+# *norms* -- Euclidean distance over the action/target dimension -- not mean
+# squared errors, and the difference is not cosmetic: d|e|/de is constant while
+# d(e^2)/de shrinks with e. Under MSE the gradient fades exactly as the student
+# gets good, which reads as a plateau; under a norm it keeps pushing.
+def _l2(model: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    return torch.norm(model - target, p=2, dim=-1)
+
+
+def _weighted_l2(
+    model: torch.Tensor, target: torch.Tensor, weights: torch.Tensor
+) -> torch.Tensor:
+    d = model - target
+    return torch.sum(d * (weights * d), dim=-1) ** 0.5
+
+
+def _reduce(per_env: torch.Tensor) -> torch.Tensor:
+    """DEXTRAH's reduction: torch_ext.apply_masks(..., mask=None) -> mean."""
+    return torch.mean(per_env)
+
+
 class Dagger:
     """Single-GPU DAgger from a frozen teacher into a recurrent depth student.
 
@@ -165,6 +186,15 @@ class Dagger:
         # as DEXTRAH does (distillation.py:445). No GradScaler: bf16 has fp32
         # dynamic range so loss scaling is unnecessary.
         self.autocast_bf16 = bool(cfg.get("autocast_bf16", True))
+        # "l2_norm" is DEXTRAH's: torch.norm(err, dim=-1) then mean over the
+        # batch, for the mu, sigma AND aux terms alike. "mse" is what this port
+        # wrote first -- a mean of squared errors, whose gradient decays with the
+        # error and stalls once the student is close.
+        self.loss_form = str(cfg.get("loss_form", "l2_norm"))
+        if self.loss_form not in ("l2_norm", "mse"):
+            raise ValueError(
+                f"loss_form must be 'l2_norm' or 'mse', got {self.loss_form!r}"
+            )
         self.mu_weight_mode = str(cfg.get("mu_weight_mode", "uniform"))
         if self.mu_weight_mode not in ("uniform", "inv_sigma2"):
             raise ValueError(
@@ -345,23 +375,36 @@ class Dagger:
 
     # -- loss ----------------------------------------------------------------
     def compute_loss(self, student_res, teacher_out, aux_gt) -> tuple[torch.Tensor, dict]:
-        mu_err = student_res["mus"] - teacher_out["mus"]
-        if self.mu_weight_mode == "inv_sigma2":
-            # Upstream's weighting, kept only for comparison. See deviation 5.
-            w = (1.0 / teacher_out["sigmas"][0]).pow(2).detach()
-            mu_loss = (mu_err.pow(2) * w).mean()
+        mus_t = teacher_out["mus"].detach()
+        if self.loss_form == "l2_norm":
+            # DEXTRAH's form.
+            if self.mu_weight_mode == "inv_sigma2":
+                w = (1.0 / teacher_out["sigmas"][0]).pow(2).detach()
+                mu_loss = _reduce(_weighted_l2(student_res["mus"], mus_t, w))
+            else:
+                mu_loss = _reduce(_l2(student_res["mus"], mus_t))
+            sigma_loss = _reduce(
+                _l2(student_res["sigmas"], teacher_out["sigmas"].detach())
+            )
         else:
-            mu_loss = mu_err.pow(2).mean()
-
-        # Off by default -- see deviation 7. Still computed so it stays visible
-        # in the log even at coefficient zero.
-        sigma_loss = (student_res["sigmas"] - teacher_out["sigmas"]).pow(2).mean()
+            mu_err = student_res["mus"] - mus_t
+            if self.mu_weight_mode == "inv_sigma2":
+                w = (1.0 / teacher_out["sigmas"][0]).pow(2).detach()
+                mu_loss = (mu_err.pow(2) * w).mean()
+            else:
+                mu_loss = mu_err.pow(2).mean()
+            sigma_loss = (
+                student_res["sigmas"] - teacher_out["sigmas"].detach()
+            ).pow(2).mean()
 
         aux_out = self.student_net.get_aux_outputs()
         aux_losses = {}
         for name in self.aux_targets:
             target = aux_gt[name].reshape(self.num_envs, -1).detach()
-            aux_losses[name] = (aux_out[name] - target).pow(2).mean()
+            if self.loss_form == "l2_norm":
+                aux_losses[name] = _reduce(_l2(aux_out[name], target))
+            else:
+                aux_losses[name] = (aux_out[name] - target).pow(2).mean()
 
         total = (
             mu_loss

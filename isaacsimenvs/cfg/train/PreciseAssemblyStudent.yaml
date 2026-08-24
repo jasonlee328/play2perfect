@@ -120,6 +120,12 @@ params:
     seq_length: 1            # DEXTRAH: reads config, then `self.seq_length = 1`
                              # (distillation.py:177). BPTT length 1.
     aux_coeff: 10.0          # DEXTRAH's weight on the summed aux losses
+    # DEXTRAH's losses are L2 NORMS -- torch.norm(err, dim=-1) then mean over
+    # the batch (distillation.py:47-54, l2 / weighted_l2) -- for the mu, sigma
+    # and aux terms alike. Not mean-squared-error. The gradient of a norm is
+    # constant in the error while MSE's decays with it, so MSE stalls exactly
+    # as the student gets close. Set "mse" to recover the old behaviour.
+    loss_form: l2_norm
     mu_weight_mode: inv_sigma2   # DEXTRAH: weights = (1/teacher_sigmas[0])**2
     sigma_loss_coef: 1.0     # DEXTRAH includes the L2-on-sigmas term
     # Teacher-driven warmup, in GRADIENT steps (not env steps). DEXTRAH
