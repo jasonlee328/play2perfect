@@ -162,6 +162,16 @@ class Dagger:
         self.aux_targets = list(params["network"]["aux_outputs"].keys())
         self.action_dim = int(env.cfg.action_space)
 
+        # RMSE a model scores by ignoring the image entirely and always
+        # predicting the centre of hole_pos' sampling range. Logged alongside
+        # hole_rmse_mm because the raw number is easy to misread as progress:
+        # for +-187.5 x +-100 mm the baseline is ~123 mm, so "446 -> 109 mm"
+        # is the encoder learning the mean, not learning to localise.
+        pih = env.cfg.precise_assembly
+        xr = float(pih.hole_x_range[1]) - float(pih.hole_x_range[0])
+        yr = float(pih.hole_y_range[1]) - float(pih.hole_y_range[0])
+        self.hole_rmse_baseline_mm = ((xr**2 + yr**2) / 12.0) ** 0.5 * 1000.0
+
         register_student_networks()
         self.student_model = (
             ModelBuilder()
@@ -269,10 +279,14 @@ class Dagger:
             "total": float(total.detach()),
         }
         # RMS error on hole_pos in millimetres: the number that decides whether
-        # this student can do the task at all (2 mm spec).
+        # this student can do the task at all (2 mm spec). Reported as a
+        # fraction of the ignore-the-image baseline too -- anything near 1.0
+        # means the encoder has learned the mean hole position and no more.
         if "hole_pos" in aux_out:
             err = (aux_out["hole_pos"] - aux_gt["hole_pos"]).detach()
-            parts["hole_rmse_mm"] = float(err.pow(2).sum(-1).mean().sqrt() * 1000.0)
+            rmse = float(err.pow(2).sum(-1).mean().sqrt() * 1000.0)
+            parts["hole_rmse_mm"] = rmse
+            parts["hole_rmse_vs_baseline"] = rmse / self.hole_rmse_baseline_mm
         return total, parts
 
     # -- main loop -----------------------------------------------------------
@@ -357,6 +371,7 @@ class Dagger:
                     f"[dagger] iter {self.iter:>7d} grad {self.grad_steps:>6d} "
                     f"beta {beta:.2f} total {rec['total']:.4f} mu {rec['mu']:.4f} "
                     f"hole_rmse {rec.get('hole_rmse_mm', float('nan')):.1f}mm "
+                    f"({rec.get('hole_rmse_vs_baseline', float('nan')):.2f}x base) "
                     f"{rec['steps_per_s']:.1f} steps/s",
                     flush=True,
                 )

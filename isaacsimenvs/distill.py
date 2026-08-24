@@ -324,7 +324,11 @@ def main() -> None:
             )
             print(
                 "[distill] hole_rmse_mm is the number that matters: the teacher "
-                "tolerates 2 mm of goal error, so that is the student's spec."
+                "tolerates 2 mm of goal error, so that is the student's spec.\n"
+                f"[distill] ignore-the-image baseline is "
+                f"{dagger.hole_rmse_baseline_mm:.1f} mm (always predict the "
+                f"centre of the hole range). ~1.00x base means the encoder "
+                f"learned the mean, not the hole."
             )
 
     run()
