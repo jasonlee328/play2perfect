@@ -116,7 +116,16 @@ params:
     # the robot never executes.
     target: action
     mu_weight_mode: inv_sigma2   # DEXTRAH: weights = (1/teacher_sigmas[0])**2
-    sigma_loss_coef: 1.0     # DEXTRAH includes the L2-on-sigmas term
+    sigma_loss_coef: 0.0     # DEXTRAH uses 1.0. Off here: the student's sigma is
+                             # a standalone parameter inference never reads (we
+                             # take mus), and fitting it burned ~50k steps and
+                             # 2744 of a 2747 total loss.
+    # Which SAPG sigma row supplies the (1/sigma^2) mu weights, independent of
+    # the block_id used for ACTING. null = DEXTRAH's behaviour (whatever row the
+    # acting block selects; spread 1.1e6, 93% of the loss on 4 of 29 joints).
+    # 5 = the coef-0 exploit block, plain PPO, spread 114x.
+    mu_weight_block: 5
+    min_episode_steps: 100   # unstable-init filter for the success metric
     # Teacher-driven warmup, in GRADIENT steps (not env steps). DEXTRAH
     # hardcodes beta=0, which is only safe because its geometric fabric bounds
     # the reachable state set; play2perfect commands 29 raw joint targets and

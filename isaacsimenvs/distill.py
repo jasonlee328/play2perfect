@@ -140,6 +140,14 @@ def main() -> None:
     )
     parser.add_argument("--mu-weight-mode", choices=("uniform", "inv_sigma2"), default=None)
     parser.add_argument(
+        "--mu-weight-block", type=int, default=None,
+        help="Which SAPG sigma row (0-5) supplies the 1/sigma^2 mu weights, "
+             "independent of --teacher-block-id used for acting. 5 is the coef-0 "
+             "exploit block (weight spread 114x); the acting block 0 spreads "
+             "1.1e6 and puts 93%% of the loss on 4 of 29 joints. -1 = DEXTRAH's "
+             "behaviour (use the acting row).",
+    )
+    parser.add_argument(
         "--loss-form", choices=("l2_norm", "mse"), default=None,
         help="l2_norm (default) is DEXTRAH's: norm over the action dim, mean "
              "over the batch. mse was this port's first attempt and stalls as "
@@ -285,6 +293,10 @@ def main() -> None:
                 "dropped-peg episodes terminated",
                 flush=True,
             )
+        if args_cli.mu_weight_block is not None:
+            scfg["mu_weight_block"] = (
+                None if args_cli.mu_weight_block < 0 else int(args_cli.mu_weight_block)
+            )
         for flag, key in [
             ("seq_length", "seq_length"),
             ("lr", "learning_rate"),
@@ -406,7 +418,7 @@ def main() -> None:
             f"[distill] aux_coeff={dagger.aux_coeff} "
             f"sigma_loss_coef={dagger.sigma_loss_coef} "
             f"mu_weight={dagger.mu_weight_mode} loss_form={dagger.loss_form} "
-            f"target={dagger.target}\n"
+            f"target={dagger.target} mu_weight_block={dagger.mu_weight_block}\n"
             f"[distill] out_dir={out_dir}  "
             f"tensorboard={'on' if out_dir else 'off (no --out-dir)'}  "
             f"wandb={'on' if args_cli.wandb_activate else 'off'}\n",

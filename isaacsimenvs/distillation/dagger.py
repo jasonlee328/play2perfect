@@ -180,6 +180,10 @@ class Dagger:
         # competence tracks gradient steps, so that is the unit.
         self.beta_warmup_grad_steps = int(cfg.get("beta_warmup_grad_steps", 15_000))
         self.beta_anneal_grad_steps = int(cfg.get("beta_anneal_grad_steps", 0))
+        # 0 by default: the student's sigma is a standalone parameter that
+        # inference never reads (we take mus), and matching the teacher's took
+        # ~50k steps walking one value to log(170) while contributing 2744 of a
+        # 2747 total loss.
         self.sigma_loss_coef = float(cfg.get("sigma_loss_coef", 0.0))
         # DEXTRAH allocates prev_actions_student as zeros and never assigns to it
         # again (distillation.py:297 is the only write, :749 the only read), so
@@ -204,6 +208,8 @@ class Dagger:
         # [-1, 1] (max 22.99), so regressing mus spends the student's capacity
         # reproducing magnitudes the robot never executes, and inflates the
         # reported error with residuals that are clipped away anyway.
+        self.mu_weight_block = cfg.get("mu_weight_block", None)
+        self._w_cache = None
         self.target = str(cfg.get("target", "action"))
         if self.target not in ("action", "mus"):
             raise ValueError(f"target must be 'action' or 'mus', got {self.target!r}")
@@ -265,6 +271,14 @@ class Dagger:
         # Rolling window of completed episodes, for the phase-free metrics.
         self._ep_hist: deque = deque(maxlen=2048)
         self._ep_full: deque = deque(maxlen=2048)
+        # Unbiased scoring: one episode per env per round, eval_offline style.
+        self.min_episode_steps = int(cfg.get("min_episode_steps", 100))
+        self._armed = torch.ones(self.num_envs, dtype=torch.bool, device=self.device)
+        self._armed_at = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self._sr_hist: deque = deque(maxlen=1024)
+        self._gr_hist: deque = deque(maxlen=1024)
+        self._bad_init = 0
+        self._rounds = 0
         self.history: list[dict] = []
         self._recent = deque(maxlen=self.log_every)
 
@@ -298,6 +312,47 @@ class Dagger:
         self._prev_actions = torch.zeros(
             self.num_envs, self.action_dim, device=self.device
         )
+
+    def _record_armed_episodes(self, dones: torch.Tensor) -> None:
+        """Score at most one episode per env per measurement round.
+
+        `ep_success_rate` pooled every completed episode, which is biased: a
+        success TERMINATES the episode (max_consecutive_successes) while a
+        failure runs to the ~600-step timeout, so successes are shorter and a
+        fixed-size episode window over-represents them. Measured consequence:
+        79% pooled vs 44.8% from eval_offline's scoring on the same checkpoint.
+
+        This mirrors eval_offline instead: each env contributes ONE episode per
+        round, episodes shorter than min_episode_steps are discarded as unstable
+        inits, and all envs re-arm once the round completes.
+        """
+        ids = torch.nonzero(dones & self._armed, as_tuple=False).reshape(-1)
+        if ids.numel():
+            try:
+                succ = self.env._prev_episode_successes[ids].float()
+                maxg = self.env.prev_episode_env_max_goals[ids].float().clamp_min(1.0)
+            except AttributeError:
+                return
+            length = self.iter - self._armed_at[ids]
+            keep = length >= self.min_episode_steps
+            if bool(keep.any()):
+                sc = succ[keep]
+                mg = maxg[keep]
+                self._sr_hist.extend((sc >= mg).float().tolist())
+                self._gr_hist.extend((sc / mg).clamp(0, 1).tolist())
+            self._bad_init += int((~keep).sum())
+            self._armed[ids] = False
+        # Round over: everyone has reported, so start a fresh round.
+        if not bool(self._armed.any()):
+            self._armed[:] = True
+            self._armed_at[:] = self.iter
+            self._rounds += 1
+
+    def _success_rate(self) -> float:
+        return sum(self._sr_hist) / len(self._sr_hist) if self._sr_hist else float("nan")
+
+    def _first_ep_goal_ratio(self) -> float:
+        return sum(self._gr_hist) / len(self._gr_hist) if self._gr_hist else float("nan")
 
     def _episode_goal_ratio(self) -> float:
         """Mean subgoal fraction over COMPLETED episodes.
@@ -364,6 +419,9 @@ class Dagger:
             "goal_ratio": rec.get("goal_ratio", float("nan")),
             "ep_goal_ratio": rec.get("ep_goal_ratio", float("nan")),
             "ep_success_rate": rec.get("ep_success_rate", float("nan")),
+            # The comparable one: same scoring as eval_offline / the teacher's 96.9%.
+            "success_rate": rec.get("success_rate", float("nan")),
+            "first_ep_goal_ratio": rec.get("first_ep_goal_ratio", float("nan")),
             "hole_rmse_mm": rec.get("hole_rmse_mm", float("nan")),
             "hole_rmse_vs_baseline": rec.get("hole_rmse_vs_baseline", float("nan")),
             "grad_steps": self.grad_steps,
@@ -438,6 +496,31 @@ class Dagger:
             self._last_aux = {}
         return res
 
+    def _mu_weights(self, teacher_out) -> torch.Tensor:
+        """The (1/sigma^2) precision weights for the mu term.
+
+        DEXTRAH uses `1/teacher_sigmas[0]**2`, unambiguous for them because
+        `fixed_sigma: True` gives one learned sigma. This teacher is SAPG
+        `coef_cond`: sigma is a 6-row table indexed by the exploration block, and
+        the rows differ by up to 247x for the SAME joint (joint 21: 170.4 in
+        block 0, 0.689 in block 5). Block 0's weights therefore span 1.1e6 and
+        put 93% of the loss on 4 of 29 joints -- reading an exploration setting
+        as a precision signal.
+
+        `mu_weight_block` selects the row. Block 5 (coef 0) is the exploit block,
+        plain PPO with no exploration bonus, so its sigma is the one optimised
+        for return alone; its weight spread is 114x. None = DEXTRAH's behaviour,
+        whichever row the acting block_id happens to select.
+        """
+        if self.mu_weight_block is None:
+            return (1.0 / teacher_out["sigmas"][0]).pow(2).detach()
+        if self._w_cache is None:
+            net = self.teacher.player.model.a2c_network
+            with torch.no_grad():
+                sig = torch.exp(net.sigma_act(net.sigma[int(self.mu_weight_block)]))
+            self._w_cache = (1.0 / sig).pow(2).detach().to(self.device)
+        return self._w_cache
+
     # -- loss ----------------------------------------------------------------
     def compute_loss(self, student_res, teacher_out, aux_gt) -> tuple[torch.Tensor, dict]:
         # Target is the teacher's executed action; the student's output is left
@@ -455,7 +538,7 @@ class Dagger:
         if self.loss_form == "l2_norm":
             # DEXTRAH's form.
             if self.mu_weight_mode == "inv_sigma2":
-                w = (1.0 / teacher_out["sigmas"][0]).pow(2).detach()
+                w = self._mu_weights(teacher_out)
                 mu_loss = _reduce(_weighted_l2(student_mus, mus_t, w))
             else:
                 mu_loss = _reduce(_l2(student_mus, mus_t))
@@ -465,7 +548,7 @@ class Dagger:
         else:
             mu_err = student_mus - mus_t
             if self.mu_weight_mode == "inv_sigma2":
-                w = (1.0 / teacher_out["sigmas"][0]).pow(2).detach()
+                w = self._mu_weights(teacher_out)
                 mu_loss = (mu_err.pow(2) * w).mean()
             else:
                 mu_loss = mu_err.pow(2).mean()
@@ -573,6 +656,7 @@ class Dagger:
 
             if bool(dones.any()):
                 self._record_finished_episodes(dones)
+                self._record_armed_episodes(dones)
                 # distillation.py:588: `states[:, all_done_indices] *= 0.` --
                 # in-place. Valid because the gradient step happens every
                 # seq_length steps and seq_length is 1 by default, so no live
@@ -609,6 +693,10 @@ class Dagger:
                 rec["ep_goal_ratio"] = self._episode_goal_ratio()
                 rec["ep_success_rate"] = self._episode_success_rate()
                 rec["ep_count"] = float(len(self._ep_full))
+                rec["success_rate"] = self._success_rate()
+                rec["first_ep_goal_ratio"] = self._first_ep_goal_ratio()
+                rec["sr_n"] = float(len(self._sr_hist))
+                rec["rounds"] = float(self._rounds)
                 self.history.append(rec)
                 self._write_logs(rec)
                 print(
@@ -617,7 +705,7 @@ class Dagger:
                     f"hole_rmse {rec.get('hole_rmse_mm', float('nan')):.1f}mm "
                     f"({rec.get('hole_rmse_vs_baseline', float('nan')):.2f}x base) "
                     f"goal {rec['goal_ratio'] * 100:.1f}% "
-                    f"epSR {rec['ep_success_rate'] * 100:.1f}% "
+                    f"SR {rec['success_rate'] * 100:.1f}%(n={int(rec['sr_n'])}) "
                     f"{rec['steps_per_s']:.1f} steps/s",
                     flush=True,
                 )
