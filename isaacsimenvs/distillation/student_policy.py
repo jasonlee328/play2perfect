@@ -27,6 +27,7 @@ class StudentPolicy:
         proprio_dim: int,
         device: str = "cuda:0",
         agent_cfg: dict | None = None,
+        blank_image: bool = False,
     ) -> None:
         from rl_games.algos_torch import model_builder
         from rl_games.algos_torch.model_builder import ModelBuilder
@@ -34,6 +35,12 @@ class StudentPolicy:
         from isaacsimenvs.distillation.a2c_aux_cnn import A2CBuilder
 
         self.device = torch.device(device)
+        # Ablation: feed a constant image instead of the camera. The hole is
+        # randomized over +-187 x +-100 mm and is not recoverable from proprio,
+        # so if success survives this the policy is not using vision -- it is
+        # finding the hole some other way (contact, search) within the env's
+        # 10 mm insertion tolerance.
+        self.blank_image = bool(blank_image)
         self.num_envs = int(num_envs)
         self.action_dim = int(action_dim)
 
@@ -99,6 +106,9 @@ class StudentPolicy:
     def act(self, env) -> torch.Tensor:
         """One deterministic step from the env's current student observation."""
         student = env.get_student_obs()
+        img = student["image"]
+        if self.blank_image:
+            img = torch.zeros_like(img)
         res = self.model({
             # is_train=True returns mus without sampling; is_train=False would
             # draw from the distribution, and for a viewer we want the
@@ -106,7 +116,7 @@ class StudentPolicy:
             "is_train": True,
             "prev_actions": self._prev_actions,
             "obs": student["proprio"],
-            "img": student["image"],
+            "img": img,
             "rnn_states": self._states,
             "seq_length": 1,
             "rnn_masks": None,
