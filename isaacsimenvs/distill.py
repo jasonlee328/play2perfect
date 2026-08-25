@@ -131,6 +131,13 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--aux-coeff", type=float, default=None)
     parser.add_argument("--sigma-loss-coef", type=float, default=None)
+    parser.add_argument(
+        "--target", choices=("action", "mus"), default=None,
+        help="What the student regresses onto. 'action' (default) is the "
+             "teacher's executed action, i.e. what eval_offline feeds the env; "
+             "'mus' is the raw pre-clamp mean, which is DEXTRAH's choice. 75%% "
+             "of this teacher's mu entries are clipped before execution.",
+    )
     parser.add_argument("--mu-weight-mode", choices=("uniform", "inv_sigma2"), default=None)
     parser.add_argument(
         "--loss-form", choices=("l2_norm", "mse"), default=None,
@@ -284,6 +291,7 @@ def main() -> None:
             ("aux_coeff", "aux_coeff"),
             ("sigma_loss_coef", "sigma_loss_coef"),
             ("mu_weight_mode", "mu_weight_mode"),
+            ("target", "target"),
             ("loss_form", "loss_form"),
             ("beta_warmup_grad_steps", "beta_warmup_grad_steps"),
             ("beta_anneal_grad_steps", "beta_anneal_grad_steps"),
@@ -397,7 +405,8 @@ def main() -> None:
             f"depth_aug={env_cfg.student_obs.use_depth_aug}\n"
             f"[distill] aux_coeff={dagger.aux_coeff} "
             f"sigma_loss_coef={dagger.sigma_loss_coef} "
-            f"mu_weight={dagger.mu_weight_mode} loss_form={dagger.loss_form}\n"
+            f"mu_weight={dagger.mu_weight_mode} loss_form={dagger.loss_form} "
+            f"target={dagger.target}\n"
             f"[distill] out_dir={out_dir}  "
             f"tensorboard={'on' if out_dir else 'off (no --out-dir)'}  "
             f"wandb={'on' if args_cli.wandb_activate else 'off'}\n",

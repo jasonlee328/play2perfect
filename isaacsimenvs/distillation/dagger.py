@@ -194,6 +194,19 @@ class Dagger:
         # batch, for the mu, sigma AND aux terms alike. "mse" is what this port
         # wrote first -- a mean of squared errors, whose gradient decays with the
         # error and stalls once the student is close.
+        # What the student regresses onto. "action" is the teacher's EXECUTED
+        # action -- rescale(clamp(mu, -1, 1)) -- i.e. exactly what eval_offline
+        # feeds the env to score 96.9%. "mus" is the raw pre-clamp mean, which
+        # is what DEXTRAH regresses.
+        #
+        # This matters here far more than it does for DEXTRAH: measured on
+        # tight_insertion, 75% of this teacher's mu entries fall outside
+        # [-1, 1] (max 22.99), so regressing mus spends the student's capacity
+        # reproducing magnitudes the robot never executes, and inflates the
+        # reported error with residuals that are clipped away anyway.
+        self.target = str(cfg.get("target", "action"))
+        if self.target not in ("action", "mus"):
+            raise ValueError(f"target must be 'action' or 'mus', got {self.target!r}")
         self.loss_form = str(cfg.get("loss_form", "l2_norm"))
         if self.loss_form not in ("l2_norm", "mse"):
             raise ValueError(
@@ -427,19 +440,30 @@ class Dagger:
 
     # -- loss ----------------------------------------------------------------
     def compute_loss(self, student_res, teacher_out, aux_gt) -> tuple[torch.Tensor, dict]:
-        mus_t = teacher_out["mus"].detach()
+        # Target is the teacher's executed action; the student's output is left
+        # RAW. Clamping the student too would zero the gradient outside [-1, 1]
+        # (verified: clamp(5.0) against target 1.0 gives loss 0.0 and grad 0.0),
+        # letting it drift arbitrarily high for free. Comparing raw-to-clamped
+        # keeps a gradient that pulls the student down into the executable
+        # range, which is what deployment needs since its action is clamp(mu).
+        if self.target == "action":
+            mus_t = teacher_out["action"].detach()
+            student_mus = student_res["mus"]
+        else:
+            mus_t = teacher_out["mus"].detach()
+            student_mus = student_res["mus"]
         if self.loss_form == "l2_norm":
             # DEXTRAH's form.
             if self.mu_weight_mode == "inv_sigma2":
                 w = (1.0 / teacher_out["sigmas"][0]).pow(2).detach()
-                mu_loss = _reduce(_weighted_l2(student_res["mus"], mus_t, w))
+                mu_loss = _reduce(_weighted_l2(student_mus, mus_t, w))
             else:
-                mu_loss = _reduce(_l2(student_res["mus"], mus_t))
+                mu_loss = _reduce(_l2(student_mus, mus_t))
             sigma_loss = _reduce(
                 _l2(student_res["sigmas"], teacher_out["sigmas"].detach())
             )
         else:
-            mu_err = student_res["mus"] - mus_t
+            mu_err = student_mus - mus_t
             if self.mu_weight_mode == "inv_sigma2":
                 w = (1.0 / teacher_out["sigmas"][0]).pow(2).detach()
                 mu_loss = (mu_err.pow(2) * w).mean()

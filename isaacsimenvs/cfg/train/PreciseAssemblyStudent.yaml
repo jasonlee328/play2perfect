@@ -108,6 +108,13 @@ params:
     # constant in the error while MSE's decays with it, so MSE stalls exactly
     # as the student gets close. Set "mse" to recover the old behaviour.
     loss_form: l2_norm
+    # What the student regresses onto. "action" = the teacher's EXECUTED action,
+    # rescale(clamp(mu,-1,1)) -- exactly what eval_offline feeds the env to
+    # score 96.9%. "mus" = the raw pre-clamp mean, which is what DEXTRAH uses.
+    # Measured on tight_insertion: 75% of this teacher's mu entries fall outside
+    # [-1,1] (max 22.99), so regressing mus trains the student toward magnitudes
+    # the robot never executes.
+    target: action
     mu_weight_mode: inv_sigma2   # DEXTRAH: weights = (1/teacher_sigmas[0])**2
     sigma_loss_coef: 1.0     # DEXTRAH includes the L2-on-sigmas term
     # Teacher-driven warmup, in GRADIENT steps (not env steps). DEXTRAH
