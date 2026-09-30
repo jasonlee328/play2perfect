@@ -23,6 +23,8 @@ def _restore(agent, args):
             agent.restore(args['checkpoint'])
         elif load_mode == 'weights':
             weights = _load_checkpoint_weights(agent, args['checkpoint'])
+            if args.get('checkpoint_obs_insert'):
+                weights = _expand_new_obs_inputs(weights, agent.model, args['checkpoint_obs_insert'])
             agent.set_weights(weights)
             if getattr(agent, 'has_central_value', False) and 'assymetric_vf_nets' in weights:
                 try:
@@ -32,6 +34,36 @@ def _restore(agent, args):
             print(f"=> initialized model weights from '{args['checkpoint']}'")
         else:
             raise ValueError(f"checkpoint_load_mode must be resume/weights, got {load_mode!r}")
+
+
+def _expand_new_obs_inputs(weights, model, obs_insert):
+    """Pad a checkpoint whose obs predates fields added at columns [offset, offset + n).
+
+    Every model tensor that is exactly n shorter than the live model's along one dim
+    (the first input layer's weight, the running obs mean/var) gets n entries inserted
+    at ``offset``: zeros, so the new inputs start out ignored and the warm-started policy
+    acts as before, and ones for the running variance. Other mismatches are left for
+    ``load_state_dict`` to report.
+    """
+    offset, n = int(obs_insert[0]), int(obs_insert[1])
+    target = model.state_dict()
+    state = dict(weights['model'])
+    for key, value in state.items():
+        want = target.get(key)
+        if want is None or value.shape == want.shape:
+            continue
+        dims = [d for d in range(value.dim()) if value.shape[d] != want.shape[d]]
+        if len(dims) != 1 or want.shape[dims[0]] - value.shape[dims[0]] != n:
+            continue
+        d = dims[0]
+        pad_shape = list(value.shape)
+        pad_shape[d] = n
+        fill = torch.ones if key.endswith('running_var') else torch.zeros
+        pad = fill(pad_shape, dtype=value.dtype, device=value.device)
+        state[key] = torch.cat(
+            [value.narrow(d, 0, offset), pad, value.narrow(d, offset, value.shape[d] - offset)], dim=d)
+        print(f"=> {key}: {tuple(value.shape)} -> {tuple(state[key].shape)} (new obs inputs zero-initialized)")
+    return {**weights, 'model': state}
 
 
 def _load_checkpoint_weights(agent, checkpoint_path):
