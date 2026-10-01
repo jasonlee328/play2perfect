@@ -51,8 +51,10 @@ class WandbAlgoObserver(AlgoObserver):
         # if set so per-run sub-file `EXPERIMENT_NAME`s actually show up in wandb.
         chosen = getattr(self.cfg, "wandb_name", "") or experiment_name
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        wandb_unique_id = f"{chosen}_{timestamp}"
-        display_name = f"{chosen}_{timestamp}"
+        # WANDB_RUN_ID pins the run id, so a job restarted after preemption logs into
+        # the same wandb run instead of opening a new one.
+        wandb_unique_id = os.environ.get("WANDB_RUN_ID") or f"{chosen}_{timestamp}"
+        display_name = os.environ.get("WANDB_RUN_ID") or f"{chosen}_{timestamp}"
         print(f"[Wandb] unique id: {wandb_unique_id}")
 
         cfg = self.cfg
@@ -74,8 +76,7 @@ class WandbAlgoObserver(AlgoObserver):
                 sync_tensorboard=True,
                 id=wandb_unique_id,
                 name=display_name,
-                resume=True,
-                settings=wandb.Settings(start_method="fork"),
+                resume="allow",
             )
             wandb.run.log_code(root=logcode_dir)
             print(f"[Wandb] run dir: {wandb.run.dir} (log_code root: {logcode_dir})")
