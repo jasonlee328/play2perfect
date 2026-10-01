@@ -17,8 +17,10 @@ from .utils.obs_utils import (
     build_observations,
     build_student_observations,
     compute_intermediate_values,
+    OBS_FIELD_SIZES,
     compute_obs_dim,
 )
+from .utils.tactile_utils import TactileSensor, tactile_obs_dim
 from .utils.reset_utils import allocate_state_buffers, reset_env_state
 from .utils.reward_utils import compute_rewards
 from .utils.scene_utils import apply_physx_material_properties, setup_scene
@@ -34,6 +36,13 @@ class PlayEnv(DirectRLEnv):
     def __init__(
         self, cfg: PlayEnvCfg, render_mode: str | None = None, **kwargs
     ) -> None:
+        if cfg.tactile.enabled:
+            # Its size depends on the resolution, so register it before any dim lookup.
+            OBS_FIELD_SIZES["tactile"] = tactile_obs_dim(cfg.tactile)
+            if "tactile" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile")
+            if cfg.tactile.in_critic and "tactile" not in cfg.obs.state_list:
+                cfg.obs.state_list = (*cfg.obs.state_list, "tactile")
         # Override obs/state space from configured field lists before
         # DirectRLEnv / rl_games observes the configclass.
         cfg.observation_space = compute_obs_dim(cfg.obs.obs_list)
@@ -42,6 +51,7 @@ class PlayEnv(DirectRLEnv):
         super().__init__(cfg, render_mode, **kwargs)  # runs _setup_scene
         apply_physx_material_properties(self)
         allocate_state_buffers(self)
+        self._tactile = TactileSensor(self, cfg.tactile) if cfg.tactile.enabled else None
 
     def _setup_scene(self) -> None:
         setup_scene(self)

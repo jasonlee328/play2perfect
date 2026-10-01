@@ -338,6 +338,8 @@ def build_observations(
         "successes": torch.log(env._successes.float() + 1.0).unsqueeze(-1),
         "reward": (env.reward_buf * 0.01).unsqueeze(-1),
     }
+    if getattr(env, "_tactile", None) is not None:
+        obs_clean["tactile"] = env._tactile.compute()
 
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw

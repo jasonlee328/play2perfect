@@ -525,6 +525,27 @@ class DomainRandomizationCfg:
     friction_n_buckets: int = 16
 
 
+@configclass
+class TactileCfg:
+    """Sharpa TacMap fingerpad tactile obs (``utils/tactile_utils.py``), off by default.
+
+    When enabled, a ``tactile`` field of 5 * resolution^2 taxels in [0, 1] (thumb, index,
+    middle, ring, pinky; row-major per pad) is appended to ``obs.obs_list`` and, with
+    ``in_critic``, to ``obs.state_list``.
+    """
+
+    enabled: bool = False
+    # Taxels per pad side; must divide 240 (the TacMap map size).
+    resolution: int = 8
+    # Rays per taxel side: each taxel averages samples_per_taxel^2 ray depths.
+    samples_per_taxel: int = 2
+    in_critic: bool = False
+    # Relative paths resolve against the repo root.
+    map_dir: str = "assets/tactile/sharpa_tacmap"
+    # Upper bound on rays per raycast call (envs are processed in chunks).
+    max_rays_per_chunk: int = 4_000_000
+
+
 # ----------------------------------------------------------------------------
 # Top-level configclass — composes the above, plus DirectRLEnvCfg requireds
 # ----------------------------------------------------------------------------
@@ -605,6 +626,7 @@ class PlayEnvCfg(DirectRLEnvCfg):
     reset: ResetCfg = ResetCfg()
     termination: TerminationCfg = TerminationCfg()
     domain_randomization: DomainRandomizationCfg = DomainRandomizationCfg()
+    tactile: TactileCfg = TactileCfg()
 
 
 __all__ = [
@@ -617,4 +639,5 @@ __all__ = [
     "ResetCfg",
     "TerminationCfg",
     "DomainRandomizationCfg",
+    "TactileCfg",
 ]

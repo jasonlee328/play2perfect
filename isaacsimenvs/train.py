@@ -119,6 +119,18 @@ def main() -> None:
         register_rlgames_env,
     )
 
+    def _tactile_obs_insert(cfg):
+        """(offset, size) of the tactile field in the actor obs, so a checkpoint trained
+        without it can warm-start (``checkpoint_load_mode=weights``); None if not in use."""
+        from isaacsimenvs.tasks.play.utils.obs_utils import OBS_FIELD_SIZES
+
+        tactile = getattr(cfg, "tactile", None)
+        if tactile is None or not tactile.enabled or getattr(cfg.student_obs, "enabled", False):
+            return None
+        fields = tuple(cfg.obs.obs_list)
+        i = fields.index("tactile")
+        return sum(OBS_FIELD_SIZES[f] for f in fields[:i]), OBS_FIELD_SIZES["tactile"]
+
     @hydra_task_config_with_yaml(args_cli.task, args_cli.agent)
     def run(env_cfg, agent_cfg: dict) -> None:
         hydra_run_dir = HydraConfig.get().runtime.output_dir
@@ -217,6 +229,7 @@ def main() -> None:
                 "play": args_cli.test,
                 "checkpoint": args_cli.checkpoint,
                 "checkpoint_load_mode": args_cli.checkpoint_load_mode,
+                "checkpoint_obs_insert": _tactile_obs_insert(env.unwrapped.cfg),
             }
         )
 
