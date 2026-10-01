@@ -1,0 +1,149 @@
+# PreciseAssemblyDepthStudent rl_games train cfg (ported from depthbasedRL's PegInHoleDepthStudentSAPG.yaml) — SAPG + DAgger.
+# Clones SimToolRealSAPG.yaml's config block verbatim, swaps:
+#   - algo.name      sapg/a2c_continuous → dagger_sapg (registered in dagger/train.py)
+#   - network.name   actor_critic → depth_cnn_lstm (registered in dagger/networks/__init__.py)
+#   - network params replaced with depth-student hyperparams (CNN/proprio/LSTM/heads)
+#   - ${dagger:...}  new block consumed by DAggerA2CAgent for teacher load + λ_D schedule
+#
+# SAPG mechanics (intr_reward_coef, off_policy_ratio, mixed_expl_learn_param,
+# coef_cond σ-table) all inherited from a2c_common.py via the same flag set.
+# `has_block_id: True` because SAPG appends the intr_reward_coef_embd channel.
+#
+# CLI knobs (set in dagger/train.py):
+#   --teacher-run-dir / --teacher-checkpoint  → dagger.teacher_*
+#   --critic asymmetric|symmetric             → drops central_value_config + flips network.symmetric_critic
+#   --lambda-d-{start,floor,decay-frac}       → dagger.lambda_d_*
+#
+# expl_coef_block_size constraint: num_envs % expl_coef_block_size == 0.
+# Default (4096 envs / 1024 block) → 4 expl blocks. Adjust both knobs together.
+
+params:
+  seed: 42
+
+  env:
+    clip_observations: 10.0
+    clip_actions: 1.0
+
+  algo:
+    name: dagger_sapg
+
+  model:
+    name: continuous_a2c_logstd
+
+  network:
+    name: depth_cnn_lstm
+    space:
+      continuous:
+        mu_activation: None
+        sigma_activation: None
+        mu_init:
+          name: default
+        sigma_init:
+          name: const_initializer
+          val: 0
+        fixed_sigma: coef_cond
+    # depth_cnn_lstm-specific hyperparams (consumed by DepthCNNLSTMBuilder.Network)
+    image_hw: [70, 70]
+    image_channels: 1
+    proprio_dim: 87           # joint_pos(29) + joint_vel(29) + prev_action_targets(29). Verify via env at smoke time.
+    has_block_id: True
+    symmetric_critic: False   # toggled by --critic
+    cnn_channels: [32, 64, 128, 128]
+    cnn_feat_dim: 256
+    proprio_hidden: [128, 64]
+    lstm_hidden: 1024
+    lstm_layers: 1
+    head_hidden: 256
+    log_sigma_init: -1.0
+
+  load_checkpoint: False
+  load_path: ''
+
+  config:
+    name: 0_precise_assembly_sapg_dagger
+    full_experiment_name: ${.name}
+    env_name: rlgpu
+    device: 'cuda:0'
+    device_name: 'cuda:0'
+    multi_gpu: False
+    ppo: True
+    mixed_precision: True
+    # OFF for the student: rl_games builds `RunningMeanStd((4988,))` over the
+    # flat obs (4900-px image + proprio + block_id), which whitens every depth
+    # pixel independently and clamps to ±5 — spatial structure is destroyed.
+    # The student handles its own normalization (GroupNorm in the CNN, LayerNorm
+    # before the heads). The teacher's running_mean_std still applies on its
+    # own 140-d state obs inside `Teacher.get_action`.
+    normalize_input: False
+    normalize_value: True
+    value_bootstrap: True
+    normalize_advantage: True
+    reward_shaper:
+      scale_value: 0.01
+    num_actors: ${....env.scene.num_envs}
+    gamma: 0.99
+    tau: 0.95
+    learning_rate: 1e-4
+    lr_schedule: adaptive
+    schedule_type: standard
+    kl_threshold: 0.016
+    score_to_win: 1000000
+    max_epochs: 1000000
+    save_best_after: 100
+    save_frequency: 3000
+    print_stats: True
+    grad_norm: 1.0
+    entropy_coef: 0.0
+    truncate_grads: True
+    e_clip: 0.1
+    minibatch_size: 16384
+    mini_epochs: 2
+    critic_coef: 4.0
+    clip_value: True
+    horizon_length: 16
+    seq_length: 16
+    bounds_loss_coef: 0.0001
+
+    central_value_config:
+      minibatch_size: 16384
+      mini_epochs: 2
+      learning_rate: 1e-4
+      kl_threshold: 0.016
+      clip_value: True
+      normalize_input: True
+      truncate_grads: True
+      network:
+        name: actor_critic
+        central_value: True
+        mlp:
+          units: [1024, 1024, 512, 512]
+          activation: elu
+          d2rl: False
+          initializer:
+            name: default
+          regularizer:
+            name: None
+
+    # === SAPG ===
+    use_others_experience: lf
+    off_policy_ratio: 1.0
+    expl_type: mixed_expl_learn_param
+    expl_reward_type: entropy
+    expl_reward_coef_embd_size: 32
+    expl_reward_coef_scale: 0.002
+    expl_coef_block_size: 1024
+
+    # === DAgger ===
+    dagger:
+      teacher_run_dir: ???                  # CLI override (--teacher-run-dir)
+      teacher_checkpoint: null              # CLI override (--teacher-checkpoint); else newest under teacher_run_dir
+      teacher_task_id: Isaacsimenvs-PreciseAssembly-Direct-v0
+      teacher_agent_key: rl_games_sapg_cfg_entry_point
+      lambda_d_start: 1.0
+      lambda_d_floor: 0.1
+      lambda_d_decay_frac: 0.5
+
+    player:
+      deterministic: False
+      games_num: 100000
+      print_stats: False

@@ -37,3 +37,17 @@ gym.register(
         "rl_games_sapg_cfg_entry_point": str(_CFG_DIR / "train" / "PreciseAssemblySAPG.yaml"),
     },
 )
+
+gym.register(
+    id="Isaacsimenvs-PreciseAssemblyDepthStudent-Direct-v0",
+    entry_point="isaacsimenvs.tasks.precise_assembly.precise_assembly_env:PreciseAssemblyEnv",
+    order_enforce=False,
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": "isaacsimenvs.tasks.precise_assembly.precise_assembly_env_cfg:PreciseAssemblyEnvCfg",
+        "env_cfg_yaml_entry_point": str(_CFG_DIR / "task" / "PreciseAssemblyDepthStudent.yaml"),
+        "rl_games_cfg_entry_point": str(_CFG_DIR / "train" / "PreciseAssemblyPPO.yaml"),
+        "rl_games_sapg_cfg_entry_point": str(_CFG_DIR / "train" / "PreciseAssemblySAPG.yaml"),
+        "rl_games_dagger_sapg_cfg_entry_point": str(_CFG_DIR / "train" / "PreciseAssemblyDepthStudentSAPG.yaml"),
+    },
+)
