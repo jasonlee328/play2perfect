@@ -101,6 +101,7 @@ was computed.
 from __future__ import annotations
 
 import copy
+import os
 import time
 from collections import deque
 
@@ -741,7 +742,25 @@ class Dagger:
         }
 
     def save(self, path: str) -> None:
-        torch.save(self.state_dict(), path)
+        # Write-then-rename, so a preemption mid-save never leaves a truncated
+        # checkpoint where the resume logic will look for one.
+        tmp = f"{path}.tmp"
+        torch.save(self.state_dict(), tmp)
+        os.replace(tmp, path)
+
+    def load_state_dict(self, state: dict) -> None:
+        """Resume from :meth:`state_dict`: weights, optimizer and step counters.
+
+        The env is not part of the checkpoint, so the next ``distill()`` call
+        starts fresh episodes; the success-rate round is re-armed at the
+        restored ``iter`` so episode lengths are not measured from step 0.
+        """
+        self.student_model.load_state_dict(state["model"])
+        self.optimizer.load_state_dict(state["optimizer"])
+        self.iter = int(state["iter"])
+        self.grad_steps = int(state["grad_steps"])
+        self._armed[:] = True
+        self._armed_at[:] = self.iter
 
 
 __all__ = ["Dagger"]

@@ -47,6 +47,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -203,7 +204,12 @@ def main() -> None:
     parser.add_argument("--wandb-notes", default="")
     # --- run management ---
     parser.add_argument("--out-dir", default=None, help="Checkpoint + log dir.")
-    parser.add_argument("--save-every", type=int, default=5000, help="Env steps.")
+    parser.add_argument("--save-every", type=int, default=5000,
+                        help="Env steps between overwrites of student_latest.pth.")
+    parser.add_argument("--keep-every", type=int, default=50000,
+                        help="Env steps between permanent student_<iter>.pth copies.")
+    parser.add_argument("--no-resume", action="store_true",
+                        help="Start fresh even if --out-dir holds student_latest.pth.")
     parser.add_argument("--log-every", type=int, default=100, help="Env steps.")
     parser.add_argument("--rl-device", default="cuda:0")
     parser.add_argument("--sim-device", default="cuda:0")
@@ -362,10 +368,22 @@ def main() -> None:
             device=args_cli.rl_device,
             block_id=block_id,
         )
+        # Auto-resume (Beaker preemption): the same --out-dir picks up where the
+        # last process stopped, and keeps logging to the same wandb run.
+        resume_path = out_dir / "student_latest.pth" if out_dir is not None else None
+        resume = (resume_path is not None and resume_path.is_file()
+                  and not args_cli.no_resume)
+        wandb_id = None
+        if out_dir is not None and args_cli.wandb_activate:
+            id_file = out_dir / "wandb_id.txt"
+            if resume and id_file.is_file():
+                wandb_id = id_file.read_text().strip()
         if args_cli.wandb_activate:
             import wandb
 
             wandb.init(
+                id=wandb_id,
+                resume="allow" if wandb_id else None,
                 project=args_cli.wandb_project,
                 entity=args_cli.wandb_entity,
                 group=args_cli.wandb_group,
@@ -391,6 +409,8 @@ def main() -> None:
                     )},
                 },
             )
+            if out_dir is not None:
+                (out_dir / "wandb_id.txt").write_text(wandb.run.id)
 
         dagger = Dagger(
             uenv, student_cfg, teacher,
@@ -400,6 +420,15 @@ def main() -> None:
             log_dir=str(out_dir / "summaries") if out_dir is not None else None,
             use_wandb=bool(args_cli.wandb_activate),
         )
+
+        if resume:
+            dagger.load_state_dict(torch.load(resume_path, map_location=args_cli.rl_device,
+                                              weights_only=False))
+            hist = out_dir / "history.json"
+            if hist.is_file():
+                dagger.history = json.loads(hist.read_text())
+            print(f"[distill] RESUMED from {resume_path} at iter {dagger.iter} "
+                  f"(grad_steps {dagger.grad_steps})", flush=True)
 
         max_iters = int(args_cli.iters) if args_cli.iters is not None else dagger.max_iters
         print(
@@ -435,7 +464,10 @@ def main() -> None:
                 while dagger.iter < max_iters:
                     stop = min(dagger.iter + int(args_cli.save_every), max_iters)
                     history = dagger.distill(max_iters=stop)
-                    dagger.save(str(out_dir / f"student_{dagger.iter:08d}.pth"))
+                    dagger.save(str(out_dir / "student_latest.pth"))
+                    if args_cli.keep_every > 0 and dagger.iter % args_cli.keep_every == 0:
+                        shutil.copyfile(out_dir / "student_latest.pth",
+                                        out_dir / f"student_{dagger.iter:08d}.pth")
                     (out_dir / "history.json").write_text(json.dumps(history, indent=2))
                     print(f"[distill] saved at iter {dagger.iter}", flush=True)
         finally:
