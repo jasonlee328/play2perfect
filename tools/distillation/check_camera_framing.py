@@ -32,6 +32,7 @@ TASK = "Isaacsimenvs-PreciseAssembly-Direct-v0"
 
 cli = argparse.ArgumentParser()
 cli.add_argument("--out", default="/tmp/play2perfect_framing")
+cli.add_argument("--problem", default="tight_insertion")
 cli.add_argument("--device", default="cuda:0")
 cli.add_argument("--settle-steps", type=int, default=4)
 args, _ = cli.parse_known_args()
@@ -60,7 +61,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 cfg = _load_env_cfg(TASK)
 _apply_env_overrides(
-    cfg, problem="tight_insertion", goal_mode="preInsertAndFinal",
+    cfg, problem=args.problem, goal_mode="preInsertAndFinal",
     random_goal_fraction=0.0, insertion_success_tolerance=0.01,
     retract_success_tolerance=0.005, num_envs=9,
     sim_device=args.device, sdf=False, keep_dr=False, extra_overrides={},
