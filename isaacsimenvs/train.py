@@ -119,15 +119,16 @@ def main() -> None:
         register_rlgames_env,
     )
 
-    def _tactile_obs_insert(cfg):
-        """(offset, size) of the tactile field in the actor obs, so a checkpoint trained
-        without it can warm-start (``checkpoint_load_mode=weights``); None if not in use."""
+    def _tactile_insert(cfg, fields):
+        """(offset, size) of the tactile field in ``fields`` (obs_list or state_list), so a
+        checkpoint trained without it can warm-start (``checkpoint_load_mode=weights``);
+        None if tactile is off or not in ``fields``."""
         from isaacsimenvs.tasks.play.utils.obs_utils import OBS_FIELD_SIZES
 
         tactile = getattr(cfg, "tactile", None)
-        if tactile is None or not tactile.enabled or getattr(cfg.student_obs, "enabled", False):
+        fields = tuple(fields)
+        if tactile is None or not tactile.enabled or "tactile" not in fields:
             return None
-        fields = tuple(cfg.obs.obs_list)
         i = fields.index("tactile")
         return sum(OBS_FIELD_SIZES[f] for f in fields[:i]), OBS_FIELD_SIZES["tactile"]
 
@@ -229,7 +230,10 @@ def main() -> None:
                 "play": args_cli.test,
                 "checkpoint": args_cli.checkpoint,
                 "checkpoint_load_mode": args_cli.checkpoint_load_mode,
-                "checkpoint_obs_insert": _tactile_obs_insert(env.unwrapped.cfg),
+                # With student_obs the policy obs is not obs_list, so only the critic is padded.
+                "checkpoint_obs_insert": None if env.unwrapped.cfg.student_obs.enabled
+                else _tactile_insert(env.unwrapped.cfg, env.unwrapped.cfg.obs.obs_list),
+                "checkpoint_states_insert": _tactile_insert(env.unwrapped.cfg, env.unwrapped.cfg.obs.state_list),
             }
         )
 

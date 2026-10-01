@@ -27,8 +27,12 @@ def _restore(agent, args):
                 weights = _expand_new_obs_inputs(weights, agent.model, args['checkpoint_obs_insert'])
             agent.set_weights(weights)
             if getattr(agent, 'has_central_value', False) and 'assymetric_vf_nets' in weights:
+                critic = weights['assymetric_vf_nets']
+                if args.get('checkpoint_states_insert'):
+                    critic = _expand_new_obs_inputs(
+                        {'model': critic}, agent.central_value_net, args['checkpoint_states_insert'])['model']
                 try:
-                    agent.central_value_net.load_state_dict(weights['assymetric_vf_nets'])
+                    agent.central_value_net.load_state_dict(critic)
                 except RuntimeError as exc:
                     print(f"Skipping central value checkpoint weights: {exc}")
             print(f"=> initialized model weights from '{args['checkpoint']}'")
