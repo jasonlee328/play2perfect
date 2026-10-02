@@ -324,6 +324,28 @@ class DAggerA2CAgent(A2CAgent):
         self.dataset.values_dict["teacher_actions"] = batch_dict["teacher_actions"]
         self.dataset.values_dict["teacher_sigmas"] = batch_dict["teacher_sigmas"]
 
+    # ----- logging: the `distill/` namespace (see isaacsimenvs/dagger/metrics.py) -----
+
+    def _log_distill_metrics(self, *, distill_loss, lam_d: float, mu, teacher_actions) -> None:
+        """Write the distillation scalars for this minibatch.
+
+        rl_games' train_epoch only forwards specific keys from `extras` to the
+        writer (a2c_common.py:1421-1426); custom keys are dropped, so these go
+        straight to the SummaryWriter (mirrored to wandb). `self.frame` is the
+        global env-frame counter. Task-level metrics (success rate etc.) are
+        emitted separately by `DistillMetricsObserver` under `metrics/`.
+        """
+        if self.writer is None:
+            return
+        loss = float(distill_loss.detach().item())
+        self.writer.add_scalar("distill/imitation_loss", loss, self.frame)
+        self.writer.add_scalar("distill/action_error_rms", loss ** 0.5 if loss >= 0 else float("nan"), self.frame)
+        self.writer.add_scalar("distill/lambda_d", float(lam_d), self.frame)
+        self.writer.add_scalar("distill/teacher_action_rms",
+                               teacher_actions.detach().pow(2).mean().sqrt().item(), self.frame)
+        self.writer.add_scalar("distill/student_action_rms",
+                               mu.detach().pow(2).mean().sqrt().item(), self.frame)
+
     # ----- per-minibatch loss: copy of A2CAgent.calc_gradients with the DAgger term added -----
 
     def calc_gradients(self, input_dict):
@@ -413,8 +435,7 @@ class DAggerA2CAgent(A2CAgent):
             else:
                 distill_per_elem = (mu - teacher_actions_batch).pow(2).mean(dim=-1, keepdim=True)
             (distill_loss,), _ = torch_ext.apply_masks([distill_per_elem], rnn_masks)
-            # Keep `mse_loss` as an alias for the wandb scalar name `dagger/L_D`
-            # so existing dashboards don't break.
+            # `mse_loss` is the (possibly NLL) distill term logged as `distill/imitation_loss`.
             mse_loss = distill_loss
 
             lam_d = self._lambda_d()
@@ -463,19 +484,9 @@ class DAggerA2CAgent(A2CAgent):
             "on_policy_grads": all_grads.detach().cpu(),
             "off_policy_grads": torch.zeros_like(all_grads).cpu(),
         }
-        # rl_games' train_epoch only forwards specific keys from `extras` to
-        # the writer (a2c_common.py:1421-1426). Custom keys are dropped, so
-        # write DAgger scalars directly to the SummaryWriter (synced to wandb
-        # via tb-mirroring). `self.frame` is the global env-frame counter.
-        if self.writer is not None:
-            self.writer.add_scalar("dagger/L_D", mse_loss.detach().item(), self.frame)
-            self.writer.add_scalar("dagger/lambda_d", lam_d, self.frame)
-            self.writer.add_scalar("dagger/teacher_action_l2",
-                                   teacher_actions_batch.detach().pow(2).mean().sqrt().item(),
-                                   self.frame)
-            self.writer.add_scalar("dagger/student_action_l2",
-                                   mu.detach().pow(2).mean().sqrt().item(),
-                                   self.frame)
+        self._log_distill_metrics(
+            distill_loss=mse_loss, lam_d=lam_d, mu=mu, teacher_actions=teacher_actions_batch
+        )
         if self.expl_type.startswith("mixed_expl") and self.intr_reward_coef_embd is not None:
             bl_ids = self.intr_reward_coef_embd[:: self.intr_coef_block_size, 0].reshape(-1, 1)
             bl_idxs = torch.argmax((obs_batch[:, -self.intr_reward_coef_embd.shape[1]] == bl_ids).float(), dim=0)

@@ -111,6 +111,7 @@ def main() -> None:
     import isaacsimenvs  # noqa: F401  triggers gym.register
     from isaacsimenvs.dagger import networks as _net  # noqa: F401  registers depth_cnn_lstm
     from isaacsimenvs.dagger.dagger_agent import DAggerA2CAgent
+    from isaacsimenvs.dagger.metrics import DistillMetricsObserver
     from isaacsimenvs.utils.hydra_utils import hydra_task_config_with_yaml
     from isaacsimenvs.utils.rlgames_utils import (
         EnvStatsAlgoObserver,
@@ -200,7 +201,9 @@ def main() -> None:
             agent_cfg["params"]["network"]["symmetric_critic"] = False
 
         # ---------------- Observers + wandb. ----------------
-        observers = [EnvStatsAlgoObserver()]
+        # EnvStatsAlgoObserver = every raw env extra (debugging firehose);
+        # DistillMetricsObserver = the curated `metrics/` namespace (headline numbers).
+        observers = [EnvStatsAlgoObserver(), DistillMetricsObserver()]
         if args_cli.wandb_activate:
             from isaacsimenvs.utils.wandb_utils import WandbAlgoObserver
 
