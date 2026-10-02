@@ -46,6 +46,9 @@ params:
     image_hw: [70, 70]
     image_channels: 1
     proprio_dim: 87           # joint_pos(29) + joint_vel(29) + prev_action_targets(29). Verify via env at smoke time.
+    # Fingerpad tactile taxels (5 pads x res^2) after proprio in the flat obs; 0 = depth only.
+    # To enable: env.tactile.enabled=true + 'tactile' at the end of env.student_obs.proprio_list.
+    tactile_dim: 0
     has_block_id: True
     symmetric_critic: False   # toggled by --critic
     cnn_channels: [32, 64, 128, 128]

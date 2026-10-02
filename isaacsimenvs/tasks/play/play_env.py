@@ -39,7 +39,7 @@ class PlayEnv(DirectRLEnv):
         if cfg.tactile.enabled:
             # Its size depends on the resolution, so register it before any dim lookup.
             OBS_FIELD_SIZES["tactile"] = tactile_obs_dim(cfg.tactile)
-            if "tactile" not in cfg.obs.obs_list:
+            if cfg.tactile.in_policy and "tactile" not in cfg.obs.obs_list:
                 cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile")
             if cfg.tactile.in_critic and "tactile" not in cfg.obs.state_list:
                 cfg.obs.state_list = (*cfg.obs.state_list, "tactile")

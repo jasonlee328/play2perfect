@@ -327,6 +327,7 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     }
     if getattr(env, "_tactile", None) is not None:
         obs_clean["tactile"] = env._tactile.compute()
+        env._last_tactile = obs_clean["tactile"]  # reused by the student obs this step
 
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
@@ -353,11 +354,18 @@ def build_observations(env) -> dict[str, torch.Tensor]:
 
 def _student_proprio_dict(env) -> dict[str, torch.Tensor]:
     joint_pos, joint_vel, prev_targets_canon = _canonical_joint_obs(env)
-    return {
+    out = {
         "joint_pos": joint_pos,
         "joint_vel": joint_vel,
         "prev_action_targets": prev_targets_canon,
     }
+    if getattr(env, "_tactile", None) is not None:
+        # Computed once per step in build_observations; zeros before the first step.
+        last = getattr(env, "_last_tactile", None)
+        out["tactile"] = last if last is not None else torch.zeros(
+            env.num_envs, OBS_FIELD_SIZES["tactile"], device=env.device
+        )
+    return out
 
 
 def _apply_student_tensor_delay(

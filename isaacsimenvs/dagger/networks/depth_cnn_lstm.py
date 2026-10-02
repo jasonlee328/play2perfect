@@ -69,6 +69,11 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             self.proprio_dim = int(params["proprio_dim"])
             self.has_block_id = bool(params.get("has_block_id", True))
             self.symmetric_critic = bool(params.get("symmetric_critic", False))
+            # Optional fingerpad tactile input: `tactile_pads` x res x res taxels in [0, 1],
+            # placed right after the proprio fields in the flat obs. 0 = depth-only network.
+            self.tactile_dim = int(params.get("tactile_dim", 0))
+            self.tactile_pads = int(params.get("tactile_pads", 5))
+            tactile_feat_dim = int(params.get("tactile_feat_dim", 64))
 
             self.fixed_sigma = params.get("fixed_sigma", "fixed")  # 'fixed' or 'coef_cond'
             assert self.fixed_sigma in ("fixed", "coef_cond"), (
@@ -85,11 +90,11 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
 
             self._image_numel = self.image_channels * self.image_hw[0] * self.image_hw[1]
             self._block_id_numel = 1 if self.has_block_id else 0
-            expected_obs_dim = self._image_numel + self.proprio_dim + self._block_id_numel
+            expected_obs_dim = self._image_numel + self.proprio_dim + self.tactile_dim + self._block_id_numel
             assert obs_dim == expected_obs_dim, (
                 f"obs_dim={obs_dim} but expected {expected_obs_dim} = image_flat({self._image_numel}) "
-                f"+ proprio({self.proprio_dim}) + block_id({self._block_id_numel}). "
-                "Check image_hw / proprio_dim / has_block_id in the yaml."
+                f"+ proprio({self.proprio_dim}) + tactile({self.tactile_dim}) + block_id({self._block_id_numel}). "
+                "Check image_hw / proprio_dim / tactile_dim / has_block_id in the yaml."
             )
 
             # ---- CNN encoder (4 conv, stride 2, GroupNorm, ReLU) + GAP ----
@@ -126,6 +131,31 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             )
             self._proprio_out_dim = p2
 
+            # ---- Tactile encoder: one small CNN shared across pads + a learned pad id ----
+            if self.tactile_dim:
+                res = int(round((self.tactile_dim / self.tactile_pads) ** 0.5))
+                assert self.tactile_pads * res * res == self.tactile_dim, (
+                    f"tactile_dim={self.tactile_dim} is not {self.tactile_pads} square pads"
+                )
+                self.tactile_res = res
+                self.tactile_pad_cnn = nn.Sequential(
+                    nn.Conv2d(1, 16, kernel_size=3, stride=1, padding=1),
+                    nn.ELU(inplace=True),
+                    nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
+                    nn.ELU(inplace=True),
+                    nn.Flatten(),
+                    nn.Linear(32 * ((res + 1) // 2) ** 2, 32),
+                    nn.ELU(inplace=True),
+                )
+                self.tactile_pad_embed = nn.Parameter(torch.zeros(self.tactile_pads, 32))
+                self.tactile_mlp = nn.Sequential(
+                    nn.Linear(self.tactile_pads * 32, tactile_feat_dim),
+                    nn.ELU(inplace=True),
+                )
+                self._tactile_out_dim = tactile_feat_dim
+            else:
+                self._tactile_out_dim = 0
+
             # ---- LSTM ----
             # `LSTMWithDones` masks (h, c) to zero at every `dones=1` boundary so
             # the BPTT unroll inside `calc_gradients` doesn't stitch hidden state
@@ -135,7 +165,7 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             from rl_games.common.layers.recurrent import LSTMWithDones
 
             self.lstm = LSTMWithDones(
-                input_size=cnn_feat_dim + self._proprio_out_dim,
+                input_size=cnn_feat_dim + self._proprio_out_dim + self._tactile_out_dim,
                 hidden_size=self.lstm_hidden,
                 num_layers=self.lstm_layers,
             )
@@ -200,14 +230,27 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             tail = obs[:, self._image_numel :]
             return image, tail
 
+        def _encode_tactile(self, tactile: torch.Tensor) -> torch.Tensor:
+            """(B, pads*res*res) taxels -> (B, tactile_feat_dim), pads encoded by one shared CNN."""
+            B = tactile.shape[0]
+            pads = tactile.reshape(B * self.tactile_pads, 1, self.tactile_res, self.tactile_res)
+            feat = self.tactile_pad_cnn(pads).view(B, self.tactile_pads, -1) + self.tactile_pad_embed
+            return self.tactile_mlp(feat.reshape(B, -1))
+
         def forward(self, obs_dict):
             obs = obs_dict["obs"]                                   # (seq*B, obs_dim) at train; (B, obs_dim) at inference
             image, proprio_aug = self._split_obs(obs)
 
             # CNN encoder + GAP + projection.
             cnn_feat = self.cnn_proj(self.cnn(image))               # (seq*B, cnn_feat_dim)
+            feats = [cnn_feat]
+            if self.tactile_dim:
+                # tail = [proprio | tactile | block_id?]: pull tactile out of the proprio stream.
+                t0, t1 = self.proprio_dim, self.proprio_dim + self.tactile_dim
+                feats.append(self._encode_tactile(proprio_aug[:, t0:t1]))
+                proprio_aug = torch.cat([proprio_aug[:, :t0], proprio_aug[:, t1:]], dim=-1)
             prop_feat = self.proprio_mlp(proprio_aug)               # (seq*B, p2)
-            fused = torch.cat([cnn_feat, prop_feat], dim=-1)        # (seq*B, F)
+            fused = torch.cat([feats[0], prop_feat, *feats[1:]], dim=-1)  # (seq*B, F)
 
             # LSTM with the rl_games (seq*B → (seq, num_seqs, F) → LSTM → (seq*B, hidden)) reshape.
             seq_length = int(obs_dict.get("seq_length", 1))

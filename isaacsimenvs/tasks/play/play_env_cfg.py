@@ -502,8 +502,9 @@ class TactileCfg:
     """Sharpa TacMap fingerpad tactile obs (``utils/tactile_utils.py``), off by default.
 
     When enabled, a ``tactile`` field of 5 * resolution^2 taxels in [0, 1] (thumb, index,
-    middle, ring, pinky; row-major per pad) is appended to ``obs.obs_list`` and, with
-    ``in_critic``, to ``obs.state_list``.
+    middle, ring, pinky; row-major per pad) is appended to ``obs.obs_list`` (unless
+    ``in_policy`` is False) and, with ``in_critic``, to ``obs.state_list``. A distillation
+    student can also read it by listing ``tactile`` in ``student_obs.proprio_list``.
     """
 
     enabled: bool = False
@@ -511,6 +512,8 @@ class TactileCfg:
     resolution: int = 8
     # Rays per taxel side: each taxel averages samples_per_taxel^2 ray depths.
     samples_per_taxel: int = 2
+    # False keeps tactile out of the policy (teacher) obs, e.g. to feed only a student.
+    in_policy: bool = True
     in_critic: bool = False
     # Relative paths resolve against the repo root.
     map_dir: str = "assets/tactile/sharpa_tacmap"
