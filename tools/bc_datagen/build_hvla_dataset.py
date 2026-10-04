@@ -297,7 +297,14 @@ def main() -> None:
                                                "convention": cam["convention"], "frame": "env"}},
     }
     (out / "meta" / "info.json").write_text(json.dumps(info, indent=2))
-    (out / "meta" / "stats.json").write_text(json.dumps(stats.finalize(total), indent=2))
+    final_stats = stats.finalize(total)
+    # Tactile is sparse: most taxels are 0 in >99% of frames, so q01 == q99 == 0 and the
+    # loader's 2 * (x - q01) / (q99 - q01) - 1 would send a contact to ~1e6. Normalize
+    # with the sensor's fixed [0, 1] range instead (-> 2x - 1).
+    t = final_stats["observation.tactile"]
+    t["q01"] = [0.0] * len(t["q01"])
+    t["q99"] = [1.0] * len(t["q99"])
+    (out / "meta" / "stats.json").write_text(json.dumps(final_stats, indent=2))
     with open(out / "meta" / "episodes.jsonl", "w") as f:
         for line in ep_lines:
             f.write(json.dumps(line) + "\n")
