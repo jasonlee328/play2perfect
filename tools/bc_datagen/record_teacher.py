@@ -51,7 +51,12 @@ LOWDIM_FIELDS = {
     "goals_reached": "goals hit so far in this episode (0..10)",
     "retract_phase": "1 once every goal is hit and the hand is retracting",
     "teacher_mu": "raw teacher action (unclipped), canonical order",
-    "action_joint_target": "LABEL: absolute joint target produced by clamp(mu, -1, 1), rad, canonical order",
+    "action_joint_target": "LABEL: absolute joint target the TEACHER's clamp(mu, -1, 1) produces from this "
+                           "state (computed, not necessarily executed), rad, canonical order",
+    "behavior_mu": "action the driving policy executed (= teacher_mu unless --behavior-checkpoint)",
+    "executed_joint_target": "absolute joint target actually executed this step, rad, canonical order",
+    "student_depth": "uint8 (70*70): the depth student's input view (window-normalized depth of the "
+                     "student camera's 70x70 crop), derived from the recorded high-res depth",
 }
 
 
@@ -126,6 +131,14 @@ def main() -> None:
     parser.add_argument("--teacher-tactile", action="store_true",
                         help="Teacher was trained with 8x8 tactile in its obs (screw_tactile8). "
                              "Tactile is recorded either way.")
+    parser.add_argument("--behavior-checkpoint", default=None,
+                        help="If set, this RL checkpoint DRIVES the env and --teacher-checkpoint only "
+                             "labels the visited states (DAgger-style coverage from older policies).")
+    parser.add_argument("--keep-all", action="store_true",
+                        help="Save failed episodes too (default: successes only).")
+    parser.add_argument("--first-episode-only", action="store_true",
+                        help="Each env contributes only its first episode (unbiased: otherwise short "
+                             "failing episodes finish first and fill the quota). Use num_envs = episodes.")
     parser.add_argument("--block-id", type=float, default=50.0)
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--shard", default="s0", help="Prefix for episode dir names.")
@@ -239,6 +252,17 @@ def main() -> None:
             env_info=teacher_env_info(wrapped),
         )
         teacher.pin_block_id(args.block_id)
+        behavior = None
+        if args.behavior_checkpoint:
+            behavior = Teacher(
+                task_id="Isaacsimenvs-PreciseAssembly-Direct-v0",
+                agent_key="rl_games_sapg_cfg_entry_point",
+                checkpoint_path=args.behavior_checkpoint,
+                num_envs=N,
+                rl_device=args.rl_device,
+                env_info=teacher_env_info(wrapped),
+            )
+            behavior.pin_block_id(args.block_id)
         # rl_games' Runner.load() reseeds every RNG from the agent yaml's fixed seed, which
         # would make every shard and attempt replay the same episodes. Reseed from ours.
         import random
@@ -258,6 +282,30 @@ def main() -> None:
             u._bc_label = u._cur_targets[:, perm].clone()
 
         u._pre_physics_step = _pre_physics_step
+
+        act_cfg = env_cfg.action
+
+        def target_from(actions: torch.Tensor) -> torch.Tensor:
+            """Absolute joint target `actions` (canonical, clipped) would produce from the
+            current state: action_utils.apply_action_pipeline without delay or mutation."""
+            a = actions.to(u.device)[:, u._perm_canon_to_lab]
+            prev = u._prev_targets
+            arm_raw = torch.clamp(prev[:, :7] + act_cfg.dof_speed_scale * u.step_dt * a[:, :7],
+                                  u._arm_lower, u._arm_upper)
+            arm = torch.clamp(act_cfg.arm_moving_average * arm_raw
+                              + (1.0 - act_cfg.arm_moving_average) * prev[:, :7], u._arm_lower, u._arm_upper)
+            hand_raw = u._hand_lower + 0.5 * (a[:, 7:] + 1.0) * (u._hand_upper - u._hand_lower)
+            hand = torch.clamp(act_cfg.hand_moving_average * hand_raw
+                               + (1.0 - act_cfg.hand_moving_average) * prev[:, 7:], u._hand_lower, u._hand_upper)
+            tgt = u._cur_targets.clone()
+            tgt[:, u._arm_joint_ids] = arm
+            tgt[:, u._hand_joint_ids] = hand
+            return tgt[:, perm]
+
+        # The depth student's crop (x 90:160, y 0:70 at 160x90) in this render's pixels.
+        dsx, dsy = args.render_width / 160.0, args.render_height / 90.0
+        dx0, dx1, dy0, dy1 = round(90 * dsx), round(160 * dsx), 0, round(70 * dsy)
+        dmin, dmax = float(so.depth_min_m), float(so.depth_max_m)
 
         cam = u.student_camera
         obs, _ = env.reset()
@@ -290,7 +338,12 @@ def main() -> None:
             valid = torch.isfinite(d) & (d > 0) & (d <= args.max_depth_m)
             mm = torch.where(valid, (d * 1000.0).round(), torch.zeros_like(d)).to(torch.int32)
             rg8 = torch.stack([mm & 0xFF, (mm >> 8) & 0xFF, torch.zeros_like(mm)], dim=-1).to(torch.uint8)
-            return rgb.cpu().numpy(), rg8.cpu().numpy()
+            sd = out["distance_to_image_plane"][..., 0][:, dy0:dy1, dx0:dx1].unsqueeze(1)
+            sd = F.interpolate(sd, size=(70, 70), mode="nearest-exact")[:, 0]
+            sd = torch.nan_to_num(sd, nan=dmax, posinf=dmax, neginf=dmax)
+            sd = ((sd - dmin) / (dmax - dmin)).clamp(0, 1)
+            sd8 = (sd * 255).round().to(torch.uint8).reshape(N, -1)
+            return rgb.cpu().numpy(), rg8.cpu().numpy(), sd8.cpu().numpy()
 
         def lowdim():
             rd = u.robot.data
@@ -325,6 +378,7 @@ def main() -> None:
             ep_root.mkdir(parents=True, exist_ok=True)
         counters = [0] * N
         episodes = [_Episode(ep_root / f"{tag}_e{i:04d}_n0000", S, fps, save) for i in range(N)]
+        first_done = np.zeros(N, bool)
         pool = ThreadPoolExecutor(max_workers=32)
         closers = []
         n_saved = n_prev
@@ -339,27 +393,36 @@ def main() -> None:
             ld = {k: v.float().cpu().numpy() for k, v in lowdim().items()}
             with torch.no_grad():
                 mu = teacher.get_action(obs["teacher_obs"])
-            obs, _, term, trunc, extras = env.step(mu.clamp(-1.0, 1.0))
-            label = u._bc_label.cpu().numpy()
+                mu_b = behavior.get_action(obs["teacher_obs"]) if behavior is not None else mu
+                label = target_from(mu.clamp(-1.0, 1.0)).cpu().numpy()  # before the step
+            obs, _, term, trunc, extras = env.step(mu_b.clamp(-1.0, 1.0))
+            executed = u._bc_label.cpu().numpy()
             mu_np = mu.float().cpu().numpy()
+            mub_np = mu_b.float().cpu().numpy()
 
             if args.preview and step in (0, 1, 2, 30, 120, 300):
                 full = cam.data.output["rgb"][..., :3][: args.preview].cpu().numpy()
                 for i in range(min(args.preview, N)):
                     iio.imwrite(pdir / f"full_env{i}_t{step:04d}.png", full[i])
                     iio.imwrite(pdir / f"crop_env{i}_t{step:04d}.png", frames[0][i])
+                    iio.imwrite(pdir / f"studentdepth_env{i}_t{step:04d}.png", frames[2][i].reshape(70, 70))
                     dm = frames[1][i, ..., 0].astype(np.uint16) | (frames[1][i, ..., 1].astype(np.uint16) << 8)
                     iio.imwrite(pdir / f"depth_env{i}_t{step:04d}.png",
                                 (np.clip((dm.astype(np.float32) - 500) / 1000.0, 0, 1) * 255).astype(np.uint8))
 
             if save:
-                list(pool.map(lambda i: episodes[i].write_frames(frames[0][i], frames[1][i]), range(N)))
+                list(pool.map(lambda i: episodes[i].write_frames(frames[0][i], frames[1][i]),
+                              [i for i in range(N) if episodes[i].save]))
             for i in range(N):
                 ep = episodes[i]
                 for k in ld:
                     ep.rows[k].append(ld[k][i])
                 ep.rows["teacher_mu"].append(mu_np[i])
+                ep.rows["behavior_mu"].append(mub_np[i])
                 ep.rows["action_joint_target"].append(label[i])
+                ep.rows["executed_joint_target"].append(executed[i])
+                if frames is not None:
+                    ep.rows["student_depth"].append(frames[2][i])
                 ep.n += 1
 
             done = (term | trunc).nonzero(as_tuple=False).squeeze(-1)
@@ -380,15 +443,23 @@ def main() -> None:
                         if succ[j]:
                             n_success += 1
                             lengths_success.append(ep.n)
-                    keep = save and succ[j] and valid_len and n_saved < args.num_episodes
+                    counted = not (args.first_episode_only and first_done[i])
+                    keep = (save and counted and (succ[j] or args.keep_all) and valid_len
+                            and n_saved < args.num_episodes)
                     if keep:
                         n_saved += 1
                     meta = {"success": bool(succ[j]), "length": ep.n, "goals_ratio": ratio[j],
-                            "termination": reason, "env": i, "shard": tag, "seed": env_cfg.seed}
+                            "termination": reason, "env": i, "shard": tag, "seed": env_cfg.seed,
+                            "behavior": args.behavior_checkpoint or args.teacher_checkpoint,
+                            "first_episode": bool(not first_done[i])}
                     closers.append(pool.submit(ep.close, keep, meta))
                     counters[i] += 1
-                    episodes[i] = _Episode(ep_root / f"{tag}_e{i:04d}_n{counters[i]:04d}", S, fps, save)
+                    first_done[i] = True
+                    episodes[i] = _Episode(ep_root / f"{tag}_e{i:04d}_n{counters[i]:04d}", S, fps,
+                                           save and not args.first_episode_only)
                 teacher.reset_idx(done)
+                if behavior is not None:
+                    behavior.reset_idx(done)
 
             step += 1
             if step % 200 == 0:
@@ -399,6 +470,8 @@ def main() -> None:
                       f"mean len succ {np.mean(lengths_success) if lengths_success else 0:.0f} | {reasons_count}",
                       flush=True)
             stop = (n_saved >= args.num_episodes) if save else (n_done >= args.num_episodes)
+            if args.first_episode_only and (first_done.all() or step > args.max_episode_steps + 10):
+                stop = True
 
         # Discard the episodes still in flight, then wait for every encoder.
         for ep in episodes:
@@ -409,6 +482,7 @@ def main() -> None:
         summary = {
             "teacher_checkpoint": args.teacher_checkpoint,
             "teacher_tactile": bool(args.teacher_tactile),
+            "behavior_checkpoint": args.behavior_checkpoint,
             "block_id": args.block_id,
             "num_envs": N,
             "fps": fps,

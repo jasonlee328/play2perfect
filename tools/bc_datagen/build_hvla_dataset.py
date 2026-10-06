@@ -57,6 +57,8 @@ VECTOR_COLS = {
     "observation.tactile": ("tactile", 320),
     "action.joint_target": ("action_joint_target", 29),
     "action.teacher_mu": ("teacher_mu", 29),
+    "action.behavior_mu": ("behavior_mu", 29),
+    "action.executed_joint_target": ("executed_joint_target", 29),
     "action.gripper_position": (None, 1),
     "action.pd_mode": (None, 1),
 }
@@ -247,7 +249,8 @@ def main() -> None:
             _link_or_copy(d / fname, out / "videos" / key / f"chunk-{chunk:03d}" / f"file-{fi:03d}.mp4",
                           args.link_mode)
         ep_lines.append({"episode_index": ep_i, "length": n, "tasks": [args.task],
-                         "source": str(d), **{k: meta[k] for k in ("success", "goals_ratio", "termination")}})
+                         "source": str(d), **{k: meta[k] for k in ("success", "goals_ratio", "termination")},
+                         **({"behavior": meta["behavior"]} if "behavior" in meta else {})})
         global_idx += n
         total += n
         if (ep_i + 1) % 100 == 0:
