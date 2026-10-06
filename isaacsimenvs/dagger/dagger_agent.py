@@ -20,6 +20,7 @@ Loss is `(1 - λ_D) · L_PPO + λ_D · MSE(student_μ, teacher_μ)` with a linea
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import torch
@@ -126,6 +127,12 @@ class DAggerA2CAgent(A2CAgent):
         self.replay_updates = int(cfg.get("replay_updates", 0))
         self.replay_min_rollouts = int(cfg.get("replay_min_rollouts", 2))
         self._replay: list[dict] = []
+
+        # Dataset aggregation to disk: every rollout's student inputs + teacher labels are
+        # written to <dump_dir>/rank<r>/rollout_<epoch>.npz (time-ordered (T, B, ...)) so a
+        # student can later be trained offline on all of it (tools: dagger/train_offline.py).
+        self.dump_dir = cfg.get("dump_dir") or None
+        self._dump_pool = None
 
         # Counter incremented inside the wrapped env_step (one per env-step).
         self._dagger_step_counter = 0
@@ -324,9 +331,58 @@ class DAggerA2CAgent(A2CAgent):
 
         self.env_step = wrapped_env_step
         try:
-            return super().play_steps()
+            result = super().play_steps()
         finally:
             self.env_step = original_env_step
+        if self.dump_dir:
+            self._dump_rollout()
+        return result
+
+    def _dump_rollout(self) -> None:
+        """Write this rollout (before SAPG augmentation / shuffling) to disk, off-thread.
+
+        image: uint8 (T, B, C*H*W)   the student's normalized depth x 255
+        low:   fp16  (T, B, P[+tac]) proprio (+ tactile), block-id column dropped
+        teacher_mu: fp16 (T, B, A)   the label (raw teacher mean)
+        dones: bool (T, B)           True where obs[t] starts a new episode
+        """
+        import json
+        from concurrent.futures import ThreadPoolExecutor
+
+        import numpy as np
+
+        td = self.experience_buffer.tensor_dict
+        net = self.model.a2c_network
+        n_img = int(net._image_numel)
+        obs = td["obses"]
+        base = n_img + int(net.proprio_dim) + int(getattr(net, "tactile_dim", 0))
+        if obs.shape[-1] == base + 1:
+            obs = obs[..., :base]
+        arrays = {
+            "image": (obs[..., :n_img].clamp(0, 1) * 255).round().to(torch.uint8).cpu().numpy(),
+            "low": obs[..., n_img:].to(torch.float16).cpu().numpy(),
+            "teacher_mu": td["teacher_actions"].to(torch.float16).cpu().numpy(),
+            "dones": td["dones"].bool().cpu().numpy(),
+            "epoch": np.int64(self.epoch_num),
+            "frame": np.int64(self.frame),
+        }
+        out = Path(self.dump_dir) / f"rank{self.global_rank}"
+        if self._dump_pool is None:
+            out.mkdir(parents=True, exist_ok=True)
+            self._dump_pool = ThreadPoolExecutor(max_workers=2)
+            meta = {"image_hw": list(net.image_hw), "image_channels": int(net.image_channels),
+                    "proprio_dim": int(net.proprio_dim), "tactile_dim": int(getattr(net, "tactile_dim", 0)),
+                    "action_dim": int(td["teacher_actions"].shape[-1]), "horizon": int(obs.shape[0]),
+                    "num_envs": int(obs.shape[1]), "teacher": str(self.teacher.checkpoint_path)}
+            (out / "meta.json").write_text(json.dumps(meta, indent=2))
+        path = out / f"rollout_{self.epoch_num:07d}.npz"
+
+        def _write():
+            tmp = path.with_suffix(".tmp.npz")
+            np.savez_compressed(tmp, **arrays)
+            os.replace(tmp, path)
+
+        self._dump_pool.submit(_write)
 
     # ----- dataset: ensure teacher_actions reaches calc_gradients via input_dict -----
 

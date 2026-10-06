@@ -63,6 +63,9 @@ def main() -> None:
                              "replay (0 = off).")
     parser.add_argument("--replay-updates", type=int, default=None,
                         help="Extra BC-only minibatches per epoch drawn from the replay FIFO.")
+    parser.add_argument("--dump-dir", default=None,
+                        help="Write every rollout's student inputs + teacher labels here "
+                             "(dataset aggregation for offline training).")
     parser.add_argument("--deterministic-rollouts", action="store_true",
                         help="Use student μ as rollout action (no N(μ, σ) sampling). "
                              "Still DAgger — teacher labels every student-visited state.")
@@ -240,6 +243,8 @@ def main() -> None:
             dagger_cfg["init_sigma_from_teacher_block_id"] = args_cli.init_sigma_from_teacher_block
         if args_cli.deterministic_rollouts:
             dagger_cfg["deterministic_rollouts"] = True
+        if args_cli.dump_dir is not None:
+            dagger_cfg["dump_dir"] = args_cli.dump_dir
         if args_cli.replay_capacity is not None:
             dagger_cfg["replay_capacity"] = args_cli.replay_capacity
         if args_cli.replay_updates is not None:
