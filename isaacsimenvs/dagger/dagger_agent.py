@@ -114,6 +114,19 @@ class DAggerA2CAgent(A2CAgent):
         # stays = 1 (replay log_prob computed at μ matches stored log_prob at μ).
         self.deterministic_rollouts = bool(cfg.get("deterministic_rollouts", False))
 
+        # Aggregated-data replay (classic DAgger keeps every labeled state; the
+        # online loop here otherwise trains on each 16-step rollout and drops
+        # it). `replay_capacity` rollouts are kept in a FIFO on the GPU (obs as
+        # fp16), and after each epoch's normal update `replay_updates` extra
+        # BC-only minibatches are drawn from it: a uniform rollout, then whole
+        # seq_length games within it with their stored rollout-time RNN states
+        # (R2D2-style "stored state"; slightly stale vs. current weights).
+        # 0 / 0 = off, i.e. the original on-policy-only behaviour.
+        self.replay_capacity = int(cfg.get("replay_capacity", 0))
+        self.replay_updates = int(cfg.get("replay_updates", 0))
+        self.replay_min_rollouts = int(cfg.get("replay_min_rollouts", 2))
+        self._replay: list[dict] = []
+
         # Counter incremented inside the wrapped env_step (one per env-step).
         self._dagger_step_counter = 0
         self._dagger_buffer_allocated = False
@@ -323,6 +336,80 @@ class DAggerA2CAgent(A2CAgent):
         # of the dataset. batch_dict was built with swap_and_flatten01 → shape (T*B, A).
         self.dataset.values_dict["teacher_actions"] = batch_dict["teacher_actions"]
         self.dataset.values_dict["teacher_sigmas"] = batch_dict["teacher_sigmas"]
+        if self.replay_capacity > 0:
+            self._replay_push(self.dataset.values_dict)
+
+    # ----- aggregated-data replay -----
+
+    def _replay_push(self, values: dict) -> None:
+        """Copy this rollout's training sequences (same flat game layout as
+        PPODataset: game g = rows [g*seq_length, (g+1)*seq_length)) into the FIFO."""
+        def opt(k):
+            v = values.get(k)
+            return v.detach().clone() if torch.is_tensor(v) else None
+
+        entry = {
+            "obs": values["obs"].detach().to(torch.float16),
+            "actions": values["actions"].detach().clone(),
+            "teacher_actions": values["teacher_actions"].detach().clone(),
+            "dones": opt("dones"),
+            "rnn_masks": opt("rnn_masks"),
+            "rnn_states": ([st.detach().clone() for st in values["rnn_states"]]
+                           if values.get("rnn_states") is not None else None),
+        }
+        self._replay.append(entry)
+        if len(self._replay) > self.replay_capacity:
+            self._replay.pop(0)
+
+    def _replay_update(self) -> float:
+        """One BC-only gradient step on sequences sampled from the replay FIFO."""
+        r = self._replay[int(torch.randint(len(self._replay), (1,)))]
+        n = r["obs"].shape[0]
+        if self.is_rnn:
+            seq = self.seq_length
+            n_games = n // seq
+            g = torch.randint(n_games, (max(1, self.minibatch_size // seq),), device=r["obs"].device)
+            idx = (g[:, None] * seq + torch.arange(seq, device=g.device)[None]).reshape(-1)
+        else:
+            idx = torch.randint(n, (self.minibatch_size,), device=r["obs"].device)
+
+        batch_dict = {
+            "is_train": True,
+            "prev_actions": r["actions"][idx],
+            "obs": self._preproc_obs(r["obs"][idx].float()),
+        }
+        masks = None
+        if self.is_rnn:
+            batch_dict["rnn_states"] = [st[:, g, :].contiguous() for st in r["rnn_states"]]
+            batch_dict["seq_length"] = self.seq_length
+            if self.zero_rnn_on_done and r["dones"] is not None:
+                batch_dict["dones"] = r["dones"][idx]
+            if r["rnn_masks"] is not None:
+                masks = r["rnn_masks"][idx]
+
+        with torch.cuda.amp.autocast(enabled=self.mixed_precision):
+            mu = self.model(batch_dict)["mus"]
+            per_elem = (mu - r["teacher_actions"][idx]).pow(2).mean(dim=-1, keepdim=True)
+            (loss,), _ = torch_ext.apply_masks([per_elem], masks)
+        if self.multi_gpu:
+            self.optimizer.zero_grad()
+        else:
+            for param in self.model.parameters():
+                param.grad = None
+        self.scaler.scale(loss).backward()
+        self.trancate_gradients_and_step()
+        return float(loss.detach().item())
+
+    def train_epoch(self):
+        result = super().train_epoch()
+        if (self.replay_capacity > 0 and self.replay_updates > 0
+                and len(self._replay) >= self.replay_min_rollouts):
+            self.set_train()
+            losses = [self._replay_update() for _ in range(self.replay_updates)]
+            if self.writer is not None:
+                self.writer.add_scalar("distill/replay_imitation_loss", sum(losses) / len(losses), self.frame)
+                self.writer.add_scalar("distill/replay_rollouts", len(self._replay), self.frame)
+        return result
 
     # ----- logging: the `distill/` namespace (see isaacsimenvs/dagger/metrics.py) -----
 
