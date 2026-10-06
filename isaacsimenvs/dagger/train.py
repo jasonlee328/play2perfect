@@ -119,21 +119,21 @@ def main() -> None:
         parser.error("--teacher-run-dir is required unless --probe-only.")
 
     sys.argv = [sys.argv[0]] + hydra_args
-    # Kit unpacks extensions into a shared per-user cache on first start; several ranks doing
-    # it at once race (FileExistsError, then "No module named isaacsim.asset"). Start rank 0
-    # first, then the others one after another, each waiting for the previous rank's marker.
+    # Kit unpacks extensions into a shared per-user cache on first start, and the first
+    # simulation start compiles shaders/kernels into a shared cache; several ranks doing
+    # either at once race (FileExistsError / "No module named isaacsim.asset") or stall in
+    # "Starting the simulation". Bring ranks up one at a time: each waits until the
+    # previous rank has finished creating its env (marker written after gym.make).
     ready = None
     if multi_gpu:
         ready = os.path.join("/tmp", f"kit_ready_{os.environ.get('TORCHELASTIC_RUN_ID', 'run')}")
         if rank > 0:
             prev = f"{ready}_{rank - 1}"
             t0 = time.time()
-            while not os.path.exists(prev) and time.time() - t0 < 1800:
+            while not os.path.exists(prev) and time.time() - t0 < 3600:
                 time.sleep(2)
             print(f"[multi-gpu] rank {rank}: rank {rank - 1} ready after {time.time() - t0:.0f}s", flush=True)
     app = AppLauncher(args_cli).app
-    if ready is not None:
-        open(f"{ready}_{rank}", "w").close()
 
     # Imports that need Kit running.
     import gymnasium as gym
@@ -161,6 +161,9 @@ def main() -> None:
             env_cfg.seed = int(env_cfg.seed if env_cfg.seed is not None else 42) + 1000 * rank
 
         env = gym.make(args_cli.task, cfg=env_cfg)
+        if ready is not None:
+            open(f"{ready}_{rank}", "w").close()
+            print(f"[multi-gpu] rank {rank}: env ready", flush=True)
 
         if args_cli.capture_viewer:
             from pathlib import Path
