@@ -110,6 +110,14 @@ def main() -> None:
     if multi_gpu:
         args_cli.distributed = True  # AppLauncher: Kit + renderer on cuda:LOCAL_RANK
         args_cli.sim_device = args_cli.rl_device = f"cuda:{local_rank}"
+        # run_dagger_p2p.sh hides the other GPUs from CUDA (Isaac Sim's scene graph only
+        # supports cuda:0), but the Vulkan renderer still enumerates every GPU: point it at
+        # this rank's physical GPU.
+        phys = os.environ.get("PHYS_GPU")
+        if phys is not None:
+            extra = f"--/renderer/activeGpu={phys} --/renderer/multiGpu/enabled=false"
+            args_cli.kit_args = f"{getattr(args_cli, 'kit_args', '') or ''} {extra}".strip()
+            print(f"[multi-gpu] rank {rank}: renderer on physical GPU {phys}", flush=True)
         if rank != 0:
             args_cli.wandb_activate = False
             args_cli.capture_viewer = False
