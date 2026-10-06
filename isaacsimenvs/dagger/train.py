@@ -100,6 +100,21 @@ def main() -> None:
     AppLauncher.add_app_launcher_args(parser)
     args_cli, hydra_args = parser.parse_known_args()
 
+    # Multi-GPU (torchrun): each rank simulates its own envs on its own GPU and rl_games
+    # averages gradients (config multi_gpu). Only rank 0 logs to wandb / captures viewer
+    # videos / writes checkpoints (rl_games gates its writer + saves on global_rank 0).
+    world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    rank = int(os.environ.get("RANK", "0"))
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    multi_gpu = world_size > 1
+    if multi_gpu:
+        args_cli.distributed = True  # AppLauncher: Kit + renderer on cuda:LOCAL_RANK
+        args_cli.sim_device = args_cli.rl_device = f"cuda:{local_rank}"
+        if rank != 0:
+            args_cli.wandb_activate = False
+            args_cli.capture_viewer = False
+        print(f"[multi-gpu] rank {rank}/{world_size} local_rank {local_rank} -> {args_cli.sim_device}", flush=True)
+
     if not args_cli.probe_only and args_cli.teacher_run_dir is None:
         parser.error("--teacher-run-dir is required unless --probe-only.")
 
@@ -128,6 +143,8 @@ def main() -> None:
     def run(env_cfg, agent_cfg: dict) -> None:
         hydra_run_dir = HydraConfig.get().runtime.output_dir
         env_cfg.sim.device = args_cli.sim_device
+        if multi_gpu:
+            env_cfg.seed = int(env_cfg.seed if env_cfg.seed is not None else 42) + 1000 * rank
 
         env = gym.make(args_cli.task, cfg=env_cfg)
 
@@ -242,6 +259,8 @@ def main() -> None:
         agent_cfg["params"]["config"]["train_dir"] = hydra_run_dir
         agent_cfg["params"]["config"]["device"] = args_cli.rl_device
         agent_cfg["params"]["config"]["device_name"] = args_cli.rl_device
+        if multi_gpu:
+            agent_cfg["params"]["config"]["multi_gpu"] = True
 
         runner.load(agent_cfg)
         runner.reset()
