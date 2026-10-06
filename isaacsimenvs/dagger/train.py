@@ -133,7 +133,8 @@ def main() -> None:
     # "Starting the simulation". Bring ranks up one at a time: each waits until the
     # previous rank has finished creating its env (marker written after gym.make).
     ready = None
-    if multi_gpu:
+    # One process per container (Beaker replicas) has its own /tmp and Kit cache: no staggering.
+    if multi_gpu and os.environ.get("DAGGER_STAGGER", "1") == "1":
         ready = os.path.join("/tmp", f"kit_ready_{os.environ.get('TORCHELASTIC_RUN_ID', 'run')}")
         if rank > 0:
             prev = f"{ready}_{rank - 1}"

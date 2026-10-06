@@ -107,7 +107,14 @@ class A2CBase(BaseAlgorithm):
 
             import hashlib
             from datetime import timedelta
-            dist.init_process_group("gloo", rank=self.global_rank, world_size=self.world_size, init_method=f'tcp://127.0.0.1:{23400 + int(hashlib.md5(self.experiment_name[3:].encode("utf-8")).hexdigest(), 16) % 500}', timeout=timedelta(hours=2))
+            # Multi-node (e.g. one Beaker replica per GPU): rendezvous at MASTER_ADDR:MASTER_PORT.
+            # Single node: the original localhost port derived from the experiment name.
+            if os.getenv("MASTER_ADDR"):
+                init_method = f'tcp://{os.environ["MASTER_ADDR"]}:{os.getenv("MASTER_PORT", "29500")}'
+            else:
+                init_method = f'tcp://127.0.0.1:{23400 + int(hashlib.md5(self.experiment_name[3:].encode("utf-8")).hexdigest(), 16) % 500}'
+            print(f"[multi-gpu] rl_games process group via {init_method} (rank {self.global_rank}/{self.world_size})", flush=True)
+            dist.init_process_group("gloo", rank=self.global_rank, world_size=self.world_size, init_method=init_method, timeout=timedelta(hours=2))
 
             self.device_name = f'cuda:{self.local_rank}'
             config['device'] = self.device_name
