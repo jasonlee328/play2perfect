@@ -119,7 +119,21 @@ def main() -> None:
         parser.error("--teacher-run-dir is required unless --probe-only.")
 
     sys.argv = [sys.argv[0]] + hydra_args
+    # Kit unpacks extensions into a shared per-user cache on first start; several ranks doing
+    # it at once race (FileExistsError, then "No module named isaacsim.asset"). Start rank 0
+    # first, then the others one after another, each waiting for the previous rank's marker.
+    ready = None
+    if multi_gpu:
+        ready = os.path.join("/tmp", f"kit_ready_{os.environ.get('TORCHELASTIC_RUN_ID', 'run')}")
+        if rank > 0:
+            prev = f"{ready}_{rank - 1}"
+            t0 = time.time()
+            while not os.path.exists(prev) and time.time() - t0 < 1800:
+                time.sleep(2)
+            print(f"[multi-gpu] rank {rank}: rank {rank - 1} ready after {time.time() - t0:.0f}s", flush=True)
     app = AppLauncher(args_cli).app
+    if ready is not None:
+        open(f"{ready}_{rank}", "w").close()
 
     # Imports that need Kit running.
     import gymnasium as gym
