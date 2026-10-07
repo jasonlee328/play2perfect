@@ -13,6 +13,7 @@ cli.add_argument("--num-envs", type=int, required=True)
 cli.add_argument("--camera", type=int, default=1)      # 1 = student depth cam on
 cli.add_argument("--warmup", type=int, default=30)
 cli.add_argument("--steps", type=int, default=120)
+cli.add_argument("--problem", default="tight_insertion")
 args = cli.parse_args()
 
 from isaaclab.app import AppLauncher
@@ -27,11 +28,11 @@ import isaacsimenvs  # noqa: F401
 from evaluation.eval_isaacsim import _load_env_cfg, _apply_env_overrides, _instantiate_env
 
 TASK = "Isaacsimenvs-PreciseAssembly-Direct-v0"
-res = {"num_envs": args.num_envs, "camera": bool(args.camera)}
+res = {"problem": args.problem, "num_envs": args.num_envs, "camera": bool(args.camera)}
 env = None
 try:
     cfg = _load_env_cfg(TASK)
-    _apply_env_overrides(cfg, problem="tight_insertion", goal_mode="preInsertAndFinal",
+    _apply_env_overrides(cfg, problem=args.problem, goal_mode="preInsertAndFinal",
         random_goal_fraction=0.0, insertion_success_tolerance=0.01,
         retract_success_tolerance=0.005, num_envs=args.num_envs, sim_device="cuda:0",
         sdf=False, keep_dr=False, extra_overrides={})
