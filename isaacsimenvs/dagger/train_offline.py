@@ -68,7 +68,13 @@ class _Cache:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     p.add_argument("--run-dir", required=True, help="DAgger run dir (its .hydra config defines the network).")
-    p.add_argument("--data", nargs="+", required=True)
+    p.add_argument("--data", nargs="*", default=[], help="DAgger rollout dumps (--dump-dir).")
+    p.add_argument("--episodes", nargs="*", default=[],
+                   help="Recorder outputs (bc_datagen/record_teacher.py dirs with episodes/*/lowdim.npz): "
+                        "student_depth + proprio rebuilt from raw joints, label = teacher_mu.")
+    p.add_argument("--joint-limits", default="/weka/robots-default/jasonl/FoundationTouch/bc_data/joint_limits_canonical.json",
+                   help="Canonical joint limits (normalizes joint_pos like the env's student obs).")
+    p.add_argument("--no-tactile", action="store_true", help="Episodes mode: drop tactile from the input.")
     p.add_argument("--out-dir", required=True)
     p.add_argument("--name", default=None)
     p.add_argument("--window", type=int, default=64)
@@ -110,18 +116,47 @@ def main() -> None:
             self.num_envs = int(n)
 
     run_dir = Path(args.run_dir)
-    streams = _streams(args.data)
-    if not streams:
-        raise SystemExit(f"no rollouts under {args.data}")
-    meta = json.loads((Path(streams[0][0]).parent / "meta.json").read_text())
-    T = meta["horizon"]
-    k = math.ceil(args.window / T) + 1  # rollouts per group so any offset fits a window
-    groups = [(s, i) for s in streams for i in range(len(s) - k + 1)]
-    n_roll = sum(len(s) for s in streams)
-    print(f"[offline] {len(streams)} streams, {n_roll} rollouts (~{n_roll * T * meta['num_envs'] / 1e6:.1f}M samples), "
-          f"{len(groups)} window groups", flush=True)
-    if not groups:
-        raise SystemExit("not enough consecutive rollouts for one window")
+    if bool(args.data) == bool(args.episodes):
+        raise SystemExit("pass exactly one of --data (DAgger dumps) or --episodes (recorder episodes)")
+    streams, groups, episodes = [], [], []
+    if args.data:
+        streams = _streams(args.data)
+        if not streams:
+            raise SystemExit(f"no rollouts under {args.data}")
+        meta = json.loads((Path(streams[0][0]).parent / "meta.json").read_text())
+        T = meta["horizon"]
+        k = math.ceil(args.window / T) + 1  # rollouts per group so any offset fits a window
+        groups = [(s, i) for s in streams for i in range(len(s) - k + 1)]
+        n_roll = sum(len(s) for s in streams)
+        print(f"[offline] {len(streams)} streams, {n_roll} rollouts (~{n_roll * T * meta['num_envs'] / 1e6:.1f}M "
+              f"samples), {len(groups)} window groups", flush=True)
+        if not groups:
+            raise SystemExit("not enough consecutive rollouts for one window")
+    else:
+        lim = json.loads(Path(args.joint_limits).read_text())
+        lo, hi = np.asarray(lim["lower"], np.float32), np.asarray(lim["upper"], np.float32)
+        for src in args.episodes:
+            for d in sorted((Path(src) / "episodes").iterdir()):
+                f = d / "lowdim.npz"
+                if not (d / "meta.json").is_file() or not f.is_file():
+                    continue
+                z = np.load(f)
+                if "student_depth" not in z.files or len(z["joint_pos"]) < args.window:
+                    continue
+                jp = 2.0 * (z["joint_pos"] - lo) / (hi - lo) - 1.0
+                parts = [jp, z["joint_vel"], z["prev_targets"]]
+                if not args.no_tactile:
+                    parts.append(z["tactile"])
+                low = np.clip(np.concatenate(parts, -1), -10.0, 10.0).astype(np.float16)
+                episodes.append({"image": z["student_depth"], "low": low,
+                                 "teacher_mu": z["teacher_mu"].astype(np.float16)})
+        if not episodes:
+            raise SystemExit(f"no usable episodes under {args.episodes}")
+        n = sum(len(e["low"]) for e in episodes)
+        meta = {"image_hw": [70, 70], "image_channels": 1, "proprio_dim": 87,
+                "tactile_dim": 0 if args.no_tactile else 320, "action_dim": 29, "horizon": 0,
+                "num_envs": 0}
+        print(f"[offline] {len(episodes)} episodes, {n / 1e6:.2f}M steps from {args.episodes}", flush=True)
 
     # Network: the run's student, built as an rl_games player (no env / sim needed).
     acfg = OmegaConf.to_container(OmegaConf.load(run_dir / ".hydra" / "config.yaml"), resolve=True)["agent"]
@@ -190,7 +225,7 @@ def main() -> None:
     while step < args.steps:
         per = args.batch // args.groups_per_batch
         imgs, lows, labs, dns = [], [], [], []
-        for _ in range(args.groups_per_batch):
+        for _ in range(args.groups_per_batch if not episodes else 0):
             s, i = random.choice(groups)
             parts = [cache.get(f) for f in s[i:i + k]]
             cat = {key: np.concatenate([q[key] for q in parts], 0) for key in parts[0]}  # (k*T, B, ...)
@@ -204,6 +239,16 @@ def main() -> None:
             d = cat["dones"][ti, envs[:, None]].copy()
             d[:, 0] = True  # every window starts from a zero LSTM state
             dns.append(d)
+        if episodes:
+            for _ in range(args.batch):
+                e = episodes[random.randrange(len(episodes))]
+                o = random.randrange(len(e["low"]) - args.window + 1)
+                imgs.append(e["image"][None, o:o + args.window])
+                lows.append(e["low"][None, o:o + args.window])
+                labs.append(e["teacher_mu"][None, o:o + args.window])
+                d = np.zeros((1, args.window), bool)
+                d[:, 0] = True
+                dns.append(d)
         img = torch.from_numpy(np.concatenate(imgs)).to(dev).float() / 255.0      # (Bw, W, C*H*W)
         low = torch.from_numpy(np.concatenate(lows)).to(dev).float()
         lab = torch.from_numpy(np.concatenate(labs)).to(dev).float()
