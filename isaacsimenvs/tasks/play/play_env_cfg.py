@@ -190,6 +190,17 @@ class StudentObsCfg:
     camera_pos: tuple[float, float, float] = (0.0, -1.0, 1.0)
     camera_quat_wxyz: tuple[float, float, float, float] = (1.0, 0.0, 0.0, 0.0)
 
+    # Optional second student view (tiled/standard backends): same modality, intrinsics,
+    # render size and input size as the main camera, its own pose / crop / depth window.
+    # Stacked after the main view along channels: image = (B, 2*C, H, W).
+    view2_enabled: bool = False
+    view2_pos: tuple[float, float, float] = (0.0, -1.0, 1.0)
+    view2_quat_wxyz: tuple[float, float, float, float] = (1.0, 0.0, 0.0, 0.0)
+    view2_crop_top_left: tuple[int, int] = (0, 0)
+    view2_crop_bottom_right: tuple[int, int] = (0, 0)
+    view2_depth_min_m: float = 0.45
+    view2_depth_max_m: float = 1.25
+
     focal_length: float = 24.0
     horizontal_aperture: float = 33.19737869997174
     # USD PinholeCamera aperture offsets shift the principal point without

@@ -65,6 +65,9 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
 
             # ---- yaml hyperparams ----
             self.image_hw = tuple(params["image_hw"])
+            # num_views: camera views stacked along channels (view-major, image_channels each).
+            # Every view goes through the same encoder; features are concatenated.
+            self.num_views = int(params.get("num_views", 1))
             self.image_channels = int(params.get("image_channels", 1))
             self.proprio_dim = int(params["proprio_dim"])
             self.has_block_id = bool(params.get("has_block_id", True))
@@ -88,7 +91,7 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             head_hidden = int(params.get("head_hidden", 256))
             log_sigma_init = float(params.get("log_sigma_init", -1.0))
 
-            self._image_numel = self.image_channels * self.image_hw[0] * self.image_hw[1]
+            self._image_numel = self.num_views * self.image_channels * self.image_hw[0] * self.image_hw[1]
             self._block_id_numel = 1 if self.has_block_id else 0
             expected_obs_dim = self._image_numel + self.proprio_dim + self.tactile_dim + self._block_id_numel
             assert obs_dim == expected_obs_dim, (
@@ -191,7 +194,7 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             from rl_games.common.layers.recurrent import LSTMWithDones
 
             self.lstm = LSTMWithDones(
-                input_size=cnn_feat_dim + self._proprio_out_dim + self._tactile_out_dim,
+                input_size=self.num_views * cnn_feat_dim + self._proprio_out_dim + self._tactile_out_dim,
                 hidden_size=self.lstm_hidden,
                 num_layers=self.lstm_layers,
             )
@@ -252,7 +255,7 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
         def _split_obs(self, obs: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
             """Slice flat obs into (image, proprio_aug). proprio_aug includes block_id as last col when has_block_id."""
             B = obs.shape[0]
-            image = obs[:, : self._image_numel].view(B, self.image_channels, *self.image_hw)
+            image = obs[:, : self._image_numel].reshape(B * self.num_views, self.image_channels, *self.image_hw)
             tail = obs[:, self._image_numel :]
             return image, tail
 
@@ -270,7 +273,8 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             # CNN encoder + GAP + projection.
             if self._imagenet_norm:
                 image = (image - self.img_mean) / self.img_std
-            cnn_feat = self.cnn_proj(self.cnn(image))               # (seq*B, cnn_feat_dim)
+            cnn_feat = self.cnn_proj(self.cnn(image))               # (seq*B*views, cnn_feat_dim)
+            cnn_feat = cnn_feat.reshape(-1, self.num_views * cnn_feat.shape[-1])  # (seq*B, views*cnn_feat_dim)
             feats = [cnn_feat]
             if self.tactile_dim:
                 # tail = [proprio | tactile | block_id?]: pull tactile out of the proprio stream.

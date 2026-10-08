@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 import time
@@ -378,6 +379,7 @@ def setup_student_camera(env) -> None:
     """
     cfg = getattr(env.cfg, "student_obs", None)
     env.student_camera = None
+    env.student_camera_view2 = None
     if cfg is None or not cfg.enabled or not cfg.image_enabled:
         return
 
@@ -387,6 +389,9 @@ def setup_student_camera(env) -> None:
             "cfg.student_obs.camera_backend must be 'tiled', 'standard', "
             f"'raycaster', or 'foundation_stereo', got {backend!r}."
         )
+
+    if bool(getattr(cfg, "view2_enabled", False)) and backend not in ("tiled", "standard"):
+        raise NotImplementedError(f"student_obs.view2_enabled needs the tiled/standard backend, got {backend!r}.")
 
     camera_mount = str(cfg.camera_mount).lower()
     if camera_mount != "world":
@@ -429,6 +434,18 @@ def setup_student_camera(env) -> None:
         )
         env.student_camera = camera_cls(cfg=camera_cfg)
         env.scene.sensors["student_camera"] = env.student_camera
+        if bool(getattr(cfg, "view2_enabled", False)):
+            import copy
+
+            view2_cfg = copy.deepcopy(camera_cfg)
+            view2_cfg.prim_path = "/World/envs/env_.*/StudentCameraView2"
+            view2_cfg.offset = camera_cfg_cls.OffsetCfg(
+                pos=tuple(float(x) for x in cfg.view2_pos),
+                rot=tuple(float(x) for x in cfg.view2_quat_wxyz),
+                convention=str(cfg.camera_convention),
+            )
+            env.student_camera_view2 = camera_cls(cfg=view2_cfg)
+            env.scene.sensors["student_camera_view2"] = env.student_camera_view2
         size_str = f"{int(cfg.image_width)}x{int(cfg.image_height)}"
     elif backend == "raycaster":
         # CUDA mesh raycaster, no rasterizer / Replicator.
@@ -809,11 +826,12 @@ def _apply_camera_pose_rand_at_reset(env, env_ids: torch.Tensor) -> None:
     )
 
 
-def _preprocess_student_depth(env, depth: torch.Tensor) -> torch.Tensor:
+def _preprocess_student_depth(env, depth: torch.Tensor, near: float | None = None,
+                              far: float | None = None) -> torch.Tensor:
     cfg = env.cfg.student_obs
     depth = depth.float()
-    near = float(cfg.depth_min_m)
-    far = float(cfg.depth_max_m)
+    near = float(cfg.depth_min_m if near is None else near)
+    far = float(cfg.depth_max_m if far is None else far)
     if far <= near:
         raise ValueError(
             "cfg.student_obs.depth_max_m must be greater than "
@@ -853,14 +871,16 @@ def _validate_student_image_shape(env, image: torch.Tensor) -> torch.Tensor:
     )
 
 
-def _crop_student_image(env, image: torch.Tensor) -> torch.Tensor:
+def _crop_student_image(env, image: torch.Tensor, crop: tuple | None = None) -> torch.Tensor:
+    """crop: ((x0, y0), (x1, y1)) overriding cfg.crop_top_left / crop_bottom_right."""
     cfg = env.cfg.student_obs
     if not cfg.crop_enabled:
         return image
 
     height, width = image.shape[-2:]
-    x0, y0 = (int(v) for v in cfg.crop_top_left)
-    x1, y1 = (int(v) for v in cfg.crop_bottom_right)
+    top_left, bottom_right = crop if crop is not None else (cfg.crop_top_left, cfg.crop_bottom_right)
+    x0, y0 = (int(v) for v in top_left)
+    x1, y1 = (int(v) for v in bottom_right)
     if not (0 <= x0 < x1 <= width and 0 <= y0 < y1 <= height):
         raise ValueError(
             "Invalid student image crop coordinates: "
@@ -1055,7 +1075,39 @@ def read_student_camera_image(env) -> torch.Tensor:
 
     if not image_parts:
         raise ValueError(f"Unsupported student image modality: {modality!r}")
-    return _validate_student_image_shape(env, torch.cat(image_parts, dim=1))
+    image = _validate_student_image_shape(env, torch.cat(image_parts, dim=1))
+
+    view2 = getattr(env, "student_camera_view2", None)
+    if view2 is not None:
+        view2.update(dt, force_recompute=False)
+        out2 = view2.data.output
+        crop2 = (cfg.view2_crop_top_left, cfg.view2_crop_bottom_right)
+        parts2: list[torch.Tensor] = []
+        if modality in ("rgb", "rgbd"):
+            rgb2 = out2["rgb"][..., :3].permute(0, 3, 1, 2).float() / 255.0
+            parts2.append(_crop_student_image(env, rgb2, crop=crop2))
+        if modality in ("depth", "rgbd"):
+            d2 = out2["distance_to_image_plane"]
+            d2 = d2.permute(0, 3, 1, 2) if d2.dim() == 4 and d2.shape[-1] == 1 else d2.unsqueeze(1)
+            d2 = _preprocess_student_depth(env, _apply_depth_noise(env, d2),
+                                           near=cfg.view2_depth_min_m, far=cfg.view2_depth_max_m)
+            parts2.append(_crop_student_image(env, d2, crop=crop2))
+        image2 = _validate_student_image_shape(env, torch.cat(parts2, dim=1))
+        env._last_student_image_view2 = image2.detach()
+        image = torch.cat([image, image2], dim=1)
+
+    # Debug: STUDENT_IMAGE_DUMP=<file.npz> saves env 0's policy image at the first
+    # STUDENT_IMAGE_DUMP_STEPS (default 400) calls, every 50th.
+    dump = os.environ.get("STUDENT_IMAGE_DUMP")
+    if dump:
+        frames = env.__dict__.setdefault("_student_image_dump", [])
+        n = int(getattr(env, "_student_camera_skip_counter", 0))
+        if n % 50 == 0 and n < int(os.environ.get("STUDENT_IMAGE_DUMP_STEPS", "400")):
+            frames.append(image[0].detach().cpu().numpy())
+            import numpy as np
+
+            np.savez_compressed(dump, image=np.stack(frames))
+    return image
 
 
 def _set_usd_attr(prim, name: str, value, value_type) -> None:

@@ -89,6 +89,7 @@ class PreciseAssemblyEnv(PlayEnv):
                 int(student_cfg.image_input_height)
                 * int(student_cfg.image_input_width)
                 * (1 if student_cfg.image_modality.lower() == "depth" else 3)
+                * (2 if getattr(student_cfg, "view2_enabled", False) else 1)
             )
             proprio_sample = _student_proprio_dict(self)
             proprio_dim = sum(
