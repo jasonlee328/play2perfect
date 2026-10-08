@@ -19,6 +19,7 @@ from isaacsimenvs.tasks.play.utils.goal_sampling import (
 from isaacsimenvs.tasks.play.utils.logging_utils import log_step_metrics
 from isaacsimenvs.tasks.play.utils.obs_utils import (
     OBS_FIELD_SIZES,
+    _keypoints_world,
     build_observations,
     compute_intermediate_values,
 )
@@ -179,6 +180,9 @@ class PreciseAssemblyEnv(PlayEnv):
         self.retract_succeeded = torch.zeros_like(self.retract_phase)
         self._just_entered_retract = torch.zeros_like(self.retract_phase)
         self._just_retracted = torch.zeros_like(self.retract_phase)
+        # allow_goal_skip: furthest later waypoint currently near, and steps held there.
+        self._skip_cand = torch.full((self.num_envs,), -1, dtype=torch.long, device=self.device)
+        self._skip_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
 
         self.goal_pos_obs_noise = torch.zeros(
             self.num_envs, 3, dtype=torch.float32, device=self.device
@@ -518,6 +522,9 @@ class PreciseAssemblyEnv(PlayEnv):
         self._closest_keypoint_max_dist[env_ids] = -1.0
         self._closest_fingertip_dist[env_ids] = -1.0
         self._near_goal_steps[env_ids] = 0
+        if hasattr(self, "_skip_cand"):
+            self._skip_cand[env_ids] = -1
+            self._skip_steps[env_ids] = 0
 
     def _keypoint_success_tolerance_m(self) -> torch.Tensor:
         pih_cfg = self.cfg.precise_assembly
@@ -587,11 +594,60 @@ class PreciseAssemblyEnv(PlayEnv):
         """
         return ~self.retract_phase
 
+    def _apply_goal_skip(self) -> None:
+        """allow_goal_skip: jump to a later insertion waypoint reached out of order.
+
+        Same test as the in-order goal (keypoint max dist within the insertion
+        tolerance, held success_steps steps), applied to every waypoint after the
+        current one. On a jump, _successes is set so the regular +1 in _get_dones
+        lands just past the reached waypoint (crediting it and all before it).
+        """
+        if self._num_prelude_goals > 0:
+            raise NotImplementedError("allow_goal_skip supports goal modes without prelude waypoints")
+        active = ~self.is_random_goal_env & ~self.retract_phase & (self._successes < self.env_max_goals)
+        if not active.any():
+            return
+        N, G = self.num_envs, self._num_insertion_goals
+        kp = (self._keypoint_offsets_fixed if self.cfg.reward.fixed_size_keypoint_reward
+              else self._keypoint_offsets)
+        K = kp.shape[1]
+        obj_pos = self.object.data.root_pos_w - self.scene.env_origins
+        obj_kp = _keypoints_world(obj_pos, self.object.data.root_quat_w, kp)              # (N, K, 3)
+
+        hole_q = self.hole_quat_wxyz.unsqueeze(1).expand(N, G, 4).reshape(-1, 4)
+        wp_pos = self.hole_pos.unsqueeze(1) + quat_apply(
+            hole_q, self._insert_pos_rel.unsqueeze(0).expand(N, G, 3).reshape(-1, 3)
+        ).reshape(N, G, 3)
+        wp_q = quat_mul(hole_q, self._insert_quat_wxyz.unsqueeze(0).expand(N, G, 4).reshape(-1, 4))
+        wp_kp = _keypoints_world(
+            wp_pos.reshape(-1, 3), wp_q, kp.unsqueeze(1).expand(N, G, K, 3).reshape(-1, K, 3)
+        ).reshape(N, G, K, 3)
+        dist = (obj_kp.unsqueeze(1) - wp_kp).norm(dim=-1).max(dim=-1).values               # (N, G)
+
+        idx = torch.arange(G, device=self.device)
+        near_later = (
+            (dist <= self._keypoint_success_tolerance_m().unsqueeze(1))
+            & (idx.unsqueeze(0) > self._successes.unsqueeze(1))
+            & active.unsqueeze(1)
+        )
+        far = torch.where(near_later, idx.unsqueeze(0), torch.full_like(near_later, -1, dtype=torch.long)).max(dim=1).values
+        held = (far >= 0) & (far == self._skip_cand)
+        self._skip_steps = torch.where(held, self._skip_steps + 1, (far >= 0).long())
+        self._skip_cand = far
+        jump = self._skip_steps >= int(self.cfg.termination.success_steps)
+        if jump.any():
+            self._successes[jump] = far[jump]
+            self._is_success[jump] = True
+            self._skip_cand[jump] = -1
+            self._skip_steps[jump] = 0
+
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
         compute_intermediate_values(self)
 
         pih_cfg = self.cfg.precise_assembly
+        if pih_cfg.allow_goal_skip:
+            self._apply_goal_skip()
         is_success = self._is_success.clone()
         if pih_cfg.enable_retract:
             is_success &= ~self.retract_phase

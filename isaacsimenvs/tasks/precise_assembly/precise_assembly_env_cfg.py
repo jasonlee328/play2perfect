@@ -56,6 +56,10 @@ class PreciseAssemblyCfg:
     lift_bonus_fade_threshold: float = 2.0
 
     insertion_success_tolerance: float = 0.01
+    # Eval scoring: reaching any later insertion waypoint (held success_steps steps)
+    # counts it and every waypoint before it, instead of requiring them in order.
+    # Leave off for training: it changes which goal the teacher sees.
+    allow_goal_skip: bool = False
 
     enable_retract: bool = True
     retract_reward_scale: float = 1.0
