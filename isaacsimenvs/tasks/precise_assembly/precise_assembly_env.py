@@ -623,10 +623,15 @@ class PreciseAssemblyEnv(PlayEnv):
             wp_pos.reshape(-1, 3), wp_q, kp.unsqueeze(1).expand(N, G, K, 3).reshape(-1, K, 3)
         ).reshape(N, G, K, 3)
         dist = (obj_kp.unsqueeze(1) - wp_kp).norm(dim=-1).max(dim=-1).values               # (N, G)
+        hole_axis = quat_apply(
+            self.hole_quat_wxyz, torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(N, 3)
+        )
+        axial_err = ((obj_pos.unsqueeze(1) - wp_pos) * hole_axis.unsqueeze(1)).sum(-1).abs()  # (N, G)
 
         idx = torch.arange(G, device=self.device)
         near_later = (
             (dist <= self._keypoint_success_tolerance_m().unsqueeze(1))
+            & (axial_err <= float(self.cfg.precise_assembly.goal_skip_axial_tol))
             & (idx.unsqueeze(0) > self._successes.unsqueeze(1))
             & active.unsqueeze(1)
         )

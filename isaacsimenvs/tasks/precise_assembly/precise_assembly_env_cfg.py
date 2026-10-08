@@ -60,6 +60,10 @@ class PreciseAssemblyCfg:
     # counts it and every waypoint before it, instead of requiring them in order.
     # Leave off for training: it changes which goal the teacher sees.
     allow_goal_skip: bool = False
+    # A skipped-to waypoint must also match its depth along the hole axis within
+    # this (m). The keypoint tolerance alone barely sees depth (2.3 mm per quarter
+    # turn), so without it pushing straight down would skip the turns.
+    goal_skip_axial_tol: float = 0.003
 
     enable_retract: bool = True
     retract_reward_scale: float = 1.0
