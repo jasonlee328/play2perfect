@@ -97,22 +97,48 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
                 "Check image_hw / proprio_dim / tactile_dim / has_block_id in the yaml."
             )
 
-            # ---- CNN encoder (4 conv, stride 2, GroupNorm, ReLU) + GAP ----
-            c1, c2, c3, c4 = cnn_channels
-            self.cnn = nn.Sequential(
-                nn.Conv2d(self.image_channels, c1, kernel_size=3, stride=2, padding=1),
-                nn.GroupNorm(num_groups=min(8, c1), num_channels=c1),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(c1, c2, kernel_size=3, stride=2, padding=1),
-                nn.GroupNorm(num_groups=min(8, c2), num_channels=c2),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(c2, c3, kernel_size=3, stride=2, padding=1),
-                nn.GroupNorm(num_groups=min(8, c3), num_channels=c3),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(c3, c4, kernel_size=3, stride=2, padding=1),
-                nn.GroupNorm(num_groups=min(8, c4), num_channels=c4),
-                nn.ReLU(inplace=True),
-            )
+            # ---- Image encoder + GAP ----
+            # image_encoder: "cnn" (4 conv, stride 2, GroupNorm, ReLU) or "resnet18"
+            # (torchvision trunk through layer4, frozen BatchNorm statistics, inputs
+            # ImageNet-normalized; RGB only). image_encoder_weights: a resnet18
+            # state_dict to start from (e.g. ImageNet), else random init.
+            self.image_encoder = str(params.get("image_encoder", "cnn"))
+            self._imagenet_norm = False
+            if self.image_encoder == "cnn":
+                c1, c2, c3, c4 = cnn_channels
+                self.cnn = nn.Sequential(
+                    nn.Conv2d(self.image_channels, c1, kernel_size=3, stride=2, padding=1),
+                    nn.GroupNorm(num_groups=min(8, c1), num_channels=c1),
+                    nn.ReLU(inplace=True),
+                    nn.Conv2d(c1, c2, kernel_size=3, stride=2, padding=1),
+                    nn.GroupNorm(num_groups=min(8, c2), num_channels=c2),
+                    nn.ReLU(inplace=True),
+                    nn.Conv2d(c2, c3, kernel_size=3, stride=2, padding=1),
+                    nn.GroupNorm(num_groups=min(8, c3), num_channels=c3),
+                    nn.ReLU(inplace=True),
+                    nn.Conv2d(c3, c4, kernel_size=3, stride=2, padding=1),
+                    nn.GroupNorm(num_groups=min(8, c4), num_channels=c4),
+                    nn.ReLU(inplace=True),
+                )
+            elif self.image_encoder == "resnet18":
+                import torchvision
+                from torchvision.ops.misc import FrozenBatchNorm2d
+
+                assert self.image_channels == 3, "image_encoder=resnet18 expects RGB (image_channels=3)"
+                rn = torchvision.models.resnet18(weights=None, norm_layer=FrozenBatchNorm2d)
+                weights = params.get("image_encoder_weights")
+                if weights:
+                    sd = torch.load(weights, map_location="cpu")
+                    rn.load_state_dict({k: v for k, v in sd.items() if not k.endswith("num_batches_tracked")})
+                    print(f"[depth_cnn_lstm] resnet18 encoder initialized from {weights}", flush=True)
+                self.cnn = nn.Sequential(rn.conv1, rn.bn1, rn.relu, rn.maxpool,
+                                         rn.layer1, rn.layer2, rn.layer3, rn.layer4)
+                c4 = 512
+                self._imagenet_norm = True
+                self.register_buffer("img_mean", torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1))
+                self.register_buffer("img_std", torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1))
+            else:
+                raise ValueError(f"unknown image_encoder {self.image_encoder!r} (cnn | resnet18)")
             self.cnn_proj = nn.Sequential(
                 nn.AdaptiveAvgPool2d(1),
                 nn.Flatten(),
@@ -242,6 +268,8 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             image, proprio_aug = self._split_obs(obs)
 
             # CNN encoder + GAP + projection.
+            if self._imagenet_norm:
+                image = (image - self.img_mean) / self.img_std
             cnn_feat = self.cnn_proj(self.cnn(image))               # (seq*B, cnn_feat_dim)
             feats = [cnn_feat]
             if self.tactile_dim:
