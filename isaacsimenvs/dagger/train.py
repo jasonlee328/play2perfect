@@ -63,6 +63,9 @@ def main() -> None:
                              "replay (0 = off).")
     parser.add_argument("--replay-updates", type=int, default=None,
                         help="Extra BC-only minibatches per epoch drawn from the replay FIFO.")
+    parser.add_argument("--replay-obs-cpu", action="store_true",
+                        help="Keep replay obs in pinned CPU memory and copy only the sampled "
+                             "minibatch to the GPU (RGB students: ~480 MB/rollout at 1024 envs).")
     parser.add_argument("--dump-dir", default=None,
                         help="Write every rollout's student inputs + teacher labels here "
                              "(dataset aggregation for offline training).")
@@ -249,6 +252,8 @@ def main() -> None:
             dagger_cfg["replay_capacity"] = args_cli.replay_capacity
         if args_cli.replay_updates is not None:
             dagger_cfg["replay_updates"] = args_cli.replay_updates
+        if args_cli.replay_obs_cpu:
+            dagger_cfg["replay_obs_cpu"] = True
 
         # ---------------- Critic toggle. ----------------
         if args_cli.critic == "symmetric":

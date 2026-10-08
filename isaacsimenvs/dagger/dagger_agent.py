@@ -126,6 +126,8 @@ class DAggerA2CAgent(A2CAgent):
         self.replay_capacity = int(cfg.get("replay_capacity", 0))
         self.replay_updates = int(cfg.get("replay_updates", 0))
         self.replay_min_rollouts = int(cfg.get("replay_min_rollouts", 2))
+        # replay_obs_cpu: obs live in pinned host memory; only sampled rows go to the GPU.
+        self.replay_obs_cpu = bool(cfg.get("replay_obs_cpu", False))
         self._replay: list[dict] = []
 
         # Dataset aggregation to disk: every rollout's student inputs + teacher labels are
@@ -405,7 +407,8 @@ class DAggerA2CAgent(A2CAgent):
             return v.detach().clone() if torch.is_tensor(v) else None
 
         entry = {
-            "obs": values["obs"].detach().to(torch.float16),
+            "obs": (values["obs"].detach().to("cpu", torch.float16).pin_memory() if self.replay_obs_cpu
+                    else values["obs"].detach().to(torch.float16)),
             "actions": values["actions"].detach().clone(),
             "teacher_actions": values["teacher_actions"].detach().clone(),
             "dones": opt("dones"),
@@ -432,7 +435,9 @@ class DAggerA2CAgent(A2CAgent):
         batch_dict = {
             "is_train": True,
             "prev_actions": r["actions"][idx],
-            "obs": self._preproc_obs(r["obs"][idx].float()),
+            "obs": self._preproc_obs(
+                (r["obs"][idx.cpu()].to(self.ppo_device, non_blocking=True) if self.replay_obs_cpu
+                 else r["obs"][idx]).float()),
         }
         masks = None
         if self.is_rnn:
