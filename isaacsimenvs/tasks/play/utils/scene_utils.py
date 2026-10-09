@@ -1044,6 +1044,10 @@ def read_student_camera_image(env) -> torch.Tensor:
             )
         rgb = rgb[..., :3].permute(0, 3, 1, 2).float() / 255.0
         image_parts.append(_crop_student_image(env, rgb))
+        if modality == "rgb":
+            # Same attribute the depth path fills (eval videos, frame-skip cache).
+            env._last_student_image_noisy = image_parts[-1].detach()
+            env._last_student_image_clean = env._last_student_image_noisy
 
     if modality in ("depth", "rgbd"):
         depth = available.get("distance_to_image_plane")
