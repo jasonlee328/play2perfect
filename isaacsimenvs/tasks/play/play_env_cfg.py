@@ -519,6 +519,10 @@ class TactileCfg:
     """
 
     enabled: bool = False
+    # Ablation of what the policy obs (teacher actor/critic) sees: "none" (real taxels),
+    # "zero" (all 0) or "random" (i.i.d. uniform [0, 1] every step). The real taxels are
+    # still computed and kept in env._last_tactile (student obs, eval tactile panels).
+    policy_override: str = "none"
     # Taxels per pad side; must divide 240 (the TacMap map size).
     resolution: int = 8
     # Rays per taxel side: each taxel averages samples_per_taxel^2 ray depths.

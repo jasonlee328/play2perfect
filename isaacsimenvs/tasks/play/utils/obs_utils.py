@@ -328,6 +328,13 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     if getattr(env, "_tactile", None) is not None:
         obs_clean["tactile"] = env._tactile.compute()
         env._last_tactile = obs_clean["tactile"]  # reused by the student obs this step
+        override = str(getattr(env.cfg.tactile, "policy_override", "none")).lower()
+        if override == "zero":
+            obs_clean["tactile"] = torch.zeros_like(obs_clean["tactile"])
+        elif override == "random":
+            obs_clean["tactile"] = torch.rand_like(obs_clean["tactile"])
+        elif override != "none":
+            raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
 
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
