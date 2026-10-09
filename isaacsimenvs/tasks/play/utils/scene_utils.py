@@ -1100,17 +1100,21 @@ def read_student_camera_image(env) -> torch.Tensor:
         env._last_student_image_view2 = image2.detach()
         image = torch.cat([image, image2], dim=1)
 
-    # Debug: STUDENT_IMAGE_DUMP=<file.npz> saves env 0's policy image at the first
-    # STUDENT_IMAGE_DUMP_STEPS (default 400) calls, every 50th.
+    # Debug: STUDENT_IMAGE_DUMP=<file.npz> saves env 0's policy image (all views) every
+    # STUDENT_IMAGE_DUMP_EVERY (default 50) calls for the first STUDENT_IMAGE_DUMP_STEPS
+    # (default 400); the file is rewritten every 25 frames and at the last one.
     dump = os.environ.get("STUDENT_IMAGE_DUMP")
     if dump:
         frames = env.__dict__.setdefault("_student_image_dump", [])
         n = int(getattr(env, "_student_camera_skip_counter", 0))
-        if n % 50 == 0 and n < int(os.environ.get("STUDENT_IMAGE_DUMP_STEPS", "400")):
+        every = int(os.environ.get("STUDENT_IMAGE_DUMP_EVERY", "50"))
+        limit = int(os.environ.get("STUDENT_IMAGE_DUMP_STEPS", "400"))
+        if n % every == 0 and n < limit:
             frames.append(image[0].detach().cpu().numpy())
-            import numpy as np
+            if len(frames) % 25 == 0 or n + every >= limit:
+                import numpy as np
 
-            np.savez_compressed(dump, image=np.stack(frames))
+                np.savez_compressed(dump, image=np.stack(frames))
     return image
 
 
