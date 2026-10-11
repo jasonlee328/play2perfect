@@ -52,6 +52,20 @@ class PlayEnv(DirectRLEnv):
         apply_physx_material_properties(self)
         allocate_state_buffers(self)
         self._tactile = TactileSensor(self, cfg.tactile) if cfg.tactile.enabled else None
+        self._tactile_hr = self._tactile_encoder = None
+        so = getattr(cfg, "student_obs", None)
+        if so is not None and so.enabled and str(getattr(so, "tactile_encoder", "none")).lower() != "none":
+            import copy
+
+            from .utils.tactile_encoders import TactileFoundationEncoder
+
+            hr_cfg = copy.deepcopy(cfg.tactile)
+            hr_cfg.resolution, hr_cfg.samples_per_taxel = int(so.tactile_encoder_resolution), 1
+            self._tactile_hr = TactileSensor(self, hr_cfg)
+            self._tactile_hr_res = int(so.tactile_encoder_resolution)
+            self._tactile_encoder = TactileFoundationEncoder(
+                str(so.tactile_encoder).lower(), self.device, size=int(so.tactile_encoder_image_size))
+            OBS_FIELD_SIZES["tactile_feat"] = 5 * self._tactile_encoder.dim
 
     def _setup_scene(self) -> None:
         setup_scene(self)

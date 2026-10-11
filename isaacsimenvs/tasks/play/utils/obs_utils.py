@@ -328,6 +328,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     if getattr(env, "_tactile", None) is not None:
         obs_clean["tactile"] = env._tactile.compute()
         env._last_tactile = obs_clean["tactile"]  # reused by the student obs this step
+        if getattr(env, "_tactile_encoder", None) is not None:
+            r = env._tactile_hr_res
+            hr = env._tactile_hr.compute().view(-1, r, r)               # (N*5, r, r) in [0, 1]
+            env._last_tactile_feat = env._tactile_encoder(hr).view(env.num_envs, -1)
 
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
@@ -365,6 +369,9 @@ def _student_proprio_dict(env) -> dict[str, torch.Tensor]:
         out["tactile"] = last if last is not None else torch.zeros(
             env.num_envs, OBS_FIELD_SIZES["tactile"], device=env.device
         )
+    if getattr(env, "_tactile_encoder", None) is not None:
+        last = getattr(env, "_last_tactile_feat", None)
+        out["tactile_feat"] = last if last is not None else env._tactile_encoder._zero_feat_or_none(env.num_envs)
     return out
 
 
