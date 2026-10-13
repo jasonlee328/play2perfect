@@ -444,6 +444,7 @@ def setup_student_camera(env) -> None:
                 rot=tuple(float(x) for x in cfg.view2_quat_wxyz),
                 convention=str(cfg.camera_convention),
             )
+            view2_cfg.spawn.clipping_range = tuple(float(x) for x in cfg.view2_clipping_range)
             env.student_camera_view2 = camera_cls(cfg=view2_cfg)
             env.scene.sensors["student_camera_view2"] = env.student_camera_view2
         size_str = f"{int(cfg.image_width)}x{int(cfg.image_height)}"
