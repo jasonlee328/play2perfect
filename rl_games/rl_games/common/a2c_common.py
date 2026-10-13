@@ -1045,11 +1045,13 @@ class A2CBase(BaseAlgorithm):
             flattened_mb_states = mb_states.reshape(-1, *mb_states.shape[2:]) if mb_states is not None else None
             
             mb_values = []
-            for i in range((flattened_mb_obs.shape[0] + 8191) // 8192):
+            # VALUE_CHUNK: rows per value forward (lower it for big image students, e.g. 2-view RGB ResNet).
+            ch = int(os.getenv("VALUE_CHUNK", "8192"))
+            for i in range((flattened_mb_obs.shape[0] + ch - 1) // ch):
                 mb_values.append(self.get_values({
-                    'obs': flattened_mb_obs[i*8192:(i+1)*8192], 
-                    'states': flattened_mb_states[i*8192:(i+1)*8192] if mb_states is not None else None
-                    }, rnn_states=[s[:, i*8192:(i+1)*8192] for s in flattened_rnn_states] if flattened_rnn_states is not None else None))
+                    'obs': flattened_mb_obs[i*ch:(i+1)*ch],
+                    'states': flattened_mb_states[i*ch:(i+1)*ch] if mb_states is not None else None
+                    }, rnn_states=[s[:, i*ch:(i+1)*ch] for s in flattened_rnn_states] if flattened_rnn_states is not None else None))
             mb_values = torch.cat(mb_values, dim=0)
             last_values = self.get_values(last_obs_and_states, last_rnn_states)
             

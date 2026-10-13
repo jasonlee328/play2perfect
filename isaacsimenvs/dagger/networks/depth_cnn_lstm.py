@@ -77,6 +77,9 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             self.tactile_dim = int(params.get("tactile_dim", 0))
             self.tactile_pads = int(params.get("tactile_pads", 5))
             tactile_feat_dim = int(params.get("tactile_feat_dim", 64))
+            # tactile_embed_dim > 0: the tactile input is tactile_pads frozen pretrained
+            # embeddings of this size (student_obs.tactile_encoder) instead of taxel grids.
+            self.tactile_embed_dim = int(params.get("tactile_embed_dim", 0))
 
             self.fixed_sigma = params.get("fixed_sigma", "fixed")  # 'fixed' or 'coef_cond'
             assert self.fixed_sigma in ("fixed", "coef_cond"), (
@@ -161,7 +164,24 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
             self._proprio_out_dim = p2
 
             # ---- Tactile encoder: one small CNN shared across pads + a learned pad id ----
-            if self.tactile_dim:
+            if self.tactile_dim and self.tactile_embed_dim:
+                assert self.tactile_pads * self.tactile_embed_dim == self.tactile_dim, (
+                    f"tactile_dim={self.tactile_dim} != {self.tactile_pads} pads x tactile_embed_dim={self.tactile_embed_dim}")
+                # LayerNorm first: frozen embeddings vary little around a large constant offset.
+                self.tactile_pad_cnn = nn.Sequential(
+                    nn.LayerNorm(self.tactile_embed_dim),
+                    nn.Linear(self.tactile_embed_dim, 128),
+                    nn.ELU(inplace=True),
+                    nn.Linear(128, 32),
+                    nn.ELU(inplace=True),
+                )
+                self.tactile_pad_embed = nn.Parameter(torch.zeros(self.tactile_pads, 32))
+                self.tactile_mlp = nn.Sequential(
+                    nn.Linear(self.tactile_pads * 32, tactile_feat_dim),
+                    nn.ELU(inplace=True),
+                )
+                self._tactile_out_dim = tactile_feat_dim
+            elif self.tactile_dim:
                 res = int(round((self.tactile_dim / self.tactile_pads) ** 0.5))
                 assert self.tactile_pads * res * res == self.tactile_dim, (
                     f"tactile_dim={self.tactile_dim} is not {self.tactile_pads} square pads"
@@ -262,7 +282,10 @@ class DepthCNNLSTMBuilder(NetworkBuilder):
         def _encode_tactile(self, tactile: torch.Tensor) -> torch.Tensor:
             """(B, pads*res*res) taxels -> (B, tactile_feat_dim), pads encoded by one shared CNN."""
             B = tactile.shape[0]
-            pads = tactile.reshape(B * self.tactile_pads, 1, self.tactile_res, self.tactile_res)
+            if self.tactile_embed_dim:
+                pads = tactile.reshape(B * self.tactile_pads, self.tactile_embed_dim)
+            else:
+                pads = tactile.reshape(B * self.tactile_pads, 1, self.tactile_res, self.tactile_res)
             feat = self.tactile_pad_cnn(pads).view(B, self.tactile_pads, -1) + self.tactile_pad_embed
             return self.tactile_mlp(feat.reshape(B, -1))
 

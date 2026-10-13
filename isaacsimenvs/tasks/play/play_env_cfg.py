@@ -190,6 +190,14 @@ class StudentObsCfg:
     camera_pos: tuple[float, float, float] = (0.0, -1.0, 1.0)
     camera_quat_wxyz: tuple[float, float, float, float] = (1.0, 0.0, 0.0, 0.0)
 
+    # Frozen pretrained tactile encoding for the student (utils/tactile_encoders.py):
+    # "none" | "ftp1" | "t3" | "wan". Adds proprio field "tactile_feat" (5 pads x D): a
+    # second TacMap at tactile_encoder_resolution (1 ray per taxel; the teacher's tactile is
+    # unchanged), resized to tactile_encoder_image_size and embedded per pad.
+    tactile_encoder: str = "none"
+    tactile_encoder_resolution: int = 120
+    tactile_encoder_image_size: int = 224
+
     # Optional second student view (tiled/standard backends): same modality, intrinsics,
     # render size and input size as the main camera, its own pose / crop / depth window.
     # Stacked after the main view along channels: image = (B, 2*C, H, W).
