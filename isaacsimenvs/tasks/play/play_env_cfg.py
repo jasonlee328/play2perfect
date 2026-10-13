@@ -208,6 +208,9 @@ class StudentObsCfg:
     view2_crop_bottom_right: tuple[int, int] = (0, 0)
     view2_depth_min_m: float = 0.45
     view2_depth_max_m: float = 1.25
+    # Near/far render clipping planes for view 2 (RGB and depth). Geometry past the far
+    # plane isn't drawn, so a short far plane hides the neighbouring envs behind the scene.
+    view2_clipping_range: tuple[float, float] = (0.1, 5.0)
 
     focal_length: float = 24.0
     horizontal_aperture: float = 33.19737869997174

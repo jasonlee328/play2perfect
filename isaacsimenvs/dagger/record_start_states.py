@@ -5,6 +5,10 @@ the episode reaches ``--goal`` successes (default 1 = lead-in reached, peg grasp
 25 mm above the hole, screwing about to start): robot joint state and targets, the
 peg pose/velocity in the hole frame, and the episode trackers the reset restores.
 
+Goals hardly check depth, so ``--max-height-mm H`` captures by geometry instead: the
+first step the peg is within H mm (along the hole axis) of the final seated waypoint and
+within ``--max-lateral-mm`` of it sideways, i.e. down in the threads.
+
     python record_start_states.py --headless --enable_cameras --teacher-checkpoint <pth> \
         --teacher-tactile --out bank.npz <env overrides, e.g. the static layout>
 """
@@ -24,6 +28,8 @@ def main():
     p.add_argument("--teacher-tactile", action="store_true")
     p.add_argument("--out", required=True)
     p.add_argument("--goal", type=int, default=1)
+    p.add_argument("--max-height-mm", type=float, default=None)
+    p.add_argument("--max-lateral-mm", type=float, default=3.0)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--max-steps", type=int, default=1500)
     AppLauncher.add_app_launcher_args(p)
@@ -61,11 +67,21 @@ def main():
                 "peg_linvel_h", "peg_angvel_h", "successes", "lifted", "object_init_z", "step"]
         bank = {k: [] for k in keys}
         taken = torch.zeros(N, dtype=torch.bool, device=u.device)   # captured or first episode over
+        seat = u._insert_pos_rel[-1]                                  # final waypoint, hole frame
+        if args.max_height_mm is not None:
+            print(f"[start-states] capture when peg <= {args.max_height_mm} mm above seat "
+                  f"{(seat * 1000).tolist()} mm (hole frame), lateral <= {args.max_lateral_mm} mm", flush=True)
         for step in range(args.max_steps):
             with torch.no_grad():
                 obs, _, term, trunc, _ = env.step(teacher.get_action(obs["teacher_obs"]).clamp(-1.0, 1.0))
             done = term | trunc
-            hit = (u._successes == args.goal) & ~taken & ~done
+            if args.max_height_mm is None:
+                hit = (u._successes == args.goal) & ~taken & ~done
+            else:
+                rel_all = quat_apply_inverse(u.hole_quat_wxyz, u.object.data.root_pos_w - u.scene.env_origins
+                                             - u.hole_pos) - seat
+                hit = ((rel_all[:, 2] <= args.max_height_mm / 1000)
+                       & (rel_all[:, :2].norm(dim=-1) <= args.max_lateral_mm / 1000) & ~taken & ~done)
             if hit.any():
                 ids = hit.nonzero(as_tuple=False).squeeze(-1)
                 hq = u.hole_quat_wxyz[ids]
@@ -92,8 +108,11 @@ def main():
                 break
         out = {k: np.concatenate(v) for k, v in bank.items()}
         np.savez(args.out, **out)
-        print(f"[start-states] saved {len(out['successes'])} states (goal {args.goal}) to {args.out}; "
-              f"capture step median {np.median(out['step']):.0f}", flush=True)
+        h = (out["peg_pos_h"][:, 2] - seat[2].item()) * 1000
+        print(f"[start-states] saved {len(out['successes'])} states (goal {args.goal}, max height "
+              f"{args.max_height_mm}) to {args.out}; capture step median {np.median(out['step']):.0f}; "
+              f"height above seat p5/50/95 {np.percentile(h, [5, 50, 95]).round(1).tolist()} mm; "
+              f"goals credited {np.unique(out['successes'], return_counts=True)}", flush=True)
         env.close()
 
     run()
