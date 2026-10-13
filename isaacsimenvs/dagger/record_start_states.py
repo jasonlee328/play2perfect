@@ -44,7 +44,7 @@ def main():
     def run(env_cfg, agent_cfg):
         env_cfg.seed = args.seed
         env_cfg.tactile.in_policy = bool(args.teacher_tactile)
-        env_cfg.precise_assembly.start_state_file = None
+        env_cfg.precise_assembly.start_state_file = ""
         env = gym.make(args.task, cfg=env_cfg)
         u = env.unwrapped
         N = u.num_envs
