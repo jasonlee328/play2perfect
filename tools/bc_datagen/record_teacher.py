@@ -10,6 +10,7 @@ FrankaDataset) dataset:
                            lossless libx264rgb -qp 0, gop 1
         lowdim.npz         per-frame arrays, see LOWDIM_FIELDS
         meta.json          success / length / goals / termination reason
+        view2_rgb.mp4, view2_depth.mp4   same, from the second student camera (--view2-crop)
 
 Frame t pairs the observation the teacher acted on (camera image, joints,
 tactile) with the absolute joint target its action produced (``_cur_targets``
@@ -20,6 +21,10 @@ forces those settings.
 The camera is the depth student's world-mounted ZED-matched camera, rendered
 at --render-width x --render-height as RGB-D, cropped to --crop (x0 y0 x1 y1,
 render pixels, exclusive end) and resized to --out-size square.
+
+--view2-crop also records the second student camera (student_obs.view2_*; pass its pose
+as hydra overrides), cropped the same way. The 70x70 ``student_depth`` fields follow the
+cfg's student crops (crop_top_left/bottom_right, view2_crop_*) scaled to the render size.
 
 --no-save turns it into a teacher-only success-rate eval of the same config.
 """
@@ -57,6 +62,7 @@ LOWDIM_FIELDS = {
     "executed_joint_target": "absolute joint target actually executed this step, rad, canonical order",
     "student_depth": "uint8 (70*70): the depth student's input view (window-normalized depth of the "
                      "student camera's 70x70 crop), derived from the recorded high-res depth",
+    "student_depth_view2": "uint8 (70*70): same for the second camera (only with --view2-crop)",
 }
 
 
@@ -83,27 +89,34 @@ def _open_encoder(path: Path, size: int, fps: int, lossless_rgb: bool) -> subpro
 class _Episode:
     """One env's in-progress episode: two streaming encoders + low-dim rows."""
 
-    def __init__(self, ep_dir: Path, size: int, fps: int, save: bool) -> None:
+    def __init__(self, ep_dir: Path, size: int, fps: int, save: bool, view2: bool = False) -> None:
         self.dir = ep_dir
-        self.rows: dict[str, list[np.ndarray]] = {k: [] for k in LOWDIM_FIELDS}
+        self.rows: dict[str, list[np.ndarray]] = {
+            k: [] for k in LOWDIM_FIELDS if view2 or k != "student_depth_view2"}
         self.n = 0
         self.save = save
         self.rgb = self.depth = None
+        self.procs = []
         if save:
             ep_dir.mkdir(parents=True, exist_ok=True)
             self.rgb = _open_encoder(ep_dir / "front_rgb.mp4", size, fps, lossless_rgb=False)
             self.depth = _open_encoder(ep_dir / "front_depth.mp4", size, fps, lossless_rgb=True)
+            self.procs = [self.rgb, self.depth]
+            if view2:
+                self.procs += [_open_encoder(ep_dir / "view2_rgb.mp4", size, fps, lossless_rgb=False),
+                               _open_encoder(ep_dir / "view2_depth.mp4", size, fps, lossless_rgb=True)]
 
-    def write_frames(self, rgb: np.ndarray, rg8: np.ndarray) -> None:
-        self.rgb.stdin.write(rgb.tobytes())
-        self.depth.stdin.write(rg8.tobytes())
+    def write_frames(self, *frames: np.ndarray) -> None:
+        """frames: rgb, rg8 [, view2 rgb, view2 rg8], in self.procs order."""
+        for p, f in zip(self.procs, frames):
+            p.stdin.write(f.tobytes())
 
     def close(self, keep: bool, meta: dict) -> bool:
         """Finish both encoders; keep the episode on disk only if `keep`."""
         if not self.save:
             return keep
         ok = True
-        for p in (self.rgb, self.depth):
+        for p in self.procs:
             try:
                 p.stdin.close()
             except BrokenPipeError:
@@ -156,6 +169,8 @@ def main() -> None:
     parser.add_argument("--render-height", type=int, default=288)
     parser.add_argument("--crop", type=int, nargs=4, default=[224, 0, 512, 288],
                         metavar=("X0", "Y0", "X1", "Y1"))
+    parser.add_argument("--view2-crop", type=int, nargs=4, default=None, metavar=("X0", "Y0", "X1", "Y1"),
+                        help="Also record the second student camera, cropped like --crop.")
     parser.add_argument("--out-size", type=int, default=224)
     parser.add_argument("--max-depth-m", type=float, default=2.5)
     parser.add_argument("--success-tolerance", type=float, default=0.075,
@@ -225,6 +240,8 @@ def main() -> None:
         so.use_camera_delay, so.camera_delay_max = False, 0
         so.use_student_obs_delay, so.student_obs_delay_max = False, 0
         so.use_depth_aug = False
+        if args.view2_crop:
+            so.view2_enabled = True
         # Every delay off, so frame t's observation and label line up exactly.
         dr = env_cfg.domain_randomization
         dr.use_obs_delay = False
@@ -302,12 +319,21 @@ def main() -> None:
             tgt[:, u._hand_joint_ids] = hand
             return tgt[:, perm]
 
-        # The depth student's crop (x 90:160, y 0:70 at 160x90) in this render's pixels.
+        # The depth student's crops (cfg pixels at 160x90) in this render's pixels.
         dsx, dsy = args.render_width / 160.0, args.render_height / 90.0
-        dx0, dx1, dy0, dy1 = round(90 * dsx), round(160 * dsx), 0, round(70 * dsy)
+
+        def _scaled(tl, br):
+            return round(tl[0] * dsx), round(br[0] * dsx), round(tl[1] * dsy), round(br[1] * dsy)
+
+        sd_crop = _scaled(so.crop_top_left, so.crop_bottom_right)
         dmin, dmax = float(so.depth_min_m), float(so.depth_max_m)
+        sd_crop2 = _scaled(so.view2_crop_top_left, so.view2_crop_bottom_right)
+        dmin2, dmax2 = float(so.view2_depth_min_m), float(so.view2_depth_max_m)
+        print(f"[record] student_depth crop x {sd_crop[:2]} y {sd_crop[2:]}"
+              + (f" | view2 x {sd_crop2[:2]} y {sd_crop2[2:]}" if args.view2_crop else ""), flush=True)
 
         cam = u.student_camera
+        cam2 = u.student_camera_view2 if args.view2_crop else None
         obs, _ = env.reset()
 
         # Intrinsics of the saved SxS image (static camera; same for every env). Built
@@ -327,9 +353,10 @@ def main() -> None:
                           [0.0, K[1, 1] * sy, (K[1, 2] - y0) * sy],
                           [0.0, 0.0, 1.0]])
 
-        def capture():
-            """Frame (rgb, rg8) for every env, as uint8 (N, S, S, 3) numpy."""
-            out = cam.data.output
+        def capture_cam(out, crop, sdc, lo, hi):
+            """(rgb, rg8, student depth) for every env from one camera output."""
+            x0, y0, x1, y1 = crop
+            dx0, dx1, dy0, dy1 = sdc
             rgb = out["rgb"][..., :3][:, y0:y1, x0:x1].permute(0, 3, 1, 2).float()
             rgb = F.interpolate(rgb, size=(S, S), mode="bilinear", antialias=True, align_corners=False)
             rgb = rgb.round().clamp(0, 255).to(torch.uint8).permute(0, 2, 3, 1)
@@ -340,10 +367,17 @@ def main() -> None:
             rg8 = torch.stack([mm & 0xFF, (mm >> 8) & 0xFF, torch.zeros_like(mm)], dim=-1).to(torch.uint8)
             sd = out["distance_to_image_plane"][..., 0][:, dy0:dy1, dx0:dx1].unsqueeze(1)
             sd = F.interpolate(sd, size=(70, 70), mode="nearest-exact")[:, 0]
-            sd = torch.nan_to_num(sd, nan=dmax, posinf=dmax, neginf=dmax)
-            sd = ((sd - dmin) / (dmax - dmin)).clamp(0, 1)
+            sd = torch.nan_to_num(sd, nan=hi, posinf=hi, neginf=hi)
+            sd = ((sd - lo) / (hi - lo)).clamp(0, 1)
             sd8 = (sd * 255).round().to(torch.uint8).reshape(N, -1)
             return rgb.cpu().numpy(), rg8.cpu().numpy(), sd8.cpu().numpy()
+
+        def capture():
+            """(rgb, rg8, sd8[, rgb2, rg82, sd82]) for every env, uint8 numpy."""
+            f = capture_cam(cam.data.output, args.crop, sd_crop, dmin, dmax)
+            if cam2 is not None:
+                f = f + capture_cam(cam2.data.output, args.view2_crop, sd_crop2, dmin2, dmax2)
+            return f
 
         def lowdim():
             rd = u.robot.data
@@ -377,7 +411,8 @@ def main() -> None:
         if save:
             ep_root.mkdir(parents=True, exist_ok=True)
         counters = [0] * N
-        episodes = [_Episode(ep_root / f"{tag}_e{i:04d}_n0000", S, fps, save) for i in range(N)]
+        episodes = [_Episode(ep_root / f"{tag}_e{i:04d}_n0000", S, fps, save, cam2 is not None)
+                    for i in range(N)]
         first_done = np.zeros(N, bool)
         pool = ThreadPoolExecutor(max_workers=32)
         closers = []
@@ -406,12 +441,16 @@ def main() -> None:
                     iio.imwrite(pdir / f"full_env{i}_t{step:04d}.png", full[i])
                     iio.imwrite(pdir / f"crop_env{i}_t{step:04d}.png", frames[0][i])
                     iio.imwrite(pdir / f"studentdepth_env{i}_t{step:04d}.png", frames[2][i].reshape(70, 70))
+                    if cam2 is not None:
+                        iio.imwrite(pdir / f"view2_crop_env{i}_t{step:04d}.png", frames[3][i])
+                        iio.imwrite(pdir / f"view2_studentdepth_env{i}_t{step:04d}.png", frames[5][i].reshape(70, 70))
                     dm = frames[1][i, ..., 0].astype(np.uint16) | (frames[1][i, ..., 1].astype(np.uint16) << 8)
                     iio.imwrite(pdir / f"depth_env{i}_t{step:04d}.png",
                                 (np.clip((dm.astype(np.float32) - 500) / 1000.0, 0, 1) * 255).astype(np.uint8))
 
             if save:
-                list(pool.map(lambda i: episodes[i].write_frames(frames[0][i], frames[1][i]),
+                list(pool.map(lambda i: episodes[i].write_frames(
+                    frames[0][i], frames[1][i], *([frames[3][i], frames[4][i]] if cam2 is not None else [])),
                               [i for i in range(N) if episodes[i].save]))
             for i in range(N):
                 ep = episodes[i]
@@ -423,6 +462,8 @@ def main() -> None:
                 ep.rows["executed_joint_target"].append(executed[i])
                 if frames is not None:
                     ep.rows["student_depth"].append(frames[2][i])
+                    if cam2 is not None:
+                        ep.rows["student_depth_view2"].append(frames[5][i])
                 ep.n += 1
 
             done = (term | trunc).nonzero(as_tuple=False).squeeze(-1)
@@ -456,7 +497,7 @@ def main() -> None:
                     counters[i] += 1
                     first_done[i] = True
                     episodes[i] = _Episode(ep_root / f"{tag}_e{i:04d}_n{counters[i]:04d}", S, fps,
-                                           save and not args.first_episode_only)
+                                           save and not args.first_episode_only, cam2 is not None)
                 teacher.reset_idx(done)
                 if behavior is not None:
                     behavior.reset_idx(done)
@@ -501,7 +542,12 @@ def main() -> None:
                        "out_size": S, "K_out": K_out.tolist(), "K_render": K.tolist(),
                        "K_render_isaac": K_isaac.tolist(),
                        "pos": list(so.camera_pos), "quat_wxyz": list(so.camera_quat_wxyz),
-                       "convention": so.camera_convention},
+                       "convention": so.camera_convention,
+                       "student_depth_crop_render_px": list(sd_crop)},
+            "camera_view2": ({"crop_xyxy": args.view2_crop, "pos": list(so.view2_pos),
+                              "quat_wxyz": list(so.view2_quat_wxyz),
+                              "student_depth_crop_render_px": list(sd_crop2),
+                              "depth_window_m": [dmin2, dmax2]} if cam2 is not None else None),
             "lowdim_fields": LOWDIM_FIELDS,
             "hydra_overrides": hydra_args,
             "wall_s": time.time() - t0,
