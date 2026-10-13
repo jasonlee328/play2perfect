@@ -90,8 +90,8 @@ class PreciseAssemblyCfg:
     # Start episodes mid-task from a bank of recorded teacher states (npz from
     # dagger/record_start_states.py): robot joint state + targets, peg pose in
     # the hole frame, and the goal index reached. Each reset samples one entry;
-    # the episode then continues from that goal. None keeps the normal reset.
-    start_state_file: str | None = None
+    # the episode then continues from that goal. "" keeps the normal reset.
+    start_state_file: str = ""
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
