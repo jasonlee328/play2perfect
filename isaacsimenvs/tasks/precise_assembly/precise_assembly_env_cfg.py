@@ -79,6 +79,12 @@ class PreciseAssemblyCfg:
     dropped_on_table_z_margin: float = 0.05
     dropped_on_table_ft_distance: float = 0.15
 
+    # Start episodes mid-task from a bank of recorded teacher states (npz from
+    # dagger/record_start_states.py): robot joint state + targets, peg pose in
+    # the hole frame, and the goal index reached. Each reset samples one entry;
+    # the episode then continues from that goal. None keeps the normal reset.
+    start_state_file: str | None = None
+
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
     """Return a render-overlay-compatible sim cfg for teacher and student tasks."""

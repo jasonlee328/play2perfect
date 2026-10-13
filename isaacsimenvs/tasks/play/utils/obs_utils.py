@@ -113,7 +113,7 @@ def _keypoints_world(
 
 
 def _episode_start(env) -> torch.Tensor:
-    return (env.episode_length_buf == 0) & (env._successes == 0)
+    return (env.episode_length_buf == 0) & (env._successes == env._start_successes)
 
 
 def _sample_delay(

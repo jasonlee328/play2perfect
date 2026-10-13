@@ -35,7 +35,7 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
 
     # Action delay.
     if dr.use_action_delay and dr.action_delay_max > 0:
-        episode_start = (env.episode_length_buf == 0) & (env._successes == 0)
+        episode_start = (env.episode_length_buf == 0) & (env._successes == env._start_successes)
         if episode_start.any():
             env._action_queue[episode_start] = actions[episode_start].unsqueeze(1)
         env._action_queue = torch.roll(env._action_queue, shifts=1, dims=1)

@@ -411,8 +411,44 @@ class PreciseAssemblyEnv(PlayEnv):
             self._prelude_pose_world[ins_ids, 1, 2] = lift_z
             self._prelude_pose_world[ins_ids, 1, 3:7] = pre_insert_quat_world
 
+        if pih_cfg.start_state_file and insertion_mask.any():
+            self._apply_start_states(env_ids[insertion_mask])
+
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
+
+    def _apply_start_states(self, env_ids: torch.Tensor) -> None:
+        """Overwrite robot + peg state with random entries of the start-state bank."""
+        if not hasattr(self, "_start_bank"):
+            import numpy as np
+
+            d = np.load(self.cfg.precise_assembly.start_state_file)
+            self._start_bank = {k: torch.as_tensor(d[k], device=self.device)
+                                for k in ("joint_pos", "joint_vel", "cur_targets", "prev_targets",
+                                          "peg_pos_h", "peg_quat_h", "peg_linvel_h", "peg_angvel_h",
+                                          "successes", "lifted", "object_init_z")}
+            print(f"[PreciseAssemblyEnv] start states: {len(d['successes'])} from "
+                  f"{self.cfg.precise_assembly.start_state_file}", flush=True)
+        b = self._start_bank
+        n = env_ids.numel()
+        k = torch.randint(0, b["successes"].numel(), (n,), device=self.device)
+
+        self.robot.write_joint_state_to_sim(b["joint_pos"][k].float(), b["joint_vel"][k].float(), env_ids=env_ids)
+        self._cur_targets[env_ids] = b["cur_targets"][k].float()
+        self._prev_targets[env_ids] = b["prev_targets"][k].float()
+
+        hole_q = self.hole_quat_wxyz[env_ids]
+        pos = self.hole_pos[env_ids] + quat_apply(hole_q, b["peg_pos_h"][k].float())
+        quat = quat_mul(hole_q, b["peg_quat_h"][k].float())
+        vel = torch.cat([quat_apply(hole_q, b["peg_linvel_h"][k].float()),
+                         quat_apply(hole_q, b["peg_angvel_h"][k].float())], dim=-1)
+        self.object.write_root_pose_to_sim(torch.cat([pos + self.scene.env_origins[env_ids], quat], -1), env_ids=env_ids)
+        self.object.write_root_velocity_to_sim(vel, env_ids=env_ids)
+
+        self._successes[env_ids] = b["successes"][k].long()
+        self._start_successes[env_ids] = b["successes"][k].long()
+        self._lifted_object[env_ids] = b["lifted"][k].bool()
+        self._object_init_z[env_ids] = b["object_init_z"][k].float()
 
     def _write_goal_pose(self, env_ids: torch.Tensor, is_first_goal: bool = False) -> None:
         n = env_ids.numel()

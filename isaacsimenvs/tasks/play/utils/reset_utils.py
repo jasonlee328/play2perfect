@@ -105,6 +105,10 @@ def allocate_state_buffers(env) -> None:
     env._successes = torch.zeros(
         env.num_envs, dtype=torch.long, device=env.device
     )
+    # goals already credited at reset (non-zero only when starting from a start-state bank)
+    env._start_successes = torch.zeros(
+        env.num_envs, dtype=torch.long, device=env.device
+    )
     # the number of consecutive steps that the object is near the goal
     env._near_goal_steps = torch.zeros(
         env.num_envs, dtype=torch.long, device=env.device
@@ -395,6 +399,7 @@ def reset_env_state(env, env_ids: torch.Tensor) -> None:
     _clear_goal_trackers(env, env_ids)
     env._lifted_object[env_ids] = False
     env._successes[env_ids] = 0
+    env._start_successes[env_ids] = 0
 
     env._action_queue[env_ids] = 0.0
     env._obs_queue[env_ids] = 0.0
