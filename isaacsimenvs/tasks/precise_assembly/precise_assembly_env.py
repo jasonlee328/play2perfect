@@ -429,9 +429,20 @@ class PreciseAssemblyEnv(PlayEnv):
                                           "successes", "lifted", "object_init_z")}
             print(f"[PreciseAssemblyEnv] start states: {len(d['successes'])} from "
                   f"{self.cfg.precise_assembly.start_state_file}", flush=True)
+            # Robot joints are absolute, so the bank only fits the hole layout it was recorded on.
+            self._start_bank_hole_pos = (torch.as_tensor(d["hole_pos"], device=self.device).float()
+                                         if "hole_pos" in d.files else None)
+            if self._start_bank_hole_pos is None:
+                print("[PreciseAssemblyEnv] start-state bank has no hole_pos; can't check the hole "
+                      "layout matches (use the layout it was recorded on)", flush=True)
         b = self._start_bank
         n = env_ids.numel()
         k = torch.randint(0, b["successes"].numel(), (n,), device=self.device)
+        if self._start_bank_hole_pos is not None:
+            err = (self._start_bank_hole_pos[k] - self.hole_pos[env_ids]).norm(dim=-1).max().item()
+            if err > 0.005:
+                raise RuntimeError(f"start-state bank was recorded with the hole {err * 1000:.1f} mm away from "
+                                   "this env's hole; use the same layout (e.g. the static-layout overrides)")
 
         self.robot.write_joint_state_to_sim(b["joint_pos"][k].float(), b["joint_vel"][k].float(), env_ids=env_ids)
         self._cur_targets[env_ids] = b["cur_targets"][k].float()
