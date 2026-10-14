@@ -64,7 +64,7 @@ def main():
 
         obs, _ = env.reset()
         keys = ["joint_pos", "joint_vel", "cur_targets", "prev_targets", "peg_pos_h", "peg_quat_h",
-                "peg_linvel_h", "peg_angvel_h", "successes", "lifted", "object_init_z", "step"]
+                "peg_linvel_h", "peg_angvel_h", "successes", "lifted", "object_init_z", "hole_pos", "step"]
         bank = {k: [] for k in keys}
         taken = torch.zeros(N, dtype=torch.bool, device=u.device)   # captured or first episode over
         seat = u._insert_pos_rel[-1]                                  # final waypoint, hole frame
@@ -95,7 +95,7 @@ def main():
                     "peg_linvel_h": quat_apply_inverse(hq, od.root_lin_vel_w[ids]),
                     "peg_angvel_h": quat_apply_inverse(hq, od.root_ang_vel_w[ids]),
                     "successes": u._successes[ids], "lifted": u._lifted_object[ids],
-                    "object_init_z": u._object_init_z[ids],
+                    "object_init_z": u._object_init_z[ids], "hole_pos": u.hole_pos[ids],
                     "step": torch.full((ids.numel(),), step, device=u.device),
                 }
                 for k in keys:
