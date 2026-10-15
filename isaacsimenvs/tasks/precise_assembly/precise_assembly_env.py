@@ -387,6 +387,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self.retract_phase[env_ids] = False
         self.retract_succeeded[env_ids] = False
         self.retract_failed[env_ids] = False
+        if hasattr(self, "_retract_clear_count"):
+            self._retract_clear_count[env_ids] = 0
         self._just_entered_retract[env_ids] = False
         self._just_retracted[env_ids] = False
 
@@ -733,8 +735,18 @@ class PreciseAssemblyEnv(PlayEnv):
                 <= pih_cfg.retract_success_tolerance * self.cfg.reward.keypoint_scale
             )
             mean_fingertip_dist = self._curr_fingertip_distances.mean(dim=-1)
-            hand_away = (mean_fingertip_dist > pih_cfg.retract_distance_threshold) & (
-                self._curr_fingertip_distances.min(dim=-1).values > pih_cfg.retract_min_fingertip_dist)
+            if pih_cfg.end_on_retract:
+                # Strict: off the peg (distance to its middle, not its root) and no tactile contact for a while.
+                far = self._curr_fingertip_dist_center.min(dim=-1).values > pih_cfg.retract_min_fingertip_dist
+                tac = getattr(self, "_last_tactile", None)
+                clear = far if tac is None else far & (tac.reshape(tac.shape[0], -1).sum(-1) == 0)
+                if not hasattr(self, "_retract_clear_count"):
+                    self._retract_clear_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+                self._retract_clear_count = torch.where(clear & self.retract_phase, self._retract_clear_count + 1,
+                                                        torch.zeros_like(self._retract_clear_count))
+                hand_away = self._retract_clear_count >= pih_cfg.retract_clear_steps
+            else:
+                hand_away = mean_fingertip_dist > pih_cfg.retract_distance_threshold
             just_retracted = (
                 hand_away
                 & self.retract_phase

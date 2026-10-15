@@ -70,12 +70,14 @@ class PreciseAssemblyCfg:
     retract_distance_threshold: float = 0.1
     retract_success_bonus: float = 1000.0
     retract_success_tolerance: float = 0.005
-    # Eval: end the episode the first time the hand has retracted after the last goal (mean fingertip distance
-    # > retract_distance_threshold and min > retract_min_fingertip_dist), success or not. Success = the peg is
+    # Eval: end the episode the first time the hand has retracted after the last goal, success or not. Success = the peg is
     # still within retract_success_tolerance of the final pose at that moment. Without it the episode runs on
     # and the hand can come back and knock the peg (or a later re-retract can count a tilted peg as success).
     end_on_retract: bool = False
+    # With end_on_retract: the hand counts as retracted only when every fingertip is more than this far from the
+    # peg's keypoint centroid AND no tactile pad has touched anything for retract_clear_steps steps.
     retract_min_fingertip_dist: float = 0.0
+    retract_clear_steps: int = 10
 
     # When True, the lift_rew / lift_bonus terms apply to insertion-only envs
     # (not only random-goal envs). Used by dense-trajectory experiments where

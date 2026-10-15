@@ -176,6 +176,8 @@ def compute_intermediate_values(env) -> None:
 
     obj_kp = _keypoints_world(obj_pos, obj_rot, kp_offsets)
     goal_kp = _keypoints_world(goal_pos, goal_rot, kp_offsets)
+    # Fingertip distance to the object's keypoint centroid (its geometric middle; the root can sit at one end).
+    env._curr_fingertip_dist_center = torch.norm(ft_pos - obj_kp.mean(dim=1, keepdim=True), dim=-1)
 
     env._keypoints_max_dist = torch.norm(obj_kp - goal_kp, dim=-1).max(dim=-1).values
 
