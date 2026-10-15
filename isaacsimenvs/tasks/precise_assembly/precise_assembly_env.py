@@ -9,7 +9,7 @@ import math
 
 import torch
 
-from isaaclab.utils.math import quat_apply, quat_from_angle_axis, quat_mul
+from isaaclab.utils.math import quat_apply, quat_apply_inverse, quat_from_angle_axis, quat_mul
 
 from isaacsimenvs.tasks.play.play_env import PlayEnv
 from isaacsimenvs.tasks.play.utils.goal_sampling import (
@@ -387,6 +387,10 @@ class PreciseAssemblyEnv(PlayEnv):
         self.retract_phase[env_ids] = False
         self.retract_succeeded[env_ids] = False
         self.retract_failed[env_ids] = False
+        if not hasattr(self, "_retract_measured"):
+            self._retract_measured = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            self._retract_meas = {}
+        self._retract_measured[env_ids] = False
         if hasattr(self, "_retract_clear_count"):
             self._retract_clear_count[env_ids] = 0
         self._just_entered_retract[env_ids] = False
@@ -649,6 +653,28 @@ class PreciseAssemblyEnv(PlayEnv):
         """
         return ~self.retract_phase
 
+
+    def _retract_seat_measures(self):
+        """Peg root vs the final waypoint: height above it along the hole axis, sideways offset, tilt (deg)."""
+        N = self.num_envs
+        obj_pos = self.object.data.root_pos_w - self.scene.env_origins
+        hq = self.hole_quat_wxyz
+        seat = self.hole_pos + quat_apply(hq, self._insert_pos_rel[-1].unsqueeze(0).expand(N, 3))
+        seat_q = quat_mul(hq, self._insert_quat_wxyz[-1].unsqueeze(0).expand(N, 4))
+        axis = quat_apply(hq, torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(N, 3))
+        d = obj_pos - seat
+        height = (d * axis).sum(-1)
+        lateral = (d - height.unsqueeze(-1) * axis).norm(dim=-1)
+        body_axis = quat_apply_inverse(seat_q, axis)          # peg-frame direction that is along the hole axis when seated
+        cur = quat_apply(self.object.data.root_quat_w, body_axis)
+        tilt = torch.rad2deg(torch.acos((cur * axis).sum(-1).clamp(-1.0, 1.0)))
+        return {"height": height, "lateral": lateral, "tilt_deg": tilt}
+
+    def _retract_seated_by_depth(self, pih_cfg):
+        m = self._retract_seat_measures()
+        return ((m["height"] <= float(pih_cfg.retract_seated_axial_tol))
+                & (m["lateral"] <= float(pih_cfg.retract_seated_lateral_tol))
+                & (m["tilt_deg"] <= float(pih_cfg.retract_seated_tilt_deg)))
     def _apply_goal_skip(self) -> None:
         """allow_goal_skip: jump to a later insertion waypoint reached out of order.
 
@@ -734,6 +760,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._keypoints_max_dist
                 <= pih_cfg.retract_success_tolerance * self.cfg.reward.keypoint_scale
             )
+            if getattr(pih_cfg, "retract_seated_mode", "keypoint") == "depth":
+                object_at_goal = self._retract_seated_by_depth(pih_cfg)
             mean_fingertip_dist = self._curr_fingertip_distances.mean(dim=-1)
             if pih_cfg.end_on_retract:
                 # Strict: off the peg (distance to its middle, not its root) and no tactile contact for a while.
@@ -757,6 +785,19 @@ class PreciseAssemblyEnv(PlayEnv):
             self.retract_succeeded |= just_retracted
             if pih_cfg.end_on_retract:
                 self.retract_failed |= hand_away & self.retract_phase & ~self.retract_succeeded
+                # Seat measurements at the moment the hand clears (kept across the auto-reset so evals can read them).
+                if not hasattr(self, "_retract_measured"):
+                    self._retract_measured = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                    self._retract_meas = {}
+                first = hand_away & self.retract_phase & ~self._retract_measured
+                if first.any():
+                    self._retract_measured |= first
+                    m = self._retract_seat_measures()
+                    for k, v in m.items():
+                        buf = self._retract_meas.setdefault(k, torch.full((self.num_envs,), float("nan"), device=self.device))
+                        buf[first] = v[first]
+                    self._retract_meas.setdefault("kp_max", torch.full((self.num_envs,), float("nan"), device=self.device))[first] = \
+                        self._keypoints_max_dist[first]
 
         if success_ids.numel() > 0:
             next_goal = (

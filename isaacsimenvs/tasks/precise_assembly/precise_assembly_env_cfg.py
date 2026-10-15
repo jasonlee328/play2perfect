@@ -78,6 +78,15 @@ class PreciseAssemblyCfg:
     # peg's keypoint centroid AND no tactile pad has touched anything for retract_clear_steps steps.
     retract_min_fingertip_dist: float = 0.0
     retract_clear_steps: int = 10
+    # How "still seated" is judged when the hand retracts. "keypoint": every peg keypoint within
+    # retract_success_tolerance * keypoint_scale of the final waypoint (also checks rotation about the axis, ~±28° at
+    # 1.5 cm). "depth": the peg root is at most retract_seated_axial_tol above the final waypoint along the hole axis,
+    # within retract_seated_lateral_tol of it sideways, and tilted at most retract_seated_tilt_deg; rotation about
+    # the hole axis is ignored (a seated peg that turns back rises with the thread, which the depth check catches).
+    retract_seated_mode: str = "keypoint"
+    retract_seated_axial_tol: float = 0.003
+    retract_seated_lateral_tol: float = 0.003
+    retract_seated_tilt_deg: float = 10.0
 
     # When True, the lift_rew / lift_bonus terms apply to insertion-only envs
     # (not only random-goal envs). Used by dense-trajectory experiments where
