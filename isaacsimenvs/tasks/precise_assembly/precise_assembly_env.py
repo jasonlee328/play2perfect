@@ -179,6 +179,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.num_envs, dtype=torch.bool, device=self.device
         )
         self.retract_succeeded = torch.zeros_like(self.retract_phase)
+        self.retract_failed = torch.zeros_like(self.retract_phase)
         self._just_entered_retract = torch.zeros_like(self.retract_phase)
         self._just_retracted = torch.zeros_like(self.retract_phase)
         # allow_goal_skip: furthest later waypoint currently near, and steps held there.
@@ -385,6 +386,7 @@ class PreciseAssemblyEnv(PlayEnv):
 
         self.retract_phase[env_ids] = False
         self.retract_succeeded[env_ids] = False
+        self.retract_failed[env_ids] = False
         self._just_entered_retract[env_ids] = False
         self._just_retracted[env_ids] = False
 
@@ -441,7 +443,10 @@ class PreciseAssemblyEnv(PlayEnv):
                       "layout matches (use the layout it was recorded on)", flush=True)
         b = self._start_bank
         n = env_ids.numel()
-        k = torch.randint(0, b["successes"].numel(), (n,), device=self.device)
+        if self.cfg.precise_assembly.start_state_sequential:
+            k = (int(self.cfg.precise_assembly.start_state_offset) + env_ids.long()) % b["successes"].numel()
+        else:
+            k = torch.randint(0, b["successes"].numel(), (n,), device=self.device)
         if self._start_bank_hole_pos is not None:
             err = (self._start_bank_hole_pos[k] - self.hole_pos[env_ids]).norm(dim=-1).max().item()
             if err > 0.005:
@@ -728,14 +733,18 @@ class PreciseAssemblyEnv(PlayEnv):
                 <= pih_cfg.retract_success_tolerance * self.cfg.reward.keypoint_scale
             )
             mean_fingertip_dist = self._curr_fingertip_distances.mean(dim=-1)
+            hand_away = (mean_fingertip_dist > pih_cfg.retract_distance_threshold) & (
+                self._curr_fingertip_distances.min(dim=-1).values > pih_cfg.retract_min_fingertip_dist)
             just_retracted = (
-                (mean_fingertip_dist > pih_cfg.retract_distance_threshold)
+                hand_away
                 & self.retract_phase
                 & ~self.retract_succeeded
                 & object_at_goal
             )
             self._just_retracted.copy_(just_retracted)
             self.retract_succeeded |= just_retracted
+            if pih_cfg.end_on_retract:
+                self.retract_failed |= hand_away & self.retract_phase & ~self.retract_succeeded
 
         if success_ids.numel() > 0:
             next_goal = (
@@ -773,11 +782,13 @@ class PreciseAssemblyEnv(PlayEnv):
         else:
             dropped = torch.zeros_like(fall)
 
-        terminated = fall | max_successes | hand_far | dropped
+        retract_fail = self.retract_failed if pih_cfg.enable_retract else torch.zeros_like(fall)
+        terminated = fall | max_successes | hand_far | dropped | retract_fail
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
             "max_successes": max_successes,
+            "retract_fail": retract_fail,
             "hand_far": hand_far,
             "dropped": dropped,
             "timeout": truncated,

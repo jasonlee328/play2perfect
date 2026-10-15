@@ -70,6 +70,12 @@ class PreciseAssemblyCfg:
     retract_distance_threshold: float = 0.1
     retract_success_bonus: float = 1000.0
     retract_success_tolerance: float = 0.005
+    # Eval: end the episode the first time the hand has retracted after the last goal (mean fingertip distance
+    # > retract_distance_threshold and min > retract_min_fingertip_dist), success or not. Success = the peg is
+    # still within retract_success_tolerance of the final pose at that moment. Without it the episode runs on
+    # and the hand can come back and knock the peg (or a later re-retract can count a tilted peg as success).
+    end_on_retract: bool = False
+    retract_min_fingertip_dist: float = 0.0
 
     # When True, the lift_rew / lift_bonus terms apply to insertion-only envs
     # (not only random-goal envs). Used by dense-trajectory experiments where
@@ -92,6 +98,10 @@ class PreciseAssemblyCfg:
     # the hole frame, and the goal index reached. Each reset samples one entry;
     # the episode then continues from that goal. "" keeps the normal reset.
     start_state_file: str = ""
+    # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
+    # starts from the same state.
+    start_state_sequential: bool = False
+    start_state_offset: int = 0
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
