@@ -134,6 +134,49 @@ class _Episode:
         return False
 
 
+def _randomize_peg(u, args, seed: int) -> dict:
+    """Per-env peg friction / mass / COM (fixed for the run), on the live PhysX view. Returns the per-env values."""
+    if not (args.peg_friction_range or args.peg_mass_range or args.peg_com_range):
+        return {}
+    import torch
+
+    obj, view = u.object, u.object.root_physx_view
+    N = u.num_envs
+    ids = torch.arange(N, dtype=torch.int32)
+    g = torch.Generator().manual_seed(int(seed) + 7919)
+    logu = lambda lo, hi: torch.exp(torch.empty(N).uniform_(np.log(lo), np.log(hi), generator=g))
+    out = {}
+    if args.peg_friction_range:
+        f = logu(*args.peg_friction_range)
+        mat = view.get_material_properties().clone()
+        base = mat[0, 0, 0].item()
+        mat[..., 0:2] = (base * f)[:, None, None]
+        view.set_material_properties(mat, ids)
+        out["friction"] = (base * f).tolist()
+    if args.peg_mass_range:
+        s = logu(*args.peg_mass_range)
+        m, inertia = view.get_masses().clone(), view.get_inertias().clone()
+        m2 = m * s.view(N, *[1] * (m.dim() - 1))
+        i2 = inertia * s.view(N, *[1] * (inertia.dim() - 1))
+        view.set_masses(m2, ids)
+        view.set_inertias(i2, ids)
+        obj.data.default_mass.copy_(m2)
+        if hasattr(obj.data, "default_inertia"):
+            obj.data.default_inertia.copy_(i2)
+        u._object_mass = obj.data.default_mass[:, 0:1].to(u.device)
+        out["mass_scale"] = s.tolist()
+        out["mass_kg"] = m2[:, 0].tolist()
+    if args.peg_com_range:
+        d = (torch.rand(N, 3, generator=g) * 2 - 1) * torch.tensor(args.peg_com_range)
+        c = view.get_coms().clone()
+        c[..., :3] += d.view(N, *[1] * (c.dim() - 2), 3).to(c.dtype)
+        view.set_coms(c, ids)
+        out["com_offset_m"] = d.tolist()
+    print(f"[record] peg DR env0: friction {view.get_material_properties()[0, 0, :2].tolist()} "
+          f"mass {view.get_masses()[0].tolist()} com {view.get_coms()[0, ..., :3].tolist()}", flush=True)
+    return out
+
+
 def main() -> None:
     from isaaclab.app import AppLauncher
 
@@ -177,6 +220,12 @@ def main() -> None:
                         help="Pins the waypoint tolerance (termination.eval_success_tolerance) so the "
                              "training-time curriculum can't tighten it mid-run. 0.075 is the start "
                              "value, the setting the 86%% teacher-only DAgger check ran with.")
+    parser.add_argument("--peg-friction-range", type=float, nargs=2, default=None, metavar=("LO", "HI"),
+                        help="Per-env peg friction scale (x the asset's), log-uniform, fixed for the run.")
+    parser.add_argument("--peg-mass-range", type=float, nargs=2, default=None, metavar=("LO", "HI"),
+                        help="Per-env peg mass (and inertia) scale, log-uniform, fixed for the run.")
+    parser.add_argument("--peg-com-range", type=float, nargs=3, default=None, metavar=("DX", "DY", "DZ"),
+                        help="Per-env peg center-of-mass offset (m, body frame), uniform in +-D, fixed for the run.")
     parser.add_argument("--no-save", action="store_true")
     parser.add_argument("--preview", type=int, default=0,
                         help="Save full + cropped PNGs of the first N envs at a few steps, then continue.")
@@ -288,6 +337,8 @@ def main() -> None:
         np.random.seed(env_cfg.seed % 2**32)
         torch.manual_seed(env_cfg.seed)
         torch.cuda.manual_seed_all(env_cfg.seed)
+
+        peg_dr = _randomize_peg(u, args, env_cfg.seed)
 
         # Label = the absolute target this step's action produces. Read it inside the
         # step, before resets overwrite _cur_targets for envs that finish.
@@ -493,6 +544,8 @@ def main() -> None:
                             "termination": reason, "env": i, "shard": tag, "seed": env_cfg.seed,
                             "behavior": args.behavior_checkpoint or args.teacher_checkpoint,
                             "first_episode": bool(not first_done[i])}
+                    if peg_dr:
+                        meta["peg"] = {k: v[i] for k, v in peg_dr.items()}
                     closers.append(pool.submit(ep.close, keep, meta))
                     counters[i] += 1
                     first_done[i] = True
