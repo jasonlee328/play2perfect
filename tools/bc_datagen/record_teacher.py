@@ -126,8 +126,11 @@ class _Episode:
                 ok = False
                 print(f"[record] ffmpeg failed for {self.dir}: {err[-500:]}", flush=True)
         if keep and ok:
+            hr = self.rows.pop("tactile_hr", None)
             arrays = {k: np.stack(v) for k, v in self.rows.items()}
             np.savez(self.dir / "lowdim.npz", **arrays)
+            if hr:
+                np.savez_compressed(self.dir / "tactile_hr.npz", tactile_hr=np.stack(hr))
             (self.dir / "meta.json").write_text(json.dumps(meta))
             return True
         shutil.rmtree(self.dir, ignore_errors=True)
@@ -187,6 +190,9 @@ def main() -> None:
     parser.add_argument("--teacher-tactile", action="store_true",
                         help="Teacher was trained with 8x8 tactile in its obs (screw_tactile8). "
                              "Tactile is recorded either way.")
+    parser.add_argument("--tactile-hr-res", type=int, default=0,
+                        help="Also record a high-res TacMap (resolution must divide 240; 1 ray per taxel) as uint8 "
+                             "(T, 5, R, R) in tactile_hr.npz per episode. The 8x8 tactile and teacher obs are unchanged.")
     parser.add_argument("--behavior-checkpoint", default=None,
                         help="If set, this RL checkpoint DRIVES the env and --teacher-checkpoint only "
                              "labels the visited states (DAgger-style coverage from older policies).")
@@ -309,6 +315,15 @@ def main() -> None:
         N = u.num_envs
         fps = int(round(1.0 / u.step_dt))
         wrapped = register_rlgames_env(env, rl_device=args.rl_device, clip_obs=10.0, clip_actions=1.0)
+        tac_hr = None
+        if args.tactile_hr_res:
+            import copy
+
+            from isaacsimenvs.tasks.play.utils.tactile_utils import TactileSensor
+
+            hr_cfg = copy.deepcopy(env_cfg.tactile)
+            hr_cfg.resolution, hr_cfg.samples_per_taxel = int(args.tactile_hr_res), 1
+            tac_hr = TactileSensor(u, hr_cfg)
         teacher = Teacher(
             task_id="Isaacsimenvs-PreciseAssembly-Direct-v0",
             agent_key="rl_games_sapg_cfg_entry_point",
@@ -477,6 +492,9 @@ def main() -> None:
         while not stop:
             frames = capture() if save or args.preview else None
             ld = {k: v.float().cpu().numpy() for k, v in lowdim().items()}
+            if tac_hr is not None:
+                r = int(args.tactile_hr_res)
+                hr_np = (tac_hr.compute() * 255).round().to(torch.uint8).view(N, 5, r, r).cpu().numpy()
             with torch.no_grad():
                 mu = teacher.get_action(obs["teacher_obs"])
                 mu_b = behavior.get_action(obs["teacher_obs"]) if behavior is not None else mu
@@ -511,6 +529,8 @@ def main() -> None:
                 ep.rows["behavior_mu"].append(mub_np[i])
                 ep.rows["action_joint_target"].append(label[i])
                 ep.rows["executed_joint_target"].append(executed[i])
+                if tac_hr is not None:
+                    ep.rows.setdefault("tactile_hr", []).append(hr_np[i])
                 if frames is not None:
                     ep.rows["student_depth"].append(frames[2][i])
                     if cam2 is not None:
