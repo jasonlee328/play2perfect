@@ -1,0 +1,236 @@
+{
+ "ellipse": {
+  "shape": "ellipse",
+  "fmb_id": 24,
+  "native_mm": [
+   34.75,
+   23.16
+  ],
+  "scale": 0.8634,
+  "section_mm": [
+   30.0,
+   19.99
+  ],
+  "length_mm": 150.0,
+  "section_area_mm2": 470.8,
+  "mass_g": 57.8,
+  "density_kg_m3": 818.5,
+  "com_m": [
+   -0.0,
+   -0.0,
+   0.0
+  ],
+  "inertia_diag": [
+   4.6926e-06,
+   0.00010982,
+   0.00011162
+  ],
+  "peg_pieces": 3,
+  "hole_pieces": 84,
+  "clearance_mm": 0.5,
+  "hole_mm": [
+   20.99,
+   31.0
+  ],
+  "object_scale": [
+   3.75,
+   0.75,
+   0.4999
+  ]
+ },
+ "star": {
+  "shape": "star",
+  "fmb_id": 4,
+  "native_mm": [
+   35.35,
+   33.85
+  ],
+  "scale": 0.8486,
+  "section_mm": [
+   30.0,
+   28.72
+  ],
+  "length_mm": 150.0,
+  "section_area_mm2": 416.5,
+  "mass_g": 57.8,
+  "density_kg_m3": 925.1,
+  "com_m": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "inertia_diag": [
+   4.7062e-06,
+   0.00011073,
+   0.00011073
+  ],
+  "peg_pieces": 8,
+  "hole_pieces": 66,
+  "clearance_mm": 0.5,
+  "hole_mm": [
+   29.73,
+   31.0
+  ],
+  "object_scale": [
+   3.75,
+   0.7499,
+   0.7181
+  ]
+ },
+ "arch": {
+  "shape": "arch",
+  "fmb_id": 5,
+  "native_mm": [
+   38.61,
+   23.17
+  ],
+  "scale": 0.777,
+  "section_mm": [
+   30.0,
+   18.0
+  ],
+  "length_mm": 150.0,
+  "section_area_mm2": 391.4,
+  "mass_g": 57.8,
+  "density_kg_m3": 984.4,
+  "com_m": [
+   0.0,
+   -0.0,
+   0.0
+  ],
+  "inertia_diag": [
+   6.6378e-06,
+   0.00010963,
+   0.00011376
+  ],
+  "peg_pieces": 29,
+  "hole_pieces": 51,
+  "clearance_mm": 0.5,
+  "hole_mm": [
+   19.0,
+   31.0
+  ],
+  "object_scale": [
+   3.75,
+   0.75,
+   0.45
+  ]
+ },
+ "hexagon": {
+  "shape": "hexagon",
+  "fmb_id": 18,
+  "native_mm": [
+   33.25,
+   29.42
+  ],
+  "scale": 0.9021,
+  "section_mm": [
+   30.0,
+   26.54
+  ],
+  "length_mm": 150.0,
+  "section_area_mm2": 608.8,
+  "mass_g": 57.8,
+  "density_kg_m3": 633.0,
+  "com_m": [
+   -0.0,
+   0.0,
+   -0.0
+  ],
+  "inertia_diag": [
+   5.6385e-06,
+   0.00011119,
+   0.00011119
+  ],
+  "peg_pieces": 3,
+  "hole_pieces": 48,
+  "clearance_mm": 0.5,
+  "hole_mm": [
+   27.54,
+   31.0
+  ],
+  "object_scale": [
+   3.75,
+   0.75,
+   0.6636
+  ]
+ },
+ "rrect": {
+  "shape": "rrect",
+  "fmb_id": 23,
+  "native_mm": [
+   32.43,
+   20.85
+  ],
+  "scale": 0.925,
+  "section_mm": [
+   30.0,
+   19.29
+  ],
+  "length_mm": 150.0,
+  "section_area_mm2": 574.6,
+  "mass_g": 57.8,
+  "density_kg_m3": 670.6,
+  "com_m": [
+   -0.0,
+   -0.0,
+   -0.0
+  ],
+  "inertia_diag": [
+   6.051e-06,
+   0.00011015,
+   0.00011266
+  ],
+  "peg_pieces": 3,
+  "hole_pieces": 67,
+  "clearance_mm": 0.5,
+  "hole_mm": [
+   20.29,
+   31.0
+  ],
+  "object_scale": [
+   3.75,
+   0.75,
+   0.4821
+  ]
+ },
+ "circle": {
+  "shape": "circle",
+  "fmb_id": 25,
+  "native_mm": [
+   32.42,
+   32.41
+  ],
+  "scale": 0.9253,
+  "section_mm": [
+   30.0,
+   29.99
+  ],
+  "length_mm": 150.0,
+  "section_area_mm2": 706.1,
+  "mass_g": 57.8,
+  "density_kg_m3": 545.7,
+  "com_m": [
+   0.0,
+   -0.0,
+   -0.0
+  ],
+  "inertia_diag": [
+   6.4957e-06,
+   0.00011162,
+   0.00011162
+  ],
+  "peg_pieces": 3,
+  "hole_pieces": 63,
+  "clearance_mm": 0.5,
+  "hole_mm": [
+   30.99,
+   31.0
+  ],
+  "object_scale": [
+   3.75,
+   0.75,
+   0.7498
+  ]
+ }
+}

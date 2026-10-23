@@ -132,6 +132,7 @@ PROBLEM_REGISTRY: Dict[str, Problem] = {}
 from . import peg               # noqa: E402, F401
 from . import fabrica           # noqa: E402, F401
 from . import furniture_bench   # noqa: E402, F401
+from . import fmb               # noqa: E402, F401
 
 
 # The data-driven registration above populates PROBLEM_REGISTRY with every
@@ -147,6 +148,8 @@ _RELEASED_PROBLEMS = {
     "beam_assembly_step1": "fabrica.beam_3x.part_2_matchedmass_sdf_hybrid",
     "beam_assembly_step2": "fabrica.beam_3x.part_0_matchedmass_sdf_hybrid",
     "screwing": "furniture_bench.one_leg_matchedmass_sdf_hybrid_super_dense",
+    # FMB-shaped straight insertion (FoundationTouch tools/fmb_insertion), tight_insertion's convention.
+    **{f"fmb_{s}": f"fmb.{s}.tol0p5mm" for s in ("ellipse", "star", "arch", "hexagon", "rrect", "circle")},
 }
 
 _missing = [k for k in _RELEASED_PROBLEMS.values() if k not in PROBLEM_REGISTRY]
