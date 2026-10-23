@@ -27,6 +27,9 @@ as hydra overrides), cropped the same way. The 70x70 ``student_depth`` fields fo
 cfg's student crops (crop_top_left/bottom_right, view2_crop_*) scaled to the render size.
 
 --no-save turns it into a teacher-only success-rate eval of the same config.
+--no-video saves lowdim.npz + meta.json only (no mp4s, no student_depth fields); the camera still renders (the task
+needs it), so pair it with a small --render-width/--render-height. meta.json has "peg_width_mm" (precise_assembly.peg_width_mm,
+30 for the original peg).
 """
 
 from __future__ import annotations
@@ -89,15 +92,19 @@ def _open_encoder(path: Path, size: int, fps: int, lossless_rgb: bool) -> subpro
 class _Episode:
     """One env's in-progress episode: two streaming encoders + low-dim rows."""
 
-    def __init__(self, ep_dir: Path, size: int, fps: int, save: bool, view2: bool = False) -> None:
+    def __init__(self, ep_dir: Path, size: int, fps: int, save: bool, view2: bool = False,
+                 video: bool = True) -> None:
         self.dir = ep_dir
         self.rows: dict[str, list[np.ndarray]] = {
-            k: [] for k in LOWDIM_FIELDS if view2 or k != "student_depth_view2"}
+            k: [] for k in LOWDIM_FIELDS
+            if (view2 or k != "student_depth_view2") and (video or not k.startswith("student_depth"))}
         self.n = 0
         self.save = save
         self.rgb = self.depth = None
         self.procs = []
         if save:
+            ep_dir.mkdir(parents=True, exist_ok=True)
+        if save and video:
             ep_dir.mkdir(parents=True, exist_ok=True)
             self.rgb = _open_encoder(ep_dir / "front_rgb.mp4", size, fps, lossless_rgb=False)
             self.depth = _open_encoder(ep_dir / "front_depth.mp4", size, fps, lossless_rgb=True)
@@ -233,6 +240,8 @@ def main() -> None:
     parser.add_argument("--peg-com-range", type=float, nargs=3, default=None, metavar=("DX", "DY", "DZ"),
                         help="Per-env peg center-of-mass offset (m, body frame), uniform in +-D, fixed for the run.")
     parser.add_argument("--no-save", action="store_true")
+    parser.add_argument("--no-video", action="store_true",
+                        help="Save lowdim.npz + meta.json only (no mp4s, no student_depth fields).")
     parser.add_argument("--preview", type=int, default=0,
                         help="Save full + cropped PNGs of the first N envs at a few steps, then continue.")
     parser.add_argument("--rl_device", default="cuda:0")
@@ -354,6 +363,7 @@ def main() -> None:
         torch.cuda.manual_seed_all(env_cfg.seed)
 
         peg_dr = _randomize_peg(u, args, env_cfg.seed)
+        peg_width_mm = float(getattr(env_cfg.precise_assembly, "peg_width_mm", 0.0) or 0.0) or 30.0
 
         # Label = the absolute target this step's action produces. Read it inside the
         # step, before resets overwrite _cur_targets for envs that finish.
@@ -477,7 +487,8 @@ def main() -> None:
         if save:
             ep_root.mkdir(parents=True, exist_ok=True)
         counters = [0] * N
-        episodes = [_Episode(ep_root / f"{tag}_e{i:04d}_n0000", S, fps, save, cam2 is not None)
+        episodes = [_Episode(ep_root / f"{tag}_e{i:04d}_n0000", S, fps, save, cam2 is not None,
+                             not args.no_video)
                     for i in range(N)]
         first_done = np.zeros(N, bool)
         pool = ThreadPoolExecutor(max_workers=32)
@@ -490,7 +501,7 @@ def main() -> None:
         t0 = time.time()
         step = 0
         while not stop:
-            frames = capture() if save or args.preview else None
+            frames = capture() if (save and not args.no_video) or args.preview else None
             ld = {k: v.float().cpu().numpy() for k, v in lowdim().items()}
             if tac_hr is not None:
                 r = int(args.tactile_hr_res)
@@ -517,7 +528,7 @@ def main() -> None:
                     iio.imwrite(pdir / f"depth_env{i}_t{step:04d}.png",
                                 (np.clip((dm.astype(np.float32) - 500) / 1000.0, 0, 1) * 255).astype(np.uint8))
 
-            if save:
+            if save and not args.no_video:
                 list(pool.map(lambda i: episodes[i].write_frames(
                     frames[0][i], frames[1][i], *([frames[3][i], frames[4][i]] if cam2 is not None else [])),
                               [i for i in range(N) if episodes[i].save]))
@@ -531,7 +542,7 @@ def main() -> None:
                 ep.rows["executed_joint_target"].append(executed[i])
                 if tac_hr is not None:
                     ep.rows.setdefault("tactile_hr", []).append(hr_np[i])
-                if frames is not None:
+                if frames is not None and not args.no_video:
                     ep.rows["student_depth"].append(frames[2][i])
                     if cam2 is not None:
                         ep.rows["student_depth_view2"].append(frames[5][i])
@@ -566,11 +577,13 @@ def main() -> None:
                             "first_episode": bool(not first_done[i])}
                     if peg_dr:
                         meta["peg"] = {k: v[i] for k, v in peg_dr.items()}
+                    meta["peg_width_mm"] = peg_width_mm
                     closers.append(pool.submit(ep.close, keep, meta))
                     counters[i] += 1
                     first_done[i] = True
                     episodes[i] = _Episode(ep_root / f"{tag}_e{i:04d}_n{counters[i]:04d}", S, fps,
-                                           save and not args.first_episode_only, cam2 is not None)
+                                           save and not args.first_episode_only, cam2 is not None,
+                                           not args.no_video)
                 teacher.reset_idx(done)
                 if behavior is not None:
                     behavior.reset_idx(done)
@@ -623,6 +636,8 @@ def main() -> None:
                               "depth_window_m": [dmin2, dmax2]} if cam2 is not None else None),
             "lowdim_fields": LOWDIM_FIELDS,
             "hydra_overrides": hydra_args,
+            "peg_width_mm": peg_width_mm,
+            "no_video": bool(args.no_video),
             "wall_s": time.time() - t0,
         }
         out_dir.mkdir(parents=True, exist_ok=True)

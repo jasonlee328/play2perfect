@@ -1,0 +1,82 @@
+{
+ "30.0": {
+  "n_hulls": 12,
+  "shoulder_x_mm": -19.094,
+  "hull_half_width_mm": 15.344,
+  "shoulder_half_width_mm": 15.172,
+  "corner_radius_mm": 21.46,
+  "support_area_mm2_min_max": [
+   303.9,
+   305.0
+  ],
+  "thread_x_max_mm": -18.75,
+  "thread_inside_body_footprint": true,
+  "rests_flat_on_table_by_body": true,
+  "overhangs_boss": false,
+  "corner_over_rim_top": true
+ },
+ "25.0": {
+  "n_hulls": 12,
+  "shoulder_x_mm": -19.094,
+  "hull_half_width_mm": 12.844,
+  "shoulder_half_width_mm": 12.672,
+  "corner_radius_mm": 17.92,
+  "support_area_mm2_min_max": [
+   138.0,
+   141.5
+  ],
+  "thread_x_max_mm": -18.75,
+  "thread_inside_body_footprint": true,
+  "rests_flat_on_table_by_body": true,
+  "overhangs_boss": false,
+  "corner_over_rim_top": false
+ },
+ "27.5": {
+  "n_hulls": 12,
+  "shoulder_x_mm": -19.094,
+  "hull_half_width_mm": 14.094,
+  "shoulder_half_width_mm": 13.922,
+  "corner_radius_mm": 19.69,
+  "support_area_mm2_min_max": [
+   231.2,
+   234.8
+  ],
+  "thread_x_max_mm": -18.75,
+  "thread_inside_body_footprint": true,
+  "rests_flat_on_table_by_body": true,
+  "overhangs_boss": false,
+  "corner_over_rim_top": false
+ },
+ "32.5": {
+  "n_hulls": 12,
+  "shoulder_x_mm": -19.094,
+  "hull_half_width_mm": 16.594,
+  "shoulder_half_width_mm": 16.422,
+  "corner_radius_mm": 23.22,
+  "support_area_mm2_min_max": [
+   338.5,
+   338.5
+  ],
+  "thread_x_max_mm": -18.75,
+  "thread_inside_body_footprint": true,
+  "rests_flat_on_table_by_body": true,
+  "overhangs_boss": true,
+  "corner_over_rim_top": true
+ },
+ "35.0": {
+  "n_hulls": 12,
+  "shoulder_x_mm": -19.094,
+  "hull_half_width_mm": 17.844,
+  "shoulder_half_width_mm": 17.671,
+  "corner_radius_mm": 24.99,
+  "support_area_mm2_min_max": [
+   338.5,
+   338.5
+  ],
+  "thread_x_max_mm": -18.75,
+  "thread_inside_body_footprint": true,
+  "rests_flat_on_table_by_body": true,
+  "overhangs_boss": true,
+  "corner_over_rim_top": true
+ }
+}

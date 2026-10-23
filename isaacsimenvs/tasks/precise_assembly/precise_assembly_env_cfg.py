@@ -114,6 +114,13 @@ class PreciseAssemblyCfg:
     start_state_sequential: bool = False
     start_state_offset: int = 0
 
+    # Screwing only: body-width variant of the peg (square_table_leg4), in mm. 0 (or 30) = the original
+    # 30 x 30 mm body. Other values load assets/.../square_table_leg4/width_variants/w<10*W>/ (made by
+    # tools/peg_variants/make_leg4_width_variants.py): body cross-section W x W mm, same length, same thread
+    # and mass. Keypoints / object_scale stay the original's, so goals and the teacher obs don't change.
+    # With reset.fixed_start_pose set, its z is shifted by (W - 30) / 2 mm so the peg still rests on the table.
+    peg_width_mm: float = 0.0
+
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
     """Return a render-overlay-compatible sim cfg for teacher and student tasks."""

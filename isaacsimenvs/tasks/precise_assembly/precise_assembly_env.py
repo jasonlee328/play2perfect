@@ -243,6 +243,22 @@ class PreciseAssemblyEnv(PlayEnv):
             )
         object_spec = NAME_TO_OBJECT[problem.insertion_object_name]
         object_urdf = _resolve_asset_path(object_spec.urdf_path)
+        peg_width_mm = float(getattr(pih_cfg, "peg_width_mm", 0.0) or 0.0)
+        if peg_width_mm and abs(peg_width_mm - 30.0) > 1e-6:
+            if "square_table_leg4" not in str(object_urdf):
+                raise ValueError(f"precise_assembly.peg_width_mm needs the screwing peg, got {object_urdf}")
+            object_urdf = (REPO_ROOT / "assets/urdf/furniture_bench/square_table/square_table_leg4/width_variants"
+                           / f"w{int(round(peg_width_mm * 10))}" / "square_table_leg4_matchedmass_sdf_hybrid.urdf")
+            if not object_urdf.is_file():
+                raise FileNotFoundError(f"no peg width variant for {peg_width_mm} mm: {object_urdf} "
+                                        "(make it with tools/peg_variants/make_leg4_width_variants.py)")
+            fsp = getattr(cfg.reset, "fixed_start_pose", None)
+            if fsp:
+                fsp = list(fsp)
+                fsp[2] += (peg_width_mm - 30.0) / 2000.0
+                cfg.reset.fixed_start_pose = tuple(fsp)
+            print(f"[PreciseAssemblyEnv] peg_width_mm={peg_width_mm:g}: object {object_urdf}, "
+                  f"fixed_start_pose {getattr(cfg.reset, 'fixed_start_pose', None)}", flush=True)
         receptive_urdf = _resolve_asset_path(problem.receptive_urdf)
 
         insert_pose_sequence = problem.insert_pose_rel_receptive
