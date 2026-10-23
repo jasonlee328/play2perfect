@@ -12,7 +12,10 @@ import isaaclab.sim as sim_utils
 from isaaclab.assets import Articulation, RigidObject, RigidObjectCfg
 from isaaclab.sim.spawners.from_files import GroundPlaneCfg, UsdFileCfg, spawn_ground_plane
 
+from isaaclab.sim.utils import find_matching_prim_paths
+
 from isaacsimenvs.tasks.play.utils.scene_utils import (
+    build_rigid_object_cfg,
     _bake_usd,
     _convert_urdf_to_usd,
     _log_scene_step,
@@ -55,7 +58,8 @@ def setup_scene(env) -> None:
     _log_scene_step(setup_t0, f"peg-in-hole setup start num_envs={env.num_envs}")
 
     env._tmp_asset_dir = tempfile.mkdtemp(prefix="precise_assembly_assets_")
-    env._object_urdf_paths = [_asset_path(env._pih_object_urdf_abs)]
+    object_urdfs = list(getattr(env, "_pih_object_urdfs_abs", None) or [env._pih_object_urdf_abs])
+    env._object_urdf_paths = [_asset_path(p) for p in object_urdfs]
     env._hole_urdf_paths = [_asset_path(env._pih_receptive_urdf_abs)]
     env._table_urdf_paths = [_asset_path(assets_cfg.table_urdf)]
 
@@ -63,35 +67,40 @@ def setup_scene(env) -> None:
     bake_root = Path(env._tmp_asset_dir) / "baked_usd"
     usd_work_dir.mkdir(parents=True, exist_ok=True)
 
-    object_raw_usd = _convert_urdf_to_usd(
-        _asset_path(env._pih_object_urdf_abs), usd_work_dir, fix_base=False
-    )
-    object_usd_path = _bake_usd(
-        object_raw_usd,
-        bake_root,
-        "object",
-        props=dict(
-            kinematic_enabled=False,
-            disable_gravity=False,
-            max_depenetration_velocity=1000.0,
-            rb_solver_position_iterations=4,
-            rb_solver_velocity_iterations=0,
-            articulation_enabled=False,
-        ),
-    )
-    goalviz_usd_path = _bake_usd(
-        object_raw_usd,
-        bake_root,
-        "goalviz",
-        props=dict(
-            kinematic_enabled=True,
-            disable_gravity=True,
-            articulation_enabled=False,
-            rb_solver_position_iterations=4,
-            rb_solver_velocity_iterations=0,
-        ),
-        collision_enabled=False,
-    )
+    object_usd_paths, goalviz_usd_paths = [], []
+    for k, urdf in enumerate(env._object_urdf_paths):
+        # one work dir per shape: every variant URDF has the same basename
+        object_raw_usd = _convert_urdf_to_usd(
+            urdf, usd_work_dir if k == 0 else usd_work_dir / f"object_{k}", fix_base=False
+        )
+        sfx = "" if k == 0 else f"_{k}"
+        object_usd_paths.append(_bake_usd(
+            object_raw_usd,
+            bake_root,
+            "object" + sfx,
+            props=dict(
+                kinematic_enabled=False,
+                disable_gravity=False,
+                max_depenetration_velocity=1000.0,
+                rb_solver_position_iterations=4,
+                rb_solver_velocity_iterations=0,
+                articulation_enabled=False,
+            ),
+        ))
+        goalviz_usd_paths.append(_bake_usd(
+            object_raw_usd,
+            bake_root,
+            "goalviz" + sfx,
+            props=dict(
+                kinematic_enabled=True,
+                disable_gravity=True,
+                articulation_enabled=False,
+                rb_solver_position_iterations=4,
+                rb_solver_velocity_iterations=0,
+            ),
+            collision_enabled=False,
+        ))
+    object_usd_path, goalviz_usd_path = object_usd_paths[0], goalviz_usd_paths[0]
 
     hole_usd_path = _bake_usd(
         _convert_urdf_to_usd(
@@ -156,8 +165,16 @@ def setup_scene(env) -> None:
     env.robot = Articulation(build_robot_articulation_usd_cfg(robot_usd_path))
     env.table = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Table", table_usd_path))
     env.hole = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_path))
-    env.object = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_path))
-    env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_path))
+    if len(object_usd_paths) == 1:
+        env.object = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_path))
+        env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_path))
+    else:
+        # Several peg shapes (precise_assembly.peg_shapes): MultiUsdFileCfg copies asset (index % K) onto the
+        # index-th matching env prim; needs replicate_physics=False (PlayEnvCfg's scene default).
+        if getattr(env.cfg.scene, "replicate_physics", False):
+            raise RuntimeError("precise_assembly.peg_shapes needs scene.replicate_physics=False")
+        env.object = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths))
+        env.goal_viz = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths))
     _log_scene_step(setup_t0, "spawned robot/table/hole/object/goalviz")
 
     spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
@@ -172,6 +189,15 @@ def setup_scene(env) -> None:
     env._object_asset_index_per_env = torch.zeros(
         env.num_envs, device=env.device, dtype=torch.long
     )
+    if len(object_usd_paths) > 1:
+        # Same order as the MultiUsdFileCfg spawn: the k-th matching env prim got asset k % K.
+        paths = find_matching_prim_paths("/World/envs/env_.*/Object")
+        if len(paths) != env.num_envs:
+            raise RuntimeError(f"expected {env.num_envs} Object prims, got {len(paths)}")
+        for k, p in enumerate(paths):
+            env._object_asset_index_per_env[int(p.rsplit("/", 2)[-2].removeprefix("env_"))] = k % len(object_usd_paths)
+        counts = torch.bincount(env._object_asset_index_per_env, minlength=len(object_usd_paths)).tolist()
+        _log_scene_step(setup_t0, f"peg shapes {getattr(env, '_pih_peg_shapes', None)}: envs per shape {counts}")
 
     env.scene.articulations["robot"] = env.robot
     env.scene.rigid_objects["table"] = env.table

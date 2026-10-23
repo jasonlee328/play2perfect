@@ -128,6 +128,12 @@ class PreciseAssemblyCfg:
     # set, its z is shifted by the variant's rest_z_shift_m (its hull extent below the axis vs the original's).
     peg_shape: str = ""
 
+    # Screwing only: several peg shapes in one run, env i gets peg_shapes[i % K] (names as for peg_shape, "original"
+    # = the square body). Empty = one shape (peg_shape). Every shape keeps the same thread, mass, keypoints and
+    # object_scale, so goals/obs are shared; the tactile ray-cast uses each env's own body. Not with
+    # reset.fixed_start_pose (the rest height differs per shape).
+    peg_shapes: tuple = ()
+
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
     """Return a render-overlay-compatible sim cfg for teacher and student tasks."""

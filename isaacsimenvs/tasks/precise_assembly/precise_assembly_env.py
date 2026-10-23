@@ -280,6 +280,29 @@ class PreciseAssemblyEnv(PlayEnv):
             print(f"[PreciseAssemblyEnv] peg_shape={peg_shape} ({vinfo['family']}, FMB #{vinfo['fmb_index']}, "
                   f"area {vinfo['area_mm2']} mm^2): object {object_urdf}, "
                   f"fixed_start_pose {getattr(cfg.reset, 'fixed_start_pose', None)}", flush=True)
+        # Several peg shapes across envs: env i gets peg_shapes[i % K] (round-robin spawn, see scene_utils).
+        peg_shapes = [str(v).strip() for v in (getattr(pih_cfg, "peg_shapes", None) or ())]
+        object_urdfs = [object_urdf]
+        if peg_shapes:
+            if peg_shape or (peg_width_mm and abs(peg_width_mm - 30.0) > 1e-6):
+                raise ValueError("precise_assembly.peg_shapes can't be combined with peg_shape / peg_width_mm")
+            if "square_table_leg4" not in str(object_urdf):
+                raise ValueError(f"precise_assembly.peg_shapes needs the screwing peg, got {object_urdf}")
+            if getattr(cfg.reset, "fixed_start_pose", None):
+                raise NotImplementedError("precise_assembly.peg_shapes with reset.fixed_start_pose (the rest height "
+                                          "differs per shape); use one peg_shape per run for static-layout evals")
+            leg = REPO_ROOT / "assets/urdf/furniture_bench/square_table/square_table_leg4"
+            object_urdfs = []
+            for sh in peg_shapes:
+                p = (object_urdf if sh in ("", "original", "square")
+                     else leg / "fmb_variants" / sh / "square_table_leg4_matchedmass_sdf_hybrid.urdf")
+                if not Path(p).is_file():
+                    raise FileNotFoundError(f"no FMB peg shape {sh!r}: {p}")
+                object_urdfs.append(p)
+            object_urdf = object_urdfs[0]
+            print(f"[PreciseAssemblyEnv] peg_shapes={peg_shapes}: env i gets shape i % {len(peg_shapes)}", flush=True)
+        self._pih_peg_shapes = peg_shapes or [peg_shape or "original"]
+        self._pih_object_urdfs_abs = [str(p) for p in object_urdfs]
         receptive_urdf = _resolve_asset_path(problem.receptive_urdf)
 
         insert_pose_sequence = problem.insert_pose_rel_receptive

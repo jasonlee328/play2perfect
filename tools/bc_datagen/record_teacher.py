@@ -365,6 +365,10 @@ def main() -> None:
         peg_dr = _randomize_peg(u, args, env_cfg.seed)
         peg_width_mm = float(getattr(env_cfg.precise_assembly, "peg_width_mm", 0.0) or 0.0) or 30.0
         peg_shape = str(getattr(env_cfg.precise_assembly, "peg_shape", "") or "") or "original"
+        peg_shapes_env = None  # precise_assembly.peg_shapes: each env's shape
+        if len(getattr(u, "_pih_peg_shapes", ())) > 1:
+            peg_shapes_env = [u._pih_peg_shapes[k] for k in u._object_asset_index_per_env.tolist()]
+            peg_shape = "multi:" + ",".join(u._pih_peg_shapes)
 
         # Label = the absolute target this step's action produces. Read it inside the
         # step, before resets overwrite _cur_targets for envs that finish.
@@ -579,7 +583,7 @@ def main() -> None:
                     if peg_dr:
                         meta["peg"] = {k: v[i] for k, v in peg_dr.items()}
                     meta["peg_width_mm"] = peg_width_mm
-                    meta["peg_shape"] = peg_shape
+                    meta["peg_shape"] = peg_shapes_env[i] if peg_shapes_env else peg_shape
                     closers.append(pool.submit(ep.close, keep, meta))
                     counters[i] += 1
                     first_done[i] = True

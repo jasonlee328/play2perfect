@@ -13,8 +13,9 @@ Differences from the sensor, which renders a 240x240 image per pad:
 - play2perfect merges fixed joints, so the ``left_*_elastomer`` bodies don't exist; the
   elastomer frame is rebuilt from ``left_*_DP`` plus the URDF's fixed-joint rotation.
 - The right-hand maps are used for the left hand (the pad is x-symmetric).
-- Only the manipulated object is ray-cast, from its collision meshes. This assumes every
-  env holds the same object asset at the same scale (true for PreciseAssembly).
+- Only the manipulated object is ray-cast, from its collision meshes, at its asset scale (no per-env
+  scale noise). With several object assets (env._object_asset_index_per_env), their meshes are placed
+  ASSET_SPACING apart in one warp mesh and each env's rays are shifted to its own asset.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ MAP_SIZE: int = 240   # pixels per side of the TacMap maps
 MAX_DIST: float = 0.015      # m, sensor max_distance
 CPD_MAX_DIST: float = 0.5    # m, sensor cpd_max_dist
 CPD_EPS: float = -1e-4       # m, sensor cpd_eps
+ASSET_SPACING: float = 2.0    # m, spacing of the per-asset meshes in the merged ray-cast mesh (> CPD_MAX_DIST + size)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
@@ -50,13 +52,13 @@ def _rpy_matrix(r: float, p: float, y: float) -> np.ndarray:
 R_DP_ELASTOMER = _rpy_matrix(math.pi / 2, -math.pi / 2, 0.0)
 
 
-def _object_mesh(env) -> tuple[np.ndarray, np.ndarray]:
-    """env_0's object collision meshes (all prims merged), in the object's rigid-body frame."""
+def _object_mesh(env, env_id: int = 0) -> tuple[np.ndarray, np.ndarray]:
+    """env ``env_id``'s object collision meshes (all prims merged), in the object's rigid-body frame."""
     import omni.usd
     from pxr import Usd, UsdGeom, UsdPhysics
 
     stage = omni.usd.get_context().get_stage()
-    root = stage.GetPrimAtPath(env.object.cfg.prim_path.replace("env_.*", "env_0"))
+    root = stage.GetPrimAtPath(env.object.cfg.prim_path.replace("env_.*", f"env_{env_id}"))
     prims = list(Usd.PrimRange(root, Usd.TraverseInstanceProxies()))
     body = next((p for p in prims if p.HasAPI(UsdPhysics.RigidBodyAPI)), root)
     meshes = [p for p in prims if p.IsA(UsdGeom.Mesh)]
@@ -102,14 +104,40 @@ class TactileSensor:
         cell = MAP_SIZE // res
         if not 1 <= sub <= cell:
             raise ValueError(f"tactile.samples_per_taxel must be in [1, {cell}] at resolution {res}, got {sub}")
-        if len(env._object_urdf_paths) != 1:
-            raise NotImplementedError("tactile obs needs a single object asset shared by all envs")
+        n_assets = len(env._object_urdf_paths)
+        if n_assets > 1 and len(getattr(env, "_pih_peg_shapes", ())) != n_assets:
+            # only PreciseAssembly's peg_shapes is supported: same scale for all assets, index in
+            # env._object_asset_index_per_env (the play task's procedural assets are scaled per env)
+            raise NotImplementedError("tactile obs with several object assets needs precise_assembly.peg_shapes")
         lo, hi = env.cfg.domain_randomization.object_scale_noise_multiplier_range
         if (lo, hi) != (1.0, 1.0):
             raise NotImplementedError("tactile obs does not support object_scale_noise_multiplier_range != (1, 1)")
 
         self.env, self.device, self.res = env, env.device, res
-        pts, tris = _object_mesh(env)
+        # Several assets (e.g. precise_assembly.peg_shapes): one warp mesh holding asset k's mesh shifted by
+        # k * ASSET_SPACING along x; each env's rays are shifted by its asset's offset (in the object frame).
+        self.ray_offset = None
+        if n_assets == 1:
+            pts, tris = _object_mesh(env)
+        else:
+            idx = env._object_asset_index_per_env
+            P, T, n = [], [], 0
+            for k in range(n_assets):
+                e = (idx == k).nonzero()
+                if len(e) == 0:
+                    continue
+                p, t = _object_mesh(env, int(e[0]))
+                for j in e[1:4].flatten().tolist():  # check the spawn order matches the asset index
+                    q, _ = _object_mesh(env, int(j))
+                    if q.shape != p.shape or np.abs(q - p).max() > 1e-6:
+                        raise RuntimeError(f"tactile: env {j} (asset {k}) has a different mesh than env {int(e[0])}")
+                p = p + np.array([k * ASSET_SPACING, 0.0, 0.0])
+                P.append(p)
+                T.append(t + n)
+                n += len(p)
+            pts, tris = np.concatenate(P), np.concatenate(T)
+            self.ray_offset = torch.zeros(env.num_envs, 1, 3, device=self.device)
+            self.ray_offset[:, 0, 0] = idx.float() * ASSET_SPACING
         self.mesh = convert_to_warp_mesh(pts, tris, device=self.device)
 
         self.body_ids = [env.robot.find_bodies(f"left_{f}_DP")[0][0] for f in FINGERS]
@@ -160,6 +188,8 @@ class TactileSensor:
         for a in range(0, env.num_envs, self.envs_per_chunk):
             Rc, tc = R_od[a:a + self.envs_per_chunk][:, self.finger], t_od[a:a + self.envs_per_chunk][:, self.finger]
             s = (Rc @ self.starts.unsqueeze(-1)).squeeze(-1) + tc  # (n, R, 3) object frame
+            if self.ray_offset is not None:
+                s = s + self.ray_offset[a:a + self.envs_per_chunk]
             d = (Rc @ self.dirs.unsqueeze(-1)).squeeze(-1)
             _, dist, _, _ = raycast_mesh(s, d, self.mesh, max_dist=MAX_DIST, return_distance=True)
             back = s + d * (dist.clamp_min(0.0) + CPD_EPS).nan_to_num(0.0, 0.0, 0.0).unsqueeze(-1)
