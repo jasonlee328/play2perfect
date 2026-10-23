@@ -29,7 +29,7 @@ cfg's student crops (crop_top_left/bottom_right, view2_crop_*) scaled to the ren
 --no-save turns it into a teacher-only success-rate eval of the same config.
 --no-video saves lowdim.npz + meta.json only (no mp4s, no student_depth fields); the camera still renders (the task
 needs it), so pair it with a small --render-width/--render-height. meta.json has "peg_width_mm" (precise_assembly.peg_width_mm,
-30 for the original peg).
+30 for the original peg) and "peg_shape" (precise_assembly.peg_shape, "original" for the square body).
 """
 
 from __future__ import annotations
@@ -364,6 +364,7 @@ def main() -> None:
 
         peg_dr = _randomize_peg(u, args, env_cfg.seed)
         peg_width_mm = float(getattr(env_cfg.precise_assembly, "peg_width_mm", 0.0) or 0.0) or 30.0
+        peg_shape = str(getattr(env_cfg.precise_assembly, "peg_shape", "") or "") or "original"
 
         # Label = the absolute target this step's action produces. Read it inside the
         # step, before resets overwrite _cur_targets for envs that finish.
@@ -578,6 +579,7 @@ def main() -> None:
                     if peg_dr:
                         meta["peg"] = {k: v[i] for k, v in peg_dr.items()}
                     meta["peg_width_mm"] = peg_width_mm
+                    meta["peg_shape"] = peg_shape
                     closers.append(pool.submit(ep.close, keep, meta))
                     counters[i] += 1
                     first_done[i] = True
@@ -637,6 +639,7 @@ def main() -> None:
             "lowdim_fields": LOWDIM_FIELDS,
             "hydra_overrides": hydra_args,
             "peg_width_mm": peg_width_mm,
+            "peg_shape": peg_shape,
             "no_video": bool(args.no_video),
             "wall_s": time.time() - t0,
         }

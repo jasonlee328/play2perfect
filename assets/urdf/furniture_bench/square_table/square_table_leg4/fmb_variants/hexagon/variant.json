@@ -1,0 +1,60 @@
+{
+ "family": "hexagon",
+ "fmb_index": 11,
+ "rot_deg": 90.0,
+ "scale": 0.8823,
+ "fmb_area_mm2": 1156.2,
+ "area_mm2": 899.8,
+ "section_bbox_mm": [
+  36.48,
+  32.27
+ ],
+ "section_centroid_mm": [
+  0.002,
+  -0.003
+ ],
+ "section_max_radius_mm": 18.24,
+ "section_min_radius_mm": 16.13,
+ "thread_disk_covered_frac": 1.0,
+ "thread_disk_covered": true,
+ "hull_inflation_mm": 0.338,
+ "hulls": 1,
+ "hull_bounds_mm": [
+  [
+   -19.088,
+   -18.545,
+   -16.481
+  ],
+  [
+   44.088,
+   18.545,
+   16.481
+  ]
+ ],
+ "hull_section_missed_frac": 0.0,
+ "hull_area_beyond_0p5mm_mm2": 0.0,
+ "rest_below_axis_mm": 16.481,
+ "rest_z_shift_m": 0.001137,
+ "com": [
+  0.0057435,
+  1.3e-06,
+  -3.3e-06
+ ],
+ "inertia": [
+  [
+   2.4576654777214915e-06,
+   -3.9082563495330305e-10,
+   -7.988151943913054e-09
+  ],
+  [
+   -3.9082563495330305e-10,
+   1.1970148144787113e-05,
+   -3.349477516964251e-10
+  ],
+  [
+   -7.988151943913054e-09,
+   -3.349477516964251e-10,
+   1.1970052099572148e-05
+  ]
+ ]
+}

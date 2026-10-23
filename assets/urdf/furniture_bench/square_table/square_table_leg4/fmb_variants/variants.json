@@ -1,0 +1,422 @@
+{
+ "circle": {
+  "family": "circle",
+  "fmb_index": 10,
+  "rot_deg": 0.0,
+  "scale": 0.8402,
+  "fmb_area_mm2": 1274.8,
+  "area_mm2": 900.0,
+  "section_bbox_mm": [
+   33.88,
+   33.88
+  ],
+  "section_centroid_mm": [
+   -0.0,
+   0.0
+  ],
+  "section_max_radius_mm": 16.94,
+  "section_min_radius_mm": 16.92,
+  "thread_disk_covered_frac": 1.0,
+  "thread_disk_covered": true,
+  "hull_inflation_mm": 0.338,
+  "hulls": 1,
+  "hull_bounds_mm": [
+   [
+    -19.088,
+    -17.268,
+    -17.268
+   ],
+   [
+    44.088,
+    17.268,
+    17.268
+   ]
+  ],
+  "hull_section_missed_frac": 0.0,
+  "hull_area_beyond_0p5mm_mm2": 0.0,
+  "rest_below_axis_mm": 17.268,
+  "rest_z_shift_m": 0.001924,
+  "com": [
+   0.005745,
+   -0.0,
+   -1e-06
+  ],
+  "inertia": [
+   [
+    2.439307959707597e-06,
+    -2.0093839999485327e-10,
+    -8.317314000000996e-09
+   ],
+   [
+    -2.0093839999485327e-10,
+    1.1960313979853792e-05,
+    -2.8977699999262283e-12
+   ],
+   [
+    -8.317314000000996e-09,
+    -2.8977699999262283e-12,
+    1.1959843979853795e-05
+   ]
+  ]
+ },
+ "hexagon": {
+  "family": "hexagon",
+  "fmb_index": 11,
+  "rot_deg": 90.0,
+  "scale": 0.8823,
+  "fmb_area_mm2": 1156.2,
+  "area_mm2": 899.8,
+  "section_bbox_mm": [
+   36.48,
+   32.27
+  ],
+  "section_centroid_mm": [
+   0.002,
+   -0.003
+  ],
+  "section_max_radius_mm": 18.24,
+  "section_min_radius_mm": 16.13,
+  "thread_disk_covered_frac": 1.0,
+  "thread_disk_covered": true,
+  "hull_inflation_mm": 0.338,
+  "hulls": 1,
+  "hull_bounds_mm": [
+   [
+    -19.088,
+    -18.545,
+    -16.481
+   ],
+   [
+    44.088,
+    18.545,
+    16.481
+   ]
+  ],
+  "hull_section_missed_frac": 0.0,
+  "hull_area_beyond_0p5mm_mm2": 0.0,
+  "rest_below_axis_mm": 16.481,
+  "rest_z_shift_m": 0.001137,
+  "com": [
+   0.0057435,
+   1.3e-06,
+   -3.3e-06
+  ],
+  "inertia": [
+   [
+    2.4576654777214915e-06,
+    -3.9082563495330305e-10,
+    -7.988151943913054e-09
+   ],
+   [
+    -3.9082563495330305e-10,
+    1.1970148144787113e-05,
+    -3.349477516964251e-10
+   ],
+   [
+    -7.988151943913054e-09,
+    -3.349477516964251e-10,
+    1.1970052099572148e-05
+   ]
+  ]
+ },
+ "ellipse": {
+  "family": "ellipse",
+  "fmb_index": 20,
+  "rot_deg": 0.0,
+  "scale": 0.7774,
+  "fmb_area_mm2": 1489.3,
+  "area_mm2": 900.0,
+  "section_bbox_mm": [
+   41.48,
+   27.64
+  ],
+  "section_centroid_mm": [
+   0.0,
+   0.003
+  ],
+  "section_max_radius_mm": 20.74,
+  "section_min_radius_mm": 13.81,
+  "thread_disk_covered_frac": 1.0,
+  "thread_disk_covered": true,
+  "hull_inflation_mm": 0.338,
+  "hulls": 1,
+  "hull_bounds_mm": [
+   [
+    -19.088,
+    -21.071,
+    -14.156
+   ],
+   [
+    44.088,
+    21.07,
+    14.16
+   ]
+  ],
+  "hull_section_missed_frac": 0.0,
+  "hull_area_beyond_0p5mm_mm2": 0.0,
+  "rest_below_axis_mm": 14.156,
+  "rest_z_shift_m": -0.001187,
+  "com": [
+   0.0057447,
+   0.0,
+   1.5e-06
+  ],
+  "inertia": [
+   [
+    2.6721213268275858e-06,
+    -2.0711596746228664e-10,
+    -8.677230214019986e-09
+   ],
+   [
+    -2.0711596746228664e-10,
+    1.1495265623849412e-05,
+    -1.320312796863044e-10
+   ],
+   [
+    -8.677230214019986e-09,
+    -1.320312796863044e-10,
+    1.2657991962607776e-05
+   ]
+  ]
+ },
+ "star": {
+  "family": "star",
+  "fmb_index": 17,
+  "rot_deg": 0.0,
+  "scale": 1.003,
+  "fmb_area_mm2": 894.6,
+  "area_mm2": 899.2,
+  "section_bbox_mm": [
+   44.08,
+   42.21
+  ],
+  "section_centroid_mm": [
+   -0.001,
+   -1.924
+  ],
+  "section_max_radius_mm": 24.61,
+  "section_min_radius_mm": 9.77,
+  "thread_disk_covered_frac": 0.9681,
+  "thread_disk_covered": false,
+  "hull_inflation_mm": 0.338,
+  "hulls": 4,
+  "hull_bounds_mm": [
+   [
+    -19.088,
+    -22.36,
+    -21.418
+   ],
+   [
+    44.088,
+    22.348,
+    21.41
+   ]
+  ],
+  "hull_section_missed_frac": 0.0,
+  "hull_area_beyond_0p5mm_mm2": 4.0,
+  "rest_below_axis_mm": 21.418,
+  "rest_z_shift_m": 0.006074,
+  "com": [
+   0.0057404,
+   -1.1e-06,
+   -0.0016466
+  ],
+  "inertia": [
+   [
+    3.082840281409538e-06,
+    -3.6911816465160306e-11,
+    2.2857703850352615e-07
+   ],
+   [
+    -3.6911816465160306e-11,
+    1.2289313015166372e-05,
+    2.300356414307338e-10
+   ],
+   [
+    2.2857703850352615e-07,
+    2.300356414307338e-10,
+    1.2279596111269425e-05
+   ]
+  ]
+ },
+ "arch": {
+  "family": "arch",
+  "fmb_index": 19,
+  "rot_deg": 0.0,
+  "scale": 0.9475,
+  "fmb_area_mm2": 1002.4,
+  "area_mm2": 899.8,
+  "section_bbox_mm": [
+   45.48,
+   27.29
+  ],
+  "section_centroid_mm": [
+   0.0,
+   2.797
+  ],
+  "section_max_radius_mm": 25.52,
+  "section_min_radius_mm": 0.89,
+  "thread_disk_covered_frac": 0.5475,
+  "thread_disk_covered": false,
+  "hull_inflation_mm": 0.338,
+  "hulls": 5,
+  "hull_bounds_mm": [
+   [
+    -19.088,
+    -23.084,
+    -13.987
+   ],
+   [
+    44.088,
+    23.085,
+    13.988
+   ]
+  ],
+  "hull_section_missed_frac": 0.0,
+  "hull_area_beyond_0p5mm_mm2": 11.84,
+  "rest_below_axis_mm": 13.987,
+  "rest_z_shift_m": -0.001357,
+  "com": [
+   0.005744,
+   1e-07,
+   0.0023916
+  ],
+  "inertia": [
+   [
+    4.811830403981398e-06,
+    -2.1072840370238232e-10,
+    -3.52548641676993e-07
+   ],
+   [
+    -2.1072840370238232e-10,
+    1.1561608370204054e-05,
+    1.746189242611309e-11
+   ],
+   [
+    -3.52548641676993e-07,
+    1.746189242611309e-11,
+    1.4732148552093184e-05
+   ]
+  ]
+ },
+ "rrect": {
+  "family": "rounded rectangle",
+  "fmb_index": 9,
+  "rot_deg": 0.0,
+  "scale": 0.9312,
+  "fmb_area_mm2": 1037.9,
+  "area_mm2": 899.5,
+  "section_bbox_mm": [
+   37.53,
+   24.14
+  ],
+  "section_centroid_mm": [
+   -0.006,
+   0.003
+  ],
+  "section_max_radius_mm": 21.31,
+  "section_min_radius_mm": 12.06,
+  "thread_disk_covered_frac": 0.9988,
+  "thread_disk_covered": false,
+  "hull_inflation_mm": 0.338,
+  "hulls": 1,
+  "hull_bounds_mm": [
+   [
+    -19.088,
+    -19.116,
+    -12.412
+   ],
+   [
+    44.088,
+    19.104,
+    12.412
+   ]
+  ],
+  "hull_section_missed_frac": 0.0,
+  "hull_area_beyond_0p5mm_mm2": 0.0,
+  "rest_below_axis_mm": 12.412,
+  "rest_z_shift_m": -0.002932,
+  "com": [
+   0.0057418,
+   -5.5e-06,
+   1.4e-06
+  ],
+  "inertia": [
+   [
+    2.840721515547711e-06,
+    5.875222570596004e-10,
+    -8.660553269042399e-09
+   ],
+   [
+    5.875222570596004e-10,
+    1.1501412468592527e-05,
+    -3.002776956549251e-10
+   ],
+   [
+    -8.660553269042399e-09,
+    -3.002776956549251e-10,
+    1.282380065290514e-05
+   ]
+  ]
+ },
+ "star_big": {
+  "family": "star",
+  "fmb_index": 17,
+  "rot_deg": 0.0,
+  "scale": 1.2766,
+  "fmb_area_mm2": 894.6,
+  "area_mm2": 1456.6,
+  "section_bbox_mm": [
+   56.1,
+   53.72
+  ],
+  "section_centroid_mm": [
+   -0.002,
+   -2.449
+  ],
+  "section_max_radius_mm": 31.32,
+  "section_min_radius_mm": 12.44,
+  "thread_disk_covered_frac": 1.0,
+  "thread_disk_covered": true,
+  "hull_inflation_mm": 0.338,
+  "hulls": 5,
+  "hull_bounds_mm": [
+   [
+    -19.088,
+    -28.374,
+    -27.174
+   ],
+   [
+    44.088,
+    28.368,
+    27.169
+   ]
+  ],
+  "hull_section_missed_frac": 0.0,
+  "hull_area_beyond_0p5mm_mm2": 1.28,
+  "rest_below_axis_mm": 27.174,
+  "rest_z_shift_m": 0.01183,
+  "com": [
+   0.0079329,
+   -1.5e-06,
+   -0.0022181
+  ],
+  "inertia": [
+   [
+    5.460115898395164e-06,
+    -5.6517373195573574e-11,
+    2.002618375950594e-07
+   ],
+   [
+    -5.6517373195573574e-11,
+    1.2129549592671064e-05,
+    4.008143235896786e-10
+   ],
+   [
+    2.002618375950594e-07,
+    4.008143235896786e-10,
+    1.2119412672950779e-05
+   ]
+  ]
+ }
+}

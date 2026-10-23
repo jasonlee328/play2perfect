@@ -1,0 +1,60 @@
+{
+ "family": "arch",
+ "fmb_index": 19,
+ "rot_deg": 0.0,
+ "scale": 0.9475,
+ "fmb_area_mm2": 1002.4,
+ "area_mm2": 899.8,
+ "section_bbox_mm": [
+  45.48,
+  27.29
+ ],
+ "section_centroid_mm": [
+  0.0,
+  2.797
+ ],
+ "section_max_radius_mm": 25.52,
+ "section_min_radius_mm": 0.89,
+ "thread_disk_covered_frac": 0.5475,
+ "thread_disk_covered": false,
+ "hull_inflation_mm": 0.338,
+ "hulls": 5,
+ "hull_bounds_mm": [
+  [
+   -19.088,
+   -23.084,
+   -13.987
+  ],
+  [
+   44.088,
+   23.085,
+   13.988
+  ]
+ ],
+ "hull_section_missed_frac": 0.0,
+ "hull_area_beyond_0p5mm_mm2": 11.84,
+ "rest_below_axis_mm": 13.987,
+ "rest_z_shift_m": -0.001357,
+ "com": [
+  0.005744,
+  1e-07,
+  0.0023916
+ ],
+ "inertia": [
+  [
+   4.811830403981398e-06,
+   -2.1072840370238232e-10,
+   -3.52548641676993e-07
+  ],
+  [
+   -2.1072840370238232e-10,
+   1.1561608370204054e-05,
+   1.746189242611309e-11
+  ],
+  [
+   -3.52548641676993e-07,
+   1.746189242611309e-11,
+   1.4732148552093184e-05
+  ]
+ ]
+}

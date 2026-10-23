@@ -1,0 +1,60 @@
+{
+ "family": "rounded rectangle",
+ "fmb_index": 9,
+ "rot_deg": 0.0,
+ "scale": 0.9312,
+ "fmb_area_mm2": 1037.9,
+ "area_mm2": 899.5,
+ "section_bbox_mm": [
+  37.53,
+  24.14
+ ],
+ "section_centroid_mm": [
+  -0.006,
+  0.003
+ ],
+ "section_max_radius_mm": 21.31,
+ "section_min_radius_mm": 12.06,
+ "thread_disk_covered_frac": 0.9988,
+ "thread_disk_covered": false,
+ "hull_inflation_mm": 0.338,
+ "hulls": 1,
+ "hull_bounds_mm": [
+  [
+   -19.088,
+   -19.116,
+   -12.412
+  ],
+  [
+   44.088,
+   19.104,
+   12.412
+  ]
+ ],
+ "hull_section_missed_frac": 0.0,
+ "hull_area_beyond_0p5mm_mm2": 0.0,
+ "rest_below_axis_mm": 12.412,
+ "rest_z_shift_m": -0.002932,
+ "com": [
+  0.0057418,
+  -5.5e-06,
+  1.4e-06
+ ],
+ "inertia": [
+  [
+   2.840721515547711e-06,
+   5.875222570596004e-10,
+   -8.660553269042399e-09
+  ],
+  [
+   5.875222570596004e-10,
+   1.1501412468592527e-05,
+   -3.002776956549251e-10
+  ],
+  [
+   -8.660553269042399e-09,
+   -3.002776956549251e-10,
+   1.282380065290514e-05
+  ]
+ ]
+}

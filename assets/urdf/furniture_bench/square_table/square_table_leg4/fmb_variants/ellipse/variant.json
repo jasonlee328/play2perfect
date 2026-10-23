@@ -1,0 +1,60 @@
+{
+ "family": "ellipse",
+ "fmb_index": 20,
+ "rot_deg": 0.0,
+ "scale": 0.7774,
+ "fmb_area_mm2": 1489.3,
+ "area_mm2": 900.0,
+ "section_bbox_mm": [
+  41.48,
+  27.64
+ ],
+ "section_centroid_mm": [
+  0.0,
+  0.003
+ ],
+ "section_max_radius_mm": 20.74,
+ "section_min_radius_mm": 13.81,
+ "thread_disk_covered_frac": 1.0,
+ "thread_disk_covered": true,
+ "hull_inflation_mm": 0.338,
+ "hulls": 1,
+ "hull_bounds_mm": [
+  [
+   -19.088,
+   -21.071,
+   -14.156
+  ],
+  [
+   44.088,
+   21.07,
+   14.16
+  ]
+ ],
+ "hull_section_missed_frac": 0.0,
+ "hull_area_beyond_0p5mm_mm2": 0.0,
+ "rest_below_axis_mm": 14.156,
+ "rest_z_shift_m": -0.001187,
+ "com": [
+  0.0057447,
+  0.0,
+  1.5e-06
+ ],
+ "inertia": [
+  [
+   2.6721213268275858e-06,
+   -2.0711596746228664e-10,
+   -8.677230214019986e-09
+  ],
+  [
+   -2.0711596746228664e-10,
+   1.1495265623849412e-05,
+   -1.320312796863044e-10
+  ],
+  [
+   -8.677230214019986e-09,
+   -1.320312796863044e-10,
+   1.2657991962607776e-05
+  ]
+ ]
+}

@@ -121,6 +121,13 @@ class PreciseAssemblyCfg:
     # With reset.fixed_start_pose set, its z is shifted by (W - 30) / 2 mm so the peg still rests on the table.
     peg_width_mm: float = 0.0
 
+    # Screwing only: FMB-benchmark body cross-section for the peg (square_table_leg4), "" = the original square
+    # body. Names: circle, hexagon, ellipse, star, arch, rrect, star_big (assets/.../square_table_leg4/fmb_variants/,
+    # made by tools/peg_variants/make_leg4_fmb_variants.py): cross-section area 900 mm^2 like the original (star_big:
+    # scaled to cover the thread), same length, thread, mass, keypoints and object_scale. With reset.fixed_start_pose
+    # set, its z is shifted by the variant's rest_z_shift_m (its hull extent below the axis vs the original's).
+    peg_shape: str = ""
+
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
     """Return a render-overlay-compatible sim cfg for teacher and student tasks."""

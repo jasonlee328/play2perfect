@@ -259,6 +259,27 @@ class PreciseAssemblyEnv(PlayEnv):
                 cfg.reset.fixed_start_pose = tuple(fsp)
             print(f"[PreciseAssemblyEnv] peg_width_mm={peg_width_mm:g}: object {object_urdf}, "
                   f"fixed_start_pose {getattr(cfg.reset, 'fixed_start_pose', None)}", flush=True)
+        peg_shape = str(getattr(pih_cfg, "peg_shape", "") or "").strip()
+        if peg_shape and peg_shape not in ("original", "square"):
+            if "square_table_leg4" not in str(object_urdf):
+                raise ValueError(f"precise_assembly.peg_shape needs the screwing peg, got {object_urdf}")
+            if peg_width_mm and abs(peg_width_mm - 30.0) > 1e-6:
+                raise ValueError("precise_assembly.peg_shape and peg_width_mm can't be combined")
+            vdir = REPO_ROOT / "assets/urdf/furniture_bench/square_table/square_table_leg4/fmb_variants" / peg_shape
+            object_urdf = vdir / "square_table_leg4_matchedmass_sdf_hybrid.urdf"
+            if not object_urdf.is_file():
+                raise FileNotFoundError(f"no FMB peg shape {peg_shape!r}: {object_urdf} "
+                                        "(make it with tools/peg_variants/make_leg4_fmb_variants.py)")
+            import json as _json
+            vinfo = _json.loads((vdir / "variant.json").read_text())
+            fsp = getattr(cfg.reset, "fixed_start_pose", None)
+            if fsp:
+                fsp = list(fsp)
+                fsp[2] += float(vinfo["rest_z_shift_m"])  # hull extent below the axis vs the original's 15.34 mm
+                cfg.reset.fixed_start_pose = tuple(fsp)
+            print(f"[PreciseAssemblyEnv] peg_shape={peg_shape} ({vinfo['family']}, FMB #{vinfo['fmb_index']}, "
+                  f"area {vinfo['area_mm2']} mm^2): object {object_urdf}, "
+                  f"fixed_start_pose {getattr(cfg.reset, 'fixed_start_pose', None)}", flush=True)
         receptive_urdf = _resolve_asset_path(problem.receptive_urdf)
 
         insert_pose_sequence = problem.insert_pose_rel_receptive
