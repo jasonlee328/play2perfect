@@ -13,8 +13,8 @@ Differences from the sensor, which renders a 240x240 image per pad:
 - play2perfect merges fixed joints, so the ``left_*_elastomer`` bodies don't exist; the
   elastomer frame is rebuilt from ``left_*_DP`` plus the URDF's fixed-joint rotation.
 - The right-hand maps are used for the left hand (the pad is x-symmetric).
-- Only the manipulated object is ray-cast, from its collision meshes. This assumes every
-  env holds the same object asset at the same scale (true for PreciseAssembly).
+- Only the manipulated object is ray-cast, from its collision meshes, one mesh per object asset
+  (multi-asset PreciseAssembly groups envs by ``_object_asset_index_per_env``); no scale noise.
 """
 
 from __future__ import annotations
@@ -50,16 +50,17 @@ def _rpy_matrix(r: float, p: float, y: float) -> np.ndarray:
 R_DP_ELASTOMER = _rpy_matrix(math.pi / 2, -math.pi / 2, 0.0)
 
 
-def _object_mesh(env) -> tuple[np.ndarray, np.ndarray]:
-    """env_0's object collision meshes (all prims merged), in the object's rigid-body frame."""
+def _object_mesh(env, env_id: int = 0) -> tuple[np.ndarray, np.ndarray]:
+    """env ``env_id``'s object collision meshes (all prims merged), in the object's rigid-body frame."""
     import omni.usd
     from pxr import Usd, UsdGeom, UsdPhysics
 
     stage = omni.usd.get_context().get_stage()
-    root = stage.GetPrimAtPath(env.object.cfg.prim_path.replace("env_.*", "env_0"))
+    root = stage.GetPrimAtPath(env.object.cfg.prim_path.replace("env_.*", f"env_{int(env_id)}"))
     prims = list(Usd.PrimRange(root, Usd.TraverseInstanceProxies()))
     body = next((p for p in prims if p.HasAPI(UsdPhysics.RigidBodyAPI)), root)
-    meshes = [p for p in prims if p.IsA(UsdGeom.Mesh)]
+    # Mesh prims, plus Cube prims (URDF <box> collisions, e.g. the tight_insertion L-peg, become UsdGeom.Cube)
+    meshes = [p for p in prims if p.IsA(UsdGeom.Mesh) or p.IsA(UsdGeom.Cube)]
     coll = [p for p in meshes if p.HasAPI(UsdPhysics.CollisionAPI) or "collision" in str(p.GetPath()).lower()]
     meshes = coll or meshes
     if not meshes:
@@ -67,10 +68,16 @@ def _object_mesh(env) -> tuple[np.ndarray, np.ndarray]:
     cache = UsdGeom.XformCache()
     pts_all, tris_all, n = [], [], 0
     for m in meshes:
-        g = UsdGeom.Mesh(m)
-        pts = np.asarray(g.GetPointsAttr().Get(), dtype=np.float64)
-        counts = np.asarray(g.GetFaceVertexCountsAttr().Get())
-        idx = np.asarray(g.GetFaceVertexIndicesAttr().Get())
+        if m.IsA(UsdGeom.Cube):
+            h = 0.5 * float(UsdGeom.Cube(m).GetSizeAttr().Get())
+            pts = h * np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)], dtype=np.float64)
+            counts = np.full(6, 4)  # quads, outward winding (vertex k = 4x + 2y + z bits)
+            idx = np.array([0, 1, 3, 2, 4, 6, 7, 5, 0, 4, 5, 1, 2, 3, 7, 6, 0, 2, 6, 4, 1, 5, 7, 3])
+        else:
+            g = UsdGeom.Mesh(m)
+            pts = np.asarray(g.GetPointsAttr().Get(), dtype=np.float64)
+            counts = np.asarray(g.GetFaceVertexCountsAttr().Get())
+            idx = np.asarray(g.GetFaceVertexIndicesAttr().Get())
         rel, _ = cache.ComputeRelativeTransform(m, body)
         pts = np.c_[pts, np.ones(len(pts))] @ np.array(rel)  # row-vector convention: [p 1] @ M
         tris, o = [], 0
@@ -102,15 +109,27 @@ class TactileSensor:
         cell = MAP_SIZE // res
         if not 1 <= sub <= cell:
             raise ValueError(f"tactile.samples_per_taxel must be in [1, {cell}] at resolution {res}, got {sub}")
-        if len(env._object_urdf_paths) != 1:
-            raise NotImplementedError("tactile obs needs a single object asset shared by all envs")
+        # One ray-cast mesh per object asset (multi-asset PreciseAssembly: env i holds asset
+        # env._object_asset_index_per_env[i]); a single asset is the legacy path.
+        n_assets = len(env._object_urdf_paths)
+        asset_idx = getattr(env, "_object_asset_index_per_env", None)
+        if n_assets > 1 and asset_idx is None:
+            raise NotImplementedError("tactile obs with several object assets needs _object_asset_index_per_env")
         lo, hi = env.cfg.domain_randomization.object_scale_noise_multiplier_range
         if (lo, hi) != (1.0, 1.0):
             raise NotImplementedError("tactile obs does not support object_scale_noise_multiplier_range != (1, 1)")
 
         self.env, self.device, self.res = env, env.device, res
-        pts, tris = _object_mesh(env)
-        self.mesh = convert_to_warp_mesh(pts, tris, device=self.device)
+        self.meshes, self.asset_env_ids = [], []
+        for k in range(n_assets):
+            ids = (torch.arange(env.num_envs, device=self.device) if n_assets == 1
+                   else (asset_idx == k).nonzero().reshape(-1))
+            if ids.numel() == 0:
+                continue
+            pts, tris = _object_mesh(env, int(ids[0]))
+            self.meshes.append(convert_to_warp_mesh(pts, tris, device=self.device))
+            self.asset_env_ids.append(ids)
+        self.mesh = self.meshes[0]
 
         self.body_ids = [env.robot.find_bodies(f"left_{f}_DP")[0][0] for f in FINGERS]
         map_dir = Path(tactile_cfg.map_dir)
@@ -156,18 +175,20 @@ class TactileSensor:
         R_od = R_wo_T.unsqueeze(1) @ matrix_from_quat(body[..., 3:7])                  # (N, 5, 3, 3)
         t_od = (R_wo_T.unsqueeze(1) @ (body[..., 0:3] - obj_pos.unsqueeze(1)).unsqueeze(-1)).squeeze(-1)
 
-        out = []
-        for a in range(0, env.num_envs, self.envs_per_chunk):
-            Rc, tc = R_od[a:a + self.envs_per_chunk][:, self.finger], t_od[a:a + self.envs_per_chunk][:, self.finger]
-            s = (Rc @ self.starts.unsqueeze(-1)).squeeze(-1) + tc  # (n, R, 3) object frame
-            d = (Rc @ self.dirs.unsqueeze(-1)).squeeze(-1)
-            _, dist, _, _ = raycast_mesh(s, d, self.mesh, max_dist=MAX_DIST, return_distance=True)
-            back = s + d * (dist.clamp_min(0.0) + CPD_EPS).nan_to_num(0.0, 0.0, 0.0).unsqueeze(-1)
-            _, dist2, _, _ = raycast_mesh(back, -d, self.mesh, max_dist=CPD_MAX_DIST, return_distance=True)
-            depth = torch.where(torch.isfinite(dist) & torch.isfinite(dist2), dist, torch.zeros_like(dist))
-            taxels = torch.zeros(len(depth), len(self.counts), device=self.device).index_add_(1, self.taxel, depth)
-            out.append(taxels / self.counts)
-        return _deform_quantize(torch.cat(out)) / 255.0
+        result = torch.zeros(env.num_envs, len(self.counts), device=self.device)
+        for mesh, ids in zip(self.meshes, self.asset_env_ids):
+            for a in range(0, len(ids), self.envs_per_chunk):
+                c = ids[a:a + self.envs_per_chunk]
+                Rc, tc = R_od[c][:, self.finger], t_od[c][:, self.finger]
+                s = (Rc @ self.starts.unsqueeze(-1)).squeeze(-1) + tc  # (n, R, 3) object frame
+                d = (Rc @ self.dirs.unsqueeze(-1)).squeeze(-1)
+                _, dist, _, _ = raycast_mesh(s, d, mesh, max_dist=MAX_DIST, return_distance=True)
+                back = s + d * (dist.clamp_min(0.0) + CPD_EPS).nan_to_num(0.0, 0.0, 0.0).unsqueeze(-1)
+                _, dist2, _, _ = raycast_mesh(back, -d, mesh, max_dist=CPD_MAX_DIST, return_distance=True)
+                depth = torch.where(torch.isfinite(dist) & torch.isfinite(dist2), dist, torch.zeros_like(dist))
+                taxels = torch.zeros(len(depth), len(self.counts), device=self.device).index_add_(1, self.taxel, depth)
+                result[c] = taxels / self.counts
+        return _deform_quantize(result) / 255.0
 
 
 __all__ = ["FINGERS", "TactileSensor", "tactile_obs_dim"]

@@ -36,6 +36,10 @@ class PreciseAssemblyAssetsCfg(AssetsCfg):
 @configclass
 class PreciseAssemblyCfg:
     problem: str = "tight_insertion"
+    # Multi-problem training/eval: env i gets multi_problems[i % K] (object, hole and goal-viz assets spawned
+    # round-robin with MultiUsdFileCfg). All problems must share the insertion waypoints and hole_z_offset (true
+    # for the fmb_* problems). Overrides `problem` when non-empty. Empty = single problem (legacy).
+    multi_problems: tuple[str, ...] = ()
     goal_mode: str = "preInsertAndFinal"
 
     hole_x_range: tuple[float, float] = (-0.1875, 0.1875)

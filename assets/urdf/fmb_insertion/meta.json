@@ -12,30 +12,36 @@
    19.99
   ],
   "length_mm": 150.0,
-  "section_area_mm2": 470.8,
+  "section_area_mm2": 469.7,
   "mass_g": 57.8,
-  "density_kg_m3": 818.5,
+  "density_kg_m3": 820.4,
   "com_m": [
    -0.0,
-   -0.0,
-   0.0
+   0.0,
+   -0.0
   ],
   "inertia_diag": [
-   4.6926e-06,
+   4.681e-06,
    0.00010982,
    0.00011162
   ],
-  "peg_pieces": 3,
-  "hole_pieces": 84,
+  "peg_pieces": 4,
+  "peg_coll_prisms": 4,
+  "hole_pieces": 48,
+  "hole_coll_prisms": 48,
+  "peg_decomp": "convex",
+  "hole_decomp": "sector_hole",
+  "peg_min_piece_width_mm": 9.719,
+  "hole_min_piece_width_mm": 2.511,
   "clearance_mm": 0.5,
   "hole_mm": [
    20.99,
-   31.0
+   31.01
   ],
   "object_scale": [
    3.75,
    0.75,
-   0.4999
+   0.4997
   ]
  },
  "star": {
@@ -51,24 +57,30 @@
    28.72
   ],
   "length_mm": 150.0,
-  "section_area_mm2": 416.5,
+  "section_area_mm2": 399.7,
   "mass_g": 57.8,
-  "density_kg_m3": 925.1,
+  "density_kg_m3": 964.1,
   "com_m": [
-   0.0,
+   -0.0,
    0.0,
    0.0
   ],
   "inertia_diag": [
-   4.7062e-06,
-   0.00011073,
-   0.00011073
+   4.5213e-06,
+   0.00011062,
+   0.00011065
   ],
-  "peg_pieces": 8,
-  "hole_pieces": 66,
+  "peg_pieces": 4,
+  "peg_coll_prisms": 4,
+  "hole_pieces": 29,
+  "hole_coll_prisms": 29,
+  "peg_decomp": "cdt_hm",
+  "hole_decomp": "sector_hole",
+  "peg_min_piece_width_mm": 8.438,
+  "hole_min_piece_width_mm": 1.5,
   "clearance_mm": 0.5,
   "hole_mm": [
-   29.73,
+   29.77,
    31.0
   ],
   "object_scale": [
@@ -90,24 +102,30 @@
    18.0
   ],
   "length_mm": 150.0,
-  "section_area_mm2": 391.4,
+  "section_area_mm2": 374.5,
   "mass_g": 57.8,
-  "density_kg_m3": 984.4,
+  "density_kg_m3": 1028.9,
   "com_m": [
    0.0,
-   -0.0,
+   0.0,
    0.0
   ],
   "inertia_diag": [
-   6.6378e-06,
-   0.00010963,
-   0.00011376
+   6.4173e-06,
+   0.00010946,
+   0.00011371
   ],
-  "peg_pieces": 29,
-  "hole_pieces": 51,
+  "peg_pieces": 12,
+  "peg_coll_prisms": 15,
+  "hole_pieces": 30,
+  "hole_coll_prisms": 32,
+  "peg_decomp": "sector_notch",
+  "hole_decomp": "sector_hole",
+  "peg_min_piece_width_mm": 1.915,
+  "hole_min_piece_width_mm": 0.905,
   "clearance_mm": 0.5,
   "hole_mm": [
-   19.0,
+   19.06,
    31.0
   ],
   "object_scale": [
@@ -129,25 +147,31 @@
    26.54
   ],
   "length_mm": 150.0,
-  "section_area_mm2": 608.8,
+  "section_area_mm2": 608.7,
   "mass_g": 57.8,
-  "density_kg_m3": 633.0,
+  "density_kg_m3": 633.1,
   "com_m": [
-   -0.0,
    0.0,
-   -0.0
+   0.0,
+   0.0
   ],
   "inertia_diag": [
-   5.6385e-06,
+   5.6373e-06,
    0.00011119,
    0.00011119
   ],
-  "peg_pieces": 3,
-  "hole_pieces": 48,
+  "peg_pieces": 1,
+  "peg_coll_prisms": 1,
+  "hole_pieces": 30,
+  "hole_coll_prisms": 30,
+  "peg_decomp": "convex",
+  "hole_decomp": "sector_hole",
+  "peg_min_piece_width_mm": 26.545,
+  "hole_min_piece_width_mm": 1.3,
   "clearance_mm": 0.5,
   "hole_mm": [
    27.54,
-   31.0
+   31.01
   ],
   "object_scale": [
    3.75,
@@ -164,33 +188,39 @@
   ],
   "scale": 0.925,
   "section_mm": [
-   30.0,
+   29.99,
    19.29
   ],
   "length_mm": 150.0,
-  "section_area_mm2": 574.6,
+  "section_area_mm2": 574.0,
   "mass_g": 57.8,
-  "density_kg_m3": 670.6,
+  "density_kg_m3": 671.3,
   "com_m": [
-   -0.0,
+   0.0,
    -0.0,
    -0.0
   ],
   "inertia_diag": [
-   6.051e-06,
-   0.00011015,
-   0.00011266
+   6.0437e-06,
+   0.00011014,
+   0.00011265
   ],
   "peg_pieces": 3,
-  "hole_pieces": 67,
+  "peg_coll_prisms": 3,
+  "hole_pieces": 26,
+  "hole_coll_prisms": 26,
+  "peg_decomp": "convex",
+  "hole_decomp": "sector_hole",
+  "peg_min_piece_width_mm": 9.641,
+  "hole_min_piece_width_mm": 1.235,
   "clearance_mm": 0.5,
   "hole_mm": [
    20.29,
-   31.0
+   30.99
   ],
   "object_scale": [
    3.75,
-   0.75,
+   0.7497,
    0.4821
   ]
  },
@@ -211,17 +241,23 @@
   "mass_g": 57.8,
   "density_kg_m3": 545.7,
   "com_m": [
-   0.0,
    -0.0,
-   -0.0
+   0.0,
+   0.0
   ],
   "inertia_diag": [
    6.4957e-06,
    0.00011162,
    0.00011162
   ],
-  "peg_pieces": 3,
+  "peg_pieces": 5,
+  "peg_coll_prisms": 5,
   "hole_pieces": 63,
+  "hole_coll_prisms": 63,
+  "peg_decomp": "convex",
+  "hole_decomp": "sector_hole",
+  "peg_min_piece_width_mm": 13.967,
+  "hole_min_piece_width_mm": 3.984,
   "clearance_mm": 0.5,
   "hole_mm": [
    30.99,

@@ -228,20 +228,45 @@ class PreciseAssemblyEnv(PlayEnv):
         from evaluation.objects import NAME_TO_OBJECT
         from evaluation.problems import PROBLEM_REGISTRY
 
-        problem_name = str(pih_cfg.problem)
-        if problem_name not in PROBLEM_REGISTRY:
-            raise KeyError(
-                f"Unknown peg-in-hole problem {problem_name!r}; "
-                f"known problems: {sorted(PROBLEM_REGISTRY)}"
-            )
-        problem = PROBLEM_REGISTRY[problem_name]
-
-        if problem.insertion_object_name not in NAME_TO_OBJECT:
-            raise KeyError(
-                f"Problem {problem_name!r} references object "
-                f"{problem.insertion_object_name!r}, but it is not in NAME_TO_OBJECT."
-            )
-        object_spec = NAME_TO_OBJECT[problem.insertion_object_name]
+        multi = pih_cfg.multi_problems or ()
+        if isinstance(multi, str):  # "a,b" / "[a,b]" from a plain-string override
+            multi = [p.strip() for p in multi.strip("[]").split(",") if p.strip()]
+        multi = [str(p) for p in multi]
+        problem_names = multi if multi else [str(pih_cfg.problem)]
+        for name in problem_names:
+            if name not in PROBLEM_REGISTRY:
+                raise KeyError(
+                    f"Unknown peg-in-hole problem {name!r}; "
+                    f"known problems: {sorted(PROBLEM_REGISTRY)}"
+                )
+            obj_name = PROBLEM_REGISTRY[name].insertion_object_name
+            if obj_name not in NAME_TO_OBJECT:
+                raise KeyError(
+                    f"Problem {name!r} references object {obj_name!r}, but it is not in NAME_TO_OBJECT."
+                )
+        problem_name = problem_names[0] if len(problem_names) == 1 else "+".join(problem_names)
+        problem = PROBLEM_REGISTRY[problem_names[0]]
+        for name in problem_names[1:]:
+            other = PROBLEM_REGISTRY[name]
+            same = len(other.insert_pose_rel_receptive) == len(problem.insert_pose_rel_receptive) and all(
+                abs(a - b) < 1e-9
+                for pa, pb in zip(other.insert_pose_rel_receptive, problem.insert_pose_rel_receptive)
+                for a, b in zip(pa, pb)
+            ) and abs(other.hole_z_offset - problem.hole_z_offset) < 1e-9 and (
+                other.prelude_lift_offset == problem.prelude_lift_offset)
+            if not same:
+                raise ValueError(
+                    f"multi_problems must share insertion waypoints / hole_z_offset: {name!r} differs from "
+                    f"{problem_names[0]!r}"
+                )
+        object_specs = [NAME_TO_OBJECT[PROBLEM_REGISTRY[n].insertion_object_name] for n in problem_names]
+        self._pih_problem_names = tuple(problem_names)
+        self._pih_object_urdf_abs_list = tuple(str(_resolve_asset_path(o.urdf_path)) for o in object_specs)
+        self._pih_receptive_urdf_abs_list = tuple(
+            str(_resolve_asset_path(PROBLEM_REGISTRY[n].receptive_urdf)) for n in problem_names
+        )
+        self._pih_object_scale_list = tuple(tuple(float(v) for v in o.scale) for o in object_specs)
+        object_spec = object_specs[0]
         object_urdf = _resolve_asset_path(object_spec.urdf_path)
         receptive_urdf = _resolve_asset_path(problem.receptive_urdf)
 
@@ -279,7 +304,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self._num_insertion_goals + self._num_prelude_goals
         )
 
-        cfg.assets.object_name = problem.insertion_object_name
+        cfg.assets.object_name = problem.insertion_object_name if len(problem_names) == 1 else "multi"
         cfg.assets.object_urdf = self._pih_object_urdf_abs
         cfg.assets.receptive_urdf = self._pih_receptive_urdf_abs
         cfg.assets.object_scale = self._pih_object_scale
