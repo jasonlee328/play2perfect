@@ -151,11 +151,8 @@ _RELEASED_PROBLEMS = {
     "screwing": "furniture_bench.one_leg_matchedmass_sdf_hybrid_super_dense",
     # FMB-shaped straight insertion (FoundationTouch tools/fmb_insertion), tight_insertion's convention.
     **{f"fmb_{s}": f"fmb.{s}.tol0p5mm" for s in ("ellipse", "star", "arch", "hexagon", "rrect", "circle")},
-    # ContactBench 1.0 plug-in-charger (FoundationTouch tools/contactbench), registered only if the assets exist.
-    **{f"cb_plug{k}{v}": f"contactbench.cb_plug{k}{v}" for k in (1, 2, 3, 4) for v in ("", "_rigidspring")
-       if f"contactbench.cb_plug{k}{v}" in PROBLEM_REGISTRY},
-    **{f"cb_card_deck{n}": f"contactbench.cb_card_deck{n}" for n in (0, 4, 8)
-       if f"contactbench.cb_card_deck{n}" in PROBLEM_REGISTRY},
+    # ContactBench 1.0 problems (FoundationTouch tools/contactbench), registered only if their assets exist.
+    **{k.split(".", 1)[1]: k for k in PROBLEM_REGISTRY if k.startswith("contactbench.")},
 }
 
 _missing = [k for k in _RELEASED_PROBLEMS.values() if k not in PROBLEM_REGISTRY]

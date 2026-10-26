@@ -7,6 +7,8 @@ blades 16 mm deep for block 1). ``cb_plug<k>_rigidspring``: the same with the 0.
 the fixture as a rigid body (blades cannot enter; a check of what a rigid sim does with the flexure).
 ``cb_card_deck<n>``: task 24 "place card into holder", the card standing upright in the holder's channel against
 n cards already there (fused into the fixture as a rigid deck; n = 0, 4, 8); pre-insert 5 cm above.
+Placing under constraints (FoundationTouch tools/contactbench/place_tasks.py): ``cb_hang_<obj>`` (three explicit
+waypoints onto the board's hook), ``cb_cupstack_n<k>``, ``cb_binv_<utensil>_n<k>``.
 """
 
 import json
@@ -39,8 +41,9 @@ def _register_all() -> None:
                 name=name,
                 insertion_object_name=obj,
                 receptive_urdf=urdf_rel,
-                insert_pose_rel_receptive=make_pre_insert_sequence(
-                    tuple(p["seated_pose"]), pre_insert_offset=p.get("pre_insert_offset", PRE_INSERT_OFFSET)),
+                insert_pose_rel_receptive=tuple(tuple(w) for w in p["waypoints"]) if "waypoints" in p else
+                make_pre_insert_sequence(tuple(p["seated_pose"]),
+                                         pre_insert_offset=p.get("pre_insert_offset", PRE_INSERT_OFFSET)),
             )
 
 

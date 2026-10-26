@@ -80,6 +80,14 @@ class AssetsCfg:
     )
     num_assets_per_type: int = 100
 
+    # External object URDFs instead of the procedural handle-head pool (e.g. ContactBench parts from FoundationTouch
+    # tools/contactbench). When non-empty, env i gets object_urdfs[i % K] and object_scales[i % K] (the 3-tuple bbox
+    # in units of object_base_size = 0.04 m, the same convention as the procedural pool; PreciseAssembly's
+    # Object.scale); handle_head_types / num_assets_per_type are then ignored. Relative paths resolve against the
+    # play2perfect repo root.
+    object_urdfs: tuple[str, ...] = ()
+    object_scales: tuple[tuple[float, float, float], ...] = ()
+
     # Shuffle the procedural pool after generation. Legacy default (True)
     # gives env i uniform coverage over types via i % len(pool). Debug/parity
     # runs set this False so pool[0] is the first matching distribution

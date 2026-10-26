@@ -4,7 +4,10 @@
   <material name="c"><color rgba="0.85 0.75 0.10 1.0"/></material>
   <link name="object">
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="allen_key.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="allen_key.obj" scale="1 1 1"/></geometry><sdf resolution="256"/></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_00.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_01.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_02.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_03.obj" scale="1 1 1"/></geometry></collision>
     <inertial><mass value="0.001366"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="8.513435e-08" ixy="-1.362041e-07" ixz="5.735169e-18" iyy="6.350567e-07" iyz="5.240164e-18" izz="7.146003e-07"/></inertial>
   </link>
 </robot>

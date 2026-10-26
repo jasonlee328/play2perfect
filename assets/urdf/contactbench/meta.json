@@ -19,7 +19,8 @@
     1.4,
     0.875,
     0.5625
-   ]
+   ],
+   "collision": "sdf"
   },
   "charging_block_2": {
    "src": "charging_blocks/charging_block_2.stl",
@@ -38,7 +39,8 @@
     1.6,
     0.7,
     0.625
-   ]
+   ],
+   "collision": "sdf"
   },
   "charging_block_3": {
    "src": "charging_blocks/charging_block_3.stl",
@@ -57,7 +59,8 @@
     1.0625,
     0.875,
     1.375
-   ]
+   ],
+   "collision": "sdf"
   },
   "charging_block_4": {
    "src": "charging_blocks/charging_block_4.stl",
@@ -76,7 +79,8 @@
     1.3,
     0.625,
     0.45
-   ]
+   ],
+   "collision": "sdf"
   },
   "ethernet_plug": {
    "src": "ethernet_plug_and_slot_unz/ethernet_plug_and_slot/ethernet_plug.stl",
@@ -95,7 +99,8 @@
     0.275,
     0.825,
     0.3886
-   ]
+   ],
+   "collision": "sdf"
   },
   "toy_block_top": {
    "src": "toy_assembly_block_unz/toy_assembly_block/toy_assembly_block_top.stl",
@@ -114,7 +119,8 @@
     2.0,
     0.75,
     0.35
-   ]
+   ],
+   "collision": "sdf"
   },
   "cup": {
    "src": "cup.stl",
@@ -133,7 +139,8 @@
     1.7157,
     1.7157,
     1.628
-   ]
+   ],
+   "collision": "coacd 42"
   },
   "screwdriver": {
    "src": "tools/screwdriver.stl",
@@ -152,7 +159,8 @@
     3.125,
     0.3,
     0.3
-   ]
+   ],
+   "collision": "sdf"
   },
   "allen_key": {
    "src": "tools/allen_key.stl",
@@ -171,7 +179,8 @@
     1.6875,
     0.75,
     0.125
-   ]
+   ],
+   "collision": "coacd 4"
   },
   "wrench": {
    "src": "tools/wrench.stl",
@@ -190,7 +199,8 @@
     2.8273,
     0.7499,
     0.1875
-   ]
+   ],
+   "collision": "coacd 10"
   },
   "key_1": {
    "src": "keys/key_1.stl",
@@ -209,7 +219,8 @@
     1.2434,
     0.5,
     0.0625
-   ]
+   ],
+   "collision": "coacd 16"
   },
   "card": {
    "src": "card.stl",
@@ -228,7 +239,8 @@
     2.125,
     1.375,
     0.03
-   ]
+   ],
+   "collision": "box"
   },
   "spoon": {
    "src": "utensils/spoon.stl",
@@ -247,7 +259,108 @@
     4.2562,
     1.128,
     0.6328
-   ]
+   ],
+   "collision": "coacd 13"
+  },
+  "fork": {
+   "src": "utensils/fork.stl",
+   "extents_mm": [
+    180.31,
+    24.58,
+    18.35
+   ],
+   "mass_g": 5.51,
+   "com_src_mm": [
+    -3.359,
+    0.002,
+    -3.876
+   ],
+   "object_scale": [
+    4.5077,
+    0.6146,
+    0.4586
+   ],
+   "collision": "coacd 4"
+  },
+  "knife": {
+   "src": "utensils/knife.stl",
+   "extents_mm": [
+    196.52,
+    4.0,
+    17.49
+   ],
+   "mass_g": 4.27,
+   "com_src_mm": [
+    -8.559,
+    0.282,
+    -5.461
+   ],
+   "object_scale": [
+    4.913,
+    0.1,
+    0.4372
+   ],
+   "collision": "coacd 2"
+  },
+  "chopstick": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 3.66,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1"
+  },
+  "ruler": {
+   "src": "ruler.stl",
+   "extents_mm": [
+    137.0,
+    25.0,
+    2.0
+   ],
+   "mass_g": 3.93,
+   "com_src_mm": [
+    -0.249,
+    -0.367,
+    1.541
+   ],
+   "object_scale": [
+    3.425,
+    0.625,
+    0.05
+   ],
+   "collision": "coacd 5"
+  },
+  "key_fob": {
+   "src": "keys/key_fob.stl",
+   "extents_mm": [
+    38.49,
+    31.0,
+    6.0
+   ],
+   "mass_g": 2.62,
+   "com_src_mm": [
+    -1.573,
+    -0.0,
+    2.627
+   ],
+   "object_scale": [
+    0.9623,
+    0.7749,
+    0.15
+   ],
+   "collision": "coacd 7"
   }
  },
  "fixtures": {
@@ -328,9 +441,24 @@
     -0.0
    ]
   },
+  "hanging_board": {
+   "src": [
+    "hanging_board.stl"
+   ],
+   "extents_mm": [
+    69.0,
+    170.0,
+    181.0
+   ],
+   "origin_src_mm": [
+    4.5,
+    0.0,
+    -0.0
+   ]
+  },
   "card_holder_deck0": {
    "src": [
-    "card_holder.stl"
+    "card_holder_deck0"
    ],
    "extents_mm": [
     90.5,
@@ -345,11 +473,7 @@
   },
   "card_holder_deck4": {
    "src": [
-    "card_holder.stl",
-    "card.stl",
-    "card.stl",
-    "card.stl",
-    "card.stl"
+    "card_holder_deck4"
    ],
    "extents_mm": [
     90.5,
@@ -364,15 +488,7 @@
   },
   "card_holder_deck8": {
    "src": [
-    "card_holder.stl",
-    "card.stl",
-    "card.stl",
-    "card.stl",
-    "card.stl",
-    "card.stl",
-    "card.stl",
-    "card.stl",
-    "card.stl"
+    "card_holder_deck8"
    ],
    "extents_mm": [
     90.5,
@@ -383,6 +499,111 @@
     0.0,
     0.0,
     -0.0
+   ]
+  },
+  "cup_stack_n1": {
+   "src": [
+    "cup_stack_n1"
+   ],
+   "extents_mm": [
+    68.63,
+    68.63,
+    65.12
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  "cup_stack_n2": {
+   "src": [
+    "cup_stack_n2"
+   ],
+   "extents_mm": [
+    68.63,
+    68.63,
+    69.84
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  "cup_stack_n3": {
+   "src": [
+    "cup_stack_n3"
+   ],
+   "extents_mm": [
+    68.63,
+    68.63,
+    74.56
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  "utensil_bin_v_empty": {
+   "src": [
+    "utensil_bin_v_empty"
+   ],
+   "extents_mm": [
+    44.96,
+    64.96,
+    92.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "utensil_bin_v_knife_chopstick": {
+   "src": [
+    "utensil_bin_v_knife_chopstick"
+   ],
+   "extents_mm": [
+    44.96,
+    64.97,
+    202.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    -0.006,
+    0.0
+   ]
+  },
+  "utensil_bin_v_chopstick_fork": {
+   "src": [
+    "utensil_bin_v_chopstick_fork"
+   ],
+   "extents_mm": [
+    44.96,
+    64.96,
+    202.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "utensil_bin_v_knife_fork": {
+   "src": [
+    "utensil_bin_v_knife_fork"
+   ],
+   "extents_mm": [
+    44.96,
+    64.97,
+    198.52
+   ],
+   "origin_src_mm": [
+    0.0,
+    -0.006,
+    0.0
    ]
   }
  },
@@ -578,6 +799,334 @@
     "deck_cards": 8,
     "card_y_mm": 3.6499999999999995
    }
+  },
+  "cb_hang_ruler": {
+   "object": "ruler",
+   "fixture": "hanging_board",
+   "waypoints": [
+    [
+     0.028475804519821176,
+     6.721713676387941e-05,
+     0.11135138231350025,
+     -0.7071067811865475,
+     0.0,
+     -0.7071067811865475,
+     0.0
+    ],
+    [
+     0.015475804519821175,
+     6.721713676387941e-05,
+     0.09560138231350025,
+     -0.7071067811865475,
+     0.0,
+     -0.7071067811865475,
+     0.0
+    ],
+    [
+     0.015475804519821175,
+     6.721713676387941e-05,
+     0.09160138231350025,
+     -0.7071067811865475,
+     0.0,
+     -0.7071067811865475,
+     0.0
+    ]
+   ],
+   "layout": {
+    "hook_y_mm": 0.0,
+    "rest_hole_z_mm": 153.25
+   }
+  },
+  "cb_hang_wrench": {
+   "object": "wrench",
+   "fixture": "hanging_board",
+   "waypoints": [
+    [
+     0.028499999998017216,
+     -0.00017563734865533935,
+     0.11982397556258682,
+     -0.0,
+     0.7071067811865475,
+     -0.0,
+     0.7071067811865475
+    ],
+    [
+     0.01549999999801722,
+     -0.00017563734865533935,
+     0.10402397556258683,
+     -0.0,
+     0.7071067811865475,
+     -0.0,
+     0.7071067811865475
+    ],
+    [
+     0.01549999999801722,
+     -0.00017563734865533935,
+     0.10002397556258683,
+     -0.0,
+     0.7071067811865475,
+     -0.0,
+     0.7071067811865475
+    ]
+   ],
+   "layout": {
+    "hook_y_mm": 0.0,
+    "rest_hole_z_mm": 153.2
+   }
+  },
+  "cb_cupstack_n1": {
+   "object": "cup",
+   "fixture": "cup_stack_n1",
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    -6.025902578639107e-18,
+    4.1433071667200306e-08,
+    0.03690861535258873,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "layout": {
+    "cups_below": 1,
+    "nest_z_mm": [
+     0.0,
+     4.72
+    ]
+   }
+  },
+  "cb_cupstack_n2": {
+   "object": "cup",
+   "fixture": "cup_stack_n2",
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    -6.025902578639107e-18,
+    4.1433071667200306e-08,
+    0.041628213741260627,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "layout": {
+    "cups_below": 2,
+    "nest_z_mm": [
+     0.0,
+     4.72,
+     9.44
+    ]
+   }
+  },
+  "cb_cupstack_n3": {
+   "object": "cup",
+   "fixture": "cup_stack_n3",
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    -6.025902578639107e-18,
+    4.1433071667200306e-08,
+    0.046347812129932525,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "layout": {
+    "cups_below": 3,
+    "nest_z_mm": [
+     0.0,
+     4.72,
+     9.44,
+     14.16
+    ]
+   }
+  },
+  "cb_binv_fork_n0": {
+   "object": "fork",
+   "fixture": "utensil_bin_v_empty",
+   "layout": {
+    "existing": [],
+    "slot_mm": [
+     0.0,
+     0.0
+    ],
+    "bottom_z_mm": 2.0
+   },
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    2.117381584353749e-06,
+    -0.002875688314061202,
+    0.09864109848874894,
+    -0.5,
+    -0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ]
+  },
+  "cb_binv_fork_n2": {
+   "object": "fork",
+   "fixture": "utensil_bin_v_knife_chopstick",
+   "layout": {
+    "existing": [
+     "knife",
+     "chopstick"
+    ],
+    "slot_mm": [
+     0.0,
+     0.0
+    ],
+    "bottom_z_mm": 2.0
+   },
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    2.117381584353749e-06,
+    -0.002869688314061202,
+    0.09864109848874894,
+    -0.5,
+    -0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ]
+  },
+  "cb_binv_spoon_n0": {
+   "object": "spoon",
+   "fixture": "utensil_bin_v_empty",
+   "layout": {
+    "existing": [],
+    "slot_mm": [
+     0.0,
+     0.0
+    ],
+    "bottom_z_mm": 2.0
+   },
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    1.0068535646230485e-05,
+    -0.011256058631614762,
+    0.10878252924333065,
+    -0.5,
+    -0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ]
+  },
+  "cb_binv_spoon_n2": {
+   "object": "spoon",
+   "fixture": "utensil_bin_v_knife_chopstick",
+   "layout": {
+    "existing": [
+     "knife",
+     "chopstick"
+    ],
+    "slot_mm": [
+     0.0,
+     9.0
+    ],
+    "bottom_z_mm": 2.0
+   },
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    1.0068535646230485e-05,
+    -0.0022500586316147628,
+    0.10878252924333065,
+    -0.5,
+    -0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ]
+  },
+  "cb_binv_knife_n0": {
+   "object": "knife",
+   "fixture": "utensil_bin_v_empty",
+   "layout": {
+    "existing": [],
+    "slot_mm": [
+     0.0,
+     0.0
+    ],
+    "bottom_z_mm": 2.0
+   },
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    -3.6005976325990676e-06,
+    -0.0004607722811860846,
+    0.09515384182627246,
+    -0.5,
+    -0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ]
+  },
+  "cb_binv_knife_n2": {
+   "object": "knife",
+   "fixture": "utensil_bin_v_chopstick_fork",
+   "layout": {
+    "existing": [
+     "chopstick",
+     "fork"
+    ],
+    "slot_mm": [
+     0.0,
+     0.0
+    ],
+    "bottom_z_mm": 2.0
+   },
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    -3.6005976325990676e-06,
+    -0.0004607722811860846,
+    0.09515384182627246,
+    -0.5,
+    -0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ]
+  },
+  "cb_binv_chopstick_n0": {
+   "object": "chopstick",
+   "fixture": "utensil_bin_v_empty",
+   "layout": {
+    "existing": [],
+    "slot_mm": [
+     0.0,
+     0.0
+    ],
+    "bottom_z_mm": 2.0
+   },
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    1.1507835554203093e-09,
+    1.4292498660625763e-10,
+    0.09235540139163419,
+    -0.5,
+    -0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ]
+  },
+  "cb_binv_chopstick_n2": {
+   "object": "chopstick",
+   "fixture": "utensil_bin_v_knife_fork",
+   "layout": {
+    "existing": [
+     "knife",
+     "fork"
+    ],
+    "slot_mm": [
+     0.0,
+     0.0
+    ],
+    "bottom_z_mm": 2.0
+   },
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    1.1507835554203093e-09,
+    6.000142924986607e-06,
+    0.09235540139163419,
+    -0.5,
+    -0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ]
   }
  }
 }

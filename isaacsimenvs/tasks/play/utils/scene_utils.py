@@ -1629,12 +1629,22 @@ def setup_scene(env) -> None:
 
     # 1. Generate procedural URDFs in a per-launch temp dir.
     env._tmp_asset_dir = tempfile.mkdtemp(prefix="play_assets_")
-    urdf_paths, object_scales_normalized = generate_handle_head_urdfs(
-        handle_head_types=tuple(assets_cfg.handle_head_types),
-        num_per_type=assets_cfg.num_assets_per_type,
-        out_dir=env._tmp_asset_dir,
-        shuffle=assets_cfg.shuffle_assets,
-    )
+    external = tuple(getattr(assets_cfg, "object_urdfs", ()) or ())
+    if external:
+        scales = tuple(getattr(assets_cfg, "object_scales", ()) or ())
+        if len(scales) != len(external):
+            raise ValueError(f"assets.object_scales needs one 3-tuple per object_urdfs entry "
+                             f"({len(scales)} vs {len(external)})")
+        repo_root = Path(__file__).resolve().parents[4]
+        urdf_paths = [p if Path(p).is_absolute() else repo_root / p for p in external]
+        object_scales_normalized = [tuple(float(v) for v in sc) for sc in scales]
+    else:
+        urdf_paths, object_scales_normalized = generate_handle_head_urdfs(
+            handle_head_types=tuple(assets_cfg.handle_head_types),
+            num_per_type=assets_cfg.num_assets_per_type,
+            out_dir=env._tmp_asset_dir,
+            shuffle=assets_cfg.shuffle_assets,
+        )
     if not urdf_paths:
         raise ValueError(
             "No procedural object URDFs were generated. "
