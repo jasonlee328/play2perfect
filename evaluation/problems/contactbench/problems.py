@@ -5,6 +5,8 @@ fixture root at the centre of its bottom face, on the table). Two goals like tig
 above the seated pose (blade tips about 14 mm above the outlet face), then seated (plug face on the outlet face,
 blades 16 mm deep for block 1). ``cb_plug<k>_rigidspring``: the same with the 0.7 mm-indent spring fused into
 the fixture as a rigid body (blades cannot enter; a check of what a rigid sim does with the flexure).
+``cb_card_deck<n>``: task 24 "place card into holder", the card standing upright in the holder's channel against
+n cards already there (fused into the fixture as a rigid deck; n = 0, 4, 8); pre-insert 5 cm above.
 """
 
 import json
@@ -25,7 +27,10 @@ def _register_all() -> None:
     meta = json.loads(meta_path.read_text())
     for pname, p in meta["problems"].items():
         obj = f"cb_{p['object']}"
-        for suffix, fixture in (("", p["fixture"]), ("_rigidspring", p["fixture"] + "_rigidspring")):
+        variants = [("", p["fixture"])]
+        if p["fixture"] == "outlet":
+            variants.append(("_rigidspring", "outlet_rigidspring"))
+        for suffix, fixture in variants:
             urdf_rel = f"urdf/contactbench/fixtures/{fixture}/{fixture}.urdf"
             if obj not in NAME_TO_OBJECT or not (ASSETS_DIR.parent.parent / urdf_rel).exists():
                 continue
@@ -35,7 +40,7 @@ def _register_all() -> None:
                 insertion_object_name=obj,
                 receptive_urdf=urdf_rel,
                 insert_pose_rel_receptive=make_pre_insert_sequence(
-                    tuple(p["seated_pose"]), pre_insert_offset=PRE_INSERT_OFFSET),
+                    tuple(p["seated_pose"]), pre_insert_offset=p.get("pre_insert_offset", PRE_INSERT_OFFSET)),
             )
 
 

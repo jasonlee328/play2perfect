@@ -154,6 +154,8 @@ _RELEASED_PROBLEMS = {
     # ContactBench 1.0 plug-in-charger (FoundationTouch tools/contactbench), registered only if the assets exist.
     **{f"cb_plug{k}{v}": f"contactbench.cb_plug{k}{v}" for k in (1, 2, 3, 4) for v in ("", "_rigidspring")
        if f"contactbench.cb_plug{k}{v}" in PROBLEM_REGISTRY},
+    **{f"cb_card_deck{n}": f"contactbench.cb_card_deck{n}" for n in (0, 4, 8)
+       if f"contactbench.cb_card_deck{n}" in PROBLEM_REGISTRY},
 }
 
 _missing = [k for k in _RELEASED_PROBLEMS.values() if k not in PROBLEM_REGISTRY]

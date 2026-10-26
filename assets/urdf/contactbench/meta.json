@@ -327,6 +327,63 @@
     0.0,
     -0.0
    ]
+  },
+  "card_holder_deck0": {
+   "src": [
+    "card_holder.stl"
+   ],
+   "extents_mm": [
+    90.5,
+    50.0,
+    37.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  "card_holder_deck4": {
+   "src": [
+    "card_holder.stl",
+    "card.stl",
+    "card.stl",
+    "card.stl",
+    "card.stl"
+   ],
+   "extents_mm": [
+    90.5,
+    50.0,
+    57.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  "card_holder_deck8": {
+   "src": [
+    "card_holder.stl",
+    "card.stl",
+    "card.stl",
+    "card.stl",
+    "card.stl",
+    "card.stl",
+    "card.stl",
+    "card.stl",
+    "card.stl"
+   ],
+   "extents_mm": [
+    90.5,
+    50.0,
+    57.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
   }
  },
  "problems": {
@@ -466,6 +523,60 @@
      }
     ],
     "seat_lift_mm": 0.1
+   }
+  },
+  "cb_card_deck0": {
+   "object": "card",
+   "fixture": "card_holder_deck0",
+   "seated_pose": [
+    0.0,
+    -0.006350000023841859,
+    0.029500000000000002,
+    0.7071067811865475,
+    -0.0,
+    -0.0,
+    0.7071067811865475
+   ],
+   "pre_insert_offset": 0.05,
+   "layout": {
+    "deck_cards": 0,
+    "card_y_mm": -6.3500000000000005
+   }
+  },
+  "cb_card_deck4": {
+   "object": "card",
+   "fixture": "card_holder_deck4",
+   "seated_pose": [
+    0.0,
+    -0.0013500000238418585,
+    0.029500000000000002,
+    0.7071067811865475,
+    -0.0,
+    -0.0,
+    0.7071067811865475
+   ],
+   "pre_insert_offset": 0.05,
+   "layout": {
+    "deck_cards": 4,
+    "card_y_mm": -1.3500000000000005
+   }
+  },
+  "cb_card_deck8": {
+   "object": "card",
+   "fixture": "card_holder_deck8",
+   "seated_pose": [
+    0.0,
+    0.0036499999761581414,
+    0.029500000000000002,
+    0.7071067811865475,
+    -0.0,
+    -0.0,
+    0.7071067811865475
+   ],
+   "pre_insert_offset": 0.05,
+   "layout": {
+    "deck_cards": 8,
+    "card_y_mm": 3.6499999999999995
    }
   }
  }
