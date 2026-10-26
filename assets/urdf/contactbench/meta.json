@@ -1,0 +1,472 @@
+{
+ "density_kg_m3": 620.0,
+ "sdf_resolution": 256,
+ "objects": {
+  "charging_block_1": {
+   "src": "charging_blocks/charging_block_1.stl",
+   "extents_mm": [
+    56.0,
+    35.0,
+    22.5
+   ],
+   "mass_g": 19.39,
+   "com_src_mm": [
+    -1.658,
+    -0.0,
+    0.0
+   ],
+   "object_scale": [
+    1.4,
+    0.875,
+    0.5625
+   ]
+  },
+  "charging_block_2": {
+   "src": "charging_blocks/charging_block_2.stl",
+   "extents_mm": [
+    64.0,
+    28.0,
+    25.0
+   ],
+   "mass_g": 9.97,
+   "com_src_mm": [
+    1.106,
+    -0.0,
+    0.967
+   ],
+   "object_scale": [
+    1.6,
+    0.7,
+    0.625
+   ]
+  },
+  "charging_block_3": {
+   "src": "charging_blocks/charging_block_3.stl",
+   "extents_mm": [
+    42.5,
+    35.0,
+    55.0
+   ],
+   "mass_g": 26.82,
+   "com_src_mm": [
+    0.742,
+    0.004,
+    -0.429
+   ],
+   "object_scale": [
+    1.0625,
+    0.875,
+    1.375
+   ]
+  },
+  "charging_block_4": {
+   "src": "charging_blocks/charging_block_4.stl",
+   "extents_mm": [
+    52.0,
+    25.0,
+    18.0
+   ],
+   "mass_g": 5.39,
+   "com_src_mm": [
+    -1.42,
+    0.02,
+    0.0
+   ],
+   "object_scale": [
+    1.3,
+    0.625,
+    0.45
+   ]
+  },
+  "ethernet_plug": {
+   "src": "ethernet_plug_and_slot_unz/ethernet_plug_and_slot/ethernet_plug.stl",
+   "extents_mm": [
+    11.0,
+    33.0,
+    15.55
+   ],
+   "mass_g": 1.4,
+   "com_src_mm": [
+    -15.0,
+    36.54,
+    15.343
+   ],
+   "object_scale": [
+    0.275,
+    0.825,
+    0.3886
+   ]
+  },
+  "toy_block_top": {
+   "src": "toy_assembly_block_unz/toy_assembly_block/toy_assembly_block_top.stl",
+   "extents_mm": [
+    80.0,
+    30.0,
+    14.0
+   ],
+   "mass_g": 13.0,
+   "com_src_mm": [
+    -0.0,
+    -0.0,
+    15.156
+   ],
+   "object_scale": [
+    2.0,
+    0.75,
+    0.35
+   ]
+  },
+  "cup": {
+   "src": "cup.stl",
+   "extents_mm": [
+    68.63,
+    68.63,
+    65.12
+   ],
+   "mass_g": 7.61,
+   "com_src_mm": [
+    -0.0,
+    0.0,
+    32.189
+   ],
+   "object_scale": [
+    1.7157,
+    1.7157,
+    1.628
+   ]
+  },
+  "screwdriver": {
+   "src": "tools/screwdriver.stl",
+   "extents_mm": [
+    125.0,
+    12.0,
+    12.0
+   ],
+   "mass_g": 6.5,
+   "com_src_mm": [
+    -8.784,
+    0.077,
+    0.0
+   ],
+   "object_scale": [
+    3.125,
+    0.3,
+    0.3
+   ]
+  },
+  "allen_key": {
+   "src": "tools/allen_key.stl",
+   "extents_mm": [
+    67.5,
+    30.0,
+    5.0
+   ],
+   "mass_g": 1.37,
+   "com_src_mm": [
+    6.345,
+    -8.776,
+    -0.0
+   ],
+   "object_scale": [
+    1.6875,
+    0.75,
+    0.125
+   ]
+  },
+  "wrench": {
+   "src": "tools/wrench.stl",
+   "extents_mm": [
+    113.09,
+    30.0,
+    7.5
+   ],
+   "mass_g": 6.76,
+   "com_src_mm": [
+    1.876,
+    0.024,
+    3.75
+   ],
+   "object_scale": [
+    2.8273,
+    0.7499,
+    0.1875
+   ]
+  },
+  "key_1": {
+   "src": "keys/key_1.stl",
+   "extents_mm": [
+    49.73,
+    20.0,
+    2.5
+   ],
+   "mass_g": 0.69,
+   "com_src_mm": [
+    7.758,
+    -0.244,
+    1.239
+   ],
+   "object_scale": [
+    1.2434,
+    0.5,
+    0.0625
+   ]
+  },
+  "card": {
+   "src": "card.stl",
+   "extents_mm": [
+    85.0,
+    55.0,
+    1.2
+   ],
+   "mass_g": 3.47,
+   "com_src_mm": [
+    0.0,
+    -0.0,
+    0.6
+   ],
+   "object_scale": [
+    2.125,
+    1.375,
+    0.03
+   ]
+  },
+  "spoon": {
+   "src": "utensils/spoon.stl",
+   "extents_mm": [
+    170.25,
+    45.12,
+    25.31
+   ],
+   "mass_g": 5.22,
+   "com_src_mm": [
+    27.289,
+    0.01,
+    1.038
+   ],
+   "object_scale": [
+    4.2562,
+    1.128,
+    0.6328
+   ]
+  }
+ },
+ "fixtures": {
+  "outlet": {
+   "src": [
+    "outlet/outlet_shell.stl"
+   ],
+   "extents_mm": [
+    63.0,
+    63.0,
+    22.5
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  "outlet_rigidspring": {
+   "src": [
+    "outlet/outlet_shell.stl",
+    "outlet/outlet_spring_0.7mm_indent.stl"
+   ],
+   "extents_mm": [
+    63.0,
+    63.0,
+    22.5
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  "ethernet_slot": {
+   "src": [
+    "ethernet_plug_and_slot_unz/ethernet_plug_and_slot/ethernet_slot_shell.stl",
+    "ethernet_plug_and_slot_unz/ethernet_plug_and_slot/ethernet_slot.stl"
+   ],
+   "extents_mm": [
+    98.0,
+    32.5,
+    32.5
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  "toy_block_bottom": {
+   "src": [
+    "toy_assembly_block_unz/toy_assembly_block/toy_assembly_block_bottom.stl"
+   ],
+   "extents_mm": [
+    80.0,
+    30.0,
+    10.5
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.5
+   ]
+  },
+  "card_holder": {
+   "src": [
+    "card_holder.stl"
+   ],
+   "extents_mm": [
+    90.5,
+    50.0,
+    37.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  }
+ },
+ "problems": {
+  "cb_plug1": {
+   "object": "charging_block_1",
+   "fixture": "outlet",
+   "seated_pose": [
+    -0.005,
+    -7.753958918012536e-19,
+    0.04218171812640215,
+    -0.0,
+    0.7071067811865475,
+    -0.0,
+    0.7071067811865475
+   ],
+   "layout": {
+    "face_x_mm": 17.923558897243105,
+    "blade_zc_mm": 0.0,
+    "sign": 1.0,
+    "blades": [
+     {
+      "y": -6.430803711788432,
+      "z": 0.0,
+      "w_y": 2.0,
+      "h_z": 6.0
+     },
+     {
+      "y": 6.569196288211568,
+      "z": 0.0,
+      "w_y": 2.0,
+      "h_z": 6.0
+     }
+    ],
+    "seat_lift_mm": 0.1
+   }
+  },
+  "cb_plug2": {
+   "object": "charging_block_2",
+   "fixture": "outlet",
+   "seated_pose": [
+    -0.0010329404903131971,
+    -3.1279537790876392e-09,
+    0.036862786174283735,
+    -0.0,
+    0.7071067811865475,
+    -0.0,
+    0.7071067811865475
+   ],
+   "layout": {
+    "face_x_mm": 14.868421052631575,
+    "blade_zc_mm": -3.0000000223517054,
+    "sign": 1.0,
+    "blades": [
+     {
+      "y": -4.1635811831803473e-16,
+      "z": 8.00586199760437,
+      "w_y": 3.994133710861206,
+      "h_z": 3.9882760047912598
+     },
+     {
+      "y": 6.4300132050556495,
+      "z": -3.00000002235174,
+      "w_y": 2.0,
+      "h_z": 5.999999955296566
+     },
+     {
+      "y": -6.611111111111111,
+      "z": -3.000000022351671,
+      "w_y": 2.0,
+      "h_z": 5.999999955296701
+     }
+    ],
+    "seat_lift_mm": 0.6
+   }
+  },
+  "cb_plug3": {
+   "object": "charging_block_3",
+   "fixture": "outlet",
+   "seated_pose": [
+    0.007348349950232903,
+    -3.990873472987612e-06,
+    0.03610276674100414,
+    -0.7071067811865475,
+    0.0,
+    0.7071067811865475,
+    0.0
+   ],
+   "layout": {
+    "face_x_mm": 14.24441525452119,
+    "blade_zc_mm": 11.919622421264648,
+    "sign": -1.0,
+    "blades": [
+     {
+      "y": 6.524816705738171,
+      "z": 11.919622421264648,
+      "w_y": 2.0,
+      "h_z": 8.000000476837158
+     },
+     {
+      "y": -6.611111111111111,
+      "z": 11.919622421264648,
+      "w_y": 2.0,
+      "h_z": 6.0
+     }
+    ],
+    "seat_lift_mm": 0.1
+   }
+  },
+  "cb_plug4": {
+   "object": "charging_block_4",
+   "fixture": "outlet",
+   "seated_pose": [
+    -0.005,
+    -1.9849320569955793e-05,
+    0.03392572848913733,
+    -0.7071067811865475,
+    0.0,
+    0.7071067811865475,
+    0.0
+   ],
+   "layout": {
+    "face_x_mm": 9.906015037593981,
+    "blade_zc_mm": 0.0,
+    "sign": -1.0,
+    "blades": [
+     {
+      "y": -6.43055218691891,
+      "z": 0.0,
+      "w_y": 2.0,
+      "h_z": 6.0
+     },
+     {
+      "y": 6.388888888888889,
+      "z": 0.0,
+      "w_y": 2.0,
+      "h_z": 8.0
+     }
+    ],
+    "seat_lift_mm": 0.1
+   }
+  }
+ }
+}

@@ -133,6 +133,7 @@ from . import peg               # noqa: E402, F401
 from . import fabrica           # noqa: E402, F401
 from . import furniture_bench   # noqa: E402, F401
 from . import fmb               # noqa: E402, F401
+from . import contactbench      # noqa: E402, F401
 
 
 # The data-driven registration above populates PROBLEM_REGISTRY with every
@@ -150,6 +151,9 @@ _RELEASED_PROBLEMS = {
     "screwing": "furniture_bench.one_leg_matchedmass_sdf_hybrid_super_dense",
     # FMB-shaped straight insertion (FoundationTouch tools/fmb_insertion), tight_insertion's convention.
     **{f"fmb_{s}": f"fmb.{s}.tol0p5mm" for s in ("ellipse", "star", "arch", "hexagon", "rrect", "circle")},
+    # ContactBench 1.0 plug-in-charger (FoundationTouch tools/contactbench), registered only if the assets exist.
+    **{f"cb_plug{k}{v}": f"contactbench.cb_plug{k}{v}" for k in (1, 2, 3, 4) for v in ("", "_rigidspring")
+       if f"contactbench.cb_plug{k}{v}" in PROBLEM_REGISTRY},
 }
 
 _missing = [k for k in _RELEASED_PROBLEMS.values() if k not in PROBLEM_REGISTRY]
