@@ -554,6 +554,9 @@ class PreciseAssemblyEnv(PlayEnv):
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
+        # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
+        # (z - init_z > 0.10, which gates the keypoint reward) would need ~20 cm above the bin. Measure from here.
+        self._object_init_z[env_ids] = w[:, 2] - self.scene.env_origins[env_ids, 2]
 
     def _apply_start_states(self, env_ids: torch.Tensor) -> None:
         """Overwrite robot + peg state with random entries of the start-state bank."""
