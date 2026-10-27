@@ -366,6 +366,8 @@ class RewardCfg:
     lifting_rew_scale: float = 20.0
     lifting_bonus: float = 300.0
     lifting_bonus_threshold: float = 0.15
+    # lift reward = scale * clamp(rise + offset, 0, 0.5) until lifted; 0 = no reward for an untouched object
+    lifting_rew_offset: float = 0.05
 
     distance_delta_rew_scale: float = 50.0
     reach_goal_bonus: float = 1000.0
