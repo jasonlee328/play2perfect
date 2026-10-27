@@ -72,6 +72,29 @@ def make_transport_pre_insert_sequence(
 
 
 @dataclass(frozen=True)
+class JointSpec:
+    """A revolute joint between the receptive fixture and a moving body (ContactBench dials / screws / locks).
+
+    ``body``: "object" or "distractor<k>". ``anchor`` / ``axis``: a point on the axis and its direction in the
+    receptive frame (the body is at its reset pose: Problem.object_start_pose_rel_receptive or its distractor pose;
+    the joint angle is 0 there). The behavioural variations are all here, so they are felt, not seen:
+    ``lower_deg`` / ``upper_deg`` end stops (None = free; e.g. "required rotation amount"), ``damping`` viscous
+    resistance (N m s / rad), ``stiffness`` a return spring towards 0 (N m / rad), ``detent_count`` /
+    ``detent_torque`` a snap-to-position torque -detent_torque * sin(detent_count * angle) (N m).
+    """
+
+    body: str
+    anchor: Tuple[float, float, float]
+    axis: Tuple[float, float, float] = (0.0, 0.0, 1.0)
+    lower_deg: float | None = None
+    upper_deg: float | None = None
+    damping: float = 0.0
+    stiffness: float = 0.0
+    detent_count: int = 0
+    detent_torque: float = 0.0
+
+
+@dataclass(frozen=True)
 class Problem:
     """A single insertion problem.
 
@@ -98,6 +121,14 @@ class Problem:
     # at this Z lift above the start pose (with pre-insert orientation), prepended
     # to the hole-frame insertion sequence. Only honored when goal_mode allows it.
     prelude_lift_offset: float = 0.0
+    # Clutter (FoundationTouch tools/contactbench): extra free bodies spawned with the fixture, as
+    # (urdf path relative to assets/, pose7 in the receptive frame). Empty = none (every existing problem).
+    distractors: Tuple[Tuple[str, Pose7], ...] = ()
+    # If set (pose7 in the receptive frame), the object starts there at every reset (e.g. the top cup of a stack)
+    # instead of PlayEnv's table pose. Empty = PlayEnv's start pose.
+    object_start_pose_rel_receptive: Tuple[float, ...] = ()
+    # Revolute joints to the fixture (JointSpec), e.g. a dial knob (body "object") or a screw (a distractor).
+    joints: Tuple["JointSpec", ...] = ()
 
     def __post_init__(self) -> None:
         poses = self._normalize_pose_sequence(self.insert_pose_rel_receptive)

@@ -113,6 +113,12 @@ class PreciseAssemblyCfg:
     # the hole frame, and the goal index reached. Each reset samples one entry;
     # the episode then continues from that goal. "" keeps the normal reset.
     start_state_file: str = ""
+    # Clutter problems (Problem.distractors): per-step reward -= distractor_penalty_scale * the largest distractor
+    # displacement from its reset pose (m); with terminate_on_disturb the episode ends once it exceeds
+    # distractor_disturb_tol. Both off by default (and no effect on problems without distractors).
+    distractor_penalty_scale: float = 0.0
+    distractor_disturb_tol: float = 0.01
+    terminate_on_disturb: bool = False
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False

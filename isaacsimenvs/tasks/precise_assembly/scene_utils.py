@@ -50,6 +50,71 @@ def _pih_rigid_object_cfg(prim_path: str, usd_path: str) -> RigidObjectCfg:
     return RigidObjectCfg(prim_path=prim_path, spawn=UsdFileCfg(usd_path=usd_path))
 
 
+def _rigid_body_prim(stage, root: str):
+    from pxr import Usd, UsdPhysics
+    for prim in Usd.PrimRange(stage.GetPrimAtPath(root)):
+        if prim.HasAPI(UsdPhysics.RigidBodyAPI):
+            return prim
+    raise RuntimeError(f"no rigid body under {root}")
+
+
+def _create_fixture_joints(env) -> None:
+    """Problem.joints: one USD revolute joint per env between the fixture's body and the jointed body. The joint
+    frame's z is the axis (frame 0 in the fixture, frame 1 = the same frame in the body at its reset pose, so the
+    angle is 0 there); damping / stiffness are an angular drive (USD drive units are per degree); limits in degrees.
+    Jointed bodies do not collide with the fixture (USD joint default)."""
+    joints = getattr(env, "_pih_joints", ())
+    if not joints:
+        return
+    import math
+    import numpy as np
+    import omni.usd
+    from pxr import Gf, UsdPhysics
+
+    def quat_z_to(axis):
+        a = np.asarray(axis, float) / np.linalg.norm(axis)
+        z = np.array([0.0, 0.0, 1.0])
+        c = float(np.dot(z, a))
+        if c > 1 - 1e-9:
+            return Gf.Quatf(1.0, 0.0, 0.0, 0.0)
+        if c < -1 + 1e-9:
+            return Gf.Quatf(0.0, 1.0, 0.0, 0.0)
+        v = np.cross(z, a); w = 1.0 + c
+        n = math.sqrt(w * w + float(np.dot(v, v)))
+        return Gf.Quatf(w / n, *(v / n).tolist())
+
+    stage = omni.usd.get_context().get_stage()
+    for k, j in enumerate(joints):
+        pose = env._joint_reset_pose_rel(j)
+        p_b = Gf.Vec3d(*pose[:3]); q_b = Gf.Quatd(pose[6], Gf.Vec3d(*pose[3:6]))
+        rot_b = Gf.Rotation(q_b)
+        q0 = quat_z_to(j.axis)
+        anchor = Gf.Vec3d(*j.anchor)
+        # joint frame expressed in the body frame: inverse(body pose) * (anchor, q0)
+        pos1 = rot_b.GetInverse().TransformDir(anchor - p_b)
+        q1 = (q_b.GetInverse() * Gf.Quatd(q0.GetReal(), Gf.Vec3d(q0.GetImaginary())))
+        body_root = "Object" if j.body == "object" else f"Distractor{int(j.body[10:])}"
+        for i in range(env.num_envs):
+            b0 = _rigid_body_prim(stage, f"/World/envs/env_{i}/Hole").GetPath()
+            b1 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{body_root}").GetPath()
+            jp = UsdPhysics.RevoluteJoint.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
+            jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
+            jp.CreateAxisAttr("Z")
+            jp.CreateLocalPos0Attr(Gf.Vec3f(*j.anchor)); jp.CreateLocalRot0Attr(q0)
+            jp.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jp.CreateLocalRot1Attr(Gf.Quatf(q1))
+            if j.lower_deg is not None:
+                jp.CreateLowerLimitAttr(float(j.lower_deg))
+            if j.upper_deg is not None:
+                jp.CreateUpperLimitAttr(float(j.upper_deg))
+            if j.damping or j.stiffness:
+                drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "angular")
+                drive.CreateTypeAttr("force")
+                drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
+                drive.CreateDampingAttr(float(j.damping) * math.pi / 180.0)
+                drive.CreateStiffnessAttr(float(j.stiffness) * math.pi / 180.0)
+    print(f"[precise_assembly] created {len(joints)} fixture joint(s) x {env.num_envs} envs", flush=True)
+
+
 def setup_scene(env) -> None:
     """Build robot, narrow table, dynamic hole fixture, object, goal, and light."""
     assets_cfg = env.cfg.assets
@@ -111,6 +176,22 @@ def setup_scene(env) -> None:
             ),
         ))
 
+    distractor_usd_paths = []
+    for k, d_urdf in enumerate(getattr(env, "_pih_distractor_urdf_abs", ()) or ()):
+        distractor_usd_paths.append(_bake_usd(
+            _convert_urdf_to_usd(_asset_path(d_urdf), usd_work_dir / f"distractor_{k}", fix_base=False),
+            bake_root,
+            f"distractor_{k}",
+            props=dict(
+                kinematic_enabled=False,
+                disable_gravity=False,
+                max_depenetration_velocity=1000.0,
+                rb_solver_position_iterations=4,
+                rb_solver_velocity_iterations=0,
+                articulation_enabled=False,
+            ),
+        ))
+
     robot_usd_path = _bake_usd(
         _convert_urdf_to_usd(
             _asset_path(assets_cfg.robot_urdf),
@@ -166,7 +247,11 @@ def setup_scene(env) -> None:
         env.hole = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0]))
         env.object = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0]))
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
-    _log_scene_step(setup_t0, "spawned robot/table/hole/object/goalviz")
+    env.distractors = tuple(
+        RigidObject(_pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd))
+        for k, usd in enumerate(distractor_usd_paths)
+    )
+    _log_scene_step(setup_t0, f"spawned robot/table/hole/object/goalviz + {len(env.distractors)} distractors")
 
     spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
     light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
@@ -192,6 +277,8 @@ def setup_scene(env) -> None:
     env.scene.rigid_objects["hole"] = env.hole
     env.scene.rigid_objects["object"] = env.object
     env.scene.rigid_objects["goal_viz"] = env.goal_viz
+    for k, body in enumerate(env.distractors):
+        env.scene.rigid_objects[f"distractor{k}"] = body
     hide_goal_viz_for_student_camera(env)
     _log_scene_step(setup_t0, "registered assets with scene")
 
@@ -202,6 +289,8 @@ def setup_scene(env) -> None:
     # manually built, so we call it ourselves here. With
     # replicate_physics=False this is a no-op for env_origins (already
     # set in __init__).
+    _create_fixture_joints(env)
+
     if env.scene._default_env_origins is None:
         env.scene.clone_environments(copy_from_source=False)
         _log_scene_step(setup_t0, "cloned environments (replicate_physics=True path)")

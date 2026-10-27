@@ -9,7 +9,7 @@ import math
 
 import torch
 
-from isaaclab.utils.math import quat_apply, quat_apply_inverse, quat_from_angle_axis, quat_mul
+from isaaclab.utils.math import quat_apply, quat_apply_inverse, quat_conjugate, quat_from_angle_axis, quat_mul
 
 from isaacsimenvs.tasks.play.play_env import PlayEnv
 from isaacsimenvs.tasks.play.utils.goal_sampling import (
@@ -304,6 +304,24 @@ class PreciseAssemblyEnv(PlayEnv):
             self._num_insertion_goals + self._num_prelude_goals
         )
 
+        # Clutter: distractor bodies + an optional object start pose, both in the receptive frame (single problem).
+        if len(problem_names) > 1 and any(
+                PROBLEM_REGISTRY[n].distractors or PROBLEM_REGISTRY[n].object_start_pose_rel_receptive
+                for n in problem_names):
+            raise ValueError("distractors / object_start_pose_rel_receptive need a single problem")
+        self._pih_distractor_urdf_abs = tuple(str(_resolve_asset_path(u)) for u, _ in problem.distractors)
+        self._pih_distractor_pose_rel = tuple(tuple(float(v) for v in pose) for _, pose in problem.distractors)
+        self._pih_object_start_rel = tuple(float(v) for v in problem.object_start_pose_rel_receptive)
+        if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
+            raise ValueError("Problem.joints need a single problem")
+        self._pih_joints = tuple(problem.joints)
+        for j in self._pih_joints:
+            if j.body != "object" and not (j.body.startswith("distractor")
+                                           and int(j.body[10:]) < len(self._pih_distractor_urdf_abs)):
+                raise ValueError(f"JointSpec.body must be 'object' or 'distractor<k>', got {j.body!r}")
+            if j.body == "object" and not self._pih_object_start_rel:
+                raise ValueError("a joint on the object needs Problem.object_start_pose_rel_receptive")
+
         cfg.assets.object_name = problem.insertion_object_name if len(problem_names) == 1 else "multi"
         cfg.assets.object_urdf = self._pih_object_urdf_abs
         cfg.assets.receptive_urdf = self._pih_receptive_urdf_abs
@@ -448,11 +466,94 @@ class PreciseAssemblyEnv(PlayEnv):
             self._prelude_pose_world[ins_ids, 1, 2] = lift_z
             self._prelude_pose_world[ins_ids, 1, 3:7] = pre_insert_quat_world
 
+        self._reset_distractors(env_ids)
+        if self._pih_object_start_rel and insertion_mask.any():
+            self._apply_object_start_pose(env_ids[insertion_mask])
+
         if pih_cfg.start_state_file and insertion_mask.any():
             self._apply_start_states(env_ids[insertion_mask])
 
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
+
+    def _pose_rel_hole_to_world(self, env_ids: torch.Tensor, pose7) -> torch.Tensor:
+        """(n, 7) world pose (pos + quat wxyz) of a receptive-frame pose7 (xyz + quat xyzw) for env_ids."""
+        n = env_ids.numel()
+        p = torch.tensor(pose7[:3], device=self.device, dtype=torch.float32).expand(n, 3)
+        q = _xyzw_to_wxyz(torch.tensor([pose7[3:7]], device=self.device, dtype=torch.float32)).expand(n, 4)
+        hq = self.hole_quat_wxyz[env_ids]
+        pos = self.hole_pos[env_ids] + quat_apply(hq, p) + self.scene.env_origins[env_ids]
+        return torch.cat([pos, quat_mul(hq, q)], dim=-1)
+
+    def _reset_distractors(self, env_ids: torch.Tensor) -> None:
+        """Place every distractor at its receptive-frame pose; remember it to measure disturbance."""
+        dists = getattr(self, "distractors", ())
+        if not dists:
+            return
+        if not hasattr(self, "_distractor_reset_pos"):
+            self._distractor_reset_pos = torch.zeros(len(dists), self.num_envs, 3, device=self.device)
+            self.distractor_disp = torch.zeros(self.num_envs, device=self.device)
+            self.distractor_disp_ep_max = torch.zeros(self.num_envs, device=self.device)
+        for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
+            w = self._pose_rel_hole_to_world(env_ids, pose)
+            body.write_root_pose_to_sim(w, env_ids=env_ids)
+            body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
+            self._distractor_reset_pos[k, env_ids] = w[:, :3]
+        self.distractor_disp[env_ids] = 0.0
+        self.distractor_disp_ep_max[env_ids] = 0.0
+
+    def _update_distractor_disp(self) -> None:
+        dists = getattr(self, "distractors", ())
+        if not dists or not hasattr(self, "_distractor_reset_pos"):
+            return
+        pos = torch.stack([b.data.root_pos_w for b in dists])  # (K, N, 3)
+        self.distractor_disp = (pos - self._distractor_reset_pos).norm(dim=-1).max(dim=0).values
+        self.distractor_disp_ep_max = torch.maximum(self.distractor_disp_ep_max, self.distractor_disp)
+
+    def _joint_bodies(self):
+        return [self.object if j.body == "object" else self.distractors[int(j.body[10:])] for j in self._pih_joints]
+
+    def _joint_reset_pose_rel(self, j) -> tuple:
+        return self._pih_object_start_rel if j.body == "object" else self._pih_distractor_pose_rel[int(j.body[10:])]
+
+    def _update_joint_angles(self) -> None:
+        """Signed angle of every jointed body about its axis since reset (rad), self.cb_joint_angle (J, N)."""
+        if not self._pih_joints:
+            return
+        hq = self.hole_quat_wxyz
+        angles = []
+        for j, body in zip(self._pih_joints, self._joint_bodies()):
+            q0 = _xyzw_to_wxyz(torch.tensor([self._joint_reset_pose_rel(j)[3:7]], device=self.device,
+                                            dtype=torch.float32)).expand(self.num_envs, 4)
+            q_rel = quat_mul(quat_conjugate(q0), quat_mul(quat_conjugate(hq), body.data.root_quat_w))  # body frame
+            axis_b = quat_apply_inverse(q0, torch.tensor(j.axis, device=self.device,
+                                                         dtype=torch.float32).expand(self.num_envs, 3))
+            s = (q_rel[:, 1:] * axis_b).sum(-1)
+            angles.append(2.0 * torch.atan2(s, q_rel[:, 0]))
+        a = torch.stack(angles)
+        self.cb_joint_angle = torch.atan2(torch.sin(a), torch.cos(a))
+
+    def _apply_joint_detents(self) -> None:
+        if not any(j.detent_count > 0 and j.detent_torque != 0.0 for j in self._pih_joints):
+            return
+        self._update_joint_angles()
+        for k, (j, body) in enumerate(zip(self._pih_joints, self._joint_bodies())):
+            if j.detent_count <= 0 or j.detent_torque == 0.0:
+                continue
+            tau = -j.detent_torque * torch.sin(j.detent_count * self.cb_joint_angle[k])
+            axis_w = quat_apply(self.hole_quat_wxyz, torch.tensor(j.axis, device=self.device,
+                                                                  dtype=torch.float32).expand(self.num_envs, 3))
+            torque = (tau.unsqueeze(-1) * axis_w).unsqueeze(1)
+            body.set_external_force_and_torque(torch.zeros_like(torque), torque, is_global=True)
+
+    def _pre_physics_step(self, actions: torch.Tensor) -> None:
+        super()._pre_physics_step(actions)
+        self._apply_joint_detents()
+
+    def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
+        w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
+        self.object.write_root_pose_to_sim(w, env_ids=env_ids)
+        self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
 
     def _apply_start_states(self, env_ids: torch.Tensor) -> None:
         """Overwrite robot + peg state with random entries of the start-state bank."""
@@ -861,7 +962,13 @@ class PreciseAssemblyEnv(PlayEnv):
             dropped = torch.zeros_like(fall)
 
         retract_fail = self.retract_failed if pih_cfg.enable_retract else torch.zeros_like(fall)
-        terminated = fall | max_successes | hand_far | dropped | retract_fail
+        self._update_distractor_disp()
+        self._update_joint_angles()
+        if pih_cfg.terminate_on_disturb and hasattr(self, "distractor_disp"):
+            disturbed = self.distractor_disp > pih_cfg.distractor_disturb_tol
+        else:
+            disturbed = torch.zeros_like(fall)
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -869,6 +976,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "retract_fail": retract_fail,
             "hand_far": hand_far,
             "dropped": dropped,
+            "disturbed": disturbed,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -938,6 +1046,14 @@ class PreciseAssemblyEnv(PlayEnv):
                 pih_cfg.retract_success_tolerance
             )
             self.extras["retract_success_bonus"] = self.retract_success_bonus
+
+        if hasattr(self, "distractor_disp"):
+            if pih_cfg.distractor_penalty_scale > 0.0:
+                pen = pih_cfg.distractor_penalty_scale * self.distractor_disp
+                reward = reward - pen
+                self._reward_terms["distractor_penalty"] = -pen
+                self._reward_terms["total_reward"] = reward
+            self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
 
         log_step_metrics(self)
         self._log_peg_metrics()
