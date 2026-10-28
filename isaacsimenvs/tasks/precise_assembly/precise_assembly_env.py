@@ -1094,6 +1094,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 reward = reward - lift_pen
                 self._reward_terms["distractor_lift_penalty"] = -lift_pen
                 self._reward_terms["total_reward"] = reward
+            if pih_cfg.distractor_disturb_terminal_penalty > 0.0 and "disturbed" in self._termination_reasons:
+                term_pen = pih_cfg.distractor_disturb_terminal_penalty * self._termination_reasons["disturbed"].float()
+                reward = reward - term_pen
+                self._reward_terms["distractor_terminal_penalty"] = -term_pen
+                self._reward_terms["total_reward"] = reward
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
