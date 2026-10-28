@@ -142,6 +142,9 @@ class PreciseAssemblyCfg:
     distractor_curriculum_offset_steps: int = 0  # added to common_step_counter (set on resume)
     # One-time reward subtracted when an episode ends because a distractor left the box / moved too far.
     distractor_disturb_terminal_penalty: float = 0.0
+    # PhysX max depenetration velocity (m/s) of the object and the distractors. The 1000 default lets a heap of small
+    # interpenetrating parts (keychain) launch pieces ~1 m up; ~1 m/s keeps such heaps put.
+    object_max_depenetration_velocity: float = 1000.0
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False
