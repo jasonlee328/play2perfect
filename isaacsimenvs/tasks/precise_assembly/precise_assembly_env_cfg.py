@@ -119,6 +119,10 @@ class PreciseAssemblyCfg:
     distractor_penalty_scale: float = 0.0
     distractor_disturb_tol: float = 0.01
     terminate_on_disturb: bool = False
+    # Clutter "stay in the box" mode: (xmin, xmax, ymin, ymax, zmax) in m, receptive frame. When set, the penalty and
+    # termination above use how far the furthest distractor's root is outside this box (0 while inside) instead of
+    # its displacement, so neighbours may be pushed around inside the bin but not lifted or dragged out of it.
+    distractor_box: tuple[float, ...] = ()
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False

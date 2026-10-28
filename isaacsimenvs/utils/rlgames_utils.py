@@ -109,6 +109,7 @@ class EnvStatsAlgoObserver(AlgoObserver):
         self.episode_cumulative = {}
         self.episode_cumulative_avg = {}
         self.episode_final_avg = {}
+        self.success_final_avg = {}  # success/<key>: per finished episode, like episode_final
         self.direct_info = {}
         self.new_finished_episodes = False
 
@@ -128,6 +129,7 @@ class EnvStatsAlgoObserver(AlgoObserver):
         done_indices = done_indices.reshape(-1).detach().cpu().tolist()
         self._process_episode_cumulative(infos.get("episode_cumulative"), done_indices)
         self._process_episode_final(infos.get("episode_final"), done_indices)
+        self._process_episode_final(infos.get("success_final"), done_indices, self.success_final_avg)
 
         self.direct_info = {
             key: value
@@ -155,16 +157,17 @@ class EnvStatsAlgoObserver(AlgoObserver):
                 )
                 self.episode_cumulative[key][done_idx] = 0
 
-    def _process_episode_final(self, values, done_indices: list[int]) -> None:
+    def _process_episode_final(self, values, done_indices: list[int], store=None) -> None:
         if not values or not done_indices:
             return
 
+        store = self.episode_final_avg if store is None else store
         self.new_finished_episodes = True
         for key, value in values.items():
-            if key not in self.episode_final_avg:
-                self.episode_final_avg[key] = deque([], maxlen=self.algo.games_to_track)
+            if key not in store:
+                store[key] = deque([], maxlen=self.algo.games_to_track)
             for done_idx in done_indices:
-                self.episode_final_avg[key].append(_value_at(value, done_idx))
+                store[key].append(_value_at(value, done_idx))
 
     def _process_vector_summaries(self, infos, *, tag: str) -> None:
         if tag not in infos:
@@ -187,6 +190,7 @@ class EnvStatsAlgoObserver(AlgoObserver):
     def after_clear_stats(self):
         self.episode_cumulative_avg.clear()
         self.episode_final_avg.clear()
+        self.success_final_avg.clear()
         self.direct_info.clear()
         self.new_finished_episodes = False
 
@@ -203,6 +207,11 @@ class EnvStatsAlgoObserver(AlgoObserver):
             for key, values in self.episode_final_avg.items():
                 if values:
                     self.writer.add_scalar(f"episode_final/{key}", np.mean(values), frame)
+            for key, values in self.success_final_avg.items():
+                if values:
+                    self.writer.add_scalar(f"success/{key}", np.mean(values), frame)
+            if self.success_final_avg and self.algo is not None:
+                self.writer.add_scalar("success/epoch", float(getattr(self.algo, "epoch_num", 0)), frame)
             self.new_finished_episodes = False
 
         for key, value in self.direct_info.items():

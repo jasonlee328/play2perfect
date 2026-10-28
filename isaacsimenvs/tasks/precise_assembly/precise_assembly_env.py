@@ -494,6 +494,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self._distractor_reset_pos = torch.zeros(len(dists), self.num_envs, 3, device=self.device)
             self.distractor_disp = torch.zeros(self.num_envs, device=self.device)
             self.distractor_disp_ep_max = torch.zeros(self.num_envs, device=self.device)
+            self.distractor_moved_ep_max = torch.zeros(self.num_envs, device=self.device)
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
             w = self._pose_rel_hole_to_world(env_ids, pose)
             body.write_root_pose_to_sim(w, env_ids=env_ids)
@@ -501,13 +502,27 @@ class PreciseAssemblyEnv(PlayEnv):
             self._distractor_reset_pos[k, env_ids] = w[:, :3]
         self.distractor_disp[env_ids] = 0.0
         self.distractor_disp_ep_max[env_ids] = 0.0
+        self.distractor_moved_ep_max[env_ids] = 0.0
 
     def _update_distractor_disp(self) -> None:
         dists = getattr(self, "distractors", ())
         if not dists or not hasattr(self, "_distractor_reset_pos"):
             return
         pos = torch.stack([b.data.root_pos_w for b in dists])  # (K, N, 3)
-        self.distractor_disp = (pos - self._distractor_reset_pos).norm(dim=-1).max(dim=0).values
+        moved = (pos - self._distractor_reset_pos).norm(dim=-1).max(dim=0).values
+        self.distractor_moved_ep_max = torch.maximum(self.distractor_moved_ep_max, moved)
+        box = self.cfg.precise_assembly.distractor_box
+        if box:
+            K = pos.shape[0]
+            rel = pos - (self.hole_pos + self.scene.env_origins).unsqueeze(0)
+            rel = quat_apply_inverse(self.hole_quat_wxyz.unsqueeze(0).expand(K, -1, -1).reshape(-1, 4),
+                                     rel.reshape(-1, 3)).reshape(K, -1, 3)
+            lo = torch.tensor([box[0], box[2], -1e9], device=self.device)
+            hi = torch.tensor([box[1], box[3], box[4]], device=self.device)
+            out = (torch.clamp(lo - rel, min=0.0) + torch.clamp(rel - hi, min=0.0)).norm(dim=-1)
+            self.distractor_disp = out.max(dim=0).values
+        else:
+            self.distractor_disp = moved
         self.distractor_disp_ep_max = torch.maximum(self.distractor_disp_ep_max, self.distractor_disp)
 
     def _joint_bodies(self):
@@ -1071,6 +1086,21 @@ class PreciseAssemblyEnv(PlayEnv):
         episode_final["all_goals_hit"] = all_goals_hit.float()
         if self.cfg.precise_assembly.enable_retract:
             episode_final["retract_success"] = self.retract_succeeded.float()
+
+        # Plain per-episode outcome, logged as success/<key> (EnvStatsAlgoObserver): read at each episode's end and
+        # averaged over the last games_to_track finished episodes. task = the episode did the whole task (all goals,
+        # and the release check when retract is on); any_goal = reached at least one goal ("succeeded once").
+        all_goals = all_goals_hit.float()
+        task = (self.retract_succeeded.float() if self.cfg.precise_assembly.enable_retract else all_goals)
+        sf = {"task": task, "all_goals": all_goals, "any_goal": (self._successes >= 1).float(),
+              "goals_reached": self._successes.float(), "goals_total": self.env_max_goals.float(),
+              "goals_frac": success_ratio}
+        if hasattr(self, "distractor_disp_ep_max"):
+            sf["neighbours_moved_cm"] = self.distractor_moved_ep_max * 100.0
+            sf["neighbours_out_of_box_cm"] = self.distractor_disp_ep_max * 100.0
+            sf["ended_disturbed"] = self._termination_reasons["disturbed"].float() \
+                if "disturbed" in self._termination_reasons else torch.zeros_like(task)
+        self.extras["success_final"] = {k: v.detach().clone() for k, v in sf.items()}
 
         prev_ratio = (
             self._prev_episode_successes.float()
