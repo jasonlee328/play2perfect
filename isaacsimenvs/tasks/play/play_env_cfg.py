@@ -370,6 +370,9 @@ class RewardCfg:
     lifting_rew_offset: float = 0.05
 
     distance_delta_rew_scale: float = 50.0
+    # fingertip-approach reward only for these fingers (substrings of the fingertip body names: thumb, index, middle,
+    # ring, pinky), rescaled to the same total; None = all five
+    fingertip_reward_fingers: list[str] | None = None
     reach_goal_bonus: float = 1000.0
 
     kuka_actions_penalty_scale: float = 0.03

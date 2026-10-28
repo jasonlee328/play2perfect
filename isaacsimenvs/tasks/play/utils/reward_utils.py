@@ -31,11 +31,14 @@ def distance_delta_reward(
     closest_fingertip_dist: torch.Tensor,  # (N, num_fingertips)
     lifted: torch.Tensor,                  # (N,) bool
     rew_scale: float,
+    weights: torch.Tensor | None = None,   # (num_fingertips,)
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Reward fingertip progress before the object is lifted."""
     deltas = closest_fingertip_dist - curr_fingertip_dist
     new_closest = torch.minimum(closest_fingertip_dist, curr_fingertip_dist)
     deltas = torch.clamp(deltas, 0.0, 10.0)
+    if weights is not None:
+        deltas = deltas * weights
     rew = deltas.sum(dim=-1) * (~lifted).float()
     return rew * rew_scale, new_closest
 
@@ -115,6 +118,7 @@ def compute_rewards(env) -> torch.Tensor:
         closest_fingertip_dist=env._closest_fingertip_dist,
         lifted=env._lifted_object,
         rew_scale=rew_cfg.distance_delta_rew_scale,
+        weights=getattr(env, "_fingertip_rew_weights", None),
     )
     env._closest_fingertip_dist = new_closest_ft
 

@@ -34,8 +34,16 @@ def allocate_state_buffers(env) -> None:
     env._arm_joint_ids = env.robot.find_joints(ARM_JOINT_REGEX)[0]      # 7
     env._hand_joint_ids = env.robot.find_joints(HAND_JOINT_REGEX)[0]     # 22
     env._palm_body_id = env.robot.find_bodies(PALM_BODY_NAME)[0][0]
-    env._fingertip_body_ids = env.robot.find_bodies(FINGERTIP_BODY_REGEX)[0]  # 5
+    env._fingertip_body_ids, ft_names = env.robot.find_bodies(FINGERTIP_BODY_REGEX)  # 5
     assert len(env._fingertip_body_ids) == NUM_FINGERTIPS
+    # Fingertip-approach reward weights: only the listed fingers (rescaled to the same total), e.g. a thumb-index
+    # pinch into a bin too narrow for the whole hand.
+    w = torch.ones(NUM_FINGERTIPS, device=env.device)
+    if rew.fingertip_reward_fingers:
+        w = torch.tensor([float(any(f in n for f in rew.fingertip_reward_fingers)) for n in ft_names], device=env.device)
+        assert w.sum() > 0, (rew.fingertip_reward_fingers, ft_names)
+        w = w * NUM_FINGERTIPS / w.sum()
+    env._fingertip_rew_weights = w
 
     # Convert between Lab parser order and canonical policy order.
     lab_names = list(env.robot.data.joint_names)
