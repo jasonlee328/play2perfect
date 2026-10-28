@@ -127,6 +127,10 @@ class PreciseAssemblyCfg:
     # distractor rise above its reset height beyond distractor_lift_slack (m). Sliding / rolling inside the bin is free.
     distractor_lift_penalty_scale: float = 0.0
     distractor_lift_slack: float = 0.005
+    # Privileged teacher obs: each distractor's position relative to the palm and to the object (6 per distractor,
+    # field "distractor_obs", added to obs_list and state_list). A checkpoint trained without it warm-starts with
+    # the new inputs zero-initialized when P2P_NEW_OBS_FIELD=distractor_obs (train.py).
+    obs_distractors: bool = False
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False

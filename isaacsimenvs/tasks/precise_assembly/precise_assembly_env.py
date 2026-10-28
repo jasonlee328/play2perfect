@@ -312,6 +312,11 @@ class PreciseAssemblyEnv(PlayEnv):
         self._pih_distractor_urdf_abs = tuple(str(_resolve_asset_path(u)) for u, _ in problem.distractors)
         self._pih_distractor_pose_rel = tuple(tuple(float(v) for v in pose) for _, pose in problem.distractors)
         self._pih_object_start_rel = tuple(float(v) for v in problem.object_start_pose_rel_receptive)
+        if cfg.precise_assembly.obs_distractors and self._pih_distractor_urdf_abs:
+            OBS_FIELD_SIZES["distractor_obs"] = 6 * len(self._pih_distractor_urdf_abs)
+            for lst in ("obs_list", "state_list"):
+                if "distractor_obs" not in getattr(cfg.obs, lst):
+                    setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)

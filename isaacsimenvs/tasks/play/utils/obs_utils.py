@@ -342,6 +342,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         elif override != "none":
             raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
 
+    if "distractor_obs" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
+        d = torch.stack([b.data.root_pos_w for b in env.distractors], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
+        obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
+
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel

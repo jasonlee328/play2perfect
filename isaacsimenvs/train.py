@@ -125,8 +125,15 @@ def main() -> None:
         None if tactile is off or not in ``fields``."""
         from isaacsimenvs.tasks.play.utils.obs_utils import OBS_FIELD_SIZES
 
-        tactile = getattr(cfg, "tactile", None)
         fields = tuple(fields)
+        # P2P_NEW_OBS_FIELD names another field that is new relative to the checkpoint (e.g. distractor_obs).
+        new = os.environ.get("P2P_NEW_OBS_FIELD")
+        if new:
+            if new not in fields:
+                return None
+            i = fields.index(new)
+            return sum(OBS_FIELD_SIZES[f] for f in fields[:i]), OBS_FIELD_SIZES[new]
+        tactile = getattr(cfg, "tactile", None)
         if tactile is None or not tactile.enabled or "tactile" not in fields:
             return None
         i = fields.index("tactile")
