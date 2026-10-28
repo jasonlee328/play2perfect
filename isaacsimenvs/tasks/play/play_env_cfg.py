@@ -366,6 +366,7 @@ class RewardCfg:
     lifting_rew_scale: float = 20.0
     lifting_bonus: float = 300.0
     lifting_bonus_threshold: float = 0.15
+    lifting_rew_offset: float = 0.05  # dense lift reward at rest (0 = pay only for height gained)
 
     distance_delta_rew_scale: float = 50.0
     reach_goal_bonus: float = 1000.0

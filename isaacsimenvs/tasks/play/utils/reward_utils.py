@@ -12,10 +12,12 @@ def lifting_reward(
     lifting_bonus_threshold: float,
     lifting_bonus: float,
     lifting_rew_scale: float,
+    lifting_rew_offset: float = 0.05,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Lift progress, one-shot lift bonus, and latched lifted state."""
+    """Lift progress, one-shot lift bonus, and latched lifted state. lifting_rew_offset is the dense reward paid at
+    rest (0.05 = the original; 0 pays only for height gained, so an un-lifted episode isn't worth more than lifting)."""
     z_lift = 0.05 + object_z - object_init_z
-    lift_rew = torch.clamp(z_lift, 0.0, 0.5)
+    lift_rew = torch.clamp(z_lift - 0.05 + lifting_rew_offset, 0.0, 0.5)
     lifted = (z_lift > lifting_bonus_threshold) | prev_lifted
     just_crossed = lifted & ~prev_lifted
     lift_bonus = lifting_bonus * just_crossed.float()
@@ -103,6 +105,7 @@ def compute_rewards(env) -> torch.Tensor:
         lifting_bonus_threshold=rew_cfg.lifting_bonus_threshold,
         lifting_bonus=rew_cfg.lifting_bonus,
         lifting_rew_scale=rew_cfg.lifting_rew_scale,
+        lifting_rew_offset=rew_cfg.lifting_rew_offset,
     )
     env._lifted_object = new_lifted
 
