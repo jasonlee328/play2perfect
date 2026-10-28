@@ -29,23 +29,6 @@
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_22.obj" scale="1 1 1"/></geometry></collision>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_23.obj" scale="1 1 1"/></geometry></collision>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_24.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_25.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_26.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_27.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_28.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_29.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_30.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_31.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_32.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_33.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_34.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_35.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_36.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_37.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_38.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_39.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_40.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_41.obj" scale="1 1 1"/></geometry></collision>
     <inertial><mass value="0.007611"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="5.852100e-06" ixy="9.562384e-18" ixz="5.128520e-22" iyy="5.852092e-06" iyz="-1.070066e-11" izz="5.404309e-06"/></inertial>
   </link>
 </robot>
