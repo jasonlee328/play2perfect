@@ -115,6 +115,38 @@ def _create_fixture_joints(env) -> None:
     print(f"[precise_assembly] created {len(joints)} fixture joint(s) x {env.num_envs} envs", flush=True)
 
 
+def _create_ball_links(env) -> None:
+    """cfg.precise_assembly.ball_links: (body_a, body_b, ax, ay, az) = a USD spherical joint per env between two loose
+    bodies ("object" / "distractor<k>"), anchored at (ax, ay, az) (m, body_a's frame) and at the same point in
+    body_b's frame at their reset poses. Holds a key on a keyring (the thin wire otherwise slips through the key under
+    hand forces). The two linked bodies do not collide with each other (USD joint default)."""
+    links = tuple(getattr(env.cfg.precise_assembly, "ball_links", ()) or ())
+    if not links:
+        return
+    import omni.usd
+    from pxr import Gf, UsdPhysics
+
+    def pose_of(body):
+        pose = env._pih_object_start_rel if body == "object" else env._pih_distractor_pose_rel[int(body[10:])]
+        return Gf.Vec3d(*pose[:3]), Gf.Rotation(Gf.Quatd(pose[6], Gf.Vec3d(*pose[3:6])))
+
+    def root(body):
+        return "Object" if body == "object" else f"Distractor{int(body[10:])}"
+
+    stage = omni.usd.get_context().get_stage()
+    for k, (a, b, *anchor) in enumerate(links):
+        p_a, r_a = pose_of(str(a)); p_b, r_b = pose_of(str(b))
+        world = p_a + r_a.TransformDir(Gf.Vec3d(*map(float, anchor)))  # receptive frame
+        pos_b = r_b.GetInverse().TransformDir(world - p_b)
+        for i in range(env.num_envs):
+            jp = UsdPhysics.SphericalJoint.Define(stage, f"/World/envs/env_{i}/BallLink{k}")
+            jp.CreateBody0Rel().SetTargets([_rigid_body_prim(stage, f"/World/envs/env_{i}/{root(str(a))}").GetPath()])
+            jp.CreateBody1Rel().SetTargets([_rigid_body_prim(stage, f"/World/envs/env_{i}/{root(str(b))}").GetPath()])
+            jp.CreateLocalPos0Attr(Gf.Vec3f(*map(float, anchor)))
+            jp.CreateLocalPos1Attr(Gf.Vec3f(*pos_b))
+    print(f"[precise_assembly] created {len(links)} ball link(s) x {env.num_envs} envs", flush=True)
+
+
 def setup_scene(env) -> None:
     """Build robot, narrow table, dynamic hole fixture, object, goal, and light."""
     assets_cfg = env.cfg.assets
@@ -290,6 +322,7 @@ def setup_scene(env) -> None:
     # replicate_physics=False this is a no-op for env_origins (already
     # set in __init__).
     _create_fixture_joints(env)
+    _create_ball_links(env)
 
     if env.scene._default_env_origins is None:
         env.scene.clone_environments(copy_from_source=False)

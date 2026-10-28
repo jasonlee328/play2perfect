@@ -154,6 +154,9 @@ class PreciseAssemblyCfg:
     # PhysX position iterations of the object and the distractors (the robot has its own). Thin interlocked parts (keys on
     # a 2.4 mm ring) separate under hand forces at the default 4.
     object_solver_position_iterations: int = 4
+    # Spherical joints between loose bodies: (body_a, body_b, ax, ay, az), body = "object" or "distractor<k>", anchor in
+    # m in body_a's frame (scene_utils._create_ball_links). Keychain: each key's hole centre on the ring.
+    ball_links: tuple = ()
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False
