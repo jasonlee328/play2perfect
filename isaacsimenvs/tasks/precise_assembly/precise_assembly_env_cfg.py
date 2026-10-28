@@ -139,6 +139,8 @@ class PreciseAssemblyCfg:
     distractor_curriculum_offset_steps: int = 0  # added to common_step_counter (set on resume)
     # One-time reward subtracted when an episode ends because a distractor left the box / moved too far.
     distractor_disturb_terminal_penalty: float = 0.0
+    # one-time reward cut when an episode ends because the object fell (object z < 0.1 m, off the table)
+    fall_terminal_penalty: float = 0.0
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False

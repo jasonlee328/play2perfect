@@ -1103,6 +1103,14 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
 
+        # One-time penalty when the episode ends with the object below the fall height: after the lift bonus the
+        # remaining steps only cost action penalties, so throwing a small part off the table paid (bolt runs).
+        if pih_cfg.fall_terminal_penalty > 0.0 and "fall" in self._termination_reasons:
+            fall_pen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
+            reward = reward - fall_pen
+            self._reward_terms["fall_terminal_penalty"] = -fall_pen
+            self._reward_terms["total_reward"] = reward
+
         log_step_metrics(self)
         self._log_peg_metrics()
         return reward
