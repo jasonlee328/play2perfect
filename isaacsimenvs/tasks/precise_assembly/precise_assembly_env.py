@@ -495,6 +495,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.distractor_disp = torch.zeros(self.num_envs, device=self.device)
             self.distractor_disp_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_moved_ep_max = torch.zeros(self.num_envs, device=self.device)
+            self.distractor_rise = torch.zeros(self.num_envs, device=self.device)
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
             w = self._pose_rel_hole_to_world(env_ids, pose)
             body.write_root_pose_to_sim(w, env_ids=env_ids)
@@ -503,6 +504,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self.distractor_disp[env_ids] = 0.0
         self.distractor_disp_ep_max[env_ids] = 0.0
         self.distractor_moved_ep_max[env_ids] = 0.0
+        self.distractor_rise[env_ids] = 0.0
 
     def _update_distractor_disp(self) -> None:
         dists = getattr(self, "distractors", ())
@@ -510,6 +512,7 @@ class PreciseAssemblyEnv(PlayEnv):
             return
         pos = torch.stack([b.data.root_pos_w for b in dists])  # (K, N, 3)
         moved = (pos - self._distractor_reset_pos).norm(dim=-1).max(dim=0).values
+        self.distractor_rise = (pos[..., 2] - self._distractor_reset_pos[..., 2]).max(dim=0).values
         self.distractor_moved_ep_max = torch.maximum(self.distractor_moved_ep_max, moved)
         box = self.cfg.precise_assembly.distractor_box
         if box:
@@ -1071,7 +1074,14 @@ class PreciseAssemblyEnv(PlayEnv):
                 reward = reward - pen
                 self._reward_terms["distractor_penalty"] = -pen
                 self._reward_terms["total_reward"] = reward
+            if pih_cfg.distractor_lift_penalty_scale > 0.0:
+                lift_pen = pih_cfg.distractor_lift_penalty_scale * torch.clamp(
+                    self.distractor_rise - pih_cfg.distractor_lift_slack, min=0.0)
+                reward = reward - lift_pen
+                self._reward_terms["distractor_lift_penalty"] = -lift_pen
+                self._reward_terms["total_reward"] = reward
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
+            self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
 
         log_step_metrics(self)
         self._log_peg_metrics()
