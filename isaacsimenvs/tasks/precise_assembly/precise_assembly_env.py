@@ -1090,6 +1090,12 @@ class PreciseAssemblyEnv(PlayEnv):
             )
             self.extras["retract_success_bonus"] = self.retract_success_bonus
 
+        if pih_cfg.fall_terminal_penalty > 0.0 and "fall" in self._termination_reasons:
+            fall_pen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
+            reward = reward - fall_pen
+            self._reward_terms["fall_terminal_penalty"] = -fall_pen
+            self._reward_terms["total_reward"] = reward
+
         if hasattr(self, "distractor_disp"):
             if pih_cfg.distractor_penalty_scale > 0.0:
                 pen = pih_cfg.distractor_penalty_scale * self._distractor_curriculum()[1] * self.distractor_disp
