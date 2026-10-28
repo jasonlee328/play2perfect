@@ -151,6 +151,9 @@ class PreciseAssemblyCfg:
     # PhysX max depenetration velocity (m/s) of the object and the distractors. The 1000 default lets a heap of small
     # interpenetrating parts (keychain) launch pieces ~1 m up; ~1 m/s keeps such heaps put.
     object_max_depenetration_velocity: float = 1000.0
+    # PhysX position iterations of the object and the distractors (the robot has its own). Thin interlocked parts (keys on
+    # a 2.4 mm ring) separate under hand forces at the default 4.
+    object_solver_position_iterations: int = 4
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False
