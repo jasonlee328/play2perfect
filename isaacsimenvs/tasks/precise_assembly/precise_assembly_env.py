@@ -511,6 +511,15 @@ class PreciseAssemblyEnv(PlayEnv):
         self.distractor_moved_ep_max[env_ids] = 0.0
         self.distractor_rise[env_ids] = 0.0
 
+    def _distractor_curriculum(self) -> tuple[float, float]:
+        """(disturb tolerance, penalty multiplier in [0, 1]) at the current env step."""
+        c = self.cfg.precise_assembly
+        if c.distractor_curriculum_steps <= 0:
+            return c.distractor_disturb_tol, 1.0
+        a = min(1.0, float(self.common_step_counter + c.distractor_curriculum_offset_steps)
+                / float(c.distractor_curriculum_steps))
+        return c.distractor_disturb_tol_start + a * (c.distractor_disturb_tol - c.distractor_disturb_tol_start), a
+
     def _update_distractor_disp(self) -> None:
         dists = getattr(self, "distractors", ())
         if not dists or not hasattr(self, "_distractor_reset_pos"):
@@ -991,7 +1000,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self._update_distractor_disp()
         self._update_joint_angles()
         if pih_cfg.terminate_on_disturb and hasattr(self, "distractor_disp"):
-            disturbed = self.distractor_disp > pih_cfg.distractor_disturb_tol
+            disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
         terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
@@ -1075,18 +1084,19 @@ class PreciseAssemblyEnv(PlayEnv):
 
         if hasattr(self, "distractor_disp"):
             if pih_cfg.distractor_penalty_scale > 0.0:
-                pen = pih_cfg.distractor_penalty_scale * self.distractor_disp
+                pen = pih_cfg.distractor_penalty_scale * self._distractor_curriculum()[1] * self.distractor_disp
                 reward = reward - pen
                 self._reward_terms["distractor_penalty"] = -pen
                 self._reward_terms["total_reward"] = reward
             if pih_cfg.distractor_lift_penalty_scale > 0.0:
-                lift_pen = pih_cfg.distractor_lift_penalty_scale * torch.clamp(
+                lift_pen = pih_cfg.distractor_lift_penalty_scale * self._distractor_curriculum()[1] * torch.clamp(
                     self.distractor_rise - pih_cfg.distractor_lift_slack, min=0.0)
                 reward = reward - lift_pen
                 self._reward_terms["distractor_lift_penalty"] = -lift_pen
                 self._reward_terms["total_reward"] = reward
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
+            self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
 
         log_step_metrics(self)
         self._log_peg_metrics()

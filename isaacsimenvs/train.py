@@ -127,12 +127,15 @@ def main() -> None:
 
         fields = tuple(fields)
         # P2P_NEW_OBS_FIELD names another field that is new relative to the checkpoint (e.g. distractor_obs).
-        new = os.environ.get("P2P_NEW_OBS_FIELD")
+        # A comma list must be contiguous in ``fields`` (e.g. distractor_obs,tactile from the Stage-1 play policy).
+        new = [f for f in os.environ.get("P2P_NEW_OBS_FIELD", "").split(",") if f]
         if new:
-            if new not in fields:
+            if any(f not in fields for f in new):
                 return None
-            i = fields.index(new)
-            return sum(OBS_FIELD_SIZES[f] for f in fields[:i]), OBS_FIELD_SIZES[new]
+            i = min(fields.index(f) for f in new)
+            if set(fields[i:i + len(new)]) != set(new):
+                raise ValueError(f"P2P_NEW_OBS_FIELD {new} not contiguous in {fields}")
+            return sum(OBS_FIELD_SIZES[f] for f in fields[:i]), sum(OBS_FIELD_SIZES[f] for f in new)
         tactile = getattr(cfg, "tactile", None)
         if tactile is None or not tactile.enabled or "tactile" not in fields:
             return None
