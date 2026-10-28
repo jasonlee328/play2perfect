@@ -792,6 +792,14 @@ class PreciseAssemblyEnv(PlayEnv):
                     torch.full_like(tol, float(curriculum_tol)),
                     tol,
                 )
+        hang = float(pih_cfg.distractors_hang_below)
+        dists = getattr(self, "distractors", ())
+        if hang > 0.0 and dists:
+            # the goal only counts while every distractor hangs at least `hang` below the object (it is carried by
+            # the object, not held by the hand too): a key lifted off a keychain, not the whole bunch scooped up
+            dz = torch.stack([b.data.root_pos_w[:, 2] for b in dists]) - self.object.data.root_pos_w[:, 2]
+            self._distractors_hanging = (dz <= -hang).all(dim=0)
+            tol = torch.where(self._distractors_hanging, tol, torch.full_like(tol, -1.0))
         return tol
 
     def _curriculum_eligible_mask(self) -> torch.Tensor | None:

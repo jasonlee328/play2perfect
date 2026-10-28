@@ -157,6 +157,9 @@ class PreciseAssemblyCfg:
     # Spherical joints between loose bodies: (body_a, body_b, ax, ay, az), body = "object" or "distractor<k>", anchor in
     # m in body_a's frame (scene_utils._create_ball_links). Keychain: each key's hole centre on the ring.
     ball_links: tuple = ()
+    # > 0: a goal only counts while every distractor's root is at least this far (m) below the object's (the rest of a
+    # keychain dangling from the lifted key, not scooped up with it). 0 = off.
+    distractors_hang_below: float = 0.0
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False
