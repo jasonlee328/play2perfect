@@ -142,6 +142,9 @@ class PreciseAssemblyCfg:
     distractor_curriculum_offset_steps: int = 0  # added to common_step_counter (set on resume)
     # One-time reward subtracted when an episode ends because a distractor left the box / moved too far.
     distractor_disturb_terminal_penalty: float = 0.0
+    # Per-step reward while the thumb pad and at least one finger pad touch the object (tactile), until it is lifted:
+    # shapes an opposed pinch of a flat part (keychain: 39% of episodes never got fingers under the key). Needs tactile.
+    pinch_contact_reward: float = 0.0
     # One-time reward subtracted when an episode ends because the object fell off the table (z < 0.1 m). Without it
     # sweeping the object off the table ends the episode for free (keychain: 37% of episodes).
     fall_terminal_penalty: float = 0.0

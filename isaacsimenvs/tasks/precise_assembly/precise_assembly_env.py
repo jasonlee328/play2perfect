@@ -1090,6 +1090,16 @@ class PreciseAssemblyEnv(PlayEnv):
             )
             self.extras["retract_success_bonus"] = self.retract_success_bonus
 
+        tac = getattr(self, "_last_tactile", None)
+        if pih_cfg.pinch_contact_reward > 0.0 and tac is not None:
+            # pads in FINGERS order (thumb first); tactile rays only hit the object, so contact = touching the target
+            pad = tac.reshape(self.num_envs, 5, -1).amax(dim=-1) > 0.0
+            pinch = pad[:, 0] & pad[:, 1:].any(dim=-1) & ~self._lifted_object
+            pinch_rew = pih_cfg.pinch_contact_reward * pinch.float()
+            reward = reward + pinch_rew
+            self._reward_terms["pinch_contact_rew"] = pinch_rew
+            self._reward_terms["total_reward"] = reward
+
         if pih_cfg.fall_terminal_penalty > 0.0 and "fall" in self._termination_reasons:
             fall_pen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
             reward = reward - fall_pen
