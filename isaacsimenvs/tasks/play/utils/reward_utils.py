@@ -13,16 +13,23 @@ def lifting_reward(
     lifting_bonus: float,
     lifting_rew_scale: float,
     lifting_rew_offset: float = 0.05,
+    grasp_ok: torch.Tensor | None = None,     # (N,) bool: dense lift reward only while grasped
+    grasp_held: torch.Tensor | None = None,   # (N,) bool: latch only after a held grasped lift
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Lift progress, one-shot lift bonus, and latched lifted state."""
     z_lift = 0.05 + object_z - object_init_z
     # The offset pays lifting_rew_scale * offset per step before the lift even with the object untouched; with long
     # episodes and a lift reward forced on (precise_assembly.force_lift_reward_active) that beats the lift bonus.
     lift_rew = torch.clamp(z_lift - 0.05 + lifting_rew_offset, 0.0, 0.5)
-    lifted = (z_lift > lifting_bonus_threshold) | prev_lifted
+    crossed = z_lift > lifting_bonus_threshold
+    if grasp_held is not None:
+        crossed = crossed & grasp_held
+    lifted = crossed | prev_lifted
     just_crossed = lifted & ~prev_lifted
     lift_bonus = lifting_bonus * just_crossed.float()
     lift_rew = lift_rew * (~lifted).float()
+    if grasp_ok is not None:
+        lift_rew = lift_rew * grasp_ok.float()
     return lift_rew * lifting_rew_scale, lift_bonus, lifted
 
 
@@ -102,6 +109,20 @@ def compute_rewards(env) -> torch.Tensor:
     env_origins = env.scene.env_origins
     obj_pos = env.object.data.root_pos_w - env_origins
 
+    # Grasp-gated lift (reward.lift_grasp_fingers > 0): the lift reward and the latched "lifted" state (lift bonus,
+    # start of the keypoint reward) only count while >= lift_grasp_fingers fingertips are within lift_grasp_dist of
+    # the object, held lift_grasp_steps steps for the latch. A small part in a bin otherwise earns the bonus by being
+    # knocked a few cm up.
+    grasp_ok = None
+    if rew_cfg.lift_grasp_fingers > 0:
+        grasp_ok = (env._curr_fingertip_distances < rew_cfg.lift_grasp_dist).sum(dim=-1) >= rew_cfg.lift_grasp_fingers
+        z_ok = (0.05 + obj_pos[:, 2] - env._object_init_z) > rew_cfg.lifting_bonus_threshold
+        hold = getattr(env, "_lift_grasp_hold", None)
+        if hold is None or hold.shape[0] != grasp_ok.shape[0]:
+            hold = torch.zeros_like(grasp_ok, dtype=torch.long)
+        hold = torch.where(grasp_ok & z_ok, hold + 1, torch.zeros_like(hold))
+        hold = torch.where(env.episode_length_buf <= 1, torch.zeros_like(hold), hold)
+        env._lift_grasp_hold = hold
     lift_rew, lift_bonus_rew, new_lifted = lifting_reward(
         object_z=obj_pos[:, 2],
         object_init_z=env._object_init_z,
@@ -110,6 +131,8 @@ def compute_rewards(env) -> torch.Tensor:
         lifting_bonus=rew_cfg.lifting_bonus,
         lifting_rew_scale=rew_cfg.lifting_rew_scale,
         lifting_rew_offset=rew_cfg.lifting_rew_offset,
+        grasp_ok=grasp_ok,
+        grasp_held=None if grasp_ok is None else env._lift_grasp_hold >= rew_cfg.lift_grasp_steps,
     )
     env._lifted_object = new_lifted
 
@@ -147,9 +170,15 @@ def compute_rewards(env) -> torch.Tensor:
     )
 
     reward = lift_rew + lift_bonus_rew + ft_rew + kp_rew + kuka_pen + hand_pen + bonus
+    # reward.grasp_rew_scale: per step with the grasp gate (lift_grasp_fingers near the object) before the lift
+    grasp_rew = torch.zeros_like(reward)
+    if grasp_ok is not None and rew_cfg.grasp_rew_scale > 0:
+        grasp_rew = rew_cfg.grasp_rew_scale * (grasp_ok & ~env._lifted_object).float()
+        reward = reward + grasp_rew
     env._reward_terms = {
         "fingertip_delta_rew": ft_rew,
         "lifting_rew": lift_rew,
+        "grasp_rew": grasp_rew,
         "lift_bonus_rew": lift_bonus_rew,
         "keypoint_rew": kp_rew,
         "kuka_actions_penalty": kuka_pen,

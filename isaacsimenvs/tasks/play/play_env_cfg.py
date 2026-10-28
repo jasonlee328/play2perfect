@@ -368,6 +368,12 @@ class RewardCfg:
     lifting_bonus_threshold: float = 0.15
     # lift reward = scale * clamp(rise + offset, 0, 0.5) until lifted; 0 = no reward for an untouched object
     lifting_rew_offset: float = 0.05
+    # grasp-gated lift: >0 = lift reward / lifted latch need this many fingertip bodies within lift_grasp_dist (m) of
+    # the object root, held lift_grasp_steps steps for the latch; 0 = off (any rise counts)
+    lift_grasp_fingers: int = 0
+    lift_grasp_dist: float = 0.04
+    lift_grasp_steps: int = 5
+    grasp_rew_scale: float = 0.0  # per step while the grasp gate holds, before the lift (needs lift_grasp_fingers)
 
     distance_delta_rew_scale: float = 50.0
     # fingertip-approach reward only for these fingers (substrings of the fingertip body names: thumb, index, middle,
