@@ -160,6 +160,9 @@ class PreciseAssemblyCfg:
     # > 0: a goal only counts while every distractor's root is at least this far (m) below the object's (the rest of a
     # keychain dangling from the lifted key, not scooped up with it). 0 = off.
     distractors_hang_below: float = 0.0
+    # Per-step penalty (per m, summed over distractors) while the object is lifted on how far each distractor is above
+    # the distractors_hang_below line under the object: dense shaping toward letting the rest of the bunch dangle.
+    distractors_hang_penalty_scale: float = 0.0
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False
