@@ -131,6 +131,9 @@ class PreciseAssemblyCfg:
     # field "distractor_obs", added to obs_list and state_list). A checkpoint trained without it warm-starts with
     # the new inputs zero-initialized when P2P_NEW_OBS_FIELD=distractor_obs (train.py).
     obs_distractors: bool = False
+    # > 0: feed only the obs_distractors_k distractors whose reset pose is nearest the object's start (kept in
+    # problem order), so a policy trained with k neighbours can run on a layout with more. 0 = all of them.
+    obs_distractors_k: int = 0
     # Curriculum over env steps (common_step_counter): the disturb tolerance shrinks linearly from
     # distractor_disturb_tol_start to distractor_disturb_tol, and the distractor penalties ramp from 0 to their
     # scales, over distractor_curriculum_steps. 0 = off (the final values from the start).

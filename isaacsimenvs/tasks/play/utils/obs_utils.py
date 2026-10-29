@@ -334,16 +334,24 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             r = env._tactile_hr_res
             hr = env._tactile_hr.compute().view(-1, r, r)               # (N*5, r, r) in [0, 1]
             env._last_tactile_feat = env._tactile_encoder(hr).view(env.num_envs, -1)
+        if getattr(env, "_hand_skin", None) is not None:
+            obs_clean["tactile_hand"] = env._hand_skin.compute()
+            env._last_tactile_hand = obs_clean["tactile_hand"]
         override = str(getattr(env.cfg.tactile, "policy_override", "none")).lower()
-        if override == "zero":
-            obs_clean["tactile"] = torch.zeros_like(obs_clean["tactile"])
-        elif override == "random":
-            obs_clean["tactile"] = torch.rand_like(obs_clean["tactile"])
-        elif override != "none":
-            raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
+        for k in ("tactile", "tactile_hand"):
+            if k not in obs_clean:
+                continue
+            if override == "zero":
+                obs_clean[k] = torch.zeros_like(obs_clean[k])
+            elif override == "random":
+                obs_clean[k] = torch.rand_like(obs_clean[k])
+            elif override != "none":
+                raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
 
     if "distractor_obs" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
-        d = torch.stack([b.data.root_pos_w for b in env.distractors], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
+        idx = getattr(env, "_obs_distractor_idx", None)
+        bodies = env.distractors if idx is None else [env.distractors[i] for i in idx]
+        d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
     obs_noisy = dict(obs_clean)

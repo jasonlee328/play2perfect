@@ -564,6 +564,15 @@ class TactileCfg:
     map_dir: str = "assets/tactile/sharpa_tacmap"
     # Upper bound on rays per raycast call (envs are processed in chunks).
     max_rays_per_chunk: int = 4_000_000
+    # Experimental whole-hand skin (utils/hand_skin.py): field "tactile_hand" of 21 links x grid^2 taxels, appended
+    # after "tactile" (policy obs; critic too with whole_hand_in_critic). Needs enabled=true. A checkpoint trained
+    # without it warm-starts with P2P_NEW_OBS_FIELD=tactile_hand. policy_override applies to it as well.
+    whole_hand: bool = False
+    whole_hand_grid: int = 4
+    whole_hand_spacing_mm: float = 4.0     # ray spacing on the skin
+    whole_hand_skin_mm: float = 2.0        # virtual skin thickness outside the collision surface
+    whole_hand_distractors: bool = True    # also sense the distractors (one channel with the object)
+    whole_hand_in_critic: bool = False
 
 
 # ----------------------------------------------------------------------------
