@@ -8342,6 +8342,100 @@
      100.0
     ]
    ]
+  },
+  "cb_keychain_key_1_drop": {
+   "object": "key_1",
+   "fixture": "keychain_mat",
+   "object_start_pose": [
+    -0.0086880060926459,
+    -0.00024383524708271963,
+    0.05716065578593616,
+    0.0,
+    0.8191520442889918,
+    0.0,
+    0.5735764363510463
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/keyring/keyring.urdf",
+     [
+      6.664762392182913e-07,
+      1.262960515268042e-11,
+      0.08073944354015002,
+      -0.5,
+      -0.5000000000000001,
+      -0.5000000000000001,
+      0.5000000000000001
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/key_fob/key_fob.urdf",
+     [
+      -0.02402133080340028,
+      -8.966489733219204e-21,
+      0.06756170511023978,
+      -0.0,
+      0.9659258262890684,
+      -0.0,
+      0.25881904510252085
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/key_2/key_2.urdf",
+     [
+      0.007514374593618159,
+      -2.971451040149021e-05,
+      0.06029186963636075,
+      -0.0,
+      0.5735764363510462,
+      -0.0,
+      0.8191520442889917
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/key_3/key_3.urdf",
+     [
+      0.023148407052523873,
+      -0.00023984261930248043,
+      0.06769974283533488,
+      -0.0,
+      0.2588190451025208,
+      -1.1102230246251565e-16,
+      0.9659258262890682
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     -0.0086880060926459,
+     -0.00024383524708271963,
+     0.20716065578593618,
+     0.0,
+     0.8191520442889918,
+     0.0,
+     0.5735764363510463
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     150.0
+    ]
+   ],
+   "layout": {
+    "target": "key_1",
+    "threaded": [
+     "key_fob",
+     "key_1",
+     "key_2",
+     "key_3"
+    ],
+    "note": "hanging start (unsettled): the bunch drops ~5 cm at every reset and settles into a new heap; use with env.precise_assembly.ball_links so the keys stay on the ring (without them they fall off)",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ]
+   }
   }
  }
 }
