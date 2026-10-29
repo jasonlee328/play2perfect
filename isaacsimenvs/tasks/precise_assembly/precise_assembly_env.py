@@ -546,6 +546,11 @@ class PreciseAssemblyEnv(PlayEnv):
         self._sing_entered[:, 1] = step & (self.sing_phase == 1)
         self.sing_phase += step.long()
         self._sing_steps[step] = 0
+        # Lift phase starts: keypoint progress / near-goal hold count from here (goal terms are masked before).
+        lift_ids = self._sing_entered[:, 1].nonzero(as_tuple=False).squeeze(-1)
+        if len(lift_ids) > 0:
+            self._closest_keypoint_max_dist[lift_ids] = -1.0
+            self._near_goal_steps[lift_ids] = 0
 
     def _distractor_curriculum(self) -> tuple[float, float]:
         """(disturb tolerance, penalty multiplier in [0, 1]) at the current env step."""
@@ -1154,6 +1159,12 @@ class PreciseAssemblyEnv(PlayEnv):
                     * (ph == 1).float()
                 bonus = (c.singulate_gather_bonus * self._sing_entered[:, 0].float()
                          + c.singulate_release_bonus * self._sing_entered[:, 1].float())
+                # The goal bonus is paid per step near the goal (amortized) and the episode no longer ends there before
+                # phase 2, so holding the whole bundle at the goal would pay forever: goal / keypoint terms only in phase 2.
+                pre = (ph < 2).float()
+                for k in ("bonus_rew", "keypoint_rew"):
+                    reward = reward - self._reward_terms[k] * pre
+                    self._reward_terms[k] = self._reward_terms[k] * (1.0 - pre)
                 reward = reward + gather + release + bonus
                 self._reward_terms["singulate_gather"] = gather
                 self._reward_terms["singulate_release"] = release
