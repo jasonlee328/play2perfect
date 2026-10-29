@@ -518,6 +518,34 @@ class PreciseAssemblyEnv(PlayEnv):
         self.distractor_disp_ep_max[env_ids] = 0.0
         self.distractor_moved_ep_max[env_ids] = 0.0
         self.distractor_rise[env_ids] = 0.0
+        if self.cfg.precise_assembly.singulate:
+            if not hasattr(self, "sing_phase"):
+                self.sing_phase = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+                self._sing_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+                self._sing_obj_z0 = torch.zeros(self.num_envs, device=self.device)
+                self._sing_entered = torch.zeros(self.num_envs, 2, dtype=torch.bool, device=self.device)
+            self.sing_phase[env_ids] = 0
+            self._sing_steps[env_ids] = 0
+            self._sing_entered[env_ids] = False
+            self._sing_obj_z0[env_ids] = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)[:, 2]
+
+    def _update_singulate(self) -> None:
+        """Advance the gather -> release -> lift phase (see PreciseAssemblyCfg.singulate)."""
+        c = self.cfg.precise_assembly
+        rise = torch.stack([b.data.root_pos_w[:, 2] for b in self.distractors]) - self._distractor_reset_pos[..., 2]
+        self._sing_rise = rise  # (K, N)
+        self._sing_obj_rise = self.object.data.root_pos_w[:, 2] - self._sing_obj_z0
+        gathered = ((self._sing_obj_rise >= c.singulate_rise)
+                    & ((rise >= c.singulate_rise).sum(0) >= c.singulate_min_neighbours))
+        released = ((self._sing_obj_rise >= c.singulate_hold_rise) & (rise <= c.singulate_rest).all(0)
+                    & (self.distractor_disp <= 0.0))
+        ok = torch.where(self.sing_phase == 0, gathered, torch.where(self.sing_phase == 1, released, False))
+        self._sing_steps = torch.where(ok, self._sing_steps + 1, torch.zeros_like(self._sing_steps))
+        step = (self._sing_steps >= c.singulate_hold_steps) & (self.sing_phase < 2)
+        self._sing_entered[:, 0] = step & (self.sing_phase == 0)
+        self._sing_entered[:, 1] = step & (self.sing_phase == 1)
+        self.sing_phase += step.long()
+        self._sing_steps[step] = 0
 
     def _distractor_curriculum(self) -> tuple[float, float]:
         """(disturb tolerance, penalty multiplier in [0, 1]) at the current env step."""
@@ -544,6 +572,9 @@ class PreciseAssemblyEnv(PlayEnv):
                                      rel.reshape(-1, 3)).reshape(K, -1, 3)
             lo = torch.tensor([box[0], box[2], -1e9], device=self.device)
             hi = torch.tensor([box[1], box[3], box[4]], device=self.device)
+            if self.cfg.precise_assembly.singulate and hasattr(self, "sing_phase"):
+                hi = hi.expand(self.num_envs, 3).clone()  # a raised bundle is fine until the lift phase
+                hi[self.sing_phase < 2, 2] = self.cfg.precise_assembly.singulate_zmax
             out = (torch.clamp(lo - rel, min=0.0) + torch.clamp(rel - hi, min=0.0)).norm(dim=-1)
             self.distractor_disp = out.max(dim=0).values
         else:
@@ -906,6 +937,8 @@ class PreciseAssemblyEnv(PlayEnv):
         is_success = self._is_success.clone()
         if pih_cfg.enable_retract:
             is_success &= ~self.retract_phase
+        if pih_cfg.singulate and hasattr(self, "sing_phase"):
+            is_success &= self.sing_phase >= 2
         self._is_success = is_success
 
         self._successes += is_success.long()
@@ -1006,6 +1039,8 @@ class PreciseAssemblyEnv(PlayEnv):
 
         retract_fail = self.retract_failed if pih_cfg.enable_retract else torch.zeros_like(fall)
         self._update_distractor_disp()
+        if pih_cfg.singulate and hasattr(self, "sing_phase"):
+            self._update_singulate()
         self._update_joint_angles()
         if pih_cfg.terminate_on_disturb and hasattr(self, "distractor_disp"):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
@@ -1099,6 +1134,8 @@ class PreciseAssemblyEnv(PlayEnv):
             if pih_cfg.distractor_lift_penalty_scale > 0.0:
                 lift_pen = pih_cfg.distractor_lift_penalty_scale * self._distractor_curriculum()[1] * torch.clamp(
                     self.distractor_rise - pih_cfg.distractor_lift_slack, min=0.0)
+                if pih_cfg.singulate and hasattr(self, "sing_phase"):
+                    lift_pen = torch.where(self.sing_phase >= 2, lift_pen, torch.zeros_like(lift_pen))
                 reward = reward - lift_pen
                 self._reward_terms["distractor_lift_penalty"] = -lift_pen
                 self._reward_terms["total_reward"] = reward
@@ -1107,6 +1144,23 @@ class PreciseAssemblyEnv(PlayEnv):
                 reward = reward - term_pen
                 self._reward_terms["distractor_terminal_penalty"] = -term_pen
                 self._reward_terms["total_reward"] = reward
+            if pih_cfg.singulate and hasattr(self, "_sing_rise"):
+                c, ph = pih_cfg, self.sing_phase
+                obj_f = torch.clamp(self._sing_obj_rise / c.singulate_rise, 0.0, 1.0)
+                nb_f = torch.clamp(torch.clamp(self._sing_rise / c.singulate_rise, 0.0, 1.0).sum(0)
+                                   / max(c.singulate_min_neighbours, 1), max=1.0)
+                gather = c.singulate_gather_scale * obj_f * nb_f * (ph == 0).float()
+                release = -c.singulate_release_scale * torch.clamp(self._sing_rise - c.singulate_rest, min=0.0).sum(0) \
+                    * (ph == 1).float()
+                bonus = (c.singulate_gather_bonus * self._sing_entered[:, 0].float()
+                         + c.singulate_release_bonus * self._sing_entered[:, 1].float())
+                reward = reward + gather + release + bonus
+                self._reward_terms["singulate_gather"] = gather
+                self._reward_terms["singulate_release"] = release
+                self._reward_terms["singulate_bonus"] = bonus
+                self._reward_terms["total_reward"] = reward
+                for k in range(3):
+                    self.extras[f"singulate_phase{k}"] = (ph == k).float().mean()
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)

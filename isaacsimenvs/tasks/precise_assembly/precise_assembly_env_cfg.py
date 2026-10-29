@@ -146,6 +146,26 @@ class PreciseAssemblyCfg:
     # starts from the same state.
     start_state_sequential: bool = False
     start_state_offset: int = 0
+    # Clutter "gather, release, lift" strategy (needs distractors + distractor_box). Per-env phase:
+    # 0 gather: done once the object and >= singulate_min_neighbours distractors are all >= singulate_rise above
+    #   their reset height for singulate_hold_steps steps (reward += singulate_gather_bonus once);
+    # 1 release: done once every distractor is back within singulate_rest of its reset height and inside the box
+    #   while the object stays >= singulate_hold_rise up, for singulate_hold_steps steps (+= singulate_release_bonus);
+    # 2 lift: the normal task. Goals only count in phase 2. In phases 0-1 the box's zmax is singulate_zmax (a bundle
+    # may be raised), distractor_lift_penalty is off, phase 0 pays singulate_gather_scale x (object rise fraction x
+    # neighbour rise fraction, each capped at 1) per step and phase 1 costs singulate_release_scale x the summed
+    # distractor rise above singulate_rest (m) per step.
+    singulate: bool = False
+    singulate_rise: float = 0.015
+    singulate_min_neighbours: int = 1
+    singulate_hold_steps: int = 5
+    singulate_rest: float = 0.005
+    singulate_hold_rise: float = 0.01
+    singulate_zmax: float = 0.09
+    singulate_gather_scale: float = 1.0
+    singulate_release_scale: float = 50.0
+    singulate_gather_bonus: float = 200.0
+    singulate_release_bonus: float = 200.0
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
