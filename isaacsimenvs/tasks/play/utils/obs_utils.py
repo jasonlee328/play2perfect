@@ -375,11 +375,12 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     if blind:
         ramp = int(getattr(pa, "blind_ramp_steps", 0))
         a = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter) / ramp)
-        m = (torch.arange(env.num_envs, device=env.device) < round(a * env.num_envs)).float().unsqueeze(-1)
+        m = (torch.arange(env.num_envs, device=env.device) < round(a * env.num_envs)).float()
         env.blind_frac = a
         for f in blind:
             if f in obs_noisy:
-                obs_noisy[f] = obs_noisy[f] * (1.0 - m)
+                x = obs_noisy[f]
+                obs_noisy[f] = x * (1.0 - m).view(-1, *([1] * (x.dim() - 1)))   # fields may be (N, K, 3)
 
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)
