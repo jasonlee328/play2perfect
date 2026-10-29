@@ -355,7 +355,8 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
     if "fixture_pose_rel_palm" in OBS_FIELD_SIZES and hasattr(env, "hole_pos"):
-        obs_clean["fixture_pose_rel_palm"] = torch.cat([env.hole_pos - palm_pos, env.hole_quat_wxyz], dim=-1)
+        fpos = env.hole_pos + getattr(env, "_fixture_obs_noise", 0.0)      # fixture_obs_noise_m (per episode)
+        obs_clean["fixture_pose_rel_palm"] = torch.cat([fpos - palm_pos, env.hole_quat_wxyz], dim=-1)
 
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw

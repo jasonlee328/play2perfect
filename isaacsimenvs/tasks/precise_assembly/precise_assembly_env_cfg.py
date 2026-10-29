@@ -138,6 +138,9 @@ class PreciseAssemblyCfg:
     # Privileged-free teacher obs: field "fixture_pose_rel_palm" (fixture position relative to the palm + its
     # quaternion wxyz, 7), added to obs_list and state_list.
     obs_fixture: bool = False
+    # obs_fixture: per-episode constant error on the observed fixture position, U(-d, d) per axis (m, world), so the
+    # tray is only roughly known and the sticks must be found by contact. () = exact.
+    fixture_obs_noise_m: tuple[float, ...] = ()
     # Blind teacher: actor-obs fields zeroed (critic unchanged), e.g. [object_rot,keypoints_rel_palm,
     # keypoints_rel_goal,object_scales,distractor_obs]; ramped in over blind_ramp_steps env steps (share of envs).
     blind_fields: tuple[str, ...] = ()
