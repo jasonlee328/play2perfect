@@ -123,6 +123,10 @@ class PreciseAssemblyCfg:
     # termination above use how far the furthest distractor's root is outside this box (0 while inside) instead of
     # its displacement, so neighbours may be pushed around inside the bin but not lifted or dragged out of it.
     distractor_box: tuple[float, ...] = ()
+    # Start-pose variation for clutter problems: (dx, dy, dz) half-widths in m, receptive frame. At every reset the
+    # object and each distractor are shifted independently by U(-d, d) per axis from their receptive-frame poses
+    # (sticks along their length: (0.02, 0, 0)); the object's goal poses move with it. () = off (old behaviour).
+    start_shift_m: tuple[float, ...] = ()
     # Dense "don't lift the neighbours" shaping: per-step reward -= distractor_lift_penalty_scale * the largest
     # distractor rise above its reset height beyond distractor_lift_slack (m). Sliding / rolling inside the bin is free.
     distractor_lift_penalty_scale: float = 0.0
