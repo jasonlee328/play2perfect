@@ -20,6 +20,7 @@ from .utils.obs_utils import (
     OBS_FIELD_SIZES,
     compute_obs_dim,
 )
+from .utils.hand_skin import HandSkinSensor, hand_skin_obs_dim
 from .utils.tactile_utils import TactileSensor, tactile_obs_dim
 from .utils.reset_utils import allocate_state_buffers, reset_env_state
 from .utils.reward_utils import compute_rewards
@@ -43,6 +44,12 @@ class PlayEnv(DirectRLEnv):
                 cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile")
             if cfg.tactile.in_critic and "tactile" not in cfg.obs.state_list:
                 cfg.obs.state_list = (*cfg.obs.state_list, "tactile")
+            if cfg.tactile.whole_hand:
+                OBS_FIELD_SIZES["tactile_hand"] = hand_skin_obs_dim(cfg.tactile)
+                if cfg.tactile.in_policy and "tactile_hand" not in cfg.obs.obs_list:
+                    cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_hand")
+                if cfg.tactile.whole_hand_in_critic and "tactile_hand" not in cfg.obs.state_list:
+                    cfg.obs.state_list = (*cfg.obs.state_list, "tactile_hand")
         # Override obs/state space from configured field lists before
         # DirectRLEnv / rl_games observes the configclass.
         cfg.observation_space = compute_obs_dim(cfg.obs.obs_list)
@@ -52,6 +59,7 @@ class PlayEnv(DirectRLEnv):
         apply_physx_material_properties(self)
         allocate_state_buffers(self)
         self._tactile = TactileSensor(self, cfg.tactile) if cfg.tactile.enabled else None
+        self._hand_skin = HandSkinSensor(self, cfg.tactile) if cfg.tactile.enabled and cfg.tactile.whole_hand else None
         self._tactile_hr = self._tactile_encoder = None
         so = getattr(cfg, "student_obs", None)
         if so is not None and so.enabled and str(getattr(so, "tactile_encoder", "none")).lower() != "none":
