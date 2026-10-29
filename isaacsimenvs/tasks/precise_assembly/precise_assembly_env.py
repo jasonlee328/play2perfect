@@ -398,6 +398,11 @@ class PreciseAssemblyEnv(PlayEnv):
             hole_y_min, hole_y_max
         )
         self.hole_pos[env_ids, 2] = table_top_z + self._pih_hole_z_offset
+        if pih_cfg.start_state_file and pih_cfg.start_state_bank_hole:
+            # The bank's joints are absolute: put the fixture where the chosen entry was recorded.
+            k = self._pick_start_states(env_ids)
+            self._start_k[env_ids] = k
+            self.hole_pos[env_ids] = self._start_bank_hole_pos[k]
         if is_random_goal.any():
             rg_ids = env_ids[is_random_goal]
             self.hole_pos[rg_ids, 0:2] = 0.0
@@ -524,7 +529,7 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._sing_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
                 self._sing_obj_z0 = torch.zeros(self.num_envs, device=self.device)
                 self._sing_entered = torch.zeros(self.num_envs, 2, dtype=torch.bool, device=self.device)
-            self.sing_phase[env_ids] = 0
+            self.sing_phase[env_ids] = 1 if self.cfg.precise_assembly.singulate_release_only else 0
             self._sing_steps[env_ids] = 0
             self._sing_entered[env_ids] = False
             self._sing_obj_z0[env_ids] = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)[:, 2]
@@ -634,8 +639,14 @@ class PreciseAssemblyEnv(PlayEnv):
         # (z - init_z > 0.10, which gates the keypoint reward) would need ~20 cm above the bin. Measure from here.
         self._object_init_z[env_ids] = w[:, 2] - self.scene.env_origins[env_ids, 2]
 
-    def _apply_start_states(self, env_ids: torch.Tensor) -> None:
-        """Overwrite robot + peg state with random entries of the start-state bank."""
+    def _pick_start_states(self, env_ids: torch.Tensor) -> torch.Tensor:
+        self._load_start_bank()
+        b = self._start_bank
+        if self.cfg.precise_assembly.start_state_sequential:
+            return (int(self.cfg.precise_assembly.start_state_offset) + env_ids.long()) % b["successes"].numel()
+        return torch.randint(0, b["successes"].numel(), (env_ids.numel(),), device=self.device)
+
+    def _load_start_bank(self) -> None:
         if not hasattr(self, "_start_bank"):
             import numpy as np
 
@@ -652,12 +663,19 @@ class PreciseAssemblyEnv(PlayEnv):
             if self._start_bank_hole_pos is None:
                 print("[PreciseAssemblyEnv] start-state bank has no hole_pos; can't check the hole "
                       "layout matches (use the layout it was recorded on)", flush=True)
+            for key in ("dist_pos_h", "dist_quat_h", "dist_linvel_h", "dist_angvel_h"):
+                if key in d.files:
+                    self._start_bank[key] = torch.as_tensor(d[key], device=self.device)
+            self._start_k = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+
+    def _apply_start_states(self, env_ids: torch.Tensor) -> None:
+        """Overwrite robot + peg (+ distractor, if the bank has them) state with random entries of the start-state bank."""
+        self._load_start_bank()
         b = self._start_bank
-        n = env_ids.numel()
-        if self.cfg.precise_assembly.start_state_sequential:
-            k = (int(self.cfg.precise_assembly.start_state_offset) + env_ids.long()) % b["successes"].numel()
+        if self.cfg.precise_assembly.start_state_bank_hole:
+            k = self._start_k[env_ids]
         else:
-            k = torch.randint(0, b["successes"].numel(), (n,), device=self.device)
+            k = self._pick_start_states(env_ids)
         if self._start_bank_hole_pos is not None:
             err = (self._start_bank_hole_pos[k] - self.hole_pos[env_ids]).norm(dim=-1).max().item()
             if err > 0.005:
@@ -675,6 +693,18 @@ class PreciseAssemblyEnv(PlayEnv):
                          quat_apply(hole_q, b["peg_angvel_h"][k].float())], dim=-1)
         self.object.write_root_pose_to_sim(torch.cat([pos + self.scene.env_origins[env_ids], quat], -1), env_ids=env_ids)
         self.object.write_root_velocity_to_sim(vel, env_ids=env_ids)
+
+        if "dist_pos_h" in b:
+            # Distractor poses as recorded (e.g. held in the hand); _distractor_reset_pos keeps the in-tray rest pose,
+            # so rise / box checks still measure against the tray.
+            for j, body in enumerate(self.distractors):
+                dpos = self.hole_pos[env_ids] + quat_apply(hole_q, b["dist_pos_h"][k, j].float())
+                dquat = quat_mul(hole_q, b["dist_quat_h"][k, j].float())
+                dvel = torch.cat([quat_apply(hole_q, b["dist_linvel_h"][k, j].float()),
+                                  quat_apply(hole_q, b["dist_angvel_h"][k, j].float())], dim=-1)
+                body.write_root_pose_to_sim(torch.cat([dpos + self.scene.env_origins[env_ids], dquat], -1),
+                                            env_ids=env_ids)
+                body.write_root_velocity_to_sim(dvel, env_ids=env_ids)
 
         self._successes[env_ids] = b["successes"][k].long()
         self._start_successes[env_ids] = b["successes"][k].long()
@@ -1046,6 +1076,12 @@ class PreciseAssemblyEnv(PlayEnv):
         self._update_distractor_disp()
         if pih_cfg.singulate and hasattr(self, "sing_phase"):
             self._update_singulate()
+            if pih_cfg.singulate_release_only:
+                # Task = release down to the one target stick: done once released (phase 2); fail if the target
+                # itself was let go (no "drop everything, pick one again").
+                max_successes = max_successes | (self.sing_phase >= 2)
+                self._successes[self.sing_phase >= 2] = self.env_max_goals[self.sing_phase >= 2]
+                dropped = dropped | ((self.sing_phase < 2) & (self._sing_obj_rise < pih_cfg.singulate_drop_rise))
         self._update_joint_angles()
         if pih_cfg.terminate_on_disturb and hasattr(self, "distractor_disp"):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
@@ -1159,6 +1195,8 @@ class PreciseAssemblyEnv(PlayEnv):
                     * (ph == 1).float()
                 bonus = (c.singulate_gather_bonus * self._sing_entered[:, 0].float()
                          + c.singulate_release_bonus * self._sing_entered[:, 1].float())
+                if c.singulate_release_only and "dropped" in self._termination_reasons:
+                    bonus = bonus - c.singulate_drop_penalty * self._termination_reasons["dropped"].float()
                 # The goal bonus is paid per step near the goal (amortized) and the episode no longer ends there before
                 # phase 2, so holding the whole bundle at the goal would pay forever: goal / keypoint terms only in phase 2.
                 pre = (ph < 2).float()

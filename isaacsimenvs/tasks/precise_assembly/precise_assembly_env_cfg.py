@@ -145,6 +145,9 @@ class PreciseAssemblyCfg:
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False
+    # Place the fixture (hole_pos) at the recorded entry's fixture position instead of sampling it (banks recorded
+    # with a randomized fixture, where the absolute robot joints only fit that entry's layout).
+    start_state_bank_hole: bool = False
     start_state_offset: int = 0
     # Clutter "gather, release, lift" strategy (needs distractors + distractor_box). Per-env phase:
     # 0 gather: done once the object and >= singulate_min_neighbours distractors are all >= singulate_rise above
@@ -166,6 +169,13 @@ class PreciseAssemblyCfg:
     singulate_release_scale: float = 50.0
     singulate_gather_bonus: float = 200.0
     singulate_release_bonus: float = 200.0
+    # Release-only task: episodes start in phase 1 from a start-state bank with the hand already holding the target and
+    # some neighbours (tools/contactbench/record_singulate_bank.py); success = phase 1 done (only the target left in
+    # the hand, neighbours back in the tray). The episode fails ("dropped", -singulate_drop_penalty) once the target
+    # is below singulate_drop_rise above its rest height.
+    singulate_release_only: bool = False
+    singulate_drop_rise: float = 0.005
+    singulate_drop_penalty: float = 200.0
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
