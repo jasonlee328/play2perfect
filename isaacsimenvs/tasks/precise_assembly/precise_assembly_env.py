@@ -489,10 +489,12 @@ class PreciseAssemblyEnv(PlayEnv):
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
 
-    def _pose_rel_hole_to_world(self, env_ids: torch.Tensor, pose7) -> torch.Tensor:
+    def _pose_rel_hole_to_world(self, env_ids: torch.Tensor, pose7, shift: torch.Tensor | None = None) -> torch.Tensor:
         """(n, 7) world pose (pos + quat wxyz) of a receptive-frame pose7 (xyz + quat xyzw) for env_ids."""
         n = env_ids.numel()
         p = torch.tensor(pose7[:3], device=self.device, dtype=torch.float32).expand(n, 3)
+        if shift is not None:                      # (n, 3) receptive-frame offset (start_shift_m)
+            p = p + shift
         q = _xyzw_to_wxyz(torch.tensor([pose7[3:7]], device=self.device, dtype=torch.float32)).expand(n, 4)
         hq = self.hole_quat_wxyz[env_ids]
         pos = self.hole_pos[env_ids] + quat_apply(hq, p) + self.scene.env_origins[env_ids]
@@ -501,6 +503,7 @@ class PreciseAssemblyEnv(PlayEnv):
     def _reset_distractors(self, env_ids: torch.Tensor) -> None:
         """Place every distractor at its receptive-frame pose; remember it to measure disturbance."""
         dists = getattr(self, "distractors", ())
+        self._sample_start_shift(env_ids, len(dists))
         if not dists:
             return
         if not hasattr(self, "_distractor_reset_pos"):
@@ -510,7 +513,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.distractor_moved_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_rise = torch.zeros(self.num_envs, device=self.device)
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
-            w = self._pose_rel_hole_to_world(env_ids, pose)
+            w = self._pose_rel_hole_to_world(env_ids, pose, self._start_shift[k + 1, env_ids])
             body.write_root_pose_to_sim(w, env_ids=env_ids)
             body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
             self._distractor_reset_pos[k, env_ids] = w[:, :3]
@@ -518,6 +521,15 @@ class PreciseAssemblyEnv(PlayEnv):
         self.distractor_disp_ep_max[env_ids] = 0.0
         self.distractor_moved_ep_max[env_ids] = 0.0
         self.distractor_rise[env_ids] = 0.0
+
+    def _sample_start_shift(self, env_ids: torch.Tensor, n_dist: int) -> None:
+        """start_shift_m: fresh U(-d, d) receptive-frame offsets for the object (row 0) and each distractor."""
+        if not hasattr(self, "_start_shift"):
+            self._start_shift = torch.zeros(n_dist + 1, self.num_envs, 3, device=self.device)
+        d = tuple(self.cfg.precise_assembly.start_shift_m)
+        if d:
+            half = torch.tensor((tuple(d) + (0.0, 0.0, 0.0))[:3], device=self.device, dtype=torch.float32)
+            self._start_shift[:, env_ids] = (torch.rand(n_dist + 1, env_ids.numel(), 3, device=self.device) * 2 - 1) * half
 
     def _distractor_curriculum(self) -> tuple[float, float]:
         """(disturb tolerance, penalty multiplier in [0, 1]) at the current env step."""
@@ -591,7 +603,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self._apply_joint_detents()
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
-        w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
+        w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel, self._start_shift[0, env_ids])
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
@@ -685,6 +697,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 tail_idx = subgoal_idx[in_tail] - self._num_prelude_goals
                 hole_q = self.hole_quat_wxyz[tail_ids]
                 insert_pos = self._insert_pos_rel[tail_idx]
+                if hasattr(self, "_start_shift"):     # start_shift_m: the goals move with the object
+                    insert_pos = insert_pos + self._start_shift[0, tail_ids]
                 insert_q = self._insert_quat_wxyz[tail_idx]
                 ins_pos_local[in_tail] = (
                     self.hole_pos[tail_ids] + quat_apply(hole_q, insert_pos)
