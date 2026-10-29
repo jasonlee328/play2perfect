@@ -1110,11 +1110,14 @@ class PreciseAssemblyEnv(PlayEnv):
 
         dists = getattr(self, "distractors", ())
         if pih_cfg.distractors_hang_penalty_scale > 0.0 and dists:
-            # while the object is lifted: per-step penalty on how far each distractor is above the "hanging" line
+            # while the object is raised > 2 cm: per-step penalty on how far each distractor is above the "hanging" line
             # distractors_hang_below under the object (summed, m), so carrying the whole bunch costs reward all the way up
             dz = torch.stack([b.data.root_pos_w[:, 2] for b in dists]) - self.object.data.root_pos_w[:, 2]
             excess = torch.clamp(dz + float(pih_cfg.distractors_hang_below), min=0.0).sum(dim=0)
-            hang_pen = pih_cfg.distractors_hang_penalty_scale * excess * self._lifted_object.float()
+            # only while the object is actually up (not the latched lifted flag: after the bunch is set back down, every
+            # part sits level with the object and the penalty would run for the rest of the episode)
+            rise = (self.object.data.root_pos_w[:, 2] - self.scene.env_origins[:, 2]) - self._object_init_z
+            hang_pen = pih_cfg.distractors_hang_penalty_scale * excess * (rise > 0.02).float()
             reward = reward - hang_pen
             self._reward_terms["distractors_hang_penalty"] = -hang_pen
             self._reward_terms["total_reward"] = reward
