@@ -354,6 +354,9 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "fixture_pose_rel_palm" in OBS_FIELD_SIZES and hasattr(env, "hole_pos"):
+        obs_clean["fixture_pose_rel_palm"] = torch.cat([env.hole_pos - palm_pos, env.hole_quat_wxyz], dim=-1)
+
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel
@@ -363,6 +366,19 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
+
+    # Blind teacher (precise_assembly.blind_fields): these actor-obs fields are zeroed (the critic keeps them) in the
+    # first a(t) * num_envs envs, a(t) ramping 0 -> 1 over blind_ramp_steps env steps (0 = all envs from the start).
+    pa = getattr(env.cfg, "precise_assembly", None)
+    blind = tuple(getattr(pa, "blind_fields", ())) if pa is not None else ()
+    if blind:
+        ramp = int(getattr(pa, "blind_ramp_steps", 0))
+        a = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter) / ramp)
+        m = (torch.arange(env.num_envs, device=env.device) < round(a * env.num_envs)).float().unsqueeze(-1)
+        env.blind_frac = a
+        for f in blind:
+            if f in obs_noisy:
+                obs_noisy[f] = obs_noisy[f] * (1.0 - m)
 
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)

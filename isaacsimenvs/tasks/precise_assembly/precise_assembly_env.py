@@ -325,6 +325,11 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if cfg.precise_assembly.obs_fixture:
+            OBS_FIELD_SIZES["fixture_pose_rel_palm"] = 7
+            for lst in ("obs_list", "state_list"):
+                if "fixture_pose_rel_palm" not in getattr(cfg.obs, lst):
+                    setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "fixture_pose_rel_palm"))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
@@ -530,6 +535,41 @@ class PreciseAssemblyEnv(PlayEnv):
         if d:
             half = torch.tensor((tuple(d) + (0.0, 0.0, 0.0))[:3], device=self.device, dtype=torch.float32)
             self._start_shift[:, env_ids] = (torch.rand(n_dist + 1, env_ids.numel(), 3, device=self.device) * 2 - 1) * half
+        else:
+            self._start_shift[:, env_ids] = 0.0
+        g = tuple(self.cfg.precise_assembly.start_shift_group_m)
+        if g:
+            half = torch.tensor((tuple(g) + (0.0, 0.0, 0.0))[:3], device=self.device, dtype=torch.float32)
+            self._start_shift[:, env_ids] += ((torch.rand(env_ids.numel(), 3, device=self.device) * 2 - 1) * half).unsqueeze(0)
+
+    def _swap_lifted_distractor(self) -> None:
+        """swap_lifted_distractor: make a lifted distractor the object (identical bodies, see the cfg)."""
+        thr = float(self.cfg.precise_assembly.swap_lifted_distractor)
+        dists = getattr(self, "distractors", ())
+        if thr <= 0 or not dists or not hasattr(self, "_object_rest_pos"):
+            return
+        pos = torch.stack([b.data.root_pos_w for b in dists])                      # (K, N, 3)
+        rise = pos[..., 2] - self._distractor_reset_pos[..., 2]
+        top, k = rise.max(dim=0)
+        obj_rise = self.object.data.root_pos_w[:, 2] - self._object_rest_pos[:, 2]
+        swap = (top > thr) & (obj_rise < 0.005)
+        if not swap.any():
+            return
+        ids_all = swap.nonzero().squeeze(-1)
+        for kk in k[ids_all].unique().tolist():
+            ids = ids_all[k[ids_all] == kk]
+            d = dists[kk]
+            s_obj, s_d = self.object.data.root_state_w[ids].clone(), d.data.root_state_w[ids].clone()
+            self.object.write_root_state_to_sim(s_d, env_ids=ids)
+            d.write_root_state_to_sim(s_obj, env_ids=ids)
+            old_rest, new_rest = self._object_rest_pos[ids].clone(), self._distractor_reset_pos[kk, ids].clone()
+            self._object_rest_pos[ids], self._distractor_reset_pos[kk, ids] = new_rest, old_rest
+            hq = self.hole_quat_wxyz[ids]
+            self._start_shift[0, ids] += quat_apply_inverse(hq, new_rest - old_rest)   # goals follow the object
+            self._object_init_z[ids] = new_rest[:, 2] - self.scene.env_origins[ids, 2]
+            self._write_goal_pose(ids)
+        self.swap_count = getattr(self, "swap_count", torch.zeros(self.num_envs, device=self.device))
+        self.swap_count[ids_all] += 1
 
     def _distractor_curriculum(self) -> tuple[float, float]:
         """(disturb tolerance, penalty multiplier in [0, 1]) at the current env step."""
@@ -609,6 +649,9 @@ class PreciseAssemblyEnv(PlayEnv):
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
         # (z - init_z > 0.10, which gates the keypoint reward) would need ~20 cm above the bin. Measure from here.
         self._object_init_z[env_ids] = w[:, 2] - self.scene.env_origins[env_ids, 2]
+        if not hasattr(self, "_object_rest_pos"):
+            self._object_rest_pos = torch.zeros(self.num_envs, 3, device=self.device)
+        self._object_rest_pos[env_ids] = w[:, :3]
 
     def _apply_start_states(self, env_ids: torch.Tensor) -> None:
         """Overwrite robot + peg state with random entries of the start-state bank."""
@@ -912,6 +955,7 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
+        self._swap_lifted_distractor()
         compute_intermediate_values(self)
 
         pih_cfg = self.cfg.precise_assembly

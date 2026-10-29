@@ -561,6 +561,7 @@ class TactileCfg:
     whole_hand_spacing_mm: float = 4.0     # ray spacing on the skin
     whole_hand_skin_mm: float = 2.0        # virtual skin thickness outside the collision surface
     whole_hand_distractors: bool = True    # also sense the distractors (one channel with the object)
+    fingertip_distractors: bool = False    # fingertip TacMap pads also sense the distractors (max with the object)
     whole_hand_in_critic: bool = False
 
 
