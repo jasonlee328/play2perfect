@@ -127,6 +127,21 @@ class PreciseAssemblyCfg:
     # object and each distractor are shifted independently by U(-d, d) per axis from their receptive-frame poses
     # (sticks along their length: (0.02, 0, 0)); the object's goal poses move with it. () = off (old behaviour).
     start_shift_m: tuple[float, ...] = ()
+    # Same as start_shift_m but ONE offset per env shared by the object and every distractor (moves the whole row,
+    # e.g. sideways in the tray: (0, 0.006, 0)); added to the independent start_shift_m offsets.
+    start_shift_group_m: tuple[float, ...] = ()
+    # "Any one of identical objects" tasks (blind chopstick search): > 0 = once a distractor has risen this far (m)
+    # above its reset pose while the object is still within 5 mm of its own, the two swap states (pose, velocity and
+    # reset pose; the goals move to the new object), so lifting any one stick is lifting "the object". Identical
+    # bodies only (same asset), so the swap is invisible to physics, cameras and touch.
+    swap_lifted_distractor: float = 0.0
+    # Privileged-free teacher obs: field "fixture_pose_rel_palm" (fixture position relative to the palm + its
+    # quaternion wxyz, 7), added to obs_list and state_list.
+    obs_fixture: bool = False
+    # Blind teacher: actor-obs fields zeroed (critic unchanged), e.g. [object_rot,keypoints_rel_palm,
+    # keypoints_rel_goal,object_scales,distractor_obs]; ramped in over blind_ramp_steps env steps (share of envs).
+    blind_fields: tuple[str, ...] = ()
+    blind_ramp_steps: int = 0
     # Dense "don't lift the neighbours" shaping: per-step reward -= distractor_lift_penalty_scale * the largest
     # distractor rise above its reset height beyond distractor_lift_slack (m). Sliding / rolling inside the bin is free.
     distractor_lift_penalty_scale: float = 0.0

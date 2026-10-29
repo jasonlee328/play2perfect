@@ -130,6 +130,15 @@ class TactileSensor:
             self.meshes.append(convert_to_warp_mesh(pts, tris, device=self.device))
             self.asset_env_ids.append(ids)
         self.mesh = self.meshes[0]
+        # fingertip_distractors: also cast against every distractor (own collision mesh, max with the object per
+        # taxel; one channel, so the target and its neighbours feel the same). Single object asset only.
+        self.extra = []
+        if getattr(tactile_cfg, "fingertip_distractors", False) and getattr(env, "distractors", ()):
+            if n_assets > 1:
+                raise NotImplementedError("tactile.fingertip_distractors needs a single object asset")
+            from isaacsimenvs.tasks.play.utils.hand_skin import prim_mesh
+            for d in env.distractors:
+                self.extra.append((d, convert_to_warp_mesh(*prim_mesh(d.cfg.prim_path), device=self.device)))
 
         self.body_ids = [env.robot.find_bodies(f"left_{f}_DP")[0][0] for f in FINGERS]
         map_dir = Path(tactile_cfg.map_dir)
@@ -164,19 +173,28 @@ class TactileSensor:
 
     @torch.no_grad()
     def compute(self) -> torch.Tensor:
+        env = self.env
+        result = self._cast(env.object, list(zip(self.meshes, self.asset_env_ids)))
+        all_ids = torch.arange(env.num_envs, device=self.device)
+        for body, mesh in self.extra:
+            result = torch.maximum(result, self._cast(body, [(mesh, all_ids)]))
+        return _deform_quantize(result) / 255.0
+
+    def _cast(self, obj, mesh_ids) -> torch.Tensor:
+        """Mean penetration depth per taxel (m) of ``obj`` (a rigid body with ``data``) into the pads."""
         from isaaclab.utils.math import matrix_from_quat
         from isaaclab.utils.warp import raycast_mesh
 
         env = self.env
         body = env.robot.data.body_state_w[:, self.body_ids, 0:7]  # (N, 5, 7) pos + wxyz
-        obj_pos = env.object.data.root_pos_w                        # (N, 3)
-        R_wo_T = matrix_from_quat(env.object.data.root_quat_w).transpose(-1, -2)  # world -> object
+        obj_pos = obj.data.root_pos_w                               # (N, 3)
+        R_wo_T = matrix_from_quat(obj.data.root_quat_w).transpose(-1, -2)  # world -> object
         # DP body -> object frame, per env and finger.
         R_od = R_wo_T.unsqueeze(1) @ matrix_from_quat(body[..., 3:7])                  # (N, 5, 3, 3)
         t_od = (R_wo_T.unsqueeze(1) @ (body[..., 0:3] - obj_pos.unsqueeze(1)).unsqueeze(-1)).squeeze(-1)
 
         result = torch.zeros(env.num_envs, len(self.counts), device=self.device)
-        for mesh, ids in zip(self.meshes, self.asset_env_ids):
+        for mesh, ids in mesh_ids:
             for a in range(0, len(ids), self.envs_per_chunk):
                 c = ids[a:a + self.envs_per_chunk]
                 Rc, tc = R_od[c][:, self.finger], t_od[c][:, self.finger]
@@ -188,7 +206,7 @@ class TactileSensor:
                 depth = torch.where(torch.isfinite(dist) & torch.isfinite(dist2), dist, torch.zeros_like(dist))
                 taxels = torch.zeros(len(depth), len(self.counts), device=self.device).index_add_(1, self.taxel, depth)
                 result[c] = taxels / self.counts
-        return _deform_quantize(result) / 255.0
+        return result
 
 
 __all__ = ["FINGERS", "TactileSensor", "tactile_obs_dim"]
