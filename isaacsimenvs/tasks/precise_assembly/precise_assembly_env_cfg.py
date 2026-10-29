@@ -163,6 +163,8 @@ class PreciseAssemblyCfg:
     # Per-step penalty (per m, summed over distractors) while the object is > 2 cm above its reset height on how far each distractor is above
     # the distractors_hang_below line under the object: dense shaping toward letting the rest of the bunch dangle.
     distractors_hang_penalty_scale: float = 0.0
+    # Pay the keypoint (goal-progress) reward only while distractors_hang_below holds (needs distractors_hang_below > 0).
+    hang_gate_keypoint_rew: bool = False
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False

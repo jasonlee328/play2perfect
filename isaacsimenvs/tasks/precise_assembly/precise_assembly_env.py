@@ -1033,8 +1033,18 @@ class PreciseAssemblyEnv(PlayEnv):
         return terminated, truncated
 
     def _get_rewards(self) -> torch.Tensor:
-        reward = compute_rewards(self)
         pih_cfg = self.cfg.precise_assembly
+        prev_closest_kp = self._closest_keypoint_max_dist.clone()
+        reward = compute_rewards(self)
+        hanging = getattr(self, "_distractors_hanging", None)
+        if pih_cfg.hang_gate_keypoint_rew and hanging is not None:
+            # goal-progress reward only while the rest of the bunch hangs below the object: lifting the scooped bunch
+            # toward the goal pays nothing, and the progress it made is not used up (closest distance restored)
+            kp_rew = self._reward_terms["keypoint_rew"]
+            reward = reward - kp_rew * (~hanging).float()
+            self._reward_terms["keypoint_rew"] = kp_rew * hanging.float()
+            self._reward_terms["total_reward"] = reward
+            self._closest_keypoint_max_dist = torch.where(hanging, self._closest_keypoint_max_dist, prev_closest_kp)
 
         mean_rg_eps = 0.0
         if self.is_random_goal_env.any():
