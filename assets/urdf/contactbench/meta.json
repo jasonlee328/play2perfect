@@ -581,6 +581,26 @@
     0.0624
    ],
    "collision": "coacd 24"
+  },
+  "doorknob_1_60mm": {
+   "src": "for_visualization/doorknob_module/doorknob_1_60mm.stl",
+   "extents_mm": [
+    59.99,
+    60.0,
+    58.0
+   ],
+   "mass_g": 67.08,
+   "com_src_mm": [
+    0.0,
+    0.0,
+    59.131
+   ],
+   "object_scale": [
+    1.4998,
+    1.5,
+    1.45
+   ],
+   "collision": "coacd 12"
   }
  },
  "fixtures": {
@@ -1090,6 +1110,34 @@
     0.0,
     0.0
    ]
+  },
+  "door_knobmodule": {
+   "src": [
+    "door_unz/door/{door_frame_1,door_frame_2,door}.stl",
+    "doorknob_module_base/{bottom,top}.stl"
+   ],
+   "extents_mm": [
+    250.5,
+    254.0,
+    32.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "collision_box_mm": {
+    "centre": [
+     38.85,
+     -49.75,
+     16.0
+    ],
+    "size": [
+     250.5,
+     254.0,
+     32.0
+    ]
+   }
   }
  },
  "problems": {
@@ -11099,6 +11147,68 @@
     0.6416489481925964
    ],
    "settled": true
+  },
+  "cb_doorknob_unlock": {
+   "object": "doorknob_1_60mm",
+   "fixture": "door_knobmodule",
+   "object_start_pose": [
+    -3.916421884032863e-08,
+    -1.06249410499597e-09,
+    0.06163054706666386,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -3.716572182917466e-08,
+     1.2396533870913812e-08,
+     0.06163054706666386,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     1.8661962533866586e-08,
+     3.444845548759571e-08,
+     0.06163054706666386,
+     0.0,
+     0.0,
+     0.5,
+     0.8660254037844385
+    ]
+   ],
+   "joints": [
+    {
+     "body": "object",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": -2.0,
+     "upper_deg": 90.0,
+     "stiffness": 0.03,
+     "damping": 0.002
+    }
+   ],
+   "layout": {
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "knob_top_mm": 82.5,
+    "module_top_mm": 30.0,
+    "note": "hidden unlock angle: env.precise_assembly.unlock_angle_range_deg=[lo,hi] sets each env's theta + end stop; the last waypoint is virtual (credited at theta). Latch/gear not drawn.",
+    "train_overrides": "env.precise_assembly.hole_x_range=[-0.06,0.06] env.precise_assembly.hole_y_range=[0.0,0.1] env.precise_assembly.enable_retract=false"
+   }
   }
  }
 }

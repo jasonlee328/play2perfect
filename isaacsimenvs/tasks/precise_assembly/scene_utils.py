@@ -84,6 +84,29 @@ def _create_fixture_joints(env) -> None:
         return Gf.Quatf(w / n, *(v / n).tolist())
 
     stage = omni.usd.get_context().get_stage()
+
+    def set_local_pose(path, pos, q_wxyz):
+        prim = stage.GetPrimAtPath(path)
+        t, o = prim.GetAttribute("xformOp:translate"), prim.GetAttribute("xformOp:orient")
+        if not (t and o):
+            raise RuntimeError(f"{path} has no xformOp:translate / xformOp:orient")
+        t.Set(Gf.Vec3d(*[float(v) for v in pos]))
+        w, x, y, z = (float(v) for v in q_wxyz)
+        o.Set(Gf.Quatd(w, Gf.Vec3d(x, y, z)) if "quatd" in str(o.GetTypeName()) else Gf.Quatf(w, Gf.Vec3f(x, y, z)))
+
+    # The joint's fixture end does not follow the kinematic fixture when a reset teleports it (the knob stayed at
+    # the fixture's spawn pose), so jointed problems keep every env's fixture at one pose for the env's lifetime
+    # (env._joint_hole_np, rel. to the env origin) and the prims start there: fixture + jointed body at their reset
+    # poses before PhysX parses the joints.
+    hole_np = getattr(env, "_joint_hole_np", None)
+    if hole_np is not None:
+        for i in range(env.num_envs):
+            set_local_pose(f"/World/envs/env_{i}/Hole", hole_np[i], (1.0, 0.0, 0.0, 0.0))
+            for j in joints:
+                pose = env._joint_reset_pose_rel(j)
+                root = "Object" if j.body == "object" else f"Distractor{int(j.body[10:])}"
+                set_local_pose(f"/World/envs/env_{i}/{root}", np.asarray(pose[:3]) + hole_np[i],
+                               (pose[6], pose[3], pose[4], pose[5]))
     for k, j in enumerate(joints):
         pose = env._joint_reset_pose_rel(j)
         p_b = Gf.Vec3d(*pose[:3]); q_b = Gf.Quatd(pose[6], Gf.Vec3d(*pose[3:6]))
@@ -104,7 +127,11 @@ def _create_fixture_joints(env) -> None:
             jp.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jp.CreateLocalRot1Attr(Gf.Quatf(q1))
             if j.lower_deg is not None:
                 jp.CreateLowerLimitAttr(float(j.lower_deg))
-            if j.upper_deg is not None:
+            unlock = getattr(env, "_unlock_deg_np", None)
+            if unlock is not None and k == int(env.cfg.precise_assembly.unlock_joint):
+                # hidden unlock angle: this env's end stop = its theta + margin
+                jp.CreateUpperLimitAttr(float(unlock[i]) + float(env.cfg.precise_assembly.unlock_stop_margin_deg))
+            elif j.upper_deg is not None:
                 jp.CreateUpperLimitAttr(float(j.upper_deg))
             if j.damping or j.stiffness:
                 drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "angular")
@@ -145,7 +172,7 @@ def setup_scene(env) -> None:
                 kinematic_enabled=False,
                 disable_gravity=False,
                 max_depenetration_velocity=1000.0,
-                rb_solver_position_iterations=4,
+                rb_solver_position_iterations=int(env.cfg.precise_assembly.object_position_iterations) or 4,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
             ),

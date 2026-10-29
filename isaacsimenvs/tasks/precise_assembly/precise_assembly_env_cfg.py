@@ -148,6 +148,20 @@ class PreciseAssemblyCfg:
     # starts from the same state.
     start_state_sequential: bool = False
     start_state_offset: int = 0
+    # Hidden unlock angle (ContactBench doorknob, cb_doorknob_unlock): non-empty = every env gets its own unlock angle
+    # theta (deg; uniform in [lo, hi], or unlock_angle_values_deg[i % K] when that is set), fixed for the env's
+    # lifetime (PhysX joint limits are set when the scene is built), never observed. Joint unlock_joint's end stop
+    # becomes theta + unlock_stop_margin_deg, and the problem's LAST waypoint is credited (instead of its keypoint
+    # check) while the joint angle is >= theta - unlock_tol_deg (same near-goal step counting as other goals).
+    unlock_angle_range_deg: tuple[float, ...] = ()
+    unlock_angle_values_deg: tuple[float, ...] = ()
+    unlock_stop_margin_deg: float = 2.0
+    unlock_tol_deg: float = 3.0
+    unlock_joint: int = 0
+    unlock_seed: int = 0
+    # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
+    # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
+    object_position_iterations: int = 0
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:

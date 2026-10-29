@@ -196,6 +196,16 @@ class PreciseAssemblyEnv(PlayEnv):
         self._goal_kp_obs_slice = _obs_field_slice(
             tuple(cfg.obs.obs_list), "keypoints_rel_goal"
         )
+        # hidden unlock angle (rad, per env) + the furthest the knob got this episode (for evals)
+        self.unlock_angle = None
+        if self._unlock_deg_np is not None:
+            self.unlock_angle = torch.as_tensor(self._unlock_deg_np, device=self.device, dtype=torch.float32).deg2rad()
+            self.unlock_max_angle = torch.zeros(self.num_envs, device=self.device)
+            self.unlock_reached = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            self.unlock_prev_ep_max = torch.zeros(self.num_envs, device=self.device)
+            print(f"[PreciseAssemblyEnv] unlock angle per env: {self._unlock_deg_np.min():.1f}-"
+                  f"{self._unlock_deg_np.max():.1f} deg (stop + {pih_cfg.unlock_stop_margin_deg}, "
+                  f"tol {pih_cfg.unlock_tol_deg})", flush=True)
 
         print(
             f"[PreciseAssemblyEnv] problem={self._pih_problem_name} "
@@ -334,6 +344,31 @@ class PreciseAssemblyEnv(PlayEnv):
                 raise ValueError(f"JointSpec.body must be 'object' or 'distractor<k>', got {j.body!r}")
             if j.body == "object" and not self._pih_object_start_rel:
                 raise ValueError("a joint on the object needs Problem.object_start_pose_rel_receptive")
+        # Jointed problems: one fixture pose per env for its lifetime (see scene_utils._create_fixture_joints)
+        self._joint_hole_np = None
+        if self._pih_joints:
+            import numpy as np
+            rng = np.random.default_rng(int(pih_cfg.unlock_seed) + 1)
+            n_env = int(cfg.scene.num_envs)
+            hz = float(cfg.reset.table_reset_z) + TABLE_HALF_HEIGHT + float(problem.hole_z_offset)
+            self._joint_hole_np = np.stack([rng.uniform(*[float(v) for v in pih_cfg.hole_x_range], n_env),
+                                            rng.uniform(*[float(v) for v in pih_cfg.hole_y_range], n_env),
+                                            np.full(n_env, hz)], -1)
+            if float(cfg.reset.table_reset_z_range) != 0.0 or float(pih_cfg.hole_yaw_range_deg) != 0.0:
+                print("[PreciseAssemblyEnv] WARNING: jointed problem with table_reset_z_range / hole_yaw_range_deg "
+                      "!= 0: the fixture keeps its spawn pose (use env.reset.table_reset_z_range=0.0)", flush=True)
+        self._unlock_deg_np = None
+        if pih_cfg.unlock_angle_range_deg or pih_cfg.unlock_angle_values_deg:
+            import numpy as np
+            if not (0 <= int(pih_cfg.unlock_joint) < len(self._pih_joints)):
+                raise ValueError("unlock_angle_*: the problem has no joint unlock_joint")
+            n_env = int(cfg.scene.num_envs)
+            vals = [float(v) for v in pih_cfg.unlock_angle_values_deg]
+            if vals:
+                self._unlock_deg_np = np.array([vals[i % len(vals)] for i in range(n_env)], dtype=np.float64)
+            else:
+                lo, hi = (float(v) for v in pih_cfg.unlock_angle_range_deg)
+                self._unlock_deg_np = np.random.default_rng(int(pih_cfg.unlock_seed)).uniform(lo, hi, n_env)
 
         cfg.assets.object_name = problem.insertion_object_name if len(problem_names) == 1 else "multi"
         cfg.assets.object_urdf = self._pih_object_urdf_abs
@@ -398,12 +433,16 @@ class PreciseAssemblyEnv(PlayEnv):
             hole_y_min, hole_y_max
         )
         self.hole_pos[env_ids, 2] = table_top_z + self._pih_hole_z_offset
+        if self._joint_hole_np is not None:  # jointed problem: the env's fixed fixture pose
+            if not hasattr(self, "_joint_hole_t"):
+                self._joint_hole_t = torch.as_tensor(self._joint_hole_np, device=self.device, dtype=torch.float32)
+            self.hole_pos[env_ids] = self._joint_hole_t[env_ids]
         if is_random_goal.any():
             rg_ids = env_ids[is_random_goal]
             self.hole_pos[rg_ids, 0:2] = 0.0
             self.hole_pos[rg_ids, 2] = -1.0
 
-        yaw_range_deg = float(pih_cfg.hole_yaw_range_deg)
+        yaw_range_deg = float(pih_cfg.hole_yaw_range_deg) if self._joint_hole_np is None else 0.0
         if yaw_range_deg > 0.0:
             yaw = (
                 torch.rand(n, device=self.device) * 2.0 - 1.0
@@ -486,6 +525,10 @@ class PreciseAssemblyEnv(PlayEnv):
         if pih_cfg.start_state_file and insertion_mask.any():
             self._apply_start_states(env_ids[insertion_mask])
 
+        if getattr(self, "unlock_angle", None) is not None:
+            self.unlock_prev_ep_max[env_ids] = self.unlock_max_angle[env_ids]  # kept across the auto-reset
+            self.unlock_max_angle[env_ids] = 0.0
+            self.unlock_reached[env_ids] = False
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
 
@@ -896,11 +939,33 @@ class PreciseAssemblyEnv(PlayEnv):
             self._skip_cand[jump] = -1
             self._skip_steps[jump] = 0
 
+    def _apply_unlock_goal(self, prev_near_steps: torch.Tensor) -> None:
+        """Hidden unlock angle: at the last waypoint the near-goal test is joint angle >= theta - unlock_tol (the
+        waypoint's pose is a virtual over-turn, the same for every theta, so the goal obs does not reveal theta)."""
+        from isaacsimenvs.tasks.play.utils.reward_utils import update_near_goal_steps
+        pih_cfg = self.cfg.precise_assembly
+        self._update_joint_angles()
+        ang = self.cb_joint_angle[int(pih_cfg.unlock_joint)]
+        self.unlock_max_angle = torch.maximum(self.unlock_max_angle, ang)
+        unlocked = ang >= self.unlock_angle - math.radians(float(pih_cfg.unlock_tol_deg))
+        self.unlock_reached |= unlocked
+        at_last = (self._successes == self.env_max_goals - 1) & ~self.is_random_goal_env
+        steps = update_near_goal_steps(near_goal=unlocked, near_goal_steps=prev_near_steps,
+                                       force_consecutive=self.cfg.termination.force_consecutive_near_goal_steps)
+        self._near_goal = torch.where(at_last, unlocked, self._near_goal)
+        self._near_goal_steps = torch.where(at_last, steps, self._near_goal_steps)
+        self._is_success = self._near_goal_steps >= self.cfg.termination.success_steps
+        self.extras["unlock_angle_deg_mean"] = torch.rad2deg(ang).mean()
+        self.extras["unlock_reached_frac"] = self.unlock_reached.float().mean()
+
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
+        prev_near_steps = self._near_goal_steps.clone()
         compute_intermediate_values(self)
 
         pih_cfg = self.cfg.precise_assembly
+        if getattr(self, "unlock_angle", None) is not None:
+            self._apply_unlock_goal(prev_near_steps)
         if pih_cfg.allow_goal_skip:
             self._apply_goal_skip()
         is_success = self._is_success.clone()
