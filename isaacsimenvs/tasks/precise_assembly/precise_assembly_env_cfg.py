@@ -151,6 +151,7 @@ class PreciseAssemblyCfg:
     # blind_offset_m over blind_offset_ramp_steps env steps (all envs). Wean off the poses before blind_fields zeroes them.
     blind_offset_m: tuple[float, ...] = ()
     blind_offset_ramp_steps: int = 0
+    blind_offset_offset_steps: int = 0  # added to common_step_counter for the ramp (set on resume / warm start)
     # Dense "don't lift the neighbours" shaping: per-step reward -= distractor_lift_penalty_scale * the largest
     # distractor rise above its reset height beyond distractor_lift_slack (m). Sliding / rolling inside the bin is free.
     distractor_lift_penalty_scale: float = 0.0
