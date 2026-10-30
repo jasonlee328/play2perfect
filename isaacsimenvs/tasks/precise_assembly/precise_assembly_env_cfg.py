@@ -152,6 +152,16 @@ class PreciseAssemblyCfg:
     blind_offset_m: tuple[float, ...] = ()
     blind_offset_ramp_steps: int = 0
     blind_offset_offset_steps: int = 0  # added to common_step_counter for the ramp (set on resume / warm start)
+    # blind_offset_m: also add the same per-episode error to the actor's fixture_pose_rel_palm position (actor only; the
+    # critic keeps the true tray pose). Without it the exact tray pose localizes the row to start_shift_group_m.
+    # With blind_fade_fields set, this tray error is scaled by the fade fraction f(t) (it ramps in as the poses fade).
+    blind_offset_fixture: bool = False
+    # Fade-out blinding: these actor-obs fields are scaled by (1 - f(t)) in every env (critic unchanged), f ramping
+    # 0 -> 1 over blind_fade_ramp_steps env steps (+ blind_fade_offset_steps on resume); 0 steps = fully faded from
+    # the start. A gradual alternative to blind_fields, whose hard per-env zeroing froze the policy.
+    blind_fade_fields: tuple[str, ...] = ()
+    blind_fade_ramp_steps: int = 0
+    blind_fade_offset_steps: int = 0
     # Dense "don't lift the neighbours" shaping: per-step reward -= distractor_lift_penalty_scale * the largest
     # distractor rise above its reset height beyond distractor_lift_slack (m). Sliding / rolling inside the bin is free.
     distractor_lift_penalty_scale: float = 0.0
