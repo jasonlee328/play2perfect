@@ -371,6 +371,20 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     # Blind teacher (precise_assembly.blind_fields): these actor-obs fields are zeroed (the critic keeps them) in the
     # first a(t) * num_envs envs, a(t) ramping 0 -> 1 over blind_ramp_steps env steps (0 = all envs from the start).
     pa = getattr(env.cfg, "precise_assembly", None)
+    bo = tuple(getattr(pa, "blind_offset_m", ())) if pa is not None else ()
+    if bo and hasattr(env, "_blind_offset_u"):
+        ramp = int(getattr(pa, "blind_offset_ramp_steps", 0))
+        s = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter) / ramp)
+        env.blind_offset_frac = s
+        half = torch.tensor((bo + (0.0, 0.0, 0.0))[:3], device=env.device, dtype=torch.float32)
+        off = env._blind_offset_u * half * s                                          # (N, 3)
+        if "keypoints_rel_palm" in obs_noisy:
+            x = obs_noisy["keypoints_rel_palm"]
+            obs_noisy["keypoints_rel_palm"] = (x.view(env.num_envs, -1, 3) + off.unsqueeze(1)).view(x.shape)
+        if "distractor_obs" in obs_noisy:
+            x = obs_noisy["distractor_obs"].view(env.num_envs, -1, 6).clone()       # [d - palm, d - obj] per stick
+            x[..., :3] += off.unsqueeze(1)
+            obs_noisy["distractor_obs"] = x.view(obs_noisy["distractor_obs"].shape)
     blind = tuple(getattr(pa, "blind_fields", ())) if pa is not None else ()
     if blind:
         ramp = int(getattr(pa, "blind_ramp_steps", 0))

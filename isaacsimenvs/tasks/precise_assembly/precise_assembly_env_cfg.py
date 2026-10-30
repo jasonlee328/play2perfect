@@ -145,6 +145,12 @@ class PreciseAssemblyCfg:
     # keypoints_rel_goal,object_scales,distractor_obs]; ramped in over blind_ramp_steps env steps (share of envs).
     blind_fields: tuple[str, ...] = ()
     blind_ramp_steps: int = 0
+    # Soft blinding: per-episode constant error U(-1, 1) * s(t) per axis (m, world) on where the actor thinks the sticks
+    # are: added to keypoints_rel_palm and the palm-relative part of distractor_obs (keypoints_rel_goal and the
+    # stick-to-stick part are unchanged, so the error is one consistent shift of the whole row). s(t) ramps 0 ->
+    # blind_offset_m over blind_offset_ramp_steps env steps (all envs). Wean off the poses before blind_fields zeroes them.
+    blind_offset_m: tuple[float, ...] = ()
+    blind_offset_ramp_steps: int = 0
     # Dense "don't lift the neighbours" shaping: per-step reward -= distractor_lift_penalty_scale * the largest
     # distractor rise above its reset height beyond distractor_lift_slack (m). Sliding / rolling inside the bin is free.
     distractor_lift_penalty_scale: float = 0.0

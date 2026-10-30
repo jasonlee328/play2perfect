@@ -543,6 +543,10 @@ class PreciseAssemblyEnv(PlayEnv):
         if fn:
             half = torch.tensor((fn + (0.0, 0.0, 0.0))[:3], device=self.device, dtype=torch.float32)
             self._fixture_obs_noise[env_ids] = (torch.rand(env_ids.numel(), 3, device=self.device) * 2 - 1) * half
+        if not hasattr(self, "_blind_offset_u"):
+            self._blind_offset_u = torch.zeros(self.num_envs, 3, device=self.device)
+        if tuple(self.cfg.precise_assembly.blind_offset_m):
+            self._blind_offset_u[env_ids] = torch.rand(env_ids.numel(), 3, device=self.device) * 2 - 1
         g = tuple(self.cfg.precise_assembly.start_shift_group_m)
         if g:
             half = torch.tensor((tuple(g) + (0.0, 0.0, 0.0))[:3], device=self.device, dtype=torch.float32)
