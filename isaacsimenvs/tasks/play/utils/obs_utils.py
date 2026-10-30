@@ -371,6 +371,12 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     # Blind teacher (precise_assembly.blind_fields): these actor-obs fields are zeroed (the critic keeps them) in the
     # first a(t) * num_envs envs, a(t) ramping 0 -> 1 over blind_ramp_steps env steps (0 = all envs from the start).
     pa = getattr(env.cfg, "precise_assembly", None)
+    fade = tuple(getattr(pa, "blind_fade_fields", ())) if pa is not None else ()
+    f = 1.0
+    if fade:
+        ramp = int(getattr(pa, "blind_fade_ramp_steps", 0))
+        f = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter + int(getattr(pa, "blind_fade_offset_steps", 0))) / ramp)
+        env.blind_fade_frac = f
     bo = tuple(getattr(pa, "blind_offset_m", ())) if pa is not None else ()
     if bo and hasattr(env, "_blind_offset_u"):
         ramp = int(getattr(pa, "blind_offset_ramp_steps", 0))
@@ -385,6 +391,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             x = obs_noisy["distractor_obs"].view(env.num_envs, -1, 6).clone()       # [d - palm, d - obj] per stick
             x[..., :3] += off.unsqueeze(1)
             obs_noisy["distractor_obs"] = x.view(obs_noisy["distractor_obs"].shape)
+        if getattr(pa, "blind_offset_fixture", False) and "fixture_pose_rel_palm" in obs_noisy:
+            x = obs_noisy["fixture_pose_rel_palm"].clone()                           # [pos - palm (3), quat (4)]
+            x[:, :3] += off * f                                                      # ramps in with the fade
+            obs_noisy["fixture_pose_rel_palm"] = x
     if getattr(env, "_multi_clutter", False):
         # multi clutter (e.g. stick thicknesses): actor sees the canonical problem's layout (see mc_obs_offset)
         mo = env.mc_obs_offset()                                                       # (S, N, 3)
@@ -400,6 +410,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             x[..., :3] += md
             x[..., 3:] += md - mo[0].unsqueeze(1)
             obs_noisy["distractor_obs"] = x.view(obs_noisy["distractor_obs"].shape)
+    if fade:
+        for k in fade:
+            if k in obs_noisy:
+                obs_noisy[k] = obs_noisy[k] * (1.0 - f)
     blind = tuple(getattr(pa, "blind_fields", ())) if pa is not None else ()
     if blind:
         ramp = int(getattr(pa, "blind_ramp_steps", 0))
