@@ -581,6 +581,96 @@
     0.0624
    ],
    "collision": "coacd 24"
+  },
+  "chopstick_m050": {
+   "src": "generated (make_chop_variants.py)",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 1.831,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "variant_of": "chopstick",
+   "mass_scale": 0.5
+  },
+  "chopstick_m200": {
+   "src": "generated (make_chop_variants.py)",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 7.322,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "variant_of": "chopstick",
+   "mass_scale": 2.0
+  },
+  "chopstick_dp1": {
+   "src": "generated (make_chop_variants.py)",
+   "extents_mm": [
+    200.0,
+    7.49,
+    7.49
+   ],
+   "mass_g": 4.876,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "variant_of": "chopstick",
+   "cross_section_scale": 1.15408,
+   "diameter_delta_mm": 1.0
+  },
+  "chopstick_dm1": {
+   "src": "generated (make_chop_variants.py)",
+   "extents_mm": [
+    200.0,
+    5.49,
+    5.49
+   ],
+   "mass_g": 2.62,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "variant_of": "chopstick",
+   "cross_section_scale": 0.84592,
+   "diameter_delta_mm": -1.0
   }
  },
  "fixtures": {
@@ -8315,6 +8405,400 @@
     0.0003311903993359831
    ],
    "settled": true,
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_binh_chopstick_n5_lift_m050": {
+   "object": "chopstick_m050",
+   "fixture": "utensil_bin_h",
+   "object_start_pose": [
+    0.009632833302021027,
+    0.0002913698263000697,
+    0.0041474103927612305,
+    0.0015272648306563497,
+    -0.04961204528808594,
+    -0.9987673759460449,
+    0.00016617774963378906
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/chopstick_m050/chopstick_m050.urdf",
+     [
+      -0.009633995592594147,
+      -0.014507448300719261,
+      0.004147946834564209,
+      0.05014604330062866,
+      0.0015680897049605846,
+      0.0007998347282409668,
+      0.9987402558326721
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_m050/chopstick_m050.urdf",
+     [
+      0.009634420275688171,
+      -0.006800011731684208,
+      0.00414729118347168,
+      0.0015416983515024185,
+      -0.04953855276107788,
+      -0.9987708926200867,
+      0.00048363208770751953
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_m050/chopstick_m050.urdf",
+     [
+      0.00963439792394638,
+      0.007404226344078779,
+      0.004147648811340332,
+      0.0015525349881500006,
+      -0.0497705340385437,
+      -0.9987592101097107,
+      0.0006449222564697266
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_m050/chopstick_m050.urdf",
+     [
+      0.00963658094406128,
+      0.014478305354714394,
+      0.004147350788116455,
+      -0.0014835132751613855,
+      0.050213515758514404,
+      0.9987370371818542,
+      0.0007905960083007812
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.009632833302021027,
+     0.0002913698263000697,
+     0.10414741039276124,
+     0.0015272648306563497,
+     -0.04961204528808594,
+     -0.9987673759460449,
+     0.00016617774963378906
+    ]
+   ],
+   "layout": {
+    "chopsticks": 5,
+    "bottom_row": 5,
+    "top_row": 0,
+    "target": "bottom2",
+    "goals": "lift only",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ],
+    "variant": "mass x0.5",
+    "base_problem": "cb_binh_chopstick_n5_lift"
+   },
+   "geometric_start_pose": [
+    0.00964459849671588,
+    1.4675281799937795e-06,
+    0.004747108602397643,
+    0.0,
+    0.0,
+    -0.9999999971013522,
+    7.613997364903782e-05
+   ],
+   "settled": true,
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_binh_chopstick_n5_lift_m200": {
+   "object": "chopstick_m200",
+   "fixture": "utensil_bin_h",
+   "object_start_pose": [
+    0.009632833302021027,
+    0.0002913698263000697,
+    0.0041474103927612305,
+    0.0015272648306563497,
+    -0.04961204528808594,
+    -0.9987673759460449,
+    0.00016617774963378906
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/chopstick_m200/chopstick_m200.urdf",
+     [
+      -0.009633995592594147,
+      -0.014507448300719261,
+      0.004147946834564209,
+      0.05014604330062866,
+      0.0015680897049605846,
+      0.0007998347282409668,
+      0.9987402558326721
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_m200/chopstick_m200.urdf",
+     [
+      0.009634420275688171,
+      -0.006800011731684208,
+      0.00414729118347168,
+      0.0015416983515024185,
+      -0.04953855276107788,
+      -0.9987708926200867,
+      0.00048363208770751953
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_m200/chopstick_m200.urdf",
+     [
+      0.00963439792394638,
+      0.007404226344078779,
+      0.004147648811340332,
+      0.0015525349881500006,
+      -0.0497705340385437,
+      -0.9987592101097107,
+      0.0006449222564697266
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_m200/chopstick_m200.urdf",
+     [
+      0.00963658094406128,
+      0.014478305354714394,
+      0.004147350788116455,
+      -0.0014835132751613855,
+      0.050213515758514404,
+      0.9987370371818542,
+      0.0007905960083007812
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.009632833302021027,
+     0.0002913698263000697,
+     0.10414741039276124,
+     0.0015272648306563497,
+     -0.04961204528808594,
+     -0.9987673759460449,
+     0.00016617774963378906
+    ]
+   ],
+   "layout": {
+    "chopsticks": 5,
+    "bottom_row": 5,
+    "top_row": 0,
+    "target": "bottom2",
+    "goals": "lift only",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ],
+    "variant": "mass x2",
+    "base_problem": "cb_binh_chopstick_n5_lift"
+   },
+   "geometric_start_pose": [
+    0.00964459849671588,
+    1.4675281799937795e-06,
+    0.004747108602397643,
+    0.0,
+    0.0,
+    -0.9999999971013522,
+    7.613997364903782e-05
+   ],
+   "settled": true,
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_binh_chopstick_n5_lift_dp1": {
+   "object": "chopstick_dp1",
+   "fixture": "utensil_bin_h",
+   "object_start_pose": [
+    0.009644598496742878,
+    1.467350863577202e-06,
+    0.0052474335026129965,
+    0.0,
+    0.0,
+    -0.9999999971013522,
+    7.613997364903782e-05
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/chopstick_dp1/chopstick_dp1.urdf",
+     [
+      -0.009644588599803662,
+      -0.016213894496420227,
+      0.0052474335026129965,
+      0.0,
+      0.0,
+      0.0007203943206363354,
+      0.9999997405159777
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_dp1/chopstick_dp1.urdf",
+     [
+      0.009644595514710688,
+      -0.008092275097669457,
+      0.0052474335026129965,
+      0.0,
+      0.0,
+      -0.999999919781027,
+      0.00040054705040698166
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_dp1/chopstick_dp1.urdf",
+     [
+      0.009644592747903427,
+      0.008110632195546887,
+      0.0052474335026129965,
+      0.0,
+      0.0,
+      -0.9999998480515533,
+      0.0005512684194332226
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_dp1/chopstick_dp1.urdf",
+     [
+      0.00964458407696931,
+      0.016183257874580626,
+      0.0052474335026129965,
+      0.0,
+      0.0,
+      0.999999623387801,
+      0.0008678849325915798
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.009644598496742878,
+     1.467350863577202e-06,
+     0.10524743350261301,
+     0.0,
+     0.0,
+     -0.9999999971013522,
+     7.613997364903782e-05
+    ]
+   ],
+   "layout": {
+    "chopsticks": 5,
+    "bottom_row": 5,
+    "top_row": 0,
+    "target": "bottom2",
+    "goals": "lift only",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ],
+    "variant": "diameter +1 mm (cross-section x1.1541)",
+    "row_pitch_mm": 8.1,
+    "base_problem": "cb_binh_chopstick_n5_lift"
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_binh_chopstick_n5_lift_dm1": {
+   "object": "chopstick_dm1",
+   "fixture": "utensil_bin_h",
+   "object_start_pose": [
+    0.009644598496688875,
+    1.4677054964101765e-06,
+    0.004246783702182289,
+    0.0,
+    0.0,
+    -0.9999999971013522,
+    7.613997364903782e-05
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/chopstick_dm1/chopstick_dm1.urdf",
+     [
+      -0.009644588599292713,
+      -0.012213894851052697,
+      0.004246783702182289,
+      0.0,
+      0.0,
+      0.0007203943206363354,
+      0.9999997405159777
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_dm1/chopstick_dm1.urdf",
+     [
+      0.009644595514426594,
+      -0.0060922747430367345,
+      0.004246783702182289,
+      0.0,
+      0.0,
+      -0.999999919781027,
+      0.00040054705040698166
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_dm1/chopstick_dm1.urdf",
+     [
+      0.009644592747512434,
+      0.00611063255017951,
+      0.004246783702182289,
+      0.0,
+      0.0,
+      -0.9999998480515533,
+      0.0005512684194332226
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick_dm1/chopstick_dm1.urdf",
+     [
+      0.009644584077584874,
+      0.012183258229212932,
+      0.004246783702182289,
+      0.0,
+      0.0,
+      0.999999623387801,
+      0.0008678849325915798
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.009644598496688875,
+     1.4677054964101765e-06,
+     0.10424678370218228,
+     0.0,
+     0.0,
+     -0.9999999971013522,
+     7.613997364903782e-05
+    ]
+   ],
+   "layout": {
+    "chopsticks": 5,
+    "bottom_row": 5,
+    "top_row": 0,
+    "target": "bottom2",
+    "goals": "lift only",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ],
+    "variant": "diameter -1 mm (cross-section x0.8459)",
+    "row_pitch_mm": 6.1,
+    "base_problem": "cb_binh_chopstick_n5_lift"
+   },
    "goal_offsets_mm": [
     [
      0.0,
