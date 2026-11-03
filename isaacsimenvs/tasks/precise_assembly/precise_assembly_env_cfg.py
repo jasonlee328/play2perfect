@@ -179,6 +179,9 @@ class PreciseAssemblyCfg:
     turn_strip_steps: int = 0
     turn_strip_penalty: float = 0.0
     turn_stop_band_deg: float = 3.0
+    # What counts as "working the cap" at the stop for turn_strip_steps: > 0 = any fingertip within this distance (m)
+    # of the cap centre (hovering on / pushing a tight cap); 0 = a fingertip tactile pad in contact.
+    turn_strip_near_dist: float = 0.0
     # Hidden turning resistance: non-empty [lo, hi] = every env's turn joint gets its own viscous damping (N m s / rad,
     # log-uniform in [lo, hi], fixed for the env's life, never observed), replacing JointSpec.damping. A stiff cap then
     # feels like a locked one to the joint state, so the stop has to be told apart by touch (ribs sweeping past).

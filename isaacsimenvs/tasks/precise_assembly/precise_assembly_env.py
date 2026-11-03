@@ -746,8 +746,12 @@ class PreciseAssemblyEnv(PlayEnv):
         # over-tightening: at the stop with a fingertip pad in contact (real taxels, also under policy_override)
         at_stop = self.turn_angle >= self.unlock_angle - math.radians(float(pih_cfg.turn_stop_band_deg))
         self.turn_at_stop_steps += at_stop.long()
-        tac = getattr(self, "_last_tactile", None)
-        contact = torch.zeros_like(at_stop) if tac is None else tac.reshape(tac.shape[0], -1).sum(-1) > 0
+        near_d = float(pih_cfg.turn_strip_near_dist)
+        if near_d > 0.0:
+            contact = self._curr_fingertip_distances.min(dim=-1).values < near_d
+        else:
+            tac = getattr(self, "_last_tactile", None)
+            contact = torch.zeros_like(at_stop) if tac is None else tac.reshape(tac.shape[0], -1).sum(-1) > 0
         self.turn_strip_count += (at_stop & contact).long()
         self._turn_just_stripped = torch.zeros_like(at_stop)
         if int(pih_cfg.turn_strip_steps) > 0:
