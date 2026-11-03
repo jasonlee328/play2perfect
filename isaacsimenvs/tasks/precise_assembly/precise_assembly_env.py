@@ -1252,8 +1252,9 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
-        stripped = self.turn_stripped if getattr(self, "turn_mode", False) else torch.zeros_like(fall)
-        released_early = (self.turn_released_early if getattr(self, "turn_mode", False)
+        # clones: reset_idx clears these flags in place, after which the reasons dict must still hold this step's ends
+        stripped = self.turn_stripped.clone() if getattr(self, "turn_mode", False) else torch.zeros_like(fall)
+        released_early = (self.turn_released_early.clone() if getattr(self, "turn_mode", False)
                           else torch.zeros_like(fall))
         terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | stripped | released_early
         truncated = self.episode_length_buf >= self.max_episode_length
