@@ -383,6 +383,9 @@ class RewardCfg:
     contact_break_penalty_scale: float = 0.0
     contact_jerk_penalty_scale: float = 0.0
     contact_min_pads: int = 2
+    # "tips" = 5 fingertip TacMap pads (_last_tactile); "hand" = 21 whole-hand skin links (_last_tactile_hand,
+    # needs tactile.whole_hand=true); a link is on if any of its taxels > contact_thr. contact_min_pads then counts links.
+    contact_source: str = "tips"
     contact_thr: float = 0.02
     contact_gate_rise: float = 0.01
     # hold reward is paid for at most this many steps per episode (so hovering never beats finishing the task)

@@ -157,11 +157,12 @@ def contact_persistence_reward(env) -> torch.Tensor:
     """Hold / break / jerk terms on fingertip contact while the object is lifted (RewardCfg.contact_*).
     Also logs the contact-stability proxy (pads on, breaks, 2-pad share while lifted) in env.extras."""
     rc = env.cfg.reward
-    tac = getattr(env, "_last_tactile", None)
+    hand = getattr(rc, "contact_source", "tips") == "hand"  # "hand": 21 skin links (tactile_hand) instead of 5 pads
+    tac = getattr(env, "_last_tactile_hand" if hand else "_last_tactile", None)
     zero = torch.zeros(env.num_envs, device=env.device)
     if tac is None:
         return zero
-    tac = tac.view(env.num_envs, 5, -1)
+    tac = tac.view(env.num_envs, 21 if hand else 5, -1)
     on = (tac > rc.contact_thr).any(-1)
     prev_on = getattr(env, "_contact_prev_on", None)
     prev_tac = getattr(env, "_contact_prev_tac", None)
