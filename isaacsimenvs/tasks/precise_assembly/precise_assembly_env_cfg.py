@@ -201,6 +201,10 @@ class PreciseAssemblyCfg:
     # Per-step reward while the knob is inside the (curriculum) window and the latch has not cleared yet
     # (privileged shaping: teaches stopping near theta; the actor still has to find theta without seeing it).
     latch_window_rew_scale: float = 0.0
+    # True: the window reward is paid only on steps where the dwell count advances (in window, still, not pulled).
+    latch_window_rew_dwell_only: bool = False
+    # True: the dense lift / keypoint rewards are zero while the latch is closed (pulling a locked door pays nothing).
+    latch_gate_task_reward: bool = False
     latch_critic_obs: bool = False
     # > 0: the knob's end stop is this angle for every env (instead of theta + unlock_stop_margin_deg).
     unlock_fixed_stop_deg: float = 0.0

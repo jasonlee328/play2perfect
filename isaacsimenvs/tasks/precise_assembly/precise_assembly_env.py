@@ -736,7 +736,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 speed = (knob - self._latch_prev_knob).abs() / float(self.step_dt)
                 self._latch_prev_knob = knob.clone()
                 loaded = loaded | (speed > math.radians(float(c.latch_still_deg_s)))
-            self.latch_dwell = torch.where(in_win & ~loaded & ~self.latch_open, self.latch_dwell + 1,
+            self.latch_dwell_adv = in_win & ~loaded & ~self.latch_open
+            self.latch_dwell = torch.where(self.latch_dwell_adv, self.latch_dwell + 1,
                                            torch.zeros_like(self.latch_dwell))
             unlocked = self.latch_dwell >= d_steps
             self.latch_in_window = in_win
@@ -1324,8 +1325,17 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward + bonus
             self._reward_terms["latch_unlock_bonus"] = bonus
             self._reward_terms["total_reward"] = reward
+        if self._latch_on() and pih_cfg.latch_gate_task_reward and hasattr(self, "latch_open"):
+            closed = (~self.latch_open).float()
+            gated = sum(self._reward_terms.get(k, torch.zeros_like(reward)) for k in ("lifting_rew", "lift_bonus_rew", "keypoint_rew"))
+            reward = reward - gated * closed
+            for k in ("lifting_rew", "lift_bonus_rew", "keypoint_rew"):
+                if k in self._reward_terms:
+                    self._reward_terms[k] = self._reward_terms[k] * (1.0 - closed)
+            self._reward_terms["total_reward"] = reward
         if self._latch_on() and float(pih_cfg.latch_window_rew_scale) > 0.0 and hasattr(self, "latch_in_window"):
-            wr = float(pih_cfg.latch_window_rew_scale) * (self.latch_in_window & ~self.latch_open).float()
+            on = getattr(self, "latch_dwell_adv", self.latch_in_window) if pih_cfg.latch_window_rew_dwell_only else self.latch_in_window
+            wr = float(pih_cfg.latch_window_rew_scale) * (on & ~self.latch_open).float()
             reward = reward + wr
             self._reward_terms["latch_window_rew"] = wr
             self._reward_terms["total_reward"] = reward
