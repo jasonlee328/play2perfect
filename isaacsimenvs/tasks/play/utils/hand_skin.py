@@ -132,9 +132,56 @@ class HandSkinSensor:
                                        else [])
         self.meshes = [convert_to_warp_mesh(*prim_mesh(o.cfg.prim_path), device=self.device) for o in self.targets]
         self.envs_per_chunk = max(1, int(tactile_cfg.max_rays_per_chunk) // len(self.starts))
+        self._setup_coverage(env)
         empty = int((torch.bincount(self.taxel, minlength=self.n_tax) == 0).sum())
         print(f"[hand skin] {len(HAND_LINKS)} links x {g}x{g} taxels ({empty} without rays), {len(self.starts)} "
               f"rays/env, skin {skin * 1e3:g} mm, cast against {len(self.targets)} bodies", flush=True)
+
+    def _setup_coverage(self, env) -> None:
+        """Surface cells of the target (body frame) for the touch-coverage reward: a voxel lookup table of
+        coverage_cell_mm cells, -1 off the surface. Rays of the links in reward.coverage_links count."""
+        import trimesh
+        rc = env.cfg.reward
+        self.cov_on = bool(getattr(rc, "coverage_rew_scale", 0.0)) or bool(getattr(rc, "coverage_log", False))
+        self.cells = None
+        if not self.cov_on:
+            return
+        cell = float(rc.coverage_cell_mm) * 1e-3
+        pts, tris = prim_mesh(env.object.cfg.prim_path)
+        tm = trimesh.Trimesh(pts * 1e3, tris, process=True)
+        sp, _ = trimesh.sample.sample_surface_even(tm, 40000, radius=0.25 * cell * 1e3, seed=np.random.default_rng(1))
+        sp = sp * 1e-3
+        lo = pts.min(0) - 2 * cell
+        dims = np.ceil((pts.max(0) + 2 * cell - lo) / cell).astype(int)
+        vi = np.clip(((sp - lo) / cell).astype(int), 0, dims - 1)
+        flat = np.unique(vi[:, 0] * dims[1] * dims[2] + vi[:, 1] * dims[2] + vi[:, 2])
+        lut = np.full(int(dims.prod()), -1, dtype=np.int64)
+        lut[flat] = np.arange(len(flat))
+        self.cov_lo = torch.tensor(lo, dtype=torch.float32, device=self.device)
+        self.cov_dims = torch.tensor(dims, dtype=torch.long, device=self.device)
+        self.cov_cell = cell
+        self.cov_lut = torch.tensor(lut, device=self.device)
+        self.n_cells = len(flat)
+        links = str(getattr(rc, "coverage_links", "all")).lower()
+        if links == "tips":
+            keep = [k for k, n in enumerate(HAND_LINKS) if n.endswith("_DP")]
+        elif links == "all":
+            keep = list(range(len(HAND_LINKS)))
+        else:
+            raise ValueError(f"reward.coverage_links must be all|tips, got {links!r}")
+        self.cov_ray_mask = torch.isin(self.body, torch.tensor(keep, device=self.device))
+        print(f"[hand skin] coverage: {self.n_cells} surface cells of {cell * 1e3:g} mm on the target, "
+              f"{int(self.cov_ray_mask.sum())} rays ({links})", flush=True)
+
+    def _cells(self, s, d, dist) -> torch.Tensor:
+        """(n, R) surface-cell id of each ray's hit on the target, -1 where it misses or the link does not count."""
+        hit = s + d * dist.nan_to_num(0.0, 0.0, 0.0).unsqueeze(-1)
+        v = ((hit - self.cov_lo) / self.cov_cell).long()
+        dims = self.cov_dims
+        inb = ((v >= 0) & (v < dims)).all(-1)
+        v = torch.minimum(v.clamp_min(0), dims - 1)
+        c = self.cov_lut[v[..., 0] * dims[1] * dims[2] + v[..., 1] * dims[2] + v[..., 2]]
+        return torch.where(inb & (dist > 0) & self.cov_ray_mask, c, torch.full_like(c, -1))
 
     @torch.no_grad()
     def compute(self) -> torch.Tensor:
@@ -145,10 +192,12 @@ class HandSkinSensor:
         link = env.robot.data.body_state_w[:, self.body_ids, 0:7]  # (N, B, 7)
         R_wl = matrix_from_quat(link[..., 3:7])
         result = torch.zeros(env.num_envs, self.n_tax, device=self.device)
+        if self.cov_on:
+            cells = torch.full((env.num_envs, len(self.starts)), -1, dtype=torch.long, device=self.device)
         for a in range(0, env.num_envs, self.envs_per_chunk):
             c = slice(a, a + self.envs_per_chunk)
             depth = None
-            for obj, mesh in zip(self.targets, self.meshes):
+            for oi, (obj, mesh) in enumerate(zip(self.targets, self.meshes)):
                 R_ow = matrix_from_quat(obj.data.root_quat_w[c]).transpose(-1, -2).unsqueeze(1)  # world -> body
                 R = (R_ow @ R_wl[c])[:, self.body]                                                 # (n, R, 3, 3)
                 t = (R_ow @ (link[c, :, 0:3] - obj.data.root_pos_w[c].unsqueeze(1)).unsqueeze(-1)).squeeze(-1)
@@ -158,9 +207,13 @@ class HandSkinSensor:
                 back = s + d * (dist.clamp_min(0.0) + CPD_EPS).nan_to_num(0.0, 0.0, 0.0).unsqueeze(-1)
                 _, dist2, _, _ = raycast_mesh(back, -d, mesh, max_dist=CPD_MAX_DIST, return_distance=True)
                 dj = torch.where(torch.isfinite(dist) & torch.isfinite(dist2), dist, torch.zeros_like(dist))
+                if oi == 0 and self.cov_on:  # the target: rays are cast in its body frame
+                    cells[c] = self._cells(s, d, dj)
                 depth = dj if depth is None else torch.maximum(depth, dj)
             result[c] = torch.zeros(depth.shape[0], self.n_tax, device=self.device).scatter_reduce_(
                 1, self.taxel.expand(depth.shape[0], -1), depth, "amax")
+        if self.cov_on:
+            env._skin_cells = cells
         return _deform_quantize(result) / 255.0
 
 

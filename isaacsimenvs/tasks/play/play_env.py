@@ -46,7 +46,7 @@ class PlayEnv(DirectRLEnv):
                 cfg.obs.state_list = (*cfg.obs.state_list, "tactile")
             if cfg.tactile.whole_hand:
                 OBS_FIELD_SIZES["tactile_hand"] = hand_skin_obs_dim(cfg.tactile)
-                if cfg.tactile.in_policy and "tactile_hand" not in cfg.obs.obs_list:
+                if cfg.tactile.in_policy and getattr(cfg.tactile, "whole_hand_in_policy", True) and "tactile_hand" not in cfg.obs.obs_list:
                     cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_hand")
                 if cfg.tactile.whole_hand_in_critic and "tactile_hand" not in cfg.obs.state_list:
                     cfg.obs.state_list = (*cfg.obs.state_list, "tactile_hand")

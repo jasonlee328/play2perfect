@@ -391,6 +391,16 @@ class RewardCfg:
     # hold reward is paid for at most this many steps per episode (so hovering never beats finishing the task)
     contact_hold_max_steps: int = 120
 
+    # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
+    # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits
+    # the target on this step AND the previous one marks its cell covered (sliding contact counts, brief taps do not).
+    # Per step: + coverage_rew_scale x (newly covered cells / all surface cells), so an episode earns at most the scale.
+    # coverage_links: "all" (21 skin links) or "tips" (the 5 distal links, where the fingertip pads sit).
+    coverage_rew_scale: float = 0.0
+    coverage_cell_mm: float = 5.0
+    coverage_links: str = "all"
+    coverage_log: bool = False   # log coverage/* even when the reward is off (needs tactile.whole_hand=true)
+
 
 # ----------------------------------------------------------------------------
 # reset (includes goal sampling — both fire on _reset_idx)
@@ -580,6 +590,8 @@ class TactileCfg:
     whole_hand_skin_mm: float = 2.0        # virtual skin thickness outside the collision surface
     whole_hand_distractors: bool = True    # also sense the distractors (one channel with the object)
     whole_hand_in_critic: bool = False
+    # False computes the skin (for the coverage / contact rewards and logging) without adding it to the policy obs.
+    whole_hand_in_policy: bool = True
 
 
 # ----------------------------------------------------------------------------
