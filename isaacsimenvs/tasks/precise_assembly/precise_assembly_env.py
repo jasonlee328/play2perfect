@@ -669,8 +669,16 @@ class PreciseAssemblyEnv(PlayEnv):
         body = self._joint_bodies()[int(c.latch_door_joint)]
         axis_w = quat_apply(self.hole_quat_wxyz, torch.tensor(jd.axis, device=self.device,
                                                               dtype=torch.float32).expand(self.num_envs, 3))
-        on = pop & (door < math.radians(float(c.latch_pop_deg)))
-        tau = on.float() * float(c.latch_pop_torque)
+        if float(c.latch_pop_kp) > 0.0:
+            if not hasattr(self, "_latch_prev_door"):
+                self._latch_prev_door = door.clone()
+            wd = (door - self._latch_prev_door) / float(self.step_dt)
+            self._latch_prev_door = door.clone()
+            tau = (float(c.latch_pop_torque) + float(c.latch_pop_kp) * (math.radians(float(c.latch_pop_deg)) - door)
+                   - float(c.latch_pop_kd) * wd).clamp(min=0.0) * pop.float()
+        else:
+            on = pop & (door < math.radians(float(c.latch_pop_deg)))
+            tau = on.float() * float(c.latch_pop_torque)
         torque = (tau.unsqueeze(-1) * axis_w).unsqueeze(1)
         body.set_external_force_and_torque(torch.zeros_like(torque), torque, is_global=True)
 

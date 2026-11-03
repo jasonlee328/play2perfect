@@ -191,6 +191,10 @@ class PreciseAssemblyCfg:
     # > 0: the dwell also needs the knob held still (|knob speed| below this, deg/s); 0 = off.
     latch_still_deg_s: float = 0.0
     latch_pop_torque: float = 0.5
+    # latch_pop_kp > 0: PD pop instead of bang-bang: tau = latch_pop_torque (gravity feed-forward) +
+    # kp (pop - door) - kd * door speed, clamped >= 0 (bang-bang at one update per policy step overshoots).
+    latch_pop_kp: float = 0.0
+    latch_pop_kd: float = 0.0
     # One-time reward when the latch clears (privileged); critic-only field latch_state (theta / 90 deg, knob in
     # window, dwell fraction, latch open, door angle / 10 deg), never in the actor's obs_list.
     latch_unlock_bonus: float = 0.0
