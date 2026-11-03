@@ -696,7 +696,19 @@ class PreciseAssemblyEnv(PlayEnv):
         self._turn_prev_wrapped = a
         lower = math.radians(float(self.cfg.precise_assembly.turn_lower_deg))
         over = self.turn_angle - self.unlock_angle
-        if not self.cfg.precise_assembly.turn_stop_physical or self.cfg.precise_assembly.turn_clutch:
+        pc = self.cfg.precise_assembly
+        if pc.turn_clutch:
+            b = self._turn_clutch_brake()
+            if b > 0.0:
+                ids_b = (over > 0).nonzero(as_tuple=False).squeeze(-1)
+                if ids_b.numel() > 0:
+                    body_b = self._joint_bodies()[k]
+                    ax_b = self._turn_axis_w()[0][ids_b]
+                    vel_b = body_b.data.root_vel_w[ids_b].clone()
+                    w_b = (vel_b[:, 3:6] * ax_b).sum(-1).clamp_min(0.0)   # tightening spin only
+                    vel_b[:, 3:6] -= (b * w_b).unsqueeze(-1) * ax_b
+                    body_b.write_root_velocity_to_sim(vel_b, env_ids=ids_b)
+        if not pc.turn_stop_physical or pc.turn_clutch:
             over = torch.zeros_like(over)
         under = lower - self.turn_angle
         corr = torch.where(over > 0, -over, torch.where(under > 0, under, torch.zeros_like(over)))
@@ -720,6 +732,15 @@ class PreciseAssemblyEnv(PlayEnv):
         body.write_root_velocity_to_sim(vel, env_ids=ids)
         self.turn_angle[ids] += c
         self._turn_prev_wrapped[ids] = torch.atan2(torch.sin(a[ids] + c), torch.cos(a[ids] + c))
+
+    def _turn_clutch_brake(self) -> float:
+        pc = self.cfg.precise_assembly
+        b0 = float(pc.turn_clutch_brake)
+        if int(pc.turn_clutch_brake_ramp_steps) <= 0:
+            return b0
+        f = min(1.0, float(self.common_step_counter + int(pc.turn_clutch_brake_offset_steps))
+                / float(pc.turn_clutch_brake_ramp_steps))
+        return b0 + f * (float(pc.turn_clutch_brake_end) - b0)
 
     def _tactile_object_pose(self):
         """Object (pos, quat) the fingertip tactile ray-casts against, or None (= the real pose). Turn clutch: the cap
@@ -794,6 +815,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_stripped |= new
         self.extras["turn_angle_deg_mean"] = torch.rad2deg(self.turn_angle).mean()
         self.extras["turn_at_stop_frac"] = at_stop.float().mean()
+        if pih_cfg.turn_clutch:
+            self.extras["turn_clutch_brake_cur"] = self._turn_clutch_brake()
         self.extras["turn_over_deg_mean"] = torch.rad2deg(torch.clamp(self.turn_angle - self.unlock_angle, min=0.0)).mean()
         self.extras["turn_contact_frac"] = contact.float().mean()
 

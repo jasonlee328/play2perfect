@@ -209,6 +209,13 @@ class PreciseAssemblyCfg:
     # frozen at the stop angle: the felt surface (hull + tactile-only knurl) slips under the pads by the over-turn.
     # Touch is then the only cue. Pair with turn_strip_over_deg so a blind fixed number of turns strips the cap.
     turn_clutch: bool = False
+    # Compliant stop for the clutch (curriculum): past the stop, each physics substep removes this fraction of the cap's
+    # tightening spin (1 = stops dead each substep, like the hard stop; 0 = free clutch). Ramped from
+    # turn_clutch_brake to turn_clutch_brake_end over turn_clutch_brake_ramp_steps env steps (+ _offset_steps).
+    turn_clutch_brake: float = 0.0
+    turn_clutch_brake_end: float = 0.0
+    turn_clutch_brake_ramp_steps: int = 0
+    turn_clutch_brake_offset_steps: int = 0
     # > 0: fail `stripped` (-turn_strip_penalty) once the cap is turned more than this past its stop (any mode).
     turn_strip_over_deg: float = 0.0
     # Over-turn curriculum: > 0 = ramp the strip window from turn_strip_over_ramp_start_deg down to turn_strip_over_deg
