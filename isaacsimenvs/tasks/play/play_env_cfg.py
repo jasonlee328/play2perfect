@@ -385,6 +385,8 @@ class RewardCfg:
     contact_min_pads: int = 2
     contact_thr: float = 0.02
     contact_gate_rise: float = 0.01
+    # hold reward is paid for at most this many steps per episode (so hovering never beats finishing the task)
+    contact_hold_max_steps: int = 120
 
 
 # ----------------------------------------------------------------------------
