@@ -130,7 +130,15 @@ class HandSkinSensor:
         self.max_dist = skin + 3e-3  # a body can also sink a little into the collision surface
         self.targets = [env.object] + (list(getattr(env, "distractors", ())) if tactile_cfg.whole_hand_distractors
                                        else [])
-        self.meshes = [convert_to_warp_mesh(*prim_mesh(o.cfg.prim_path), device=self.device) for o in self.targets]
+        self.meshes = []
+        for j, o in enumerate(self.targets):
+            pts, tris = prim_mesh(o.cfg.prim_path)
+            extra = str(getattr(tactile_cfg, "object_extra_mesh", "") or "") if j == 0 else ""
+            if extra:  # tactile-only geometry (e.g. a cap's knurl), in the object body frame like the pads see it
+                xm = trimesh.load(extra, force="mesh")
+                tris = np.concatenate([np.asarray(tris), np.asarray(xm.faces) + len(pts)])
+                pts = np.concatenate([np.asarray(pts, dtype=np.float64), np.asarray(xm.vertices, dtype=np.float64)])
+            self.meshes.append(convert_to_warp_mesh(pts, tris, device=self.device))
         self.envs_per_chunk = max(1, int(tactile_cfg.max_rays_per_chunk) // len(self.starts))
         empty = int((torch.bincount(self.taxel, minlength=self.n_tax) == 0).sum())
         print(f"[hand skin] {len(HAND_LINKS)} links x {g}x{g} taxels ({empty} without rays), {len(self.starts)} "
@@ -148,10 +156,13 @@ class HandSkinSensor:
         for a in range(0, env.num_envs, self.envs_per_chunk):
             c = slice(a, a + self.envs_per_chunk)
             depth = None
-            for obj, mesh in zip(self.targets, self.meshes):
-                R_ow = matrix_from_quat(obj.data.root_quat_w[c]).transpose(-1, -2).unsqueeze(1)  # world -> body
+            override = env._tactile_object_pose() if hasattr(env, "_tactile_object_pose") else None
+            for j, (obj, mesh) in enumerate(zip(self.targets, self.meshes)):
+                opos, oquat = (override if (j == 0 and override is not None)
+                               else (obj.data.root_pos_w, obj.data.root_quat_w))
+                R_ow = matrix_from_quat(oquat[c]).transpose(-1, -2).unsqueeze(1)  # world -> body
                 R = (R_ow @ R_wl[c])[:, self.body]                                                 # (n, R, 3, 3)
-                t = (R_ow @ (link[c, :, 0:3] - obj.data.root_pos_w[c].unsqueeze(1)).unsqueeze(-1)).squeeze(-1)
+                t = (R_ow @ (link[c, :, 0:3] - opos[c].unsqueeze(1)).unsqueeze(-1)).squeeze(-1)
                 s = (R @ self.starts.unsqueeze(-1)).squeeze(-1) + t[:, self.body]
                 d = (R @ self.dirs.unsqueeze(-1)).squeeze(-1)
                 _, dist, _, _ = raycast_mesh(s, d, mesh, max_dist=self.max_dist, return_distance=True)
