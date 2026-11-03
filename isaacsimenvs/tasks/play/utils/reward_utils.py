@@ -193,6 +193,51 @@ def contact_persistence_reward(env) -> torch.Tensor:
     return rew
 
 
+def slow_touch_reward(env) -> torch.Tensor:
+    """Feel-before-lift shaping (RewardCfg.slow_touch_*). Feel phase = from the episode's first contact until the object
+    first rises contact_gate_rise. Penalize palm / joint speed in it; pay a dwell bonus at lift for its contact steps."""
+    rc = env.cfg.reward
+    N, dev = env.num_envs, env.device
+    zero = torch.zeros(N, device=dev)
+    hand = getattr(rc, "contact_source", "tips") == "hand"
+    tac = getattr(env, "_last_tactile_hand" if hand else "_last_tactile", None)
+    if tac is None:
+        return zero
+    on = (tac.view(N, 21 if hand else 5, -1) > rc.contact_thr).any(-1).any(-1)
+    fresh = env.episode_length_buf <= 1
+    st = getattr(env, "_slow_state", None)
+    if st is None or st["touched"].shape[0] != N:
+        st = {"touched": torch.zeros(N, dtype=torch.bool, device=dev), "lifted": torch.zeros(N, dtype=torch.bool, device=dev),
+              "steps": zero.clone(), "feel": zero.clone()}
+    for k in ("touched", "lifted"):
+        st[k] = st[k] & ~fresh
+    for k in ("steps", "feel"):
+        st[k] = torch.where(fresh, zero, st[k])
+    rise = env.object.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2] - env._object_init_z
+    up = rise > rc.contact_gate_rise
+    st["touched"] = st["touched"] | on
+    feel = st["touched"] & ~st["lifted"] & ~up          # in the feel phase this step
+    lift_now = st["touched"] & ~st["lifted"] & up       # first rise past the gate this episode
+    palm_v = env.robot.data.body_state_w[:, env._palm_body_id, 7:10].norm(dim=-1)
+    qd = env.robot.data.joint_vel.abs().mean(-1)
+    speed = palm_v + float(rc.slow_touch_joint_weight) * qd
+    st["steps"] = st["steps"] + (feel & on).float()
+    st["feel"] = st["feel"] + feel.float()
+    D = max(int(rc.slow_touch_dwell_steps), 1)
+    dwell = torch.clamp(st["steps"], max=D) / D
+    rew = -float(rc.slow_touch_speed_penalty_scale) * speed * feel.float() + float(rc.slow_touch_dwell_bonus) * dwell * lift_now.float()
+    nf, nl = feel.sum().clamp(min=1), lift_now.sum()
+    env.extras["slow/feel_share"] = float(feel.float().mean())
+    env.extras["slow/palm_speed_feel"] = float((palm_v * feel).sum() / nf)
+    env.extras["slow/joint_speed_feel"] = float((qd * feel).sum() / nf)
+    if int(nl) > 0:
+        env.extras["slow/feel_steps_at_lift"] = float((st["feel"] * lift_now).sum() / nl)
+        env.extras["slow/contact_steps_at_lift"] = float((st["steps"] * lift_now).sum() / nl)
+    st["lifted"] = st["lifted"] | up
+    env._slow_state = st
+    return rew
+
+
 def coverage_reward(env) -> torch.Tensor:
     """Touch coverage of the target's surface (RewardCfg.coverage_*): + scale x newly covered share of the surface
     cells, a cell counting once its ray has touched the target on this step and the previous one. Logs coverage/*."""
