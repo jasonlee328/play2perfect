@@ -400,6 +400,9 @@ class RewardCfg:
     coverage_cell_mm: float = 5.0
     coverage_links: str = "all"
     coverage_log: bool = False   # log coverage/* even when the reward is off (needs tactile.whole_hand=true)
+    # "step": + scale x newly covered share every step; "success": + scale x the episode's covered share, paid once
+    # on the step the task succeeds (no reward for rubbing the object without finishing).
+    coverage_pay: str = "step"
 
 
 # ----------------------------------------------------------------------------

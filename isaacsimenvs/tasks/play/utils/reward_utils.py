@@ -220,8 +220,13 @@ def coverage_reward(env) -> torch.Tensor:
     vis[:, C] = False
     new = (vis[:, :C].sum(1) - before).float()
     env._cov_visited, env._cov_prev_cells = vis, cells.clone()
-    rew = rc.coverage_rew_scale * new / C
     cov = vis[:, :C].float().mean(1)
+    if str(getattr(rc, "coverage_pay", "step")).lower() == "success":
+        # pay the episode's whole coverage once, only when the task succeeds this step (search must end in a lift)
+        ok = getattr(env, "_termination_reasons", {}).get("max_successes")
+        rew = rc.coverage_rew_scale * cov * (ok.float() if ok is not None else zero)
+    else:
+        rew = rc.coverage_rew_scale * new / C
     env.extras["coverage/frac"] = float(cov.mean())
     env.extras["coverage/new_cells_per_step"] = float(new.mean())
     env.extras["coverage/rays_on_target"] = float((cells >= 0).sum(1).float().mean())
