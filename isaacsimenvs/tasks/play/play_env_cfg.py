@@ -406,6 +406,10 @@ class RewardCfg:
     # scaled by slow_touch_rate (arm and hand), so the hand physically moves at that fraction of its normal speed.
     # Uses the feel-phase state of the previous step (needs slow_touch_* reward or slow_touch_rate < 1 to track it).
     slow_touch_rate: float = 1.0
+    # ramp the cap in: effective rate = 1 - (1 - slow_touch_rate) x min(1, (env step + offset) / ramp_steps); 0 = no ramp.
+    # A resume restarts the env step counter, so set slow_touch_rate_offset_steps to continue a ramp.
+    slow_touch_rate_ramp_steps: int = 0
+    slow_touch_rate_offset_steps: int = 0
 
     # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
     # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits
