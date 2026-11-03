@@ -374,6 +374,19 @@ class RewardCfg:
     kuka_actions_penalty_scale: float = 0.03
     hand_actions_penalty_scale: float = 0.003
 
+    # Contact persistence (2026-11-02, off by default): shape the teacher toward steady fingertip contact while the
+    # object is up (object >= contact_gate_rise above its reset height). A pad is "on" when any taxel > contact_thr
+    # (fingertip TacMap pads, real taxels even under tactile.policy_override). Per step while lifted:
+    #   + contact_hold_rew_scale        if >= contact_min_pads pads are on
+    #   - contact_break_penalty_scale   x number of pads that went on -> off this step
+    #   - contact_jerk_penalty_scale    x mean |taxel change| over the pads (only when a pad is on)
+    contact_hold_rew_scale: float = 0.0
+    contact_break_penalty_scale: float = 0.0
+    contact_jerk_penalty_scale: float = 0.0
+    contact_min_pads: int = 2
+    contact_thr: float = 0.02
+    contact_gate_rise: float = 0.01
+
 
 # ----------------------------------------------------------------------------
 # reset (includes goal sampling — both fire on _reset_idx)
