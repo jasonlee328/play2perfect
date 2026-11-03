@@ -1316,6 +1316,11 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward + bonus
             self._reward_terms["latch_unlock_bonus"] = bonus
             self._reward_terms["total_reward"] = reward
+        if self._latch_on() and float(pih_cfg.latch_window_rew_scale) > 0.0 and hasattr(self, "latch_in_window"):
+            wr = float(pih_cfg.latch_window_rew_scale) * (self.latch_in_window & ~self.latch_open).float()
+            reward = reward + wr
+            self._reward_terms["latch_window_rew"] = wr
+            self._reward_terms["total_reward"] = reward
 
         log_step_metrics(self)
         self._log_peg_metrics()

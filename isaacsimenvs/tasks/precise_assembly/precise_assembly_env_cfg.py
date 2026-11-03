@@ -194,6 +194,9 @@ class PreciseAssemblyCfg:
     # One-time reward when the latch clears (privileged); critic-only field latch_state (theta / 90 deg, knob in
     # window, dwell fraction, latch open, door angle / 10 deg), never in the actor's obs_list.
     latch_unlock_bonus: float = 0.0
+    # Per-step reward while the knob is inside the (curriculum) window and the latch has not cleared yet
+    # (privileged shaping: teaches stopping near theta; the actor still has to find theta without seeing it).
+    latch_window_rew_scale: float = 0.0
     latch_critic_obs: bool = False
     # > 0: the knob's end stop is this angle for every env (instead of theta + unlock_stop_margin_deg).
     unlock_fixed_stop_deg: float = 0.0
