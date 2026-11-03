@@ -209,8 +209,8 @@ def slow_touch_reward(env) -> torch.Tensor:
     st = getattr(env, "_slow_state", None)
     if st is None or st["touched"].shape[0] != N:
         st = {"touched": torch.zeros(N, dtype=torch.bool, device=dev), "lifted": torch.zeros(N, dtype=torch.bool, device=dev),
-              "steps": zero.clone(), "feel": zero.clone()}
-    for k in ("touched", "lifted"):
+              "steps": zero.clone(), "feel": zero.clone(), "lift_ok": torch.zeros(N, dtype=torch.bool, device=dev)}
+    for k in ("touched", "lifted", "lift_ok"):
         st[k] = st[k] & ~fresh
     for k in ("steps", "feel"):
         st[k] = torch.where(fresh, zero, st[k])
@@ -236,7 +236,21 @@ def slow_touch_reward(env) -> torch.Tensor:
     if int(nl) > 0:
         env.extras["slow/feel_steps_at_lift"] = float((st["feel"] * lift_now).sum() / nl)
         env.extras["slow/contact_steps_at_lift"] = float((st["steps"] * lift_now).sum() / nl)
-    st["lifted"] = st["lifted"] | up
+    mf = int(getattr(rc, "slow_touch_min_feel_steps", 0))
+    if mf > 0:
+        rs = int(getattr(rc, "slow_touch_min_feel_ramp_steps", 0))
+        t = env.common_step_counter + int(getattr(rc, "slow_touch_min_feel_offset_steps", 0))
+        req = mf * (min(1.0, t / rs) if rs > 0 else 1.0)
+        st["lift_ok"] = torch.where(lift_now, st["steps"] >= req, st["lift_ok"])
+        env.extras["slow/min_feel_req"] = float(req)
+        if int(lift_now.sum()) > 0:
+            env.extras["slow/lift_ok_share"] = float((st["steps"] >= req)[lift_now].float().mean())
+        # set back down: reopen the feel phase (contact keeps counting)
+        down = st["lifted"] & (rise < 0.5 * rc.contact_gate_rise)
+        st["lifted"] = (st["lifted"] | up) & ~down
+        st["lift_ok"] = st["lift_ok"] & ~down
+    else:
+        st["lifted"] = st["lifted"] | up
     env._slow_state = st
     return rew
 
