@@ -206,6 +206,24 @@ class PreciseAssemblyEnv(PlayEnv):
             print(f"[PreciseAssemblyEnv] unlock angle per env: {self._unlock_deg_np.min():.1f}-"
                   f"{self._unlock_deg_np.max():.1f} deg (stop + {pih_cfg.unlock_stop_margin_deg}, "
                   f"tol {pih_cfg.unlock_tol_deg})", flush=True)
+        # multi-turn hidden stop (bottle cap): unwrapped joint angle, tracked every physics substep
+        self.turn_mode = bool(pih_cfg.turn_mode)
+        if self.turn_mode:
+            if self.unlock_angle is None:
+                raise ValueError("precise_assembly.turn_mode needs unlock_angle_values_deg / unlock_angle_range_deg")
+            n = self.num_envs
+            self.turn_angle = torch.zeros(n, device=self.device)          # unwrapped, rad, + = tightening
+            self._turn_prev_wrapped = torch.zeros(n, device=self.device)
+            self.turn_max_angle = torch.zeros(n, device=self.device)
+            self.turn_prev_ep_max = torch.zeros(n, device=self.device)
+            self.turn_strip_count = torch.zeros(n, dtype=torch.long, device=self.device)
+            self.turn_stripped = torch.zeros(n, dtype=torch.bool, device=self.device)
+            self._turn_just_stripped = torch.zeros(n, dtype=torch.bool, device=self.device)
+            self.turn_at_stop_steps = torch.zeros(n, dtype=torch.long, device=self.device)
+            self.turn_prev_ep_at_stop_steps = torch.zeros(n, dtype=torch.long, device=self.device)
+            print(f"[PreciseAssemblyEnv] turn mode: software stop at {self._unlock_deg_np.min():.0f}-"
+                  f"{self._unlock_deg_np.max():.0f} deg, strip after {pih_cfg.turn_strip_steps} steps at the stop "
+                  f"with contact, hide from actor {pih_cfg.turn_hide_from_actor}", flush=True)
 
         print(
             f"[PreciseAssemblyEnv] problem={self._pih_problem_name} "
@@ -529,6 +547,15 @@ class PreciseAssemblyEnv(PlayEnv):
             self.unlock_prev_ep_max[env_ids] = self.unlock_max_angle[env_ids]  # kept across the auto-reset
             self.unlock_max_angle[env_ids] = 0.0
             self.unlock_reached[env_ids] = False
+        if getattr(self, "turn_mode", False):
+            self.turn_prev_ep_max[env_ids] = self.turn_max_angle[env_ids]
+            self.turn_prev_ep_at_stop_steps[env_ids] = self.turn_at_stop_steps[env_ids]
+            self.turn_angle[env_ids] = 0.0
+            self._turn_prev_wrapped[env_ids] = 0.0
+            self.turn_max_angle[env_ids] = 0.0
+            self.turn_strip_count[env_ids] = 0
+            self.turn_stripped[env_ids] = False
+            self.turn_at_stop_steps[env_ids] = 0
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
 
@@ -632,6 +659,95 @@ class PreciseAssemblyEnv(PlayEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
         self._apply_joint_detents()
+
+    def _apply_action(self) -> None:
+        super()._apply_action()
+        if getattr(self, "turn_mode", False):
+            self._turn_substep()
+
+    def _turn_axis_w(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """World axis direction and a world point on the turn joint's axis, (N, 3) each."""
+        j = self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)]
+        hq = self.hole_quat_wxyz
+        axis_w = quat_apply(hq, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(self.num_envs, 3))
+        anchor_w = self.hole_pos + self.scene.env_origins + quat_apply(
+            hq, torch.tensor(j.anchor, device=self.device, dtype=torch.float32).expand(self.num_envs, 3))
+        return axis_w, anchor_w
+
+    def _turn_substep(self) -> None:
+        """Every physics substep: accumulate the unwrapped joint angle and enforce the hidden stop (+ lower bound)."""
+        self._update_joint_angles()
+        k = int(self.cfg.precise_assembly.unlock_joint)
+        a = self.cb_joint_angle[k]
+        d = torch.atan2(torch.sin(a - self._turn_prev_wrapped), torch.cos(a - self._turn_prev_wrapped))
+        self.turn_angle += d
+        self._turn_prev_wrapped = a
+        lower = math.radians(float(self.cfg.precise_assembly.turn_lower_deg))
+        over = self.turn_angle - self.unlock_angle
+        under = lower - self.turn_angle
+        corr = torch.where(over > 0, -over, torch.where(under > 0, under, torch.zeros_like(over)))
+        ids = (corr != 0).nonzero(as_tuple=False).squeeze(-1)
+        if ids.numel() == 0:
+            return
+        body = self._joint_bodies()[k]
+        axis_w, anchor_w = self._turn_axis_w()
+        ax, an, c = axis_w[ids], anchor_w[ids], corr[ids]
+        rot = quat_from_angle_axis(c, ax)
+        pos = body.data.root_pos_w[ids]
+        quat = body.data.root_quat_w[ids]
+        new_pos = an + quat_apply(rot, pos - an)
+        new_quat = quat_mul(rot, quat)
+        vel = body.data.root_vel_w[ids].clone()
+        w_ax = (vel[:, 3:6] * ax).sum(-1)
+        bad = ((c < 0) & (w_ax > 0)) | ((c > 0) & (w_ax < 0))   # spinning further past the bound
+        vel[:, 3:6] -= (w_ax * bad.float()).unsqueeze(-1) * ax
+        vel[:, 0:3] = torch.where(bad.unsqueeze(-1), torch.zeros_like(vel[:, 0:3]), vel[:, 0:3])
+        body.write_root_pose_to_sim(torch.cat([new_pos, new_quat], -1), env_ids=ids)
+        body.write_root_velocity_to_sim(vel, env_ids=ids)
+        self.turn_angle[ids] += c
+        self._turn_prev_wrapped[ids] = torch.atan2(torch.sin(a[ids] + c), torch.cos(a[ids] + c))
+
+    def _actor_turn_hide(self):
+        """For obs_utils.build_observations: (world quat that undoes the cap's turn, axis) or None."""
+        if not (getattr(self, "turn_mode", False) and self.cfg.precise_assembly.turn_hide_from_actor):
+            return None
+        axis_w, _ = self._turn_axis_w()
+        return quat_from_angle_axis(-self.turn_angle, axis_w), axis_w
+
+    def _turn_goal_values(self) -> None:
+        """Turn mode, after compute_intermediate_values: goals / keypoint distance from the unwrapped angle."""
+        from isaacsimenvs.tasks.play.utils.reward_utils import update_near_goal_steps
+        pih_cfg = self.cfg.precise_assembly
+        self.turn_max_angle = torch.maximum(self.turn_max_angle, self.turn_angle)
+        at_last = self._successes >= self.env_max_goals - 1
+        target = torch.where(at_last, self.unlock_angle,
+                             torch.full_like(self.unlock_angle, math.radians(float(pih_cfg.turn_first_goal_deg))))
+        rem = torch.clamp(target - self.turn_angle, min=0.0)
+        self._keypoints_max_dist = rem * float(pih_cfg.turn_progress_m_per_rad)
+        # goal trackers cleared this step (-1 sentinel, replaced by the real keypoint distance in
+        # compute_intermediate_values): start them from the turn distance instead
+        fresh = self._turn_fresh_closest
+        self._closest_keypoint_max_dist = torch.where(fresh, self._keypoints_max_dist, self._closest_keypoint_max_dist)
+        near = rem <= math.radians(float(pih_cfg.unlock_tol_deg))
+        self._near_goal = near
+        self._near_goal_steps = update_near_goal_steps(
+            near_goal=near, near_goal_steps=self._turn_prev_near_steps,
+            force_consecutive=self.cfg.termination.force_consecutive_near_goal_steps)
+        self._is_success = self._near_goal_steps >= self.cfg.termination.success_steps
+        # over-tightening: at the stop with a fingertip pad in contact (real taxels, also under policy_override)
+        at_stop = self.turn_angle >= self.unlock_angle - math.radians(float(pih_cfg.turn_stop_band_deg))
+        self.turn_at_stop_steps += at_stop.long()
+        tac = getattr(self, "_last_tactile", None)
+        contact = torch.zeros_like(at_stop) if tac is None else tac.reshape(tac.shape[0], -1).sum(-1) > 0
+        self.turn_strip_count += (at_stop & contact).long()
+        self._turn_just_stripped = torch.zeros_like(at_stop)
+        if int(pih_cfg.turn_strip_steps) > 0:
+            new = (self.turn_strip_count > int(pih_cfg.turn_strip_steps)) & ~self.turn_stripped
+            self._turn_just_stripped = new
+            self.turn_stripped |= new
+        self.extras["turn_angle_deg_mean"] = torch.rad2deg(self.turn_angle).mean()
+        self.extras["turn_at_stop_frac"] = at_stop.float().mean()
+        self.extras["turn_contact_frac"] = contact.float().mean()
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
@@ -961,10 +1077,16 @@ class PreciseAssemblyEnv(PlayEnv):
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
         prev_near_steps = self._near_goal_steps.clone()
+        turn = getattr(self, "turn_mode", False)
+        if turn:
+            self._turn_fresh_closest = self._closest_keypoint_max_dist < 0.0
+            self._turn_prev_near_steps = prev_near_steps
         compute_intermediate_values(self)
 
         pih_cfg = self.cfg.precise_assembly
-        if getattr(self, "unlock_angle", None) is not None:
+        if turn:
+            self._turn_goal_values()
+        elif getattr(self, "unlock_angle", None) is not None:
             self._apply_unlock_goal(prev_near_steps)
         if pih_cfg.allow_goal_skip:
             self._apply_goal_skip()
@@ -1076,9 +1198,11 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
+        stripped = self.turn_stripped if getattr(self, "turn_mode", False) else torch.zeros_like(fall)
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | stripped
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
+            "stripped": stripped,
             "fall": fall,
             "max_successes": max_successes,
             "retract_fail": retract_fail,
@@ -1124,6 +1248,10 @@ class PreciseAssemblyEnv(PlayEnv):
         reward = reward - lift_rew - lift_bonus_rew + masked_lift_rew + masked_lift_bonus_rew
         self._reward_terms["lifting_rew"] = masked_lift_rew
         self._reward_terms["lift_bonus_rew"] = masked_lift_bonus_rew
+        if getattr(self, "turn_mode", False) and float(pih_cfg.turn_strip_penalty) != 0.0:
+            strip_pen = -float(pih_cfg.turn_strip_penalty) * self._turn_just_stripped.float()
+            reward = reward + strip_pen
+            self._reward_terms["turn_strip_penalty"] = strip_pen
         self._reward_terms["total_reward"] = reward
         self.extras["lift_bonus_active"] = float(self.lift_bonus_active)
         self.extras["mean_rg_prev_ep_successes"] = mean_rg_eps

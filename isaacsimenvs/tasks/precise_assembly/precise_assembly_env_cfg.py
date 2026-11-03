@@ -159,6 +159,26 @@ class PreciseAssemblyCfg:
     unlock_tol_deg: float = 3.0
     unlock_joint: int = 0
     unlock_seed: int = 0
+    # Multi-turn hidden stop (ContactBench bottle cap, cb_bottle<k>; needs unlock_angle_*): the stop is the env's unlock
+    # angle in deg (turns x 360, may exceed 360) on the UNWRAPPED joint angle, enforced in software every physics
+    # substep (PhysX revolute limits can't span 2 pi and the GPU pipeline has no gear joint): past the stop the cap is
+    # rotated back onto it and its tightening spin removed, so a finger pushing on a tight cap slides over it. No PhysX
+    # limit is set. Goals come from the unwrapped angle: waypoint 0 at turn_first_goal_deg, the last at the stop (within
+    # unlock_tol_deg); the "keypoint distance" = remaining angle x turn_progress_m_per_rad, which drives the keypoint
+    # reward (dense turning reward), the critic's closest_keypoint_max_dist and the retract at-goal check.
+    turn_mode: bool = False
+    turn_lower_deg: float = -180.0
+    turn_first_goal_deg: float = 30.0
+    turn_progress_m_per_rad: float = 0.02
+    # Actor obs hide the turn state: object_rot / keypoints use the cap's unturned orientation, object angular velocity
+    # along the axis is removed, and the reward / successes / closest_keypoint_max_dist fields are zeroed (they would
+    # reveal when the stop is reached). The critic keeps everything.
+    turn_hide_from_actor: bool = True
+    # Over-tightening ("stripped thread"): > 0 = fail once the cap has been within turn_stop_band_deg of its stop with
+    # any fingertip pad in contact for more than this many steps in the episode (penalty turn_strip_penalty).
+    turn_strip_steps: int = 0
+    turn_strip_penalty: float = 0.0
+    turn_stop_band_deg: float = 3.0
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0

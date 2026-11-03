@@ -274,6 +274,16 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     else:
         noisy_obj_pos, noisy_obj_rot, noisy_obj_vel = obj_pos, obj_rot, obj_vel
 
+    # Hidden turn state (PreciseAssembly turn_mode, bottle cap): the actor sees the object with its turn about the
+    # joint axis removed, and no spin along that axis.
+    turn_hide = getattr(env, "_actor_turn_hide", None)
+    turn_hidden = turn_hide() if callable(turn_hide) else None
+    if turn_hidden is not None:
+        unturn_q, axis_w = turn_hidden
+        noisy_obj_rot = quat_mul(unturn_q, noisy_obj_rot)
+        w = noisy_obj_vel[:, 3:6]
+        noisy_obj_vel = torch.cat([noisy_obj_vel[:, 0:3], w - (w * axis_w).sum(-1, keepdim=True) * axis_w], dim=-1)
+
     kp_offsets = env._keypoint_offsets * env._object_scale_multiplier.unsqueeze(1)
     obj_kp = _keypoints_world(obj_pos, obj_rot, kp_offsets)
     goal_kp = _keypoints_world(goal_pos, goal_rot, kp_offsets)
@@ -359,6 +369,9 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     obs_noisy["object_vel"] = noisy_obj_vel
     obs_noisy["keypoints_rel_palm"] = keypoints_rel_palm_noisy
     obs_noisy["keypoints_rel_goal"] = keypoints_rel_goal_noisy
+    if turn_hidden is not None:  # these would tell the actor when the hidden stop is reached
+        for k in ("reward", "successes", "closest_keypoint_max_dist"):
+            obs_noisy[k] = torch.zeros_like(obs_clean[k])
     if dr.joint_velocity_obs_noise_std > 0:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std

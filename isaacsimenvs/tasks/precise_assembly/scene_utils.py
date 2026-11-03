@@ -128,7 +128,9 @@ def _create_fixture_joints(env) -> None:
             if j.lower_deg is not None:
                 jp.CreateLowerLimitAttr(float(j.lower_deg))
             unlock = getattr(env, "_unlock_deg_np", None)
-            if unlock is not None and k == int(env.cfg.precise_assembly.unlock_joint):
+            if unlock is not None and k == int(env.cfg.precise_assembly.unlock_joint) and env.cfg.precise_assembly.turn_mode:
+                pass  # multi-turn stop: enforced in software on the unwrapped angle (env._turn_substep), no PhysX limit
+            elif unlock is not None and k == int(env.cfg.precise_assembly.unlock_joint):
                 # hidden unlock angle: this env's end stop = its theta + margin
                 jp.CreateUpperLimitAttr(float(unlock[i]) + float(env.cfg.precise_assembly.unlock_stop_margin_deg))
             elif j.upper_deg is not None:
