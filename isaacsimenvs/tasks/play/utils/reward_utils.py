@@ -195,6 +195,43 @@ def contact_persistence_reward(env) -> torch.Tensor:
     return rew
 
 
+def coverage_reward(env) -> torch.Tensor:
+    """Touch coverage of the target's surface (RewardCfg.coverage_*): + scale x newly covered share of the surface
+    cells, a cell counting once its ray has touched the target on this step and the previous one. Logs coverage/*."""
+    rc = env.cfg.reward
+    sk = getattr(env, "_hand_skin", None)
+    cells = getattr(env, "_skin_cells", None)
+    zero = torch.zeros(env.num_envs, device=env.device)
+    if sk is None or cells is None:
+        return zero
+    N, C = env.num_envs, sk.n_cells
+    fresh = env.episode_length_buf <= 1
+    vis = getattr(env, "_cov_visited", None)
+    prev = getattr(env, "_cov_prev_cells", None)
+    if vis is None or vis.shape[0] != N:
+        vis = torch.zeros(N, C + 1, dtype=torch.bool, device=env.device)
+        prev = torch.full_like(cells, -1)
+    # coverage at the end of finished episodes (for logging), before the reset clears it
+    done_cov = vis[fresh, :C].float().mean(1)
+    vis[fresh] = False
+    prev = torch.where(fresh.unsqueeze(1), torch.full_like(prev, -1), prev)
+    held = (cells >= 0) & (prev >= 0)                      # the ray touched the target last step too
+    idx = torch.where(held, cells, torch.full_like(cells, C))
+    before = vis[:, :C].sum(1)
+    vis.scatter_(1, idx, True)
+    vis[:, C] = False
+    new = (vis[:, :C].sum(1) - before).float()
+    env._cov_visited, env._cov_prev_cells = vis, cells.clone()
+    rew = rc.coverage_rew_scale * new / C
+    cov = vis[:, :C].float().mean(1)
+    env.extras["coverage/frac"] = float(cov.mean())
+    env.extras["coverage/new_cells_per_step"] = float(new.mean())
+    env.extras["coverage/rays_on_target"] = float((cells >= 0).sum(1).float().mean())
+    if done_cov.numel():
+        env.extras["coverage/episode_end_frac"] = float(done_cov.mean())
+    return rew
+
+
 __all__ = [
     "contact_persistence_reward",
     "lifting_reward",

@@ -1070,6 +1070,12 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward + contact_rew
             self._reward_terms["contact_rew"] = contact_rew
             self._reward_terms["total_reward"] = reward
+        if rc.coverage_rew_scale or rc.coverage_log:
+            from isaacsimenvs.tasks.play.utils.reward_utils import coverage_reward
+            cov_rew = coverage_reward(self)
+            reward = reward + cov_rew
+            self._reward_terms["coverage_rew"] = cov_rew
+            self._reward_terms["total_reward"] = reward
 
         if pih_cfg.enable_retract:
             object_at_goal = (
