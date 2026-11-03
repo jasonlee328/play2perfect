@@ -1079,6 +1079,12 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward + contact_rew
             self._reward_terms["contact_rew"] = contact_rew
             self._reward_terms["total_reward"] = reward
+        if getattr(rc, "slow_touch_speed_penalty_scale", 0.0) or getattr(rc, "slow_touch_dwell_bonus", 0.0):
+            from isaacsimenvs.tasks.play.utils.reward_utils import slow_touch_reward
+            slow_rew = slow_touch_reward(self)
+            reward = reward + slow_rew
+            self._reward_terms["slow_touch_rew"] = slow_rew
+            self._reward_terms["total_reward"] = reward
         if rc.coverage_rew_scale or rc.coverage_log:
             from isaacsimenvs.tasks.play.utils.reward_utils import coverage_reward
             cov_rew = coverage_reward(self)

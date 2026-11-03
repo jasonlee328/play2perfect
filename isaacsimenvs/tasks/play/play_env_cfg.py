@@ -389,6 +389,18 @@ class RewardCfg:
     # hold reward is paid for at most this many steps per episode (so hovering never beats finishing the task)
     contact_hold_max_steps: int = 120
 
+    # Slow touch (2026-11-03, off by default): make the teacher feel the object before it lifts. The "feel phase" runs
+    # from the episode's first contact (any pad / skin link on, per contact_source / contact_thr) until the object first
+    # rises contact_gate_rise above its reset height. Per step in the feel phase:
+    #   - slow_touch_speed_penalty_scale x (palm linear speed in m/s + slow_touch_joint_weight x mean |joint vel| rad/s)
+    # and once, on the step the object first rises past the gate:
+    #   + slow_touch_dwell_bonus x min(contact steps in the feel phase, slow_touch_dwell_steps) / slow_touch_dwell_steps
+    # (paid only at lift, so touching without lifting earns nothing). Logs slow/*.
+    slow_touch_speed_penalty_scale: float = 0.0
+    slow_touch_joint_weight: float = 0.1
+    slow_touch_dwell_bonus: float = 0.0
+    slow_touch_dwell_steps: int = 45
+
     # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
     # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits
     # the target on this step AND the previous one marks its cell covered (sliding contact counts, brief taps do not).
