@@ -656,6 +656,42 @@ class PreciseAssemblyEnv(PlayEnv):
         self._apply_joint_detents()
         self._update_latch()
 
+    def _apply_action(self) -> None:
+        super()._apply_action()
+        if float(self.cfg.precise_assembly.latch_soft_stop_deg) > 0.0 and self._latch_on() and hasattr(self, "latch_open"):
+            self._latch_soft_stop()
+
+    def _latch_soft_stop(self) -> None:
+        """Every physics substep while the latch is closed: door hinge angle <= latch_soft_stop_deg (door + knob rotated
+        back about the hinge axis, the opening spin about it removed)."""
+        c = self.cfg.precise_assembly
+        k = int(c.latch_door_joint)
+        self._update_joint_angles()
+        over = self.cb_joint_angle[k] - math.radians(float(c.latch_soft_stop_deg))
+        bad = (~self.latch_open) & (over > 0)
+        if not hasattr(self, "_soft_stop_hits"):
+            self._soft_stop_hits = torch.zeros(self.num_envs, device=self.device)
+        self._soft_stop_hits = torch.where(bad, self._soft_stop_hits + 1, self._soft_stop_hits)
+        ids = bad.nonzero(as_tuple=False).squeeze(-1)
+        if ids.numel() == 0:
+            return
+        j = self._pih_joints[k]
+        hq = self.hole_quat_wxyz[ids]
+        n = ids.numel()
+        ax = quat_apply(hq, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(n, 3))
+        an = self.hole_pos[ids] + self.scene.env_origins[ids] + quat_apply(
+            hq, torch.tensor(j.anchor, device=self.device, dtype=torch.float32).expand(n, 3))
+        rot = quat_from_angle_axis(-over[ids], ax)
+        for body in (self.distractors[int(j.body[10:])], self.object):
+            pos, quat = body.data.root_pos_w[ids], body.data.root_quat_w[ids]
+            body.write_root_pose_to_sim(torch.cat([an + quat_apply(rot, pos - an), quat_mul(rot, quat)], -1), env_ids=ids)
+            vel = body.data.root_vel_w[ids].clone()
+            w_ax = (vel[:, 3:6] * ax).sum(-1).clamp(min=0.0)        # opening spin about the hinge
+            vel[:, 3:6] -= w_ax.unsqueeze(-1) * ax
+            vel[:, 0:3] = 0.0
+            body.write_root_velocity_to_sim(vel, env_ids=ids)
+        self.cb_joint_angle[k, ids] -= over[ids]
+
     def _latch_on(self) -> bool:
         c = self.cfg.precise_assembly
         return int(c.latch_door_joint) >= 0 and int(c.latch_keeper) >= 0 and getattr(self, "unlock_angle", None) is not None
@@ -703,6 +739,10 @@ class PreciseAssemblyEnv(PlayEnv):
         if env_ids is not None:
             self.latch_open[env_ids] = False
             self.latch_open_ep[env_ids] = False
+            if hasattr(self, "latch_force_count"):
+                self.latch_force_count[env_ids] = 0
+            if hasattr(self, "_soft_stop_hits"):
+                self._soft_stop_hits[env_ids] = 0.0
             self.latch_dwell[env_ids] = 0
             self.latch_in_window[env_ids] = False
             if hasattr(self, "_latch_bonus_paid"):
@@ -1080,6 +1120,12 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["door_angle_deg_mean"] = torch.rad2deg(door).mean()
             self.extras["latch_open_frac"] = self.latch_open.float().mean()
             unlocked = door >= math.radians(float(pih_cfg.door_open_deg))   # the credited event = door open
+            if pih_cfg.latch_success_requires_open:
+                unlocked = unlocked & self.latch_open_ep
+            if hasattr(self, "_soft_stop_hits"):
+                self.extras["latch_soft_stop_ep_frac"] = (self._soft_stop_hits > 0).float().mean()
+            self.extras["door_open_no_latch_frac"] = ((door >= math.radians(float(pih_cfg.door_open_deg)))
+                                                      & ~self.latch_open_ep).float().mean()
         at_last = (self._successes == self.env_max_goals - 1) & ~self.is_random_goal_env
         steps = update_near_goal_steps(near_goal=unlocked, near_goal_steps=prev_near_steps,
                                        force_consecutive=self.cfg.termination.force_consecutive_near_goal_steps)
@@ -1207,7 +1253,22 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
+        forced = torch.zeros_like(fall)
+        if int(pih_cfg.latch_force_fail_steps) > 0 and self._latch_on() and hasattr(self, "latch_open"):
+            if not hasattr(self, "latch_force_count"):
+                self.latch_force_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+            door = self.cb_joint_angle[int(pih_cfg.latch_door_joint)]
+            tug = (~self.latch_open) & (door >= math.radians(float(pih_cfg.latch_force_deg)))
+            self.latch_force_count += tug.long()
+            budget = float(pih_cfg.latch_force_fail_steps)
+            if int(pih_cfg.latch_force_fail_start_steps) > 0 and int(pih_cfg.latch_curriculum_steps) > 0:
+                a = min(1.0, float(self.common_step_counter + int(pih_cfg.latch_curriculum_offset_steps))
+                        / float(pih_cfg.latch_curriculum_steps))
+                budget = float(pih_cfg.latch_force_fail_start_steps) + a * (budget - float(pih_cfg.latch_force_fail_start_steps))
+            self.extras["latch_force_budget"] = torch.tensor(budget, device=self.device)
+            forced = (self.latch_force_count >= int(round(budget))) & ~max_successes
+            self.extras["latch_force_count_mean"] = self.latch_force_count.float().mean()
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1216,6 +1277,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "hand_far": hand_far,
             "dropped": dropped,
             "disturbed": disturbed,
+            "forced": forced,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1313,6 +1375,12 @@ class PreciseAssemblyEnv(PlayEnv):
             fall_pen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
             reward = reward - fall_pen
             self._reward_terms["fall_terminal_penalty"] = -fall_pen
+            self._reward_terms["total_reward"] = reward
+
+        if float(pih_cfg.latch_force_fail_penalty) > 0.0 and "forced" in self._termination_reasons:
+            fpen = float(pih_cfg.latch_force_fail_penalty) * self._termination_reasons["forced"].float()
+            reward = reward - fpen
+            self._reward_terms["latch_force_fail_penalty"] = -fpen
             self._reward_terms["total_reward"] = reward
 
         # Door latch: one-time bonus when the latch clears (privileged reward; the actor never sees theta).

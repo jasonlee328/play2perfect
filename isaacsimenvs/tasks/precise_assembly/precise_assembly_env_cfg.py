@@ -168,6 +168,21 @@ class PreciseAssemblyCfg:
     # moves by latch_retract_m (receptive frame) and comes back only when the door is below latch_reengage_deg again.
     # Then the LAST waypoint is credited while the hinge is >= door_open_deg (instead of the knob angle).
     latch_door_joint: int = -1
+    # Software hard stop (0 = off): while the latch is closed the door hinge is held at <= latch_soft_stop_deg every
+    # physics substep (door + knob rotated back about the hinge, opening spin removed). The kinematic keeper alone
+    # leaks with many envs under the hand (11-03: 0 / 256 envs vs 2294 / 4096 envs forced open with the keeper in
+    # place, cause not found in the PhysX buffers), so training at 12288 envs needs this.
+    latch_soft_stop_deg: float = 0.0
+    # The door goal (last waypoint) counts only if the latch cleared this episode (latch_open_ep).
+    latch_success_requires_open: bool = True
+    # Forced-door fail (0 = off): every policy step the latch is closed with the door hinge >= latch_force_deg (i.e.
+    # pulled against the keeper / soft stop) adds 1 to a per-episode count; at latch_force_fail_steps the episode
+    # ends as "forced" with -latch_force_fail_penalty. Limits blind "hold each slot, tug, repeat" searches to a few tugs.
+    latch_force_fail_steps: int = 0
+    latch_force_deg: float = 0.6
+    # tug budget at the start of the latch curriculum (0 = no ramp), ramped to latch_force_fail_steps with it
+    latch_force_fail_start_steps: int = 0
+    latch_force_fail_penalty: float = 0.0
     latch_keeper: int = -1
     latch_retract_m: tuple[float, float, float] = (0.0, 0.012, 0.0)
     latch_reengage_deg: float = 0.5
