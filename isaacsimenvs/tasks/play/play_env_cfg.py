@@ -553,6 +553,10 @@ class TactileCfg:
     # "zero" (all 0) or "random" (i.i.d. uniform [0, 1] every step). The real taxels are
     # still computed and kept in env._last_tactile (student obs, eval tactile panels).
     policy_override: str = "none"
+    # Extra tactile-only geometry for the object (.obj, metres, in the object's rigid-body frame = its root / COM frame):
+    # appended to the meshes the pads ray-cast, not to physics (e.g. a virtual knurl on a smooth cap, so slip is felt
+    # without the ribs interlocking with the fingers). Empty = none.
+    object_extra_mesh: str = ""
     # Taxels per pad side; must divide 240 (the TacMap map size).
     resolution: int = 8
     # Rays per taxel side: each taxel averages samples_per_taxel^2 ray depths.

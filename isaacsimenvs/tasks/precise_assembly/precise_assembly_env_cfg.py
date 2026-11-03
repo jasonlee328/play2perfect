@@ -183,6 +183,9 @@ class PreciseAssemblyCfg:
     # log-uniform in [lo, hi], fixed for the env's life, never observed), replacing JointSpec.damping. A stiff cap then
     # feels like a locked one to the joint state, so the stop has to be told apart by touch (ribs sweeping past).
     turn_damping_range: tuple[float, ...] = ()
+    # Diagnostic: false = the stop is not enforced (the cap turns freely past it; goals / strip still use the angle),
+    # so the policy gets no physical signal at the stop. Tells a physical cue (stall) from an observation leak.
+    turn_stop_physical: bool = True
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0

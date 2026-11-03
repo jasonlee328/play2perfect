@@ -87,6 +87,14 @@ def _object_mesh(env, env_id: int = 0) -> tuple[np.ndarray, np.ndarray]:
         pts_all.append(pts[:, :3])
         tris_all.append(np.asarray(tris) + n)
         n += len(pts)
+    extra = str(getattr(getattr(env.cfg, "tactile", None), "object_extra_mesh", "") or "")
+    if extra:
+        import trimesh
+        xm = trimesh.load(extra, force="mesh")
+        pts_all.append(np.asarray(xm.vertices, dtype=np.float64))
+        tris_all.append(np.asarray(xm.faces) + n)
+        if env_id == 0:
+            print(f"[tactile] + tactile-only mesh {extra} ({len(xm.vertices)} verts)", flush=True)
     return np.concatenate(pts_all), np.concatenate(tris_all)
 
 

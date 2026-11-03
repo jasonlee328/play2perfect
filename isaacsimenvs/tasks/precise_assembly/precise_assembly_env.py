@@ -691,6 +691,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self._turn_prev_wrapped = a
         lower = math.radians(float(self.cfg.precise_assembly.turn_lower_deg))
         over = self.turn_angle - self.unlock_angle
+        if not self.cfg.precise_assembly.turn_stop_physical:
+            over = torch.zeros_like(over)
         under = lower - self.turn_angle
         corr = torch.where(over > 0, -over, torch.where(under > 0, under, torch.zeros_like(over)))
         ids = (corr != 0).nonzero(as_tuple=False).squeeze(-1)
