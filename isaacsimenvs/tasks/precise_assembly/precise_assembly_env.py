@@ -588,17 +588,25 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         rate = float(getattr(self.cfg.reward, "slow_touch_rate", 1.0))
-        prev = self._prev_targets.clone() if rate < 1.0 else None
+        max_err = float(getattr(self.cfg.reward, "slow_touch_max_err", 0.0))
+        prev = self._prev_targets.clone() if (rate < 1.0 or max_err > 0.0) else None
         super()._pre_physics_step(actions)
         st = getattr(self, "_slow_state", None)
         if prev is not None and st is not None:
             feel = (st["touched"] & ~st["lifted"]).unsqueeze(1)
             rs = int(getattr(self.cfg.reward, "slow_touch_rate_ramp_steps", 0))
+            f = 1.0
             if rs > 0:
                 f = min(1.0, (self.common_step_counter + int(getattr(self.cfg.reward, "slow_touch_rate_offset_steps", 0))) / rs)
                 rate = 1.0 - (1.0 - rate) * f
             self.extras["slow/rate"] = rate
             capped = prev + rate * (self._cur_targets - prev)
+            if max_err > 0.0:
+                q = self.robot.data.joint_pos
+                # ramp the error bound in too: from very loose (1 rad) to max_err over the same ramp
+                e = 1.0 - (1.0 - max_err) * (f if rs > 0 else 1.0)
+                capped = q + torch.clamp(capped - q, -e, e)
+                self.extras["slow/max_err"] = e
             self._cur_targets[:] = torch.where(feel, capped, self._cur_targets)
             self._prev_targets = self._cur_targets.clone()
         self._apply_joint_detents()
@@ -1092,7 +1100,7 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward + contact_rew
             self._reward_terms["contact_rew"] = contact_rew
             self._reward_terms["total_reward"] = reward
-        if getattr(rc, "slow_touch_speed_penalty_scale", 0.0) or getattr(rc, "slow_touch_dwell_bonus", 0.0) or getattr(rc, "slow_touch_rate", 1.0) < 1.0:
+        if getattr(rc, "slow_touch_speed_penalty_scale", 0.0) or getattr(rc, "slow_touch_dwell_bonus", 0.0) or getattr(rc, "slow_touch_rate", 1.0) < 1.0 or getattr(rc, "slow_touch_max_err", 0.0) > 0.0:
             from isaacsimenvs.tasks.play.utils.reward_utils import slow_touch_reward
             slow_rew = slow_touch_reward(self)
             reward = reward + slow_rew
