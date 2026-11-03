@@ -401,6 +401,12 @@ class RewardCfg:
     # "step": + scale x newly covered share every step; "success": + scale x the episode's covered share, paid once
     # on the step the task succeeds (no reward for rubbing the object without finishing).
     coverage_pay: str = "step"
+    # Coverage gate (11-03): the task only succeeds once the episode's touch coverage >= coverage_gate x
+    # min(1, (env step + coverage_gate_offset_steps) / coverage_gate_ramp_steps) (ramp 0 = full gate from the start).
+    # Until then the goal stays reached but the episode runs on, so the policy must map the object by touch first.
+    coverage_gate: float = 0.0
+    coverage_gate_ramp_steps: int = 0
+    coverage_gate_offset_steps: int = 0
 
 
 # ----------------------------------------------------------------------------

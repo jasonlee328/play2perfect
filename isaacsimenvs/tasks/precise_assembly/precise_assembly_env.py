@@ -991,6 +991,15 @@ class PreciseAssemblyEnv(PlayEnv):
             ) & ~self.retract_phase
         else:
             max_successes = self._successes >= self.env_max_goals
+            rcg = self.cfg.reward
+            if getattr(rcg, "coverage_gate", 0.0) > 0 and getattr(self, "_cov_visited", None) is not None:
+                C = self._hand_skin.n_cells
+                rs = int(getattr(rcg, "coverage_gate_ramp_steps", 0))
+                t = self.common_step_counter + int(getattr(rcg, "coverage_gate_offset_steps", 0))
+                g = rcg.coverage_gate * (min(1.0, t / rs) if rs > 0 else 1.0)
+                cov_now = self._cov_visited[:, :C].float().mean(1)
+                max_successes = max_successes & (cov_now >= g)
+                self.extras["coverage/gate"] = float(g)
             hand_far = self._curr_fingertip_distances.max(dim=-1).values > 1.5
 
         if pih_cfg.enable_dropped_on_table_term:
