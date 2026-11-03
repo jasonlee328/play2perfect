@@ -400,6 +400,8 @@ class RewardCfg:
     slow_touch_joint_weight: float = 0.1
     slow_touch_dwell_bonus: float = 0.0
     slow_touch_dwell_steps: int = 45
+    # contact used for the feel phase: "" = same as contact_source; "tips" / "hand" (hand needs tactile.whole_hand=true)
+    slow_touch_source: str = ""
     # Fallback speed cap (simulator-enforced, 1.0 = off): in the feel phase each policy step's joint-target change is
     # scaled by slow_touch_rate (arm and hand), so the hand physically moves at that fraction of its normal speed.
     # Uses the feel-phase state of the previous step (needs slow_touch_* reward or slow_touch_rate < 1 to track it).

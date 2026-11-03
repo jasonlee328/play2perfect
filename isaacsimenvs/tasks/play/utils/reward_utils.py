@@ -201,7 +201,8 @@ def slow_touch_reward(env) -> torch.Tensor:
     rc = env.cfg.reward
     N, dev = env.num_envs, env.device
     zero = torch.zeros(N, device=dev)
-    hand = getattr(rc, "contact_source", "tips") == "hand"
+    src = getattr(rc, "slow_touch_source", "") or getattr(rc, "contact_source", "tips")
+    hand = src == "hand"
     tac = getattr(env, "_last_tactile_hand" if hand else "_last_tactile", None)
     if tac is None:
         return zero
