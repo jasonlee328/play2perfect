@@ -1021,6 +1021,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 cov_now = self._cov_visited[:, :C].float().mean(1)
                 max_successes = max_successes & (cov_now >= g)
                 self.extras["coverage/gate"] = float(g)
+            if int(getattr(rcg, "slow_touch_min_feel_steps", 0)) > 0 and getattr(self, "_slow_state", None) is not None:
+                max_successes = max_successes & self._slow_state["lift_ok"]
             hand_far = self._curr_fingertip_distances.max(dim=-1).values > 1.5
 
         if pih_cfg.enable_dropped_on_table_term:

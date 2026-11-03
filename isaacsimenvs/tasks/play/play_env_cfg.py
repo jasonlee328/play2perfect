@@ -416,6 +416,13 @@ class RewardCfg:
     # start the slow zone before contact: a step also counts as "touching" for the cap / feel phase when the nearest
     # fingertip is within slow_touch_near_m of the object centre (_curr_fingertip_distances; 0 = contact only)
     slow_touch_near_m: float = 0.0
+    # Minimum feel time (0 = off): the task only succeeds if, when the object last rose past contact_gate_rise, the feel
+    # phase had >= req contact steps, req = slow_touch_min_feel_steps x min(1, (env step + offset) / ramp). If the object
+    # is set back down (rise < contact_gate_rise / 2) the feel phase reopens and contact keeps counting, so an early lift
+    # can be fixed by putting it back and feeling longer.
+    slow_touch_min_feel_steps: int = 0
+    slow_touch_min_feel_ramp_steps: int = 0
+    slow_touch_min_feel_offset_steps: int = 0
 
     # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
     # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits
