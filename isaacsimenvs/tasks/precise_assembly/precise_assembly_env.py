@@ -587,7 +587,15 @@ class PreciseAssemblyEnv(PlayEnv):
             body.set_external_force_and_torque(torch.zeros_like(torque), torque, is_global=True)
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
+        rate = float(getattr(self.cfg.reward, "slow_touch_rate", 1.0))
+        prev = self._prev_targets.clone() if rate < 1.0 else None
         super()._pre_physics_step(actions)
+        st = getattr(self, "_slow_state", None)
+        if prev is not None and st is not None:
+            feel = (st["touched"] & ~st["lifted"]).unsqueeze(1)
+            capped = prev + rate * (self._cur_targets - prev)
+            self._cur_targets[:] = torch.where(feel, capped, self._cur_targets)
+            self._prev_targets = self._cur_targets.clone()
         self._apply_joint_detents()
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
@@ -1079,7 +1087,7 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward + contact_rew
             self._reward_terms["contact_rew"] = contact_rew
             self._reward_terms["total_reward"] = reward
-        if getattr(rc, "slow_touch_speed_penalty_scale", 0.0) or getattr(rc, "slow_touch_dwell_bonus", 0.0):
+        if getattr(rc, "slow_touch_speed_penalty_scale", 0.0) or getattr(rc, "slow_touch_dwell_bonus", 0.0) or getattr(rc, "slow_touch_rate", 1.0) < 1.0:
             from isaacsimenvs.tasks.play.utils.reward_utils import slow_touch_reward
             slow_rew = slow_touch_reward(self)
             reward = reward + slow_rew

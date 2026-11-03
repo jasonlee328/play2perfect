@@ -402,6 +402,10 @@ class RewardCfg:
     slow_touch_joint_weight: float = 0.1
     slow_touch_dwell_bonus: float = 0.0
     slow_touch_dwell_steps: int = 45
+    # Fallback speed cap (simulator-enforced, 1.0 = off): in the feel phase each policy step's joint-target change is
+    # scaled by slow_touch_rate (arm and hand), so the hand physically moves at that fraction of its normal speed.
+    # Uses the feel-phase state of the previous step (needs slow_touch_* reward or slow_touch_rate < 1 to track it).
+    slow_touch_rate: float = 1.0
 
     # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
     # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits
