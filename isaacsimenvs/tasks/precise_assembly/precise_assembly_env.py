@@ -1055,6 +1055,14 @@ class PreciseAssemblyEnv(PlayEnv):
         self.extras["lift_bonus_active"] = float(self.lift_bonus_active)
         self.extras["mean_rg_prev_ep_successes"] = mean_rg_eps
 
+        rc = self.cfg.reward
+        if rc.contact_hold_rew_scale or rc.contact_break_penalty_scale or rc.contact_jerk_penalty_scale:
+            from isaacsimenvs.tasks.play.utils.reward_utils import contact_persistence_reward
+            contact_rew = contact_persistence_reward(self)
+            reward = reward + contact_rew
+            self._reward_terms["contact_rew"] = contact_rew
+            self._reward_terms["total_reward"] = reward
+
         if pih_cfg.enable_retract:
             object_at_goal = (
                 self._keypoints_max_dist

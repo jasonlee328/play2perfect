@@ -153,7 +153,41 @@ def compute_rewards(env) -> torch.Tensor:
     return reward
 
 
+def contact_persistence_reward(env) -> torch.Tensor:
+    """Hold / break / jerk terms on fingertip contact while the object is lifted (RewardCfg.contact_*).
+    Also logs the contact-stability proxy (pads on, breaks, 2-pad share while lifted) in env.extras."""
+    rc = env.cfg.reward
+    tac = getattr(env, "_last_tactile", None)
+    zero = torch.zeros(env.num_envs, device=env.device)
+    if tac is None:
+        return zero
+    tac = tac.view(env.num_envs, 5, -1)
+    on = (tac > rc.contact_thr).any(-1)
+    prev_on = getattr(env, "_contact_prev_on", None)
+    prev_tac = getattr(env, "_contact_prev_tac", None)
+    fresh = env.episode_length_buf <= 1  # episode just reset: no previous contact state
+    if prev_on is None:
+        prev_on, prev_tac = torch.zeros_like(on), torch.zeros_like(tac)
+    prev_on = prev_on & ~fresh.unsqueeze(1)
+    rise = env.object.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2] - env._object_init_z
+    lifted = (rise > rc.contact_gate_rise).float()
+    n_on = on.sum(1)
+    hold = (n_on >= rc.contact_min_pads).float()
+    breaks = (prev_on & ~on).sum(1).float()
+    jerk = torch.where(on.any(1) & ~fresh, (tac - prev_tac).abs().mean((1, 2)), zero)
+    rew = lifted * (rc.contact_hold_rew_scale * hold - rc.contact_break_penalty_scale * breaks
+                    - rc.contact_jerk_penalty_scale * jerk)
+    env._contact_prev_on, env._contact_prev_tac = on.clone(), tac.clone()
+    nl = lifted.sum().clamp(min=1.0)
+    env.extras["contact/lifted_2pad_frac"] = float((hold * lifted).sum() / nl)
+    env.extras["contact/lifted_pads_on"] = float((n_on.float() * lifted).sum() / nl)
+    env.extras["contact/lifted_breaks_per_step"] = float((breaks * lifted).sum() / nl)
+    env.extras["contact/lifted_share"] = float(lifted.mean())
+    return rew
+
+
 __all__ = [
+    "contact_persistence_reward",
     "lifting_reward",
     "distance_delta_reward",
     "keypoint_reward",
