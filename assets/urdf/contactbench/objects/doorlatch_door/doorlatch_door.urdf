@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- ContactBench door + knob module, hinged (door_latch_tasks.py) -->
+<robot name="cb_doorlatch_door">
+  <material name="c"><color rgba="0.95 0.95 0.93 1.0"/></material>
+  <link name="door">
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="doorlatch_door.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
+    <collision><origin xyz="0.038850 -0.064750 0.024750" rpy="0 0 0"/><geometry><box size="0.228000 0.224000 0.014500"/></geometry></collision>
+    <inertial><mass value="0.189973"/><origin xyz="0.027500 -0.066827 0.023390" rpy="0 0 0"/><inertia ixx="7.199725e-04" ixy="1.366973e-04" ixz="-9.712556e-06" iyy="8.065152e-04" iyz="1.592880e-05" izz="1.510225e-03"/></inertial>
+  </link>
+</robot>

@@ -117,13 +117,23 @@ def _create_fixture_joints(env) -> None:
         pos1 = rot_b.GetInverse().TransformDir(anchor - p_b)
         q1 = (q_b.GetInverse() * Gf.Quatd(q0.GetReal(), Gf.Vec3d(q0.GetImaginary())))
         body_root = "Object" if j.body == "object" else f"Distractor{int(j.body[10:])}"
+        parent = getattr(j, "parent", "fixture")
+        parent_root = "Hole" if parent == "fixture" else f"Distractor{int(parent[10:])}"
+        pos0 = Gf.Vec3f(*j.anchor); rot0 = q0
+        if parent != "fixture":
+            # joint frame expressed in the parent body's frame (the parent at its reset pose)
+            pp = env._pih_distractor_pose_rel[int(parent[10:])]
+            p_p = Gf.Vec3d(*pp[:3]); q_p = Gf.Quatd(pp[6], Gf.Vec3d(*pp[3:6]))
+            pos0 = Gf.Vec3f(Gf.Rotation(q_p).GetInverse().TransformDir(anchor - p_p))
+            qq = q_p.GetInverse() * Gf.Quatd(q0.GetReal(), Gf.Vec3d(q0.GetImaginary()))
+            rot0 = Gf.Quatf(qq)
         for i in range(env.num_envs):
-            b0 = _rigid_body_prim(stage, f"/World/envs/env_{i}/Hole").GetPath()
+            b0 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{parent_root}").GetPath()
             b1 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{body_root}").GetPath()
             jp = UsdPhysics.RevoluteJoint.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
             jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
             jp.CreateAxisAttr("Z")
-            jp.CreateLocalPos0Attr(Gf.Vec3f(*j.anchor)); jp.CreateLocalRot0Attr(q0)
+            jp.CreateLocalPos0Attr(pos0); jp.CreateLocalRot0Attr(rot0)
             jp.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jp.CreateLocalRot1Attr(Gf.Quatf(q1))
             if j.lower_deg is not None:
                 jp.CreateLowerLimitAttr(float(j.lower_deg))
@@ -204,16 +214,19 @@ def setup_scene(env) -> None:
         ))
 
     distractor_usd_paths = []
+    kin_d = {int(v) for v in env.cfg.precise_assembly.kinematic_distractors}
+    stiff_d = {int(v) for v in env.cfg.precise_assembly.stiff_distractors}
     for k, d_urdf in enumerate(getattr(env, "_pih_distractor_urdf_abs", ()) or ()):
         distractor_usd_paths.append(_bake_usd(
             _convert_urdf_to_usd(_asset_path(d_urdf), usd_work_dir / f"distractor_{k}", fix_base=False),
             bake_root,
             f"distractor_{k}",
             props=dict(
-                kinematic_enabled=False,
-                disable_gravity=False,
+                kinematic_enabled=k in kin_d,
+                disable_gravity=k in kin_d,
                 max_depenetration_velocity=1000.0,
-                rb_solver_position_iterations=4,
+                rb_solver_position_iterations=(int(env.cfg.precise_assembly.object_position_iterations) or 4)
+                if k in stiff_d else 4,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
             ),

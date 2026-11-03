@@ -92,6 +92,8 @@ class JointSpec:
     stiffness: float = 0.0
     detent_count: int = 0
     detent_torque: float = 0.0
+    # The joint's other end: "fixture" (the receptive fixture) or "distractor<k>" (e.g. a knob on a hinged door).
+    parent: str = "fixture"
 
 
 @dataclass(frozen=True)

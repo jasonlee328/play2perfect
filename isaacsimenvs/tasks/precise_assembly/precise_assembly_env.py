@@ -342,6 +342,10 @@ class PreciseAssemblyEnv(PlayEnv):
             if j.body != "object" and not (j.body.startswith("distractor")
                                            and int(j.body[10:]) < len(self._pih_distractor_urdf_abs)):
                 raise ValueError(f"JointSpec.body must be 'object' or 'distractor<k>', got {j.body!r}")
+            par = getattr(j, "parent", "fixture")
+            if par != "fixture" and not (par.startswith("distractor")
+                                         and int(par[10:]) < len(self._pih_distractor_urdf_abs)):
+                raise ValueError(f"JointSpec.parent must be 'fixture' or 'distractor<k>', got {par!r}")
             if j.body == "object" and not self._pih_object_start_rel:
                 raise ValueError("a joint on the object needs Problem.object_start_pose_rel_receptive")
         # Jointed problems: one fixture pose per env for its lifetime (see scene_utils._create_fixture_joints)
@@ -519,6 +523,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self._prelude_pose_world[ins_ids, 1, 3:7] = pre_insert_quat_world
 
         self._reset_distractors(env_ids)
+        self._update_latch(env_ids)
         if self._pih_object_start_rel and insertion_mask.any():
             self._apply_object_start_pose(env_ids[insertion_mask])
 
@@ -529,6 +534,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self.unlock_prev_ep_max[env_ids] = self.unlock_max_angle[env_ids]  # kept across the auto-reset
             self.unlock_max_angle[env_ids] = 0.0
             self.unlock_reached[env_ids] = False
+            if hasattr(self, "door_max_angle"):
+                self.door_prev_ep_max[env_ids] = self.door_max_angle[env_ids]
+                self.door_max_angle[env_ids] = 0.0
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
 
@@ -608,7 +616,17 @@ class PreciseAssemblyEnv(PlayEnv):
         for j, body in zip(self._pih_joints, self._joint_bodies()):
             q0 = _xyzw_to_wxyz(torch.tensor([self._joint_reset_pose_rel(j)[3:7]], device=self.device,
                                             dtype=torch.float32)).expand(self.num_envs, 4)
-            q_rel = quat_mul(quat_conjugate(q0), quat_mul(quat_conjugate(hq), body.data.root_quat_w))  # body frame
+            par = getattr(j, "parent", "fixture")
+            if par == "fixture":
+                q_par = hq
+            else:
+                # parent's current world rotation x inverse(its reset rotation rel. the fixture) = where the
+                # fixture frame would be if it moved with the parent, so the angle is relative to the parent
+                kp = int(par[10:])
+                qp0 = _xyzw_to_wxyz(torch.tensor([self._pih_distractor_pose_rel[kp][3:7]], device=self.device,
+                                                 dtype=torch.float32)).expand(self.num_envs, 4)
+                q_par = quat_mul(self.distractors[kp].data.root_quat_w, quat_conjugate(qp0))
+            q_rel = quat_mul(quat_conjugate(q0), quat_mul(quat_conjugate(q_par), body.data.root_quat_w))  # body frame
             axis_b = quat_apply_inverse(q0, torch.tensor(j.axis, device=self.device,
                                                          dtype=torch.float32).expand(self.num_envs, 3))
             s = (q_rel[:, 1:] * axis_b).sum(-1)
@@ -632,6 +650,45 @@ class PreciseAssemblyEnv(PlayEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
         self._apply_joint_detents()
+        self._update_latch()
+
+    def _latch_on(self) -> bool:
+        c = self.cfg.precise_assembly
+        return int(c.latch_door_joint) >= 0 and int(c.latch_keeper) >= 0 and getattr(self, "unlock_angle", None) is not None
+
+    def _update_latch(self, env_ids: torch.Tensor | None = None) -> None:
+        """Door latch: keeper at its problem pose (holding the door) until the knob reaches theta - unlock_tol, then
+        moved by latch_retract_m; it re-engages only once the door is closed (< latch_reengage_deg) and the knob is
+        below theta again. Resets (env_ids) force it engaged. Only envs whose state changes are written."""
+        if not self._latch_on():
+            return
+        c = self.cfg.precise_assembly
+        if not hasattr(self, "latch_open"):
+            self.latch_open = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            self.latch_open_ep = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            kp = self._pih_distractor_pose_rel[int(c.latch_keeper)]
+            self._latch_pose_rel = (tuple(kp), tuple([kp[0] + float(c.latch_retract_m[0]), kp[1] + float(c.latch_retract_m[1]),
+                                                       kp[2] + float(c.latch_retract_m[2]), *kp[3:7]]))
+        keeper = self.distractors[int(c.latch_keeper)]
+        if env_ids is not None:
+            self.latch_open[env_ids] = False
+            self.latch_open_ep[env_ids] = False
+            keeper.write_root_pose_to_sim(self._pose_rel_hole_to_world(env_ids, self._latch_pose_rel[0]), env_ids=env_ids)
+            return
+        self._update_joint_angles()
+        knob = self.cb_joint_angle[int(c.unlock_joint)]
+        door = self.cb_joint_angle[int(c.latch_door_joint)]
+        unlocked = knob >= self.unlock_angle - math.radians(float(c.unlock_tol_deg))
+        closed = door < math.radians(float(c.latch_reengage_deg))
+        new = torch.where(self.latch_open, ~(closed & ~unlocked), unlocked)
+        changed = new != self.latch_open
+        self.latch_open = new
+        self.latch_open_ep |= new
+        if changed.any():
+            for want, pose in ((True, self._latch_pose_rel[1]), (False, self._latch_pose_rel[0])):
+                ids = (changed & (new == want)).nonzero(as_tuple=False).squeeze(-1)
+                if ids.numel():
+                    keeper.write_root_pose_to_sim(self._pose_rel_hole_to_world(ids, pose), env_ids=ids)
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
@@ -949,6 +1006,15 @@ class PreciseAssemblyEnv(PlayEnv):
         self.unlock_max_angle = torch.maximum(self.unlock_max_angle, ang)
         unlocked = ang >= self.unlock_angle - math.radians(float(pih_cfg.unlock_tol_deg))
         self.unlock_reached |= unlocked
+        if self._latch_on():
+            door = self.cb_joint_angle[int(pih_cfg.latch_door_joint)]
+            if not hasattr(self, "door_max_angle"):
+                self.door_max_angle = torch.zeros(self.num_envs, device=self.device)
+                self.door_prev_ep_max = torch.zeros(self.num_envs, device=self.device)
+            self.door_max_angle = torch.maximum(self.door_max_angle, door)
+            self.extras["door_angle_deg_mean"] = torch.rad2deg(door).mean()
+            self.extras["latch_open_frac"] = self.latch_open.float().mean()
+            unlocked = door >= math.radians(float(pih_cfg.door_open_deg))   # the credited event = door open
         at_last = (self._successes == self.env_max_goals - 1) & ~self.is_random_goal_env
         steps = update_near_goal_steps(near_goal=unlocked, near_goal_steps=prev_near_steps,
                                        force_consecutive=self.cfg.termination.force_consecutive_near_goal_steps)

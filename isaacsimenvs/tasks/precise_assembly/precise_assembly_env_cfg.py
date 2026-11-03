@@ -162,6 +162,20 @@ class PreciseAssemblyCfg:
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0
+    # Door latch (ContactBench doorknob with a real hinge, cb_doorlatch*): latch_door_joint >= 0 = that joint is the
+    # door hinge. Distractor latch_keeper (kinematic, listed in kinematic_distractors) holds the door shut at its
+    # problem pose while knob joint unlock_joint is below theta - unlock_tol_deg; once the knob reaches it the keeper
+    # moves by latch_retract_m (receptive frame) and comes back only when the door is below latch_reengage_deg again.
+    # Then the LAST waypoint is credited while the hinge is >= door_open_deg (instead of the knob angle).
+    latch_door_joint: int = -1
+    latch_keeper: int = -1
+    latch_retract_m: tuple[float, float, float] = (0.0, 0.012, 0.0)
+    latch_reengage_deg: float = 0.5
+    door_open_deg: float = 5.0
+    # Distractor indices baked kinematic (no gravity; posed only by resets / the env), e.g. the latch keeper.
+    kinematic_distractors: tuple[int, ...] = ()
+    # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
+    stiff_distractors: tuple[int, ...] = ()
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:

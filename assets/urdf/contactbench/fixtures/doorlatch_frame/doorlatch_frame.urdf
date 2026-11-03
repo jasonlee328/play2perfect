@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!-- ContactBench door frame (door_latch_tasks.py) -->
+<robot name="cb_doorlatch_frame">
+  <material name="c"><color rgba="0.92 0.92 0.90 1.0"/></material>
+  <link name="receptive">
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="doorlatch_frame.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
+    <collision><origin xyz="0.038850 -0.049750 0.008500" rpy="0 0 0"/><geometry><box size="0.250500 0.254000 0.017000"/></geometry></collision>
+    <collision><origin xyz="-0.081025 -0.049750 0.024500" rpy="0 0 0"/><geometry><box size="0.010750 0.254000 0.015000"/></geometry></collision>
+    <collision><origin xyz="0.158725 -0.049750 0.024500" rpy="0 0 0"/><geometry><box size="0.010750 0.254000 0.015000"/></geometry></collision>
+    <collision><origin xyz="0.038850 0.062500 0.024500" rpy="0 0 0"/><geometry><box size="0.229000 0.029500 0.015000"/></geometry></collision>
+  </link>
+</robot>
