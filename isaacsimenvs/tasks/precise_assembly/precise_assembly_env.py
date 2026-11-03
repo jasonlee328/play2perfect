@@ -743,7 +743,9 @@ class PreciseAssemblyEnv(PlayEnv):
         """Turn mode, after compute_intermediate_values: goals / keypoint distance from the unwrapped angle."""
         from isaacsimenvs.tasks.play.utils.reward_utils import update_near_goal_steps
         pih_cfg = self.cfg.precise_assembly
+        over_prev = torch.clamp(self.turn_max_angle - self.unlock_angle, min=0.0)
         self.turn_max_angle = torch.maximum(self.turn_max_angle, self.turn_angle)
+        self._turn_over_inc = torch.clamp(self.turn_max_angle - self.unlock_angle, min=0.0) - over_prev
         at_last = self._successes >= self.env_max_goals - 1
         target = torch.where(at_last, self.unlock_angle,
                              torch.full_like(self.unlock_angle, math.radians(float(pih_cfg.turn_first_goal_deg))))
@@ -771,10 +773,20 @@ class PreciseAssemblyEnv(PlayEnv):
         self.turn_strip_count += (at_stop & contact).long()
         self._turn_just_stripped = torch.zeros_like(at_stop)
         over_deg = float(pih_cfg.turn_strip_over_deg)
-        if int(pih_cfg.turn_strip_steps) > 0 or over_deg > 0.0:
+        strip_steps = int(pih_cfg.turn_strip_steps)
+        if int(pih_cfg.turn_strip_over_ramp_steps) > 0:
+            f = min(1.0, float(self.common_step_counter + int(pih_cfg.turn_strip_over_ramp_offset_steps))
+                    / float(pih_cfg.turn_strip_over_ramp_steps))
+            over_deg = float(pih_cfg.turn_strip_over_ramp_start_deg) + f * (over_deg - float(pih_cfg.turn_strip_over_ramp_start_deg))
+            if int(pih_cfg.turn_strip_steps_ramp_start) > 0:
+                strip_steps = int(round(int(pih_cfg.turn_strip_steps_ramp_start)
+                                        + f * (strip_steps - int(pih_cfg.turn_strip_steps_ramp_start))))
+            self.extras["turn_strip_over_deg_cur"] = over_deg
+            self.extras["turn_strip_steps_cur"] = float(strip_steps)
+        if strip_steps > 0 or over_deg > 0.0:
             new = torch.zeros_like(at_stop)
-            if int(pih_cfg.turn_strip_steps) > 0:
-                new |= self.turn_strip_count > int(pih_cfg.turn_strip_steps)
+            if strip_steps > 0:
+                new |= self.turn_strip_count > strip_steps
             if over_deg > 0.0:
                 new |= self.turn_angle > self.unlock_angle + math.radians(over_deg)
             new &= ~self.turn_stripped
@@ -1310,6 +1322,10 @@ class PreciseAssemblyEnv(PlayEnv):
             strip_pen = -float(pih_cfg.turn_strip_penalty) * self._turn_just_stripped.float()
             reward = reward + strip_pen
             self._reward_terms["turn_strip_penalty"] = strip_pen
+        if getattr(self, "turn_mode", False) and float(pih_cfg.turn_over_penalty) != 0.0:
+            over_pen = -float(pih_cfg.turn_over_penalty) * self._turn_over_inc
+            reward = reward + over_pen
+            self._reward_terms["turn_over_penalty"] = over_pen
         if getattr(self, "turn_mode", False) and getattr(pih_cfg, "turn_early_release_fail", False):
             early_pen = -float(pih_cfg.turn_early_release_penalty) * self._turn_just_released_early.float()
             reward = reward + early_pen

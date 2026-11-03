@@ -211,6 +211,15 @@ class PreciseAssemblyCfg:
     turn_clutch: bool = False
     # > 0: fail `stripped` (-turn_strip_penalty) once the cap is turned more than this past its stop (any mode).
     turn_strip_over_deg: float = 0.0
+    # Over-turn curriculum: > 0 = ramp the strip window from turn_strip_over_ramp_start_deg down to turn_strip_over_deg
+    # (and, if turn_strip_steps_ramp_start > 0, the at-stop step limit from it down to turn_strip_steps) over this many
+    # env steps (common_step_counter + turn_strip_over_ramp_offset_steps; a resume restarts the counter).
+    turn_strip_over_ramp_steps: int = 0
+    turn_strip_over_ramp_start_deg: float = 720.0
+    turn_strip_steps_ramp_start: int = 0
+    turn_strip_over_ramp_offset_steps: int = 0
+    # Dense over-turn cost: reward -= this x (new max over-turn past the stop, rad) each step (total = scale x over).
+    turn_over_penalty: float = 0.0
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0
