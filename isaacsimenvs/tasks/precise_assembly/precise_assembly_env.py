@@ -697,18 +697,14 @@ class PreciseAssemblyEnv(PlayEnv):
         lower = math.radians(float(self.cfg.precise_assembly.turn_lower_deg))
         over = self.turn_angle - self.unlock_angle
         pc = self.cfg.precise_assembly
+        bfrac = None
         if pc.turn_clutch:
+            # compliant stop: undo a fraction b of this substep's new over-turn (b = 1: the hard stop's correction)
             b = self._turn_clutch_brake()
-            if b > 0.0:
-                ids_b = (over > 0).nonzero(as_tuple=False).squeeze(-1)
-                if ids_b.numel() > 0:
-                    body_b = self._joint_bodies()[k]
-                    ax_b = self._turn_axis_w()[0][ids_b]
-                    vel_b = body_b.data.root_vel_w[ids_b].clone()
-                    w_b = (vel_b[:, 3:6] * ax_b).sum(-1).clamp_min(0.0)   # tightening spin only
-                    vel_b[:, 3:6] -= (b * w_b).unsqueeze(-1) * ax_b
-                    body_b.write_root_velocity_to_sim(vel_b, env_ids=ids_b)
-        if not pc.turn_stop_physical or pc.turn_clutch:
+            inc = torch.clamp(over, min=0.0) - torch.clamp(over - d, min=0.0)
+            over = b * inc if b > 0.0 else torch.zeros_like(over)
+            bfrac = b
+        elif not pc.turn_stop_physical:
             over = torch.zeros_like(over)
         under = lower - self.turn_angle
         corr = torch.where(over > 0, -over, torch.where(under > 0, under, torch.zeros_like(over)))
@@ -726,7 +722,8 @@ class PreciseAssemblyEnv(PlayEnv):
         vel = body.data.root_vel_w[ids].clone()
         w_ax = (vel[:, 3:6] * ax).sum(-1)
         bad = ((c < 0) & (w_ax > 0)) | ((c > 0) & (w_ax < 0))   # spinning further past the bound
-        vel[:, 3:6] -= (w_ax * bad.float()).unsqueeze(-1) * ax
+        keep = torch.ones_like(c) if bfrac is None else torch.where(c < 0, torch.full_like(c, bfrac), torch.ones_like(c))
+        vel[:, 3:6] -= (w_ax * bad.float() * keep).unsqueeze(-1) * ax
         vel[:, 0:3] = torch.where(bad.unsqueeze(-1), torch.zeros_like(vel[:, 0:3]), vel[:, 0:3])
         body.write_root_pose_to_sim(torch.cat([new_pos, new_quat], -1), env_ids=ids)
         body.write_root_velocity_to_sim(vel, env_ids=ids)
