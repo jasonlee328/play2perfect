@@ -204,6 +204,13 @@ class PreciseAssemblyCfg:
     # Diagnostic: false = the stop is not enforced (the cap turns freely past it; goals / strip still use the angle),
     # so the policy gets no physical signal at the stop. Tells a physical cue (stall) from an observation leak.
     turn_stop_physical: bool = True
+    # Slip-clutch stop (torque-limiter cap): true = past the hidden stop the cap keeps turning exactly as before (no
+    # physical stop, so the joint state carries nothing about it), while the fingertip tactile sensor ray-casts the cap
+    # frozen at the stop angle: the felt surface (hull + tactile-only knurl) slips under the pads by the over-turn.
+    # Touch is then the only cue. Pair with turn_strip_over_deg so a blind fixed number of turns strips the cap.
+    turn_clutch: bool = False
+    # > 0: fail `stripped` (-turn_strip_penalty) once the cap is turned more than this past its stop (any mode).
+    turn_strip_over_deg: float = 0.0
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0

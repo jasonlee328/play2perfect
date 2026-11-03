@@ -177,8 +177,9 @@ class TactileSensor:
 
         env = self.env
         body = env.robot.data.body_state_w[:, self.body_ids, 0:7]  # (N, 5, 7) pos + wxyz
-        obj_pos = env.object.data.root_pos_w                        # (N, 3)
-        R_wo_T = matrix_from_quat(env.object.data.root_quat_w).transpose(-1, -2)  # world -> object
+        override = env._tactile_object_pose() if hasattr(env, "_tactile_object_pose") else None
+        obj_pos, obj_quat = override if override is not None else (env.object.data.root_pos_w, env.object.data.root_quat_w)
+        R_wo_T = matrix_from_quat(obj_quat).transpose(-1, -2)  # world -> object
         # DP body -> object frame, per env and finger.
         R_od = R_wo_T.unsqueeze(1) @ matrix_from_quat(body[..., 3:7])                  # (N, 5, 3, 3)
         t_od = (R_wo_T.unsqueeze(1) @ (body[..., 0:3] - obj_pos.unsqueeze(1)).unsqueeze(-1)).squeeze(-1)

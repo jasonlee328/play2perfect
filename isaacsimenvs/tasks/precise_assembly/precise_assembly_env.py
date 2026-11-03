@@ -696,7 +696,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self._turn_prev_wrapped = a
         lower = math.radians(float(self.cfg.precise_assembly.turn_lower_deg))
         over = self.turn_angle - self.unlock_angle
-        if not self.cfg.precise_assembly.turn_stop_physical:
+        if not self.cfg.precise_assembly.turn_stop_physical or self.cfg.precise_assembly.turn_clutch:
             over = torch.zeros_like(over)
         under = lower - self.turn_angle
         corr = torch.where(over > 0, -over, torch.where(under > 0, under, torch.zeros_like(over)))
@@ -720,6 +720,17 @@ class PreciseAssemblyEnv(PlayEnv):
         body.write_root_velocity_to_sim(vel, env_ids=ids)
         self.turn_angle[ids] += c
         self._turn_prev_wrapped[ids] = torch.atan2(torch.sin(a[ids] + c), torch.cos(a[ids] + c))
+
+    def _tactile_object_pose(self):
+        """Object (pos, quat) the fingertip tactile ray-casts against, or None (= the real pose). Turn clutch: the cap
+        rotated back by its over-turn past the stop, i.e. the felt surface stays at the stop angle."""
+        if not (getattr(self, "turn_mode", False) and self.cfg.precise_assembly.turn_clutch):
+            return None
+        over = torch.clamp(self.turn_angle - self.unlock_angle, min=0.0)
+        axis_w, anchor_w = self._turn_axis_w()
+        rot = quat_from_angle_axis(-over, axis_w)
+        pos = self.object.data.root_pos_w
+        return anchor_w + quat_apply(rot, pos - anchor_w), quat_mul(rot, self.object.data.root_quat_w)
 
     def _actor_turn_hide(self):
         """For obs_utils.build_observations: (world quat that undoes the cap's turn, axis) or None."""
@@ -759,12 +770,19 @@ class PreciseAssemblyEnv(PlayEnv):
             contact = torch.zeros_like(at_stop) if tac is None else tac.reshape(tac.shape[0], -1).sum(-1) > 0
         self.turn_strip_count += (at_stop & contact).long()
         self._turn_just_stripped = torch.zeros_like(at_stop)
-        if int(pih_cfg.turn_strip_steps) > 0:
-            new = (self.turn_strip_count > int(pih_cfg.turn_strip_steps)) & ~self.turn_stripped
+        over_deg = float(pih_cfg.turn_strip_over_deg)
+        if int(pih_cfg.turn_strip_steps) > 0 or over_deg > 0.0:
+            new = torch.zeros_like(at_stop)
+            if int(pih_cfg.turn_strip_steps) > 0:
+                new |= self.turn_strip_count > int(pih_cfg.turn_strip_steps)
+            if over_deg > 0.0:
+                new |= self.turn_angle > self.unlock_angle + math.radians(over_deg)
+            new &= ~self.turn_stripped
             self._turn_just_stripped = new
             self.turn_stripped |= new
         self.extras["turn_angle_deg_mean"] = torch.rad2deg(self.turn_angle).mean()
         self.extras["turn_at_stop_frac"] = at_stop.float().mean()
+        self.extras["turn_over_deg_mean"] = torch.rad2deg(torch.clamp(self.turn_angle - self.unlock_angle, min=0.0)).mean()
         self.extras["turn_contact_frac"] = contact.float().mean()
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
