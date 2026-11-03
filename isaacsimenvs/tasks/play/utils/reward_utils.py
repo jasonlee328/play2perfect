@@ -218,7 +218,9 @@ def slow_touch_reward(env) -> torch.Tensor:
         st[k] = torch.where(fresh, zero, st[k])
     rise = env.object.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2] - env._object_init_z
     up = rise > rc.contact_gate_rise
-    st["touched"] = st["touched"] | on
+    near_m = float(getattr(rc, "slow_touch_near_m", 0.0))
+    near = (env._curr_fingertip_distances.min(-1).values < near_m) if near_m > 0 else torch.zeros_like(on)
+    st["touched"] = st["touched"] | on | near
     feel = st["touched"] & ~st["lifted"] & ~up          # in the feel phase this step
     lift_now = st["touched"] & ~st["lifted"] & up       # first rise past the gate this episode
     palm_v = env.robot.data.body_state_w[:, env._palm_body_id, 7:10].norm(dim=-1)
