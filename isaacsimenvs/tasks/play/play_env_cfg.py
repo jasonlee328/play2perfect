@@ -410,6 +410,9 @@ class RewardCfg:
     # A resume restarts the env step counter, so set slow_touch_rate_offset_steps to continue a ramp.
     slow_touch_rate_ramp_steps: int = 0
     slow_touch_rate_offset_steps: int = 0
+    # also in the feel phase: keep every joint target within slow_touch_max_err rad of the actual joint position (0 = off),
+    # so targets set before contact can't keep driving the hand fast (PD tracking lag). Ramped with the rate cap.
+    slow_touch_max_err: float = 0.0
 
     # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
     # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits
