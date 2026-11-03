@@ -82,6 +82,16 @@ class PreciseAssemblyCfg:
     # peg's keypoint centroid AND no tactile pad has touched anything for retract_clear_steps steps.
     retract_min_fingertip_dist: float = 0.0
     retract_clear_steps: int = 10
+    # Release curriculum (end_on_retract): ramp the release rule from (retract_ramp_start_dist, retract_ramp_start_clear)
+    # to (retract_min_fingertip_dist, retract_clear_steps) over retract_ramp_steps env steps (0 = off); a resume restarts
+    # common_step_counter, so set retract_ramp_offset_steps to continue.
+    retract_ramp_steps: int = 0
+    # True: retract reward = retract_reward_scale x the per-step GAIN in mean fingertip distance (capped at the current
+    # release distance), so hovering away without releasing earns nothing (the default per-step distance reward pays it).
+    retract_reward_delta: bool = False
+    retract_ramp_offset_steps: int = 0
+    retract_ramp_start_dist: float = 0.05
+    retract_ramp_start_clear: int = 10
     # How "still seated" is judged when the hand retracts. "keypoint": every peg keypoint within
     # retract_success_tolerance * keypoint_scale of the final waypoint (also checks rotation about the axis, ~±28° at
     # 1.5 cm). "depth": the peg root is at most retract_seated_axial_tol above the final waypoint along the hole axis,
