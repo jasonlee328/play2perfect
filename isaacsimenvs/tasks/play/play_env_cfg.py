@@ -415,6 +415,9 @@ class RewardCfg:
     # also in the feel phase: keep every joint target within slow_touch_max_err rad of the actual joint position (0 = off),
     # so targets set before contact can't keep driving the hand fast (PD tracking lag). Ramped with the rate cap.
     slow_touch_max_err: float = 0.0
+    # start the slow zone before contact: a step also counts as "touching" for the cap / feel phase when the nearest
+    # fingertip is within slow_touch_near_m of the object centre (_curr_fingertip_distances; 0 = contact only)
+    slow_touch_near_m: float = 0.0
 
     # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
     # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits
