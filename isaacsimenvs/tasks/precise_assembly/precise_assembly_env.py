@@ -388,6 +388,13 @@ class PreciseAssemblyEnv(PlayEnv):
                 lo, hi = (float(v) for v in pih_cfg.unlock_angle_range_deg)
                 self._unlock_deg_np = np.random.default_rng(int(pih_cfg.unlock_seed)).uniform(lo, hi, n_env)
 
+        self._turn_damping_np = None
+        if pih_cfg.turn_damping_range:
+            import numpy as np
+            lo, hi = (float(v) for v in pih_cfg.turn_damping_range)
+            u = np.random.default_rng(int(pih_cfg.unlock_seed) + 2).uniform(0.0, 1.0, int(cfg.scene.num_envs))
+            self._turn_damping_np = np.exp(np.log(lo) + u * (np.log(hi) - np.log(lo)))
+
         cfg.assets.object_name = problem.insertion_object_name if len(problem_names) == 1 else "multi"
         cfg.assets.object_urdf = self._pih_object_urdf_abs
         cfg.assets.receptive_urdf = self._pih_receptive_urdf_abs

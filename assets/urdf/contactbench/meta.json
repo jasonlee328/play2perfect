@@ -661,6 +661,26 @@
     0.3751
    ],
    "collision": "convex hull"
+  },
+  "bottlecap2r": {
+   "src": "for_printing/bottles/bottle_2/cap_2_3_rev.stl",
+   "extents_mm": [
+    46.2,
+    46.19,
+    13.0
+   ],
+   "mass_g": 3.57,
+   "com_src_mm": [
+    -0.008,
+    0.0,
+    7.879
+   ],
+   "object_scale": [
+    1.155,
+    1.1548,
+    0.3251
+   ],
+   "collision": "convex hull + 24 side / 12 top rib boxes"
   }
  },
  "fixtures": {
@@ -11471,6 +11491,64 @@
      120.0
     ],
     "cap_diam_mm": 66.19,
+    "note": "hidden turns: env.precise_assembly.unlock_angle_values_deg=[720,1080,1440] (turns x 360) sets each env's stop; precise_assembly.turn_* options credit the goal from the joint angle."
+   }
+  },
+  "cb_bottle2r": {
+   "object": "bottlecap2r",
+   "fixture": "bottle2",
+   "object_start_pose": [
+    -8.36232016764904e-06,
+    3.729818116917869e-08,
+    0.1035278249654063,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     -7.223332609178426e-06,
+     4.2134612562319825e-06,
+     0.1035278249654063,
+     0.0,
+     0.0,
+     -0.25881904510252074,
+     0.9659258262890684
+    ],
+    [
+     4.213461256231981e-06,
+     7.223332609178426e-06,
+     0.1035278249654063,
+     0.0,
+     0.0,
+     -0.8660254037844385,
+     0.5
+    ]
+   ],
+   "joints": [
+    {
+     "body": "object",
+     "anchor": [
+      0.0,
+      0.0,
+      0.09478308349847794
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "stiffness": 0.0,
+     "damping": 0.0005
+    }
+   ],
+   "layout": {
+    "turn_goals_deg": [
+     30.0,
+     120.0
+    ],
+    "cap_diam_mm": 46.2,
     "note": "hidden turns: env.precise_assembly.unlock_angle_values_deg=[720,1080,1440] (turns x 360) sets each env's stop; precise_assembly.turn_* options credit the goal from the joint angle."
    }
   }

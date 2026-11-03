@@ -179,6 +179,10 @@ class PreciseAssemblyCfg:
     turn_strip_steps: int = 0
     turn_strip_penalty: float = 0.0
     turn_stop_band_deg: float = 3.0
+    # Hidden turning resistance: non-empty [lo, hi] = every env's turn joint gets its own viscous damping (N m s / rad,
+    # log-uniform in [lo, hi], fixed for the env's life, never observed), replacing JointSpec.damping. A stiff cap then
+    # feels like a locked one to the joint state, so the stop has to be told apart by touch (ribs sweeping past).
+    turn_damping_range: tuple[float, ...] = ()
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0

@@ -135,11 +135,15 @@ def _create_fixture_joints(env) -> None:
                 jp.CreateUpperLimitAttr(float(unlock[i]) + float(env.cfg.precise_assembly.unlock_stop_margin_deg))
             elif j.upper_deg is not None:
                 jp.CreateUpperLimitAttr(float(j.upper_deg))
-            if j.damping or j.stiffness:
+            damping = float(j.damping)
+            tdamp = getattr(env, "_turn_damping_np", None)
+            if tdamp is not None and k == int(env.cfg.precise_assembly.unlock_joint):
+                damping = float(tdamp[i])  # hidden per-env turning resistance
+            if damping or j.stiffness:
                 drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "angular")
                 drive.CreateTypeAttr("force")
                 drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
-                drive.CreateDampingAttr(float(j.damping) * math.pi / 180.0)
+                drive.CreateDampingAttr(damping * math.pi / 180.0)
                 drive.CreateStiffnessAttr(float(j.stiffness) * math.pi / 180.0)
     print(f"[precise_assembly] created {len(joints)} fixture joint(s) x {env.num_envs} envs", flush=True)
 
