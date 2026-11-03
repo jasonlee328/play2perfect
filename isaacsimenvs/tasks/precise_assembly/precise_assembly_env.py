@@ -335,6 +335,10 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if cfg.precise_assembly.latch_critic_obs and int(cfg.precise_assembly.latch_door_joint) >= 0:
+            OBS_FIELD_SIZES["latch_state"] = 5
+            if "latch_state" not in cfg.obs.state_list:
+                cfg.obs.state_list = (*cfg.obs.state_list, "latch_state")
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
@@ -656,6 +660,20 @@ class PreciseAssemblyEnv(PlayEnv):
         c = self.cfg.precise_assembly
         return int(c.latch_door_joint) >= 0 and int(c.latch_keeper) >= 0 and getattr(self, "unlock_angle", None) is not None
 
+    def _apply_latch_pop(self, pop: torch.Tensor, door: torch.Tensor) -> None:
+        """Felt cue: lift the door to latch_pop_deg (bang-bang torque about the hinge) where pop is set."""
+        c = self.cfg.precise_assembly
+        if float(c.latch_pop_deg) <= 0.0:
+            return
+        jd = self._pih_joints[int(c.latch_door_joint)]
+        body = self._joint_bodies()[int(c.latch_door_joint)]
+        axis_w = quat_apply(self.hole_quat_wxyz, torch.tensor(jd.axis, device=self.device,
+                                                              dtype=torch.float32).expand(self.num_envs, 3))
+        on = pop & (door < math.radians(float(c.latch_pop_deg)))
+        tau = on.float() * float(c.latch_pop_torque)
+        torque = (tau.unsqueeze(-1) * axis_w).unsqueeze(1)
+        body.set_external_force_and_torque(torch.zeros_like(torque), torque, is_global=True)
+
     def _update_latch(self, env_ids: torch.Tensor | None = None) -> None:
         """Door latch: keeper at its problem pose (holding the door) until the knob reaches theta - unlock_tol, then
         moved by latch_retract_m; it re-engages only once the door is closed (< latch_reengage_deg) and the knob is
@@ -670,17 +688,55 @@ class PreciseAssemblyEnv(PlayEnv):
             self._latch_pose_rel = (tuple(kp), tuple([kp[0] + float(c.latch_retract_m[0]), kp[1] + float(c.latch_retract_m[1]),
                                                        kp[2] + float(c.latch_retract_m[2]), *kp[3:7]]))
         keeper = self.distractors[int(c.latch_keeper)]
+        win = float(c.latch_window_deg) > 0.0
+        if not hasattr(self, "latch_dwell"):
+            self.latch_dwell = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+            self.latch_in_window = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         if env_ids is not None:
             self.latch_open[env_ids] = False
             self.latch_open_ep[env_ids] = False
+            self.latch_dwell[env_ids] = 0
+            self.latch_in_window[env_ids] = False
+            if hasattr(self, "_latch_bonus_paid"):
+                self._latch_bonus_paid[env_ids] = False
+            if hasattr(self, "_latch_prev_knob"):
+                self._latch_prev_knob[env_ids] = 0.0
             keeper.write_root_pose_to_sim(self._pose_rel_hole_to_world(env_ids, self._latch_pose_rel[0]), env_ids=env_ids)
             return
         self._update_joint_angles()
         knob = self.cb_joint_angle[int(c.unlock_joint)]
         door = self.cb_joint_angle[int(c.latch_door_joint)]
-        unlocked = knob >= self.unlock_angle - math.radians(float(c.unlock_tol_deg))
         closed = door < math.radians(float(c.latch_reengage_deg))
-        new = torch.where(self.latch_open, ~(closed & ~unlocked), unlocked)
+        if win:
+            w_deg, d_steps = float(c.latch_window_deg), int(c.latch_dwell_steps)
+            if int(c.latch_curriculum_steps) > 0:
+                a = min(1.0, float(self.common_step_counter + int(c.latch_curriculum_offset_steps))
+                        / float(c.latch_curriculum_steps))
+                w_deg = float(c.latch_window_start_deg) + a * (w_deg - float(c.latch_window_start_deg))
+                d_steps = int(round(int(c.latch_dwell_start_steps) + a * (d_steps - int(c.latch_dwell_start_steps))))
+            self.extras["latch_window_deg"] = torch.tensor(w_deg, device=self.device)
+            self._latch_dwell_now = d_steps
+            # lower edge always the final window (so a wide early window never contains the knob's rest angle);
+            # only the over-turn side follows the curriculum
+            d = knob - self.unlock_angle
+            in_win = (d >= -math.radians(float(c.latch_window_deg))) & (d <= math.radians(w_deg))
+            rest = torch.where(in_win, torch.full_like(door, math.radians(float(c.latch_pop_deg))), torch.zeros_like(door))
+            loaded = door > rest + math.radians(float(c.latch_load_margin_deg))
+            if float(c.latch_still_deg_s) > 0.0:
+                if not hasattr(self, "_latch_prev_knob"):
+                    self._latch_prev_knob = knob.clone()
+                speed = (knob - self._latch_prev_knob).abs() / float(self.step_dt)
+                self._latch_prev_knob = knob.clone()
+                loaded = loaded | (speed > math.radians(float(c.latch_still_deg_s)))
+            self.latch_dwell = torch.where(in_win & ~loaded & ~self.latch_open, self.latch_dwell + 1,
+                                           torch.zeros_like(self.latch_dwell))
+            unlocked = self.latch_dwell >= d_steps
+            self.latch_in_window = in_win
+            new = torch.where(self.latch_open, ~(closed & ~in_win), unlocked)
+            self._apply_latch_pop(in_win & ~new, door)
+        else:
+            unlocked = knob >= self.unlock_angle - math.radians(float(c.unlock_tol_deg))
+            new = torch.where(self.latch_open, ~(closed & ~unlocked), unlocked)
         changed = new != self.latch_open
         self.latch_open = new
         self.latch_open_ep |= new
@@ -1248,6 +1304,17 @@ class PreciseAssemblyEnv(PlayEnv):
             fall_pen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
             reward = reward - fall_pen
             self._reward_terms["fall_terminal_penalty"] = -fall_pen
+            self._reward_terms["total_reward"] = reward
+
+        # Door latch: one-time bonus when the latch clears (privileged reward; the actor never sees theta).
+        if self._latch_on() and float(pih_cfg.latch_unlock_bonus) > 0.0 and hasattr(self, "latch_open"):
+            if not hasattr(self, "_latch_bonus_paid"):
+                self._latch_bonus_paid = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            first = self.latch_open & ~self._latch_bonus_paid
+            self._latch_bonus_paid |= self.latch_open
+            bonus = float(pih_cfg.latch_unlock_bonus) * first.float()
+            reward = reward + bonus
+            self._reward_terms["latch_unlock_bonus"] = bonus
             self._reward_terms["total_reward"] = reward
 
         log_step_metrics(self)

@@ -354,6 +354,19 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "latch_state" in OBS_FIELD_SIZES and getattr(env, "_pih_joints", ()):
+        n = env.num_envs
+        if getattr(env, "unlock_angle", None) is not None and hasattr(env, "latch_open") and hasattr(env, "cb_joint_angle"):
+            c = env.cfg.precise_assembly
+            obs_clean["latch_state"] = torch.stack([
+                env.unlock_angle / math.radians(90.0),
+                env.latch_in_window.float(),
+                env.latch_dwell.float() / max(1, int(c.latch_dwell_steps)),
+                env.latch_open.float(),
+                env.cb_joint_angle[int(c.latch_door_joint)] / math.radians(10.0)], dim=-1)
+        else:
+            obs_clean["latch_state"] = torch.zeros(n, 5, device=env.device)
+
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel

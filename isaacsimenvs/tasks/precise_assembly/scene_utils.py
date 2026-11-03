@@ -140,7 +140,9 @@ def _create_fixture_joints(env) -> None:
             unlock = getattr(env, "_unlock_deg_np", None)
             if unlock is not None and k == int(env.cfg.precise_assembly.unlock_joint):
                 # hidden unlock angle: this env's end stop = its theta + margin
-                jp.CreateUpperLimitAttr(float(unlock[i]) + float(env.cfg.precise_assembly.unlock_stop_margin_deg))
+                fixed = float(getattr(env.cfg.precise_assembly, "unlock_fixed_stop_deg", 0.0))
+                jp.CreateUpperLimitAttr(fixed if fixed > 0.0 else
+                                        float(unlock[i]) + float(env.cfg.precise_assembly.unlock_stop_margin_deg))
             elif j.upper_deg is not None:
                 jp.CreateUpperLimitAttr(float(j.upper_deg))
             if j.damping or j.stiffness:

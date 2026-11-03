@@ -172,6 +172,31 @@ class PreciseAssemblyCfg:
     latch_retract_m: tuple[float, float, float] = (0.0, 0.012, 0.0)
     latch_reengage_deg: float = 0.5
     door_open_deg: float = 5.0
+    # Dwell latch (v2, 0 = off): the latch clears only after the knob stays within theta +- latch_window_deg for
+    # latch_dwell_steps policy steps while the door is NOT loaded (door hinge below the current rest angle +
+    # latch_load_margin_deg, i.e. not being pulled); pulling resets the count, so sweeping the knob while pulling
+    # never opens it. Felt cue: while the knob is in the window (and the latch has not cleared) the door is lifted to
+    # latch_pop_deg by a torque latch_pop_torque (bang-bang), pushing the knob ~(0.17 m * pop) up into the grip.
+    # The latch re-engages once the knob leaves the window with the door below latch_reengage_deg.
+    latch_window_deg: float = 0.0
+    latch_dwell_steps: int = 12
+    # Curriculum (0 steps = off): the window's over-turn side (theta + w) / dwell go linearly from *_start to the values above over
+    # latch_curriculum_steps env steps (+ latch_curriculum_offset_steps, to continue a ramp after a resume).
+    latch_window_start_deg: float = 0.0
+    latch_dwell_start_steps: int = 0
+    latch_curriculum_steps: int = 0
+    latch_curriculum_offset_steps: int = 0
+    latch_load_margin_deg: float = 0.1
+    latch_pop_deg: float = 0.0
+    # > 0: the dwell also needs the knob held still (|knob speed| below this, deg/s); 0 = off.
+    latch_still_deg_s: float = 0.0
+    latch_pop_torque: float = 0.5
+    # One-time reward when the latch clears (privileged); critic-only field latch_state (theta / 90 deg, knob in
+    # window, dwell fraction, latch open, door angle / 10 deg), never in the actor's obs_list.
+    latch_unlock_bonus: float = 0.0
+    latch_critic_obs: bool = False
+    # > 0: the knob's end stop is this angle for every env (instead of theta + unlock_stop_margin_deg).
+    unlock_fixed_stop_deg: float = 0.0
     # Distractor indices baked kinematic (no gravity; posed only by resets / the env), e.g. the latch keeper.
     kinematic_distractors: tuple[int, ...] = ()
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
