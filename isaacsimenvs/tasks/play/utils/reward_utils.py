@@ -176,10 +176,16 @@ def contact_persistence_reward(env) -> torch.Tensor:
     lifted = (rise > rc.contact_gate_rise).float()
     n_on = on.sum(1)
     hold = (n_on >= rc.contact_min_pads).float()
+    paid = getattr(env, "_contact_hold_paid", None)
+    if paid is None:
+        paid = torch.zeros(env.num_envs, device=env.device)
+    paid = torch.where(fresh, torch.zeros_like(paid), paid)
+    hold_pay = hold * lifted * (paid < rc.contact_hold_max_steps).float()
+    env._contact_hold_paid = paid + hold_pay
     breaks = (prev_on & ~on).sum(1).float()
     jerk = torch.where(on.any(1) & ~fresh, (tac - prev_tac).abs().mean((1, 2)), zero)
-    rew = lifted * (rc.contact_hold_rew_scale * hold - rc.contact_break_penalty_scale * breaks
-                    - rc.contact_jerk_penalty_scale * jerk)
+    rew = rc.contact_hold_rew_scale * hold_pay - lifted * (rc.contact_break_penalty_scale * breaks
+                                                         + rc.contact_jerk_penalty_scale * jerk)
     env._contact_prev_on, env._contact_prev_tac = on.clone(), tac.clone()
     nl = lifted.sum().clamp(min=1.0)
     env.extras["contact/lifted_2pad_frac"] = float((hold * lifted).sum() / nl)
