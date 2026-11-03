@@ -188,6 +188,11 @@ class PreciseAssemblyCfg:
     # any fingertip pad in contact for more than this many steps in the episode (penalty turn_strip_penalty).
     turn_strip_steps: int = 0
     turn_strip_penalty: float = 0.0
+    # Early release (end_on_retract): the hand fully released (the current release rule: every fingertip beyond the
+    # release distance, no touch, for the clear steps) BEFORE the stop goal, after the cap has turned past
+    # turn_first_goal_deg = fail `released_early` (-turn_early_release_penalty). Off by default.
+    turn_early_release_fail: bool = False
+    turn_early_release_penalty: float = 300.0
     turn_stop_band_deg: float = 3.0
     # What counts as "working the cap" at the stop for turn_strip_steps: > 0 = any fingertip within this distance (m)
     # of the cap centre (hovering on / pushing a tight cap); 0 = a fingertip tactile pad in contact.

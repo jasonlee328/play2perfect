@@ -219,6 +219,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_strip_count = torch.zeros(n, dtype=torch.long, device=self.device)
             self.turn_stripped = torch.zeros(n, dtype=torch.bool, device=self.device)
             self._turn_just_stripped = torch.zeros(n, dtype=torch.bool, device=self.device)
+            self.turn_released_early = torch.zeros(n, dtype=torch.bool, device=self.device)
+            self._turn_just_released_early = torch.zeros(n, dtype=torch.bool, device=self.device)
+            self._turn_early_clear = torch.zeros(n, dtype=torch.long, device=self.device)
             self.turn_at_stop_steps = torch.zeros(n, dtype=torch.long, device=self.device)
             self.turn_prev_ep_at_stop_steps = torch.zeros(n, dtype=torch.long, device=self.device)
             print(f"[PreciseAssemblyEnv] turn mode: software stop at {self._unlock_deg_np.min():.0f}-"
@@ -562,6 +565,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_max_angle[env_ids] = 0.0
             self.turn_strip_count[env_ids] = 0
             self.turn_stripped[env_ids] = False
+            self.turn_released_early[env_ids] = False
+            self._turn_early_clear[env_ids] = 0
             self.turn_at_stop_steps[env_ids] = 0
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
@@ -1152,6 +1157,14 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._retract_clear_count = torch.where(clear & self.retract_phase, self._retract_clear_count + 1,
                                                         torch.zeros_like(self._retract_clear_count))
                 hand_away = self._retract_clear_count >= r_clear
+                if getattr(self, "turn_mode", False) and getattr(pih_cfg, "turn_early_release_fail", False):
+                    started = self.turn_angle >= math.radians(float(pih_cfg.turn_first_goal_deg))
+                    pre = clear & ~self.retract_phase & started
+                    self._turn_early_clear = torch.where(pre, self._turn_early_clear + 1,
+                                                         torch.zeros_like(self._turn_early_clear))
+                    new_e = (self._turn_early_clear >= r_clear) & ~self.retract_phase & ~self.turn_released_early
+                    self._turn_just_released_early = new_e
+                    self.turn_released_early |= new_e
             else:
                 hand_away = mean_fingertip_dist > pih_cfg.retract_distance_threshold
             just_retracted = (
@@ -1222,10 +1235,13 @@ class PreciseAssemblyEnv(PlayEnv):
         else:
             disturbed = torch.zeros_like(fall)
         stripped = self.turn_stripped if getattr(self, "turn_mode", False) else torch.zeros_like(fall)
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | stripped
+        released_early = (self.turn_released_early if getattr(self, "turn_mode", False)
+                          else torch.zeros_like(fall))
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | stripped | released_early
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "stripped": stripped,
+            "released_early": released_early,
             "fall": fall,
             "max_successes": max_successes,
             "retract_fail": retract_fail,
@@ -1275,6 +1291,10 @@ class PreciseAssemblyEnv(PlayEnv):
             strip_pen = -float(pih_cfg.turn_strip_penalty) * self._turn_just_stripped.float()
             reward = reward + strip_pen
             self._reward_terms["turn_strip_penalty"] = strip_pen
+        if getattr(self, "turn_mode", False) and getattr(pih_cfg, "turn_early_release_fail", False):
+            early_pen = -float(pih_cfg.turn_early_release_penalty) * self._turn_just_released_early.float()
+            reward = reward + early_pen
+            self._reward_terms["turn_early_release_penalty"] = early_pen
         self._reward_terms["total_reward"] = reward
         self.extras["lift_bonus_active"] = float(self.lift_bonus_active)
         self.extras["mean_rg_prev_ep_successes"] = mean_rg_eps
