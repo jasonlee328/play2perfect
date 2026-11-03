@@ -593,6 +593,11 @@ class PreciseAssemblyEnv(PlayEnv):
         st = getattr(self, "_slow_state", None)
         if prev is not None and st is not None:
             feel = (st["touched"] & ~st["lifted"]).unsqueeze(1)
+            rs = int(getattr(self.cfg.reward, "slow_touch_rate_ramp_steps", 0))
+            if rs > 0:
+                f = min(1.0, (self.common_step_counter + int(getattr(self.cfg.reward, "slow_touch_rate_offset_steps", 0))) / rs)
+                rate = 1.0 - (1.0 - rate) * f
+            self.extras["slow/rate"] = rate
             capped = prev + rate * (self._cur_targets - prev)
             self._cur_targets[:] = torch.where(feel, capped, self._cur_targets)
             self._prev_targets = self._cur_targets.clone()
