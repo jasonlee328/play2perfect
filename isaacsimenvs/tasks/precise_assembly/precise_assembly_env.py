@@ -661,6 +661,17 @@ class PreciseAssemblyEnv(PlayEnv):
         if float(self.cfg.precise_assembly.latch_soft_stop_deg) > 0.0 and self._latch_on() and hasattr(self, "latch_open"):
             self._latch_soft_stop()
 
+    def _tactile_object_pose(self):
+        """Object (pos, quat) the fingertip tactile ray-casts against, or None (= the real pose). Door latch
+        touch-only cue: knob raised latch_tactile_pop_mm (world z) while in the unlock window and still latched."""
+        mm = float(getattr(self.cfg.precise_assembly, "latch_tactile_pop_mm", 0.0))
+        if mm <= 0.0 or not self._latch_on() or not hasattr(self, "latch_in_window"):
+            return None
+        cue = (self.latch_in_window & ~self.latch_open).float().unsqueeze(-1)
+        up = torch.zeros_like(self.object.data.root_pos_w)
+        up[:, 2] = mm * 1e-3
+        return self.object.data.root_pos_w + cue * up, self.object.data.root_quat_w
+
     def _latch_soft_stop(self) -> None:
         """Every physics substep while the latch is closed: door hinge angle <= latch_soft_stop_deg (door + knob rotated
         back about the hinge axis, the opening spin about it removed)."""

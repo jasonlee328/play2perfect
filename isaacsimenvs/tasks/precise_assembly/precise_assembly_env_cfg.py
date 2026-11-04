@@ -196,6 +196,10 @@ class PreciseAssemblyCfg:
     latch_approach_over_deg: float = 0.0
     # True: the forced-door fail counts consecutive tug steps (reset when the door drops back), not the episode total
     latch_force_consecutive: bool = False
+    # > 0: touch-only latch cue. While the knob is in the unlock window and the latch is still closed, the fingertip
+    # tactile ray-casts the knob shifted latch_tactile_pop_mm up along world z (into the grip); physics is unchanged,
+    # so joint state carries nothing. Use with latch_pop_deg=0 (no physical pop).
+    latch_tactile_pop_mm: float = 0.0
     latch_keeper: int = -1
     latch_retract_m: tuple[float, float, float] = (0.0, 0.012, 0.0)
     latch_reengage_deg: float = 0.5
