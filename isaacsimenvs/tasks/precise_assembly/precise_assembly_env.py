@@ -1266,7 +1266,10 @@ class PreciseAssemblyEnv(PlayEnv):
             if not hasattr(self, "latch_force_count"):
                 self.latch_force_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
             door = self.cb_joint_angle[int(pih_cfg.latch_door_joint)]
-            tug = (~self.latch_open) & (door >= math.radians(float(pih_cfg.latch_force_deg)))
+            # measured from the latch rest angle: in the window the pop itself holds the door at latch_pop_deg,
+            # which must not count as a tug (else a correct dwell is a forced fail once the budget is < dwell steps)
+            rest = math.radians(float(pih_cfg.latch_pop_deg)) * getattr(self, "latch_in_window", torch.zeros_like(door, dtype=torch.bool)).float()
+            tug = (~self.latch_open) & (door >= rest + math.radians(float(pih_cfg.latch_force_deg)))
             self.latch_force_count += tug.long()
             budget = float(pih_cfg.latch_force_fail_steps)
             if int(pih_cfg.latch_force_fail_start_steps) > 0 and int(pih_cfg.latch_curriculum_steps) > 0:
@@ -1405,6 +1408,11 @@ class PreciseAssemblyEnv(PlayEnv):
         if self._latch_on() and float(pih_cfg.latch_approach_rew_scale) > 0.0 and hasattr(self, "latch_open"):
             knob = self.cb_joint_angle[int(pih_cfg.unlock_joint)]
             phi = (knob / self.unlock_angle).clamp(0.0, 1.0)
+            over_deg = float(getattr(pih_cfg, "latch_approach_over_deg", 0.0))
+            if over_deg > 0.0:
+                # two-sided: the potential falls past theta (1 per over_deg of over-turn), so overshoot costs reward
+                over = (knob - self.unlock_angle).clamp(min=0.0) / math.radians(over_deg)
+                phi = phi - over.clamp(max=2.0)
             if not hasattr(self, "_latch_phi_prev"):
                 self._latch_phi_prev = phi.clone()
             ar = float(pih_cfg.latch_approach_rew_scale) * (phi - self._latch_phi_prev) * (~self.latch_open_ep).float()
