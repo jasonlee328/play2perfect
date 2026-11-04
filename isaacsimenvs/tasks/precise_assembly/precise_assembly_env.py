@@ -1270,7 +1270,11 @@ class PreciseAssemblyEnv(PlayEnv):
             # which must not count as a tug (else a correct dwell is a forced fail once the budget is < dwell steps)
             rest = math.radians(float(pih_cfg.latch_pop_deg)) * getattr(self, "latch_in_window", torch.zeros_like(door, dtype=torch.bool)).float()
             tug = (~self.latch_open) & (door >= rest + math.radians(float(pih_cfg.latch_force_deg)))
-            self.latch_force_count += tug.long()
+            if getattr(pih_cfg, "latch_force_consecutive", False):
+                # only an unbroken tug counts: a short check pull that lets go resets the count
+                self.latch_force_count = torch.where(tug, self.latch_force_count + 1, torch.zeros_like(self.latch_force_count))
+            else:
+                self.latch_force_count += tug.long()
             budget = float(pih_cfg.latch_force_fail_steps)
             if int(pih_cfg.latch_force_fail_start_steps) > 0 and int(pih_cfg.latch_curriculum_steps) > 0:
                 a = min(1.0, float(self.common_step_counter + int(pih_cfg.latch_curriculum_offset_steps))

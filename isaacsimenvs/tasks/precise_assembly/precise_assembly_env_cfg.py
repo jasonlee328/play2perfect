@@ -194,6 +194,8 @@ class PreciseAssemblyCfg:
     latch_approach_rew_scale: float = 0.0
     # > 0: the approach potential also falls past theta (by 1 per latch_approach_over_deg of over-turn, capped at -2)
     latch_approach_over_deg: float = 0.0
+    # True: the forced-door fail counts consecutive tug steps (reset when the door drops back), not the episode total
+    latch_force_consecutive: bool = False
     latch_keeper: int = -1
     latch_retract_m: tuple[float, float, float] = (0.0, 0.012, 0.0)
     latch_reengage_deg: float = 0.5
