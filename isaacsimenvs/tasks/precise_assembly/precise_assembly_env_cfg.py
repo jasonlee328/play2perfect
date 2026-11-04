@@ -127,6 +127,9 @@ class PreciseAssemblyCfg:
     # object and each distractor are shifted independently by U(-d, d) per axis from their receptive-frame poses
     # (sticks along their length: (0.02, 0, 0)); the object's goal poses move with it. () = off (old behaviour).
     start_shift_m: tuple[float, ...] = ()
+    # Same as start_shift_m but ONE offset per env shared by the object and every distractor (moves the whole row,
+    # e.g. sideways in the tray: (0, 0.006, 0)); added to the independent start_shift_m offsets.
+    start_shift_group_m: tuple[float, ...] = ()
     # Dense "don't lift the neighbours" shaping: per-step reward -= distractor_lift_penalty_scale * the largest
     # distractor rise above its reset height beyond distractor_lift_slack (m). Sliding / rolling inside the bin is free.
     distractor_lift_penalty_scale: float = 0.0

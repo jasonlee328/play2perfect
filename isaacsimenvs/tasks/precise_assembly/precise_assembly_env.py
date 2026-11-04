@@ -530,6 +530,12 @@ class PreciseAssemblyEnv(PlayEnv):
         if d:
             half = torch.tensor((tuple(d) + (0.0, 0.0, 0.0))[:3], device=self.device, dtype=torch.float32)
             self._start_shift[:, env_ids] = (torch.rand(n_dist + 1, env_ids.numel(), 3, device=self.device) * 2 - 1) * half
+        else:
+            self._start_shift[:, env_ids] = 0.0
+        g = tuple(self.cfg.precise_assembly.start_shift_group_m)
+        if g:   # one offset per env shared by the object and every distractor (moves the whole row)
+            half = torch.tensor((tuple(g) + (0.0, 0.0, 0.0))[:3], device=self.device, dtype=torch.float32)
+            self._start_shift[:, env_ids] += ((torch.rand(env_ids.numel(), 3, device=self.device) * 2 - 1) * half).unsqueeze(0)
 
     def _distractor_curriculum(self) -> tuple[float, float]:
         """(disturb tolerance, penalty multiplier in [0, 1]) at the current env step."""
