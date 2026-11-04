@@ -423,6 +423,8 @@ class RewardCfg:
     slow_touch_min_feel_steps: int = 0
     slow_touch_min_feel_ramp_steps: int = 0
     slow_touch_min_feel_offset_steps: int = 0
+    # False: setting the object back down does NOT reopen the feel phase (no lift / drop / relift credit)
+    slow_touch_min_feel_reopen: bool = True
 
     # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
     # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits

@@ -249,6 +249,8 @@ def slow_touch_reward(env) -> torch.Tensor:
             env.extras["slow/lift_ok_share"] = float((st["steps"] >= req)[lift_now].float().mean())
         # set back down: reopen the feel phase (contact keeps counting)
         down = st["lifted"] & (rise < 0.5 * rc.contact_gate_rise)
+        if not bool(getattr(rc, "slow_touch_min_feel_reopen", True)):
+            down = torch.zeros_like(down)
         st["lifted"] = (st["lifted"] | up) & ~down
         st["lift_ok"] = st["lift_ok"] & ~down
     else:
