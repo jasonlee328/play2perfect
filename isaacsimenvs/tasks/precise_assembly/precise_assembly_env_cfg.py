@@ -218,6 +218,10 @@ class PreciseAssemblyCfg:
     # tightening spin (1 = stops dead each substep, like the hard stop; 0 = free clutch). Ramped from
     # turn_clutch_brake to turn_clutch_brake_end over turn_clutch_brake_ramp_steps env steps (+ _offset_steps).
     turn_clutch_brake: float = 0.0
+    # Clutch coasting drag: past the stop, each substep removes this fraction of the cap's tightening spin (velocity only,
+    # no pose correction). A cap driven by the fingers is unaffected (they set its motion through contact), but a cap
+    # flicked and left spinning stops coasting past tight instead of free-wheeling into a strip.
+    turn_clutch_coast_damp: float = 0.0
     turn_clutch_brake_end: float = 0.0
     turn_clutch_brake_ramp_steps: int = 0
     turn_clutch_brake_offset_steps: int = 0

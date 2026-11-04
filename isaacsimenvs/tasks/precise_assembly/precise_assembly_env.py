@@ -703,6 +703,15 @@ class PreciseAssemblyEnv(PlayEnv):
         over = self.turn_angle - self.unlock_angle
         pc = self.cfg.precise_assembly
         bfrac = None
+        if pc.turn_clutch and float(pc.turn_clutch_coast_damp) > 0.0:
+            ids_c = (over > 0).nonzero(as_tuple=False).squeeze(-1)
+            if ids_c.numel() > 0:
+                body_c = self._joint_bodies()[k]
+                ax_c = self._turn_axis_w()[0][ids_c]
+                vel_c = body_c.data.root_vel_w[ids_c].clone()
+                w_c = (vel_c[:, 3:6] * ax_c).sum(-1).clamp_min(0.0)
+                vel_c[:, 3:6] -= (float(pc.turn_clutch_coast_damp) * w_c).unsqueeze(-1) * ax_c
+                body_c.write_root_velocity_to_sim(vel_c, env_ids=ids_c)
         if pc.turn_clutch:
             # compliant stop: undo a fraction b of this substep's new over-turn (b = 1: the hard stop's correction)
             b = self._turn_clutch_brake()
