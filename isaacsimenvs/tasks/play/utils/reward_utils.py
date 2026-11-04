@@ -311,3 +311,43 @@ __all__ = [
     "reach_goal_bonus",
     "compute_rewards",
 ]
+
+
+def rim_feel_update(env) -> torch.Tensor:
+    """Rim-first gate (RewardCfg.rim_feel_*). Called from _get_dones. Counts contact steps while no fingertip is inside
+    the target below its rim; returns the 'entered_early' mask (a fingertip inside before the count reaches the
+    ramped requirement). Logs rim/*."""
+    from isaacsimenvs.tasks.play.utils.obs_utils import FINGERTIP_OFFSET, _apply_local_offset
+    from isaaclab.utils.math import quat_apply_inverse
+    rc = env.cfg.reward
+    N, dev = env.num_envs, env.device
+    src = getattr(rc, "slow_touch_source", "") or getattr(rc, "contact_source", "tips")
+    tac = getattr(env, "_last_tactile_hand" if src == "hand" else "_last_tactile", None)
+    nl = 21 if src == "hand" else 5
+    on = (tac.view(N, nl, -1) > rc.contact_thr).any(-1).any(-1) if tac is not None else torch.zeros(N, dtype=torch.bool, device=dev)
+    ft = env.robot.data.body_state_w[:, env._fingertip_body_ids, :]
+    tips = _apply_local_offset(ft[:, :, 0:3], ft[:, :, 3:7], FINGERTIP_OFFSET, (N, ft.shape[1]))     # (N, 5, 3) world
+    op, oq = env.object.data.root_pos_w, env.object.data.root_quat_w
+    rel = quat_apply_inverse(oq.unsqueeze(1).expand(-1, tips.shape[1], -1).reshape(-1, 4),
+                             (tips - op.unsqueeze(1)).reshape(-1, 3)).view(N, -1, 3)
+    inside = ((rel[..., :2].norm(dim=-1) < rc.rim_feel_radius) & (rel[..., 2] < rc.rim_feel_top_z - rc.rim_feel_margin)).any(-1)
+    fresh = env.episode_length_buf <= 1
+    cnt = getattr(env, "_rim_cnt", None)
+    if cnt is None or cnt.shape[0] != N:
+        cnt = torch.zeros(N, device=dev)
+    cnt = torch.where(fresh, torch.zeros_like(cnt), cnt) + (on & ~inside).float()
+    rs = int(rc.rim_feel_ramp_steps)
+    t = env.common_step_counter + int(rc.rim_feel_offset_steps)
+    frac = min(1.0, t / rs) if rs > 0 else 1.0
+    req = float(rc.rim_feel_steps) * frac
+    ok = getattr(env, "_rim_ok", None)
+    if ok is None or ok.shape[0] != N:
+        ok = torch.zeros(N, dtype=torch.bool, device=dev)
+    ok = (ok & ~fresh) | (cnt >= req)
+    early = inside & ~ok & (req > 0) & ~fresh
+    env._rim_cnt, env._rim_ok, env._rim_frac = cnt, ok, frac
+    env.extras["rim/req"] = float(req)
+    env.extras["rim/inside_share"] = float(inside.float().mean())
+    env.extras["rim/ok_share"] = float(ok.float().mean())
+    env.extras["rim/early_share"] = float(early.float().mean())
+    return early

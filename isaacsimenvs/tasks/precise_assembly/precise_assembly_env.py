@@ -1043,7 +1043,12 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
+        if int(getattr(self.cfg.reward, "rim_feel_steps", 0)) > 0:
+            from isaacsimenvs.tasks.play.utils.reward_utils import rim_feel_update
+            entered_early = rim_feel_update(self) & ~max_successes
+        else:
+            entered_early = torch.zeros_like(fall)
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | entered_early
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1052,6 +1057,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "hand_far": hand_far,
             "dropped": dropped,
             "disturbed": disturbed,
+            "entered_early": entered_early,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1113,6 +1119,12 @@ class PreciseAssemblyEnv(PlayEnv):
             cov_rew = coverage_reward(self)
             reward = reward + cov_rew
             self._reward_terms["coverage_rew"] = cov_rew
+            self._reward_terms["total_reward"] = reward
+
+        if int(getattr(rc, "rim_feel_steps", 0)) > 0 and "entered_early" in self._termination_reasons:
+            rim_pen = float(rc.rim_feel_penalty) * float(getattr(self, "_rim_frac", 1.0)) * self._termination_reasons["entered_early"].float()
+            reward = reward - rim_pen
+            self._reward_terms["rim_feel_penalty"] = -rim_pen
             self._reward_terms["total_reward"] = reward
 
         if pih_cfg.enable_retract:

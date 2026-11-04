@@ -425,6 +425,18 @@ class RewardCfg:
     slow_touch_min_feel_offset_steps: int = 0
     # False: setting the object back down does NOT reopen the feel phase (no lift / drop / relift credit)
     slow_touch_min_feel_reopen: bool = True
+    # Rim-first gate (cup): before any fingertip may go inside the target below its rim, the hand must touch the
+    # target from outside for rim_feel_steps contact steps (ramped 0 -> N over rim_feel_ramp_steps env steps; offset
+    # skips ahead). A fingertip inside before that = "entered_early" (episode ends, -rim_feel_penalty x ramp).
+    # Geometry in the target's object frame: rim at z = rim_feel_top_z, inner radius rim_feel_radius; "inside" = tip
+    # point radially within the radius and more than rim_feel_margin below the rim.
+    rim_feel_steps: int = 0
+    rim_feel_ramp_steps: int = 0
+    rim_feel_offset_steps: int = 0
+    rim_feel_penalty: float = 200.0
+    rim_feel_top_z: float = 0.0329
+    rim_feel_radius: float = 0.034
+    rim_feel_margin: float = 0.005
 
     # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
     # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits
