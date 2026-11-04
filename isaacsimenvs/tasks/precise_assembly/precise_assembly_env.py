@@ -743,6 +743,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.latch_force_count[env_ids] = 0
             if hasattr(self, "latch_overturned"):
                 self.latch_overturned[env_ids] = False
+            if hasattr(self, "_latch_phi_prev"):
+                self._latch_phi_prev[env_ids] = 0.0
             if hasattr(self, "_soft_stop_hits"):
                 self._soft_stop_hits[env_ids] = 0.0
             self.latch_dwell[env_ids] = 0
@@ -1398,6 +1400,17 @@ class PreciseAssemblyEnv(PlayEnv):
             open_pen = float(pih_cfg.latch_overturn_penalty) * self._termination_reasons["overturned"].float()
             reward = reward - open_pen
             self._reward_terms["latch_overturn_penalty"] = -open_pen
+            self._reward_terms["total_reward"] = reward
+
+        if self._latch_on() and float(pih_cfg.latch_approach_rew_scale) > 0.0 and hasattr(self, "latch_open"):
+            knob = self.cb_joint_angle[int(pih_cfg.unlock_joint)]
+            phi = (knob / self.unlock_angle).clamp(0.0, 1.0)
+            if not hasattr(self, "_latch_phi_prev"):
+                self._latch_phi_prev = phi.clone()
+            ar = float(pih_cfg.latch_approach_rew_scale) * (phi - self._latch_phi_prev) * (~self.latch_open_ep).float()
+            self._latch_phi_prev = phi.clone()
+            reward = reward + ar
+            self._reward_terms["latch_approach_rew"] = ar
             self._reward_terms["total_reward"] = reward
 
         # Door latch: one-time bonus when the latch clears (privileged reward; the actor never sees theta).

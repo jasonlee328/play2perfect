@@ -188,6 +188,10 @@ class PreciseAssemblyCfg:
     # "turn to the far stop" strategy, which works whenever the stop lies inside the window (v2, v6 C/D at theta 80).
     latch_overturn_fail_deg: float = -1.0
     latch_overturn_penalty: float = 0.0
+    # Approach reward (0 = off): potential-based, scale x change of clamp(knob / theta, 0, 1) per policy step while the
+    # latch is closed (privileged: theta is hidden from the actor). Turning toward theta pays, past it pays nothing,
+    # backing off costs it back, so freezing earns 0 and hovering can't farm it (v7 froze under the over-turn fail).
+    latch_approach_rew_scale: float = 0.0
     latch_keeper: int = -1
     latch_retract_m: tuple[float, float, float] = (0.0, 0.012, 0.0)
     latch_reengage_deg: float = 0.5
