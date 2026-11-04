@@ -213,6 +213,7 @@ class PreciseAssemblyEnv(PlayEnv):
                 raise ValueError("precise_assembly.turn_mode needs unlock_angle_values_deg / unlock_angle_range_deg")
             n = self.num_envs
             self.turn_angle = torch.zeros(n, device=self.device)          # unwrapped, rad, + = tightening
+            self.turn_offset = torch.zeros(n, device=self.device)         # hidden pre-turn, rad
             self._turn_prev_wrapped = torch.zeros(n, device=self.device)
             self.turn_max_angle = torch.zeros(n, device=self.device)
             self.turn_prev_ep_max = torch.zeros(n, device=self.device)
@@ -560,9 +561,13 @@ class PreciseAssemblyEnv(PlayEnv):
         if getattr(self, "turn_mode", False):
             self.turn_prev_ep_max[env_ids] = self.turn_max_angle[env_ids]
             self.turn_prev_ep_at_stop_steps[env_ids] = self.turn_at_stop_steps[env_ids]
-            self.turn_angle[env_ids] = 0.0
+            rng_off = self.cfg.precise_assembly.turn_start_offset_range_deg
+            if rng_off:
+                lo, hi = (math.radians(float(v)) for v in rng_off)
+                self.turn_offset[env_ids] = lo + (hi - lo) * torch.rand(len(env_ids), device=self.device)
+            self.turn_angle[env_ids] = self.turn_offset[env_ids]
             self._turn_prev_wrapped[env_ids] = 0.0
-            self.turn_max_angle[env_ids] = 0.0
+            self.turn_max_angle[env_ids] = self.turn_offset[env_ids]
             self.turn_strip_count[env_ids] = 0
             self.turn_stripped[env_ids] = False
             self.turn_released_early[env_ids] = False
@@ -706,7 +711,7 @@ class PreciseAssemblyEnv(PlayEnv):
             bfrac = b
         elif not pc.turn_stop_physical:
             over = torch.zeros_like(over)
-        under = lower - self.turn_angle
+        under = lower + self.turn_offset - self.turn_angle
         corr = torch.where(over > 0, -over, torch.where(under > 0, under, torch.zeros_like(over)))
         ids = (corr != 0).nonzero(as_tuple=False).squeeze(-1)
         if ids.numel() == 0:
@@ -755,7 +760,7 @@ class PreciseAssemblyEnv(PlayEnv):
         if not (getattr(self, "turn_mode", False) and self.cfg.precise_assembly.turn_hide_from_actor):
             return None
         axis_w, _ = self._turn_axis_w()
-        return quat_from_angle_axis(-self.turn_angle, axis_w), axis_w
+        return quat_from_angle_axis(-(self.turn_angle - self.turn_offset), axis_w), axis_w
 
     def _turn_goal_values(self) -> None:
         """Turn mode, after compute_intermediate_values: goals / keypoint distance from the unwrapped angle."""
@@ -766,7 +771,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self._turn_over_inc = torch.clamp(self.turn_max_angle - self.unlock_angle, min=0.0) - over_prev
         at_last = self._successes >= self.env_max_goals - 1
         target = torch.where(at_last, self.unlock_angle,
-                             torch.full_like(self.unlock_angle, math.radians(float(pih_cfg.turn_first_goal_deg))))
+                             self.turn_offset + math.radians(float(pih_cfg.turn_first_goal_deg)))
         rem = torch.clamp(target - self.turn_angle, min=0.0)
         self._keypoints_max_dist = rem * float(pih_cfg.turn_progress_m_per_rad)
         # goal trackers cleared this step (-1 sentinel, replaced by the real keypoint distance in
@@ -1208,7 +1213,7 @@ class PreciseAssemblyEnv(PlayEnv):
                                                         torch.zeros_like(self._retract_clear_count))
                 hand_away = self._retract_clear_count >= r_clear
                 if getattr(self, "turn_mode", False) and getattr(pih_cfg, "turn_early_release_fail", False):
-                    started = self.turn_angle >= math.radians(float(pih_cfg.turn_first_goal_deg))
+                    started = self.turn_angle - self.turn_offset >= math.radians(float(pih_cfg.turn_first_goal_deg))
                     pre = clear & ~self.retract_phase & started
                     self._turn_early_clear = torch.where(pre, self._turn_early_clear + 1,
                                                          torch.zeros_like(self._turn_early_clear))

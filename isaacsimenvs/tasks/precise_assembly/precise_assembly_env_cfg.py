@@ -208,6 +208,11 @@ class PreciseAssemblyCfg:
     # physical stop, so the joint state carries nothing about it), while the fingertip tactile sensor ray-casts the cap
     # frozen at the stop angle: the felt surface (hull + tactile-only knurl) slips under the pads by the over-turn.
     # Touch is then the only cue. Pair with turn_strip_over_deg so a blind fixed number of turns strips the cap.
+    # Hidden pre-turn: non-empty [lo, hi] (deg) = each episode starts as if the cap were already turned by
+    # U(lo, hi) (the bookkeeping angle starts there; the cap pose is unchanged), so the stop comes after
+    # stop - offset of actual turning: it lands at any phase of a turn and can't be predicted by counting.
+    # The first goal and the lower bound are relative to the start; the actor's hidden cap pose ignores the offset.
+    turn_start_offset_range_deg: tuple[float, ...] = ()
     turn_clutch: bool = False
     # Compliant stop for the clutch (curriculum): past the stop, each physics substep removes this fraction of the cap's
     # tightening spin (1 = stops dead each substep, like the hard stop; 0 = free clutch). Ramped from
