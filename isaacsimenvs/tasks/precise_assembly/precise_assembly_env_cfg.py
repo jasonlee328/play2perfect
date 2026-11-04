@@ -183,6 +183,11 @@ class PreciseAssemblyCfg:
     # tug budget at the start of the latch curriculum (0 = no ramp), ramped to latch_force_fail_steps with it
     latch_force_fail_start_steps: int = 0
     latch_force_fail_penalty: float = 0.0
+    # Over-turn fail (< 0 = off): the knob passing theta + (current window, over-turn side) + latch_overturn_fail_deg
+    # while the latch is closed ends the episode as "overturned" (-latch_overturn_penalty). Blocks the blind
+    # "turn to the far stop" strategy, which works whenever the stop lies inside the window (v2, v6 C/D at theta 80).
+    latch_overturn_fail_deg: float = -1.0
+    latch_overturn_penalty: float = 0.0
     latch_keeper: int = -1
     latch_retract_m: tuple[float, float, float] = (0.0, 0.012, 0.0)
     latch_reengage_deg: float = 0.5

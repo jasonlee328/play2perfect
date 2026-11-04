@@ -741,6 +741,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.latch_open_ep[env_ids] = False
             if hasattr(self, "latch_force_count"):
                 self.latch_force_count[env_ids] = 0
+            if hasattr(self, "latch_overturned"):
+                self.latch_overturned[env_ids] = False
             if hasattr(self, "_soft_stop_hits"):
                 self._soft_stop_hits[env_ids] = 0.0
             self.latch_dwell[env_ids] = 0
@@ -777,6 +779,10 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._latch_prev_knob = knob.clone()
                 loaded = loaded | (speed > math.radians(float(c.latch_still_deg_s)))
             self.latch_dwell_adv = in_win & ~loaded & ~self.latch_open
+            if float(c.latch_overturn_fail_deg) >= 0.0:
+                if not hasattr(self, "latch_overturned"):
+                    self.latch_overturned = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                self.latch_overturned |= (~self.latch_open) & (d > math.radians(w_deg + float(c.latch_overturn_fail_deg)))
             self.latch_dwell = torch.where(self.latch_dwell_adv, self.latch_dwell + 1,
                                            torch.zeros_like(self.latch_dwell))
             unlocked = self.latch_dwell >= d_steps
@@ -1268,7 +1274,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["latch_force_budget"] = torch.tensor(budget, device=self.device)
             forced = (self.latch_force_count >= int(round(budget))) & ~max_successes
             self.extras["latch_force_count_mean"] = self.latch_force_count.float().mean()
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced
+        overturned = torch.zeros_like(fall)
+        if hasattr(self, "latch_overturned"):
+            overturned = self.latch_overturned & ~max_successes
+            self.extras["latch_overturned_frac"] = self.latch_overturned.float().mean()
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1278,6 +1288,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "dropped": dropped,
             "disturbed": disturbed,
             "forced": forced,
+            "overturned": overturned,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1381,6 +1392,12 @@ class PreciseAssemblyEnv(PlayEnv):
             fpen = float(pih_cfg.latch_force_fail_penalty) * self._termination_reasons["forced"].float()
             reward = reward - fpen
             self._reward_terms["latch_force_fail_penalty"] = -fpen
+            self._reward_terms["total_reward"] = reward
+
+        if float(pih_cfg.latch_overturn_penalty) > 0.0 and "overturned" in self._termination_reasons:
+            open_pen = float(pih_cfg.latch_overturn_penalty) * self._termination_reasons["overturned"].float()
+            reward = reward - open_pen
+            self._reward_terms["latch_overturn_penalty"] = -open_pen
             self._reward_terms["total_reward"] = reward
 
         # Door latch: one-time bonus when the latch clears (privileged reward; the actor never sees theta).
