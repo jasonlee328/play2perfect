@@ -356,3 +356,41 @@ def rim_feel_update(env) -> torch.Tensor:
     env.extras["rim/ok_share"] = float(ok.float().mean())
     env.extras["rim/early_share"] = float(early.float().mean())
     return early
+
+
+def lift_feel_update(env) -> torch.Tensor:
+    """Feel-before-lift gate (RewardCfg.lift_feel_*). Called from _get_dones. Counts contact steps before the object
+    first rises contact_gate_rise; returns the 'lifted_early' mask (first rise with fewer than the ramped requirement).
+    Logs liftfeel/*."""
+    rc = env.cfg.reward
+    N, dev = env.num_envs, env.device
+    src = getattr(rc, "slow_touch_source", "") or getattr(rc, "contact_source", "tips")
+    tac = getattr(env, "_last_tactile_hand" if src == "hand" else "_last_tactile", None)
+    nl = 21 if src == "hand" else 5
+    on = (tac.view(N, nl, -1) > rc.contact_thr).any(-1).any(-1) if tac is not None else torch.zeros(N, dtype=torch.bool, device=dev)
+    fresh = env.episode_length_buf <= 1
+    cnt = getattr(env, "_lf_cnt", None)
+    risen = getattr(env, "_lf_risen", None)
+    if cnt is None or cnt.shape[0] != N:
+        cnt = torch.zeros(N, device=dev)
+        risen = torch.zeros(N, dtype=torch.bool, device=dev)
+    cnt = torch.where(fresh, torch.zeros_like(cnt), cnt)
+    risen = risen & ~fresh
+    rise = env.object.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2] - env._object_init_z
+    up = rise > rc.contact_gate_rise
+    cnt = cnt + (on & ~risen & ~up).float()
+    rs = int(rc.lift_feel_ramp_steps)
+    t = env.common_step_counter + int(rc.lift_feel_offset_steps)
+    frac = min(1.0, t / rs) if rs > 0 else 1.0
+    lo = float(rc.lift_feel_start)
+    req = lo + (float(rc.lift_feel_steps) - lo) * frac
+    first = up & ~risen & ~fresh
+    early = first & (cnt < req)
+    risen = risen | up
+    env._lf_cnt, env._lf_risen, env._lift_feel_frac = cnt, risen, frac
+    env.extras["liftfeel/req"] = float(req)
+    nf = int(first.sum())
+    if nf > 0:
+        env.extras["liftfeel/cnt_at_rise"] = float(cnt[first].mean())
+        env.extras["liftfeel/early_share_of_rises"] = float(early[first].float().mean())
+    return early

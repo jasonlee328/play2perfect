@@ -441,6 +441,15 @@ class RewardCfg:
     rim_feel_top_z: float = 0.0329
     rim_feel_radius: float = 0.034
     rim_feel_margin: float = 0.005
+    # Feel-before-lift termination (0 = off; chopstick analogue of the cup's rim gate): count steps with contact
+    # (slow_touch_source pads / skin links, contact_thr) before the object first rises contact_gate_rise; if it rises
+    # with fewer than req = lift_feel_start + (lift_feel_steps - lift_feel_start) x min(1, (env step + offset) / ramp)
+    # contact steps the episode ends as "lifted_early" (-lift_feel_penalty x ramp share). Logs liftfeel/*.
+    lift_feel_steps: int = 0
+    lift_feel_start: int = 0
+    lift_feel_ramp_steps: int = 0
+    lift_feel_offset_steps: int = 0
+    lift_feel_penalty: float = 200.0
 
     # Touch coverage (2026-11-03, off by default): reward mapping the target's surface by touch. The target's surface
     # is split into coverage_cell_mm cells in its own frame; a whole-hand skin ray (tactile.whole_hand=true) that hits
