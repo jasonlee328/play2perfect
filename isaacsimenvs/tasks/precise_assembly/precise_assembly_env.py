@@ -814,6 +814,10 @@ class PreciseAssemblyEnv(PlayEnv):
             self.latch_open_ep[env_ids] = False
             if hasattr(self, "latch_force_count"):
                 self.latch_force_count[env_ids] = 0
+            if hasattr(self, "latch_check_count"):
+                self.latch_check_count[env_ids] = 0
+                self._latch_quiet[env_ids] = 0
+                self._latch_prev_loaded[env_ids] = False
             if hasattr(self, "latch_overturned"):
                 self.latch_overturned[env_ids] = False
             if hasattr(self, "latch_false_stop"):
@@ -862,7 +866,23 @@ class PreciseAssemblyEnv(PlayEnv):
                     self._latch_prev_knob = knob.clone()
                 speed = (knob - self._latch_prev_knob).abs() / float(self.step_dt)
                 self._latch_prev_knob = knob.clone()
-                loaded = loaded | (speed > math.radians(float(c.latch_still_deg_s)))
+                door_loaded = loaded.clone()
+                moving = speed > math.radians(float(c.latch_still_deg_s))
+                if int(c.latch_check_pull_fail) > 0:
+                    if not hasattr(self, "latch_check_count"):
+                        self.latch_check_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+                        self._latch_quiet = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+                        self._latch_prev_loaded = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                    onset = door_loaded & ~self._latch_prev_loaded & ~self.latch_open
+                    chk = onset & (self._latch_quiet >= int(c.latch_dwell_steps))
+                    self.latch_check_count += chk.long()
+                    self._latch_quiet = torch.where(~moving & ~door_loaded, self._latch_quiet + 1,
+                                                    torch.zeros_like(self._latch_quiet))
+                    self._latch_prev_loaded = door_loaded
+                    self.extras["latch_check_count_mean"] = self.latch_check_count.float().mean()
+                if c.latch_relock_on_motion:
+                    self._latch_motion_relock = moving & (door < math.radians(float(c.latch_reengage_deg)))
+                loaded = loaded | moving
                 if c.latch_false_stop:
                     # false stop: knob held still outside the window (past latch_false_stop_min_deg) for the dwell time
                     if not hasattr(self, "latch_false_count"):
@@ -909,6 +929,8 @@ class PreciseAssemblyEnv(PlayEnv):
             else:
                 self.latch_cue_frac = in_win.float()
             new = torch.where(self.latch_open, ~(closed & ~in_win), unlocked)
+            if c.latch_relock_on_motion and hasattr(self, "_latch_motion_relock"):
+                new = new & ~(self.latch_open & self._latch_motion_relock)
             self._apply_latch_pop(in_win & ~new, door)
         else:
             unlocked = knob >= self.unlock_angle - math.radians(float(c.unlock_tol_deg))
@@ -1402,6 +1424,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["latch_force_budget"] = torch.tensor(budget, device=self.device)
             forced = (self.latch_force_count >= int(round(budget))) & ~max_successes
             self.extras["latch_force_count_mean"] = self.latch_force_count.float().mean()
+        if int(pih_cfg.latch_check_pull_fail) > 0 and self._latch_on() and hasattr(self, "latch_check_count"):
+            forced = forced | ((self.latch_check_count >= int(pih_cfg.latch_check_pull_fail)) & ~max_successes)
         overturned = torch.zeros_like(fall)
         if hasattr(self, "latch_overturned"):
             overturned = self.latch_overturned & ~max_successes

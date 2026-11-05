@@ -219,6 +219,14 @@ class PreciseAssemblyCfg:
     latch_approach_over_deg: float = 0.0
     # True: the forced-door fail counts consecutive tug steps (reset when the door drops back), not the episode total
     latch_force_consecutive: bool = False
+    # > 0: check-pull fail (replaces the cumulative tug budget; set latch_force_fail_steps=0). A check pull = the door
+    # becomes loaded (above the rest angle + latch_load_margin_deg) while the latch is closed, right after >= the dwell
+    # steps of quiet (knob still <= latch_still_deg_s, door unloaded): the blind stop-dwell-pull test. The N-th one ends
+    # the episode as 'forced' (latch_force_fail_penalty). Loads while turning / regrasping (no quiet spell) are free.
+    latch_check_pull_fail: int = 0
+    # True: an open latch re-locks when the knob moves faster than latch_still_deg_s while the door is still below
+    # latch_reengage_deg, so a useful pull must start from a still knob (closes the dwell-twitch-pull loophole).
+    latch_relock_on_motion: bool = False
     # > 0: touch-only latch cue. While the knob is in the unlock window and the latch is still closed, the fingertip
     # tactile ray-casts the knob shifted latch_tactile_pop_mm up along world z (into the grip); physics is unchanged,
     # so joint state carries nothing. Use with latch_pop_deg=0 (no physical pop).
