@@ -757,6 +757,8 @@ class PreciseAssemblyEnv(PlayEnv):
             if hasattr(self, "latch_false_stop"):
                 self.latch_false_stop[env_ids] = False
                 self.latch_false_count[env_ids] = 0
+                if hasattr(self, "latch_false_used"):
+                    self.latch_false_used[env_ids] = 0
             if hasattr(self, "_latch_phi_prev"):
                 self._latch_phi_prev[env_ids] = 0.0
             if hasattr(self, "_soft_stop_hits"):
@@ -802,7 +804,20 @@ class PreciseAssemblyEnv(PlayEnv):
                     still = speed <= math.radians(float(c.latch_still_deg_s))
                     off = still & ~in_win & ~self.latch_open & (knob > math.radians(float(c.latch_false_stop_min_deg)))
                     self.latch_false_count = torch.where(off, self.latch_false_count + 1, torch.zeros_like(self.latch_false_count))
-                    self.latch_false_stop |= self.latch_false_count >= d_steps
+                    ev = self.latch_false_count >= d_steps
+                    if not hasattr(self, "latch_false_used"):
+                        self.latch_false_used = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+                    # where false stops happen (signed knob - theta, deg): below vs past the window
+                    if bool(ev.any()):
+                        dd = torch.rad2deg(d[ev])
+                        self.extras["latch_false_stop_d_mean"] = dd.mean()
+                        self.extras["latch_false_stop_below_frac"] = (dd < 0).float().mean()
+                    # tolerated false stops: counted, penalised once (latch_false_stop_free_penalty), counter reset
+                    free = ev & (self.latch_false_used < int(c.latch_false_stop_free))
+                    self.latch_false_event = free
+                    self.latch_false_used = self.latch_false_used + free.long()
+                    self.latch_false_count = torch.where(free, torch.zeros_like(self.latch_false_count), self.latch_false_count)
+                    self.latch_false_stop |= ev & ~free
             self.latch_dwell_adv = in_win & ~loaded & ~self.latch_open
             if float(c.latch_overturn_fail_deg) >= 0.0:
                 if not hasattr(self, "latch_overturned"):
@@ -1445,6 +1460,12 @@ class PreciseAssemblyEnv(PlayEnv):
                                                                 | self._termination_reasons["false_stop"]).float()
             reward = reward - open_pen
             self._reward_terms["latch_overturn_penalty"] = -open_pen
+            self._reward_terms["total_reward"] = reward
+
+        if float(pih_cfg.latch_false_stop_free_penalty) > 0.0 and hasattr(self, "latch_false_event"):
+            fs_pen = float(pih_cfg.latch_false_stop_free_penalty) * self.latch_false_event.float()
+            reward = reward - fs_pen
+            self._reward_terms["latch_false_free_penalty"] = -fs_pen
             self._reward_terms["total_reward"] = reward
 
         if self._latch_on() and float(pih_cfg.latch_approach_rew_scale) > 0.0 and hasattr(self, "latch_open"):

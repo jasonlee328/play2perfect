@@ -193,6 +193,10 @@ class PreciseAssemblyCfg:
     # -latch_overturn_penalty). Blocks the blind "step, dwell, try the door, step on" search: a blind policy gets one stop.
     latch_false_stop: bool = False
     latch_false_stop_min_deg: float = 20.0
+    # Tolerated false stops per episode (0 = the first one fails): each costs latch_false_stop_free_penalty once and
+    # resets the still counter; the (free + 1)-th ends the episode. A blind policy then gets free + 1 stops.
+    latch_false_stop_free: int = 0
+    latch_false_stop_free_penalty: float = 0.0
     # Approach reward (0 = off): potential-based, scale x change of clamp(knob / theta, 0, 1) per policy step while the
     # latch is closed (privileged: theta is hidden from the actor). Turning toward theta pays, past it pays nothing,
     # backing off costs it back, so freezing earns 0 and hovering can't farm it (v7 froze under the over-turn fail).
