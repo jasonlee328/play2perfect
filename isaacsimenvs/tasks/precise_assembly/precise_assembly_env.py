@@ -803,6 +803,11 @@ class PreciseAssemblyEnv(PlayEnv):
                         self.latch_false_stop = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
                     still = speed <= math.radians(float(c.latch_still_deg_s))
                     off = still & ~in_win & ~self.latch_open & (knob > math.radians(float(c.latch_false_stop_min_deg)))
+                    z_deg = float(getattr(c, "latch_false_stop_zone_deg", 0.0))
+                    if z_deg > 0.0:
+                        # tolerated approach zone: a stop within z_deg below the window's lower edge is not a false stop
+                        lo_edge = -math.radians(float(c.latch_window_deg))
+                        off = off & ~((d >= lo_edge - math.radians(z_deg)) & (d < lo_edge))
                     self.latch_false_count = torch.where(off, self.latch_false_count + 1, torch.zeros_like(self.latch_false_count))
                     ev = self.latch_false_count >= d_steps
                     if not hasattr(self, "latch_false_used"):

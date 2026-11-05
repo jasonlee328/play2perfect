@@ -196,6 +196,7 @@ class PreciseAssemblyCfg:
     # Tolerated false stops per episode (0 = the first one fails): each costs latch_false_stop_free_penalty once and
     # resets the still counter; the (free + 1)-th ends the episode. A blind policy then gets free + 1 stops.
     latch_false_stop_free: int = 0
+    latch_false_stop_zone_deg: float = 0.0  # stops this far below the window's lower edge are tolerated
     latch_false_stop_free_penalty: float = 0.0
     # Approach reward (0 = off): potential-based, scale x change of clamp(knob / theta, 0, 1) per policy step while the
     # latch is closed (privileged: theta is hidden from the actor). Turning toward theta pays, past it pays nothing,
