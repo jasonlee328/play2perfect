@@ -188,6 +188,11 @@ class PreciseAssemblyCfg:
     # "turn to the far stop" strategy, which works whenever the stop lies inside the window (v2, v6 C/D at theta 80).
     latch_overturn_fail_deg: float = -1.0
     latch_overturn_penalty: float = 0.0
+    # False-stop fail (needs latch_still_deg_s > 0): the knob held still (<= latch_still_deg_s) outside the unlock window,
+    # past latch_false_stop_min_deg, latch closed, for the current dwell steps ends the episode as "false_stop" (also
+    # -latch_overturn_penalty). Blocks the blind "step, dwell, try the door, step on" search: a blind policy gets one stop.
+    latch_false_stop: bool = False
+    latch_false_stop_min_deg: float = 20.0
     # Approach reward (0 = off): potential-based, scale x change of clamp(knob / theta, 0, 1) per policy step while the
     # latch is closed (privileged: theta is hidden from the actor). Turning toward theta pays, past it pays nothing,
     # backing off costs it back, so freezing earns 0 and hovering can't farm it (v7 froze under the over-turn fail).

@@ -754,6 +754,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.latch_force_count[env_ids] = 0
             if hasattr(self, "latch_overturned"):
                 self.latch_overturned[env_ids] = False
+            if hasattr(self, "latch_false_stop"):
+                self.latch_false_stop[env_ids] = False
+                self.latch_false_count[env_ids] = 0
             if hasattr(self, "_latch_phi_prev"):
                 self._latch_phi_prev[env_ids] = 0.0
             if hasattr(self, "_soft_stop_hits"):
@@ -791,6 +794,15 @@ class PreciseAssemblyEnv(PlayEnv):
                 speed = (knob - self._latch_prev_knob).abs() / float(self.step_dt)
                 self._latch_prev_knob = knob.clone()
                 loaded = loaded | (speed > math.radians(float(c.latch_still_deg_s)))
+                if c.latch_false_stop:
+                    # false stop: knob held still outside the window (past latch_false_stop_min_deg) for the dwell time
+                    if not hasattr(self, "latch_false_count"):
+                        self.latch_false_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+                        self.latch_false_stop = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                    still = speed <= math.radians(float(c.latch_still_deg_s))
+                    off = still & ~in_win & ~self.latch_open & (knob > math.radians(float(c.latch_false_stop_min_deg)))
+                    self.latch_false_count = torch.where(off, self.latch_false_count + 1, torch.zeros_like(self.latch_false_count))
+                    self.latch_false_stop |= self.latch_false_count >= d_steps
             self.latch_dwell_adv = in_win & ~loaded & ~self.latch_open
             if float(c.latch_overturn_fail_deg) >= 0.0:
                 if not hasattr(self, "latch_overturned"):
@@ -1298,7 +1310,11 @@ class PreciseAssemblyEnv(PlayEnv):
         if hasattr(self, "latch_overturned"):
             overturned = self.latch_overturned & ~max_successes
             self.extras["latch_overturned_frac"] = self.latch_overturned.float().mean()
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned
+        false_stop = torch.zeros_like(fall)
+        if hasattr(self, "latch_false_stop"):
+            false_stop = self.latch_false_stop & ~max_successes & ~overturned
+            self.extras["latch_false_stop_frac"] = self.latch_false_stop.float().mean()
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1309,6 +1325,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "disturbed": disturbed,
             "forced": forced,
             "overturned": overturned,
+            "false_stop": false_stop,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1415,7 +1432,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["total_reward"] = reward
 
         if float(pih_cfg.latch_overturn_penalty) > 0.0 and "overturned" in self._termination_reasons:
-            open_pen = float(pih_cfg.latch_overturn_penalty) * self._termination_reasons["overturned"].float()
+            open_pen = float(pih_cfg.latch_overturn_penalty) * (self._termination_reasons["overturned"]
+                                                                | self._termination_reasons["false_stop"]).float()
             reward = reward - open_pen
             self._reward_terms["latch_overturn_penalty"] = -open_pen
             self._reward_terms["total_reward"] = reward
