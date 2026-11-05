@@ -667,7 +667,7 @@ class PreciseAssemblyEnv(PlayEnv):
         mm = float(getattr(self.cfg.precise_assembly, "latch_tactile_pop_mm", 0.0))
         if mm <= 0.0 or not self._latch_on() or not hasattr(self, "latch_in_window"):
             return None
-        cue = (self.latch_in_window & ~self.latch_open).float().unsqueeze(-1)
+        cue = (getattr(self, "latch_cue_frac", self.latch_in_window.float()) * (~self.latch_open).float()).unsqueeze(-1)
         up = torch.zeros_like(self.object.data.root_pos_w)
         up[:, 2] = mm * 1e-3
         return self.object.data.root_pos_w + cue * up, self.object.data.root_quat_w
@@ -812,6 +812,15 @@ class PreciseAssemblyEnv(PlayEnv):
                                            torch.zeros_like(self.latch_dwell))
             unlocked = self.latch_dwell >= d_steps
             self.latch_in_window = in_win
+            r_deg = float(getattr(c, "latch_tactile_ramp_deg", 0.0))
+            if r_deg > 0.0:
+                # graded touch-only approach cue: 0 at r_deg below the window, rising linearly to 1 at its lower edge,
+                # 1 inside the window, 0 past it
+                lo = d + math.radians(float(c.latch_window_deg))
+                frac = ((lo + math.radians(r_deg)) / math.radians(r_deg)).clamp(0.0, 1.0)
+                self.latch_cue_frac = torch.where(d > math.radians(w_deg), torch.zeros_like(frac), frac)
+            else:
+                self.latch_cue_frac = in_win.float()
             new = torch.where(self.latch_open, ~(closed & ~in_win), unlocked)
             self._apply_latch_pop(in_win & ~new, door)
         else:
