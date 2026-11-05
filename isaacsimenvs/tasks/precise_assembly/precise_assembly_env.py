@@ -1086,7 +1086,12 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
+        if int(getattr(self.cfg.reward, "lift_feel_steps", 0)) > 0:
+            from isaacsimenvs.tasks.play.utils.reward_utils import lift_feel_update
+            lifted_early = lift_feel_update(self) & ~max_successes
+        else:
+            lifted_early = torch.zeros_like(fall)
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | lifted_early
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1095,6 +1100,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "hand_far": hand_far,
             "dropped": dropped,
             "disturbed": disturbed,
+            "lifted_early": lifted_early,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1135,6 +1141,11 @@ class PreciseAssemblyEnv(PlayEnv):
         self._reward_terms["lifting_rew"] = masked_lift_rew
         self._reward_terms["lift_bonus_rew"] = masked_lift_bonus_rew
         self._reward_terms["total_reward"] = reward
+        if int(getattr(self.cfg.reward, "lift_feel_steps", 0)) > 0 and "lifted_early" in self._termination_reasons:
+            lf_pen = float(self.cfg.reward.lift_feel_penalty) * float(getattr(self, "_lift_feel_frac", 1.0)) * self._termination_reasons["lifted_early"].float()
+            reward = reward - lf_pen
+            self._reward_terms["lift_feel_penalty"] = -lf_pen
+            self._reward_terms["total_reward"] = reward
         self.extras["lift_bonus_active"] = float(self.lift_bonus_active)
         self.extras["mean_rg_prev_ep_successes"] = mean_rg_eps
 
