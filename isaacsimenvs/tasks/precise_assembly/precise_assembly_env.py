@@ -335,6 +335,10 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if cfg.precise_assembly.latch_hint_obs and int(cfg.precise_assembly.latch_door_joint) >= 0:
+            OBS_FIELD_SIZES["latch_hint"] = 2
+            if "latch_hint" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "latch_hint")
         if cfg.precise_assembly.latch_critic_obs and int(cfg.precise_assembly.latch_door_joint) >= 0:
             OBS_FIELD_SIZES["latch_state"] = 5
             if "latch_state" not in cfg.obs.state_list:
@@ -746,6 +750,21 @@ class PreciseAssemblyEnv(PlayEnv):
             body.write_root_velocity_to_sim(vel, env_ids=ids)
         self.cb_joint_angle[k, ids] -= over[ids]
 
+    def latch_hint_p(self) -> float:
+        """Share of episodes that get the privileged theta hint now (1 -> latch_hint_final over the ramp)."""
+        c = self.cfg.precise_assembly
+        if int(c.latch_hint_ramp_steps) <= 0:
+            return float(c.latch_hint_final)
+        a = min(1.0, float(self.common_step_counter + int(c.latch_hint_offset_steps)) / float(c.latch_hint_ramp_steps))
+        return 1.0 + a * (float(c.latch_hint_final) - 1.0)
+
+    def _latch_hint_resample(self, env_ids) -> None:
+        if not hasattr(self, "latch_hint_on"):
+            self.latch_hint_on = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        p = self.latch_hint_p()
+        self.latch_hint_on[env_ids] = torch.rand(len(env_ids), device=self.device) < p
+        self.extras["latch_hint_p"] = torch.tensor(p, device=self.device)
+
     def _latch_on(self) -> bool:
         c = self.cfg.precise_assembly
         return int(c.latch_door_joint) >= 0 and int(c.latch_keeper) >= 0 and getattr(self, "unlock_angle", None) is not None
@@ -808,6 +827,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._soft_stop_hits[env_ids] = 0.0
             self.latch_dwell[env_ids] = 0
             self.latch_in_window[env_ids] = False
+            if c.latch_hint_obs:
+                self._latch_hint_resample(env_ids)
             if hasattr(self, "_knob_cap_prev"):
                 self._knob_cap_prev[env_ids] = float("nan")
                 self._knob_cap_hits[env_ids] = 0.0

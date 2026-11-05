@@ -354,6 +354,14 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "latch_hint" in OBS_FIELD_SIZES:
+        n = env.num_envs
+        if getattr(env, "unlock_angle", None) is not None and hasattr(env, "latch_hint_on"):
+            m = env.latch_hint_on.float()
+            obs_clean["latch_hint"] = torch.stack([env.unlock_angle / math.radians(90.0) * m, m], dim=-1)
+        else:
+            obs_clean["latch_hint"] = torch.zeros(n, 2, device=env.device)
+
     if "latch_state" in OBS_FIELD_SIZES and getattr(env, "_pih_joints", ()):
         n = env.num_envs
         if getattr(env, "unlock_angle", None) is not None and hasattr(env, "latch_open") and hasattr(env, "cb_joint_angle"):

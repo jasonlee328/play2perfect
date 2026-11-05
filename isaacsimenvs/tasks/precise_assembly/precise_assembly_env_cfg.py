@@ -177,6 +177,15 @@ class PreciseAssemblyCfg:
     # (relative to the door) is clamped to <= latch_knob_max_deg_s, so a policy has time to react to the window cue.
     # Same for every theta (joint state carries no theta information).
     latch_knob_max_deg_s: float = 0.0
+    # Privileged hint curriculum (actor obs field "latch_hint" = [theta / 90 deg * m, m], appended to obs_list only):
+    # m = 1 for a share p(t) of episodes (resampled at every reset), p decaying 1 -> latch_hint_final over
+    # latch_hint_ramp_steps env steps (+ latch_hint_offset_steps). Hinted episodes teach 'turn to theta, hold, pull';
+    # unhinted ones can only succeed by stopping on the touch cue. Warm-start with P2P_NEW_OBS_FIELD=latch_hint.
+    # Eval with latch_hint_ramp_steps=0 and latch_hint_final=0 (hint off in every episode).
+    latch_hint_obs: bool = False
+    latch_hint_ramp_steps: int = 0
+    latch_hint_offset_steps: int = 0
+    latch_hint_final: float = 0.0
     # The door goal (last waypoint) counts only if the latch cleared this episode (latch_open_ep).
     latch_success_requires_open: bool = True
     # Forced-door fail (0 = off): every policy step the latch is closed with the door hinge >= latch_force_deg (i.e.
