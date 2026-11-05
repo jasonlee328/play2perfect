@@ -660,6 +660,49 @@ class PreciseAssemblyEnv(PlayEnv):
         super()._apply_action()
         if float(self.cfg.precise_assembly.latch_soft_stop_deg) > 0.0 and self._latch_on() and hasattr(self, "latch_open"):
             self._latch_soft_stop()
+        if float(getattr(self.cfg.precise_assembly, "latch_knob_max_deg_s", 0.0)) > 0.0 and self._latch_on() \
+                and hasattr(self, "latch_open"):
+            self._latch_knob_speed_cap()
+
+    def _latch_knob_speed_cap(self) -> None:
+        """Every physics substep while the latch is closed: the knob may advance at most latch_knob_max_deg_s x sim dt
+        about its axis; any extra turn is rotated back (pose level, like the soft stop: a velocity clamp is undone by the
+        fingers' contacts) and the excess spin removed. Theta-independent, so joint state carries no theta."""
+        c = self.cfg.precise_assembly
+        kj = int(c.unlock_joint)
+        self._update_joint_angles()
+        a = self.cb_joint_angle[kj]
+        if not hasattr(self, "_knob_cap_prev"):
+            self._knob_cap_prev = a.clone()
+            self._knob_cap_hits = torch.zeros(self.num_envs, device=self.device)
+        prev = torch.where(torch.isnan(self._knob_cap_prev), a, self._knob_cap_prev)
+        lim = math.radians(float(c.latch_knob_max_deg_s)) * float(self.cfg.sim.dt)
+        delta = a - prev
+        excess = delta - delta.clamp(-lim, lim)
+        bad = (~self.latch_open) & (excess.abs() > 1e-6)
+        excess = torch.where(bad, excess, torch.zeros_like(excess))
+        self._knob_cap_prev = a - excess
+        self._knob_cap_hits = self._knob_cap_hits + bad.float()
+        ids = bad.nonzero(as_tuple=False).squeeze(-1)
+        if ids.numel() == 0:
+            return
+        j = self._pih_joints[kj]
+        hq = self.hole_quat_wxyz[ids]
+        n = ids.numel()
+        ax = quat_apply(hq, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(n, 3))
+        an = self.hole_pos[ids] + self.scene.env_origins[ids] + quat_apply(
+            hq, torch.tensor(j.anchor, device=self.device, dtype=torch.float32).expand(n, 3))
+        rot = quat_from_angle_axis(-excess[ids], ax)
+        body = self.object
+        pos, quat = body.data.root_pos_w[ids], body.data.root_quat_w[ids]
+        body.write_root_pose_to_sim(torch.cat([an + quat_apply(rot, pos - an), quat_mul(rot, quat)], -1), env_ids=ids)
+        vel = body.data.root_vel_w[ids].clone()
+        door_w = self._joint_bodies()[int(c.latch_door_joint)].data.root_vel_w[ids, 3:6]
+        rel = ((vel[:, 3:6] - door_w) * ax).sum(-1)
+        cap = math.radians(float(c.latch_knob_max_deg_s))
+        vel[:, 3:6] -= (rel - rel.clamp(-cap, cap)).unsqueeze(-1) * ax
+        body.write_root_velocity_to_sim(vel, env_ids=ids)
+        self.cb_joint_angle[kj, ids] -= excess[ids]
 
     def _tactile_object_pose(self):
         """Object (pos, quat) the fingertip tactile ray-casts against, or None (= the real pose). Door latch
@@ -765,6 +808,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._soft_stop_hits[env_ids] = 0.0
             self.latch_dwell[env_ids] = 0
             self.latch_in_window[env_ids] = False
+            if hasattr(self, "_knob_cap_prev"):
+                self._knob_cap_prev[env_ids] = float("nan")
+                self._knob_cap_hits[env_ids] = 0.0
             if hasattr(self, "_latch_bonus_paid"):
                 self._latch_bonus_paid[env_ids] = False
             if hasattr(self, "_latch_prev_knob"):

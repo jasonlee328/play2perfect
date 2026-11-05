@@ -173,6 +173,10 @@ class PreciseAssemblyCfg:
     # leaks with many envs under the hand (11-03: 0 / 256 envs vs 2294 / 4096 envs forced open with the keeper in
     # place, cause not found in the PhysX buffers), so training at 12288 envs needs this.
     latch_soft_stop_deg: float = 0.0
+    # Knob speed cap (0 = off): while the latch is closed, every physics substep the knob's spin about its axis
+    # (relative to the door) is clamped to <= latch_knob_max_deg_s, so a policy has time to react to the window cue.
+    # Same for every theta (joint state carries no theta information).
+    latch_knob_max_deg_s: float = 0.0
     # The door goal (last waypoint) counts only if the latch cleared this episode (latch_open_ep).
     latch_success_requires_open: bool = True
     # Forced-door fail (0 = off): every policy step the latch is closed with the door hinge >= latch_force_deg (i.e.
