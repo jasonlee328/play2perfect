@@ -625,9 +625,14 @@ class PreciseAssemblyEnv(PlayEnv):
                 e = 1.0 - (1.0 - max_err) * (f if rs > 0 else 1.0)
                 capped = q + torch.clamp(capped - q, -e, e)
                 self.extras["slow/max_err"] = e
-            self._cur_targets[:] = torch.where(feel, capped, self._cur_targets)
             H = int(getattr(self.cfg.reward, "slow_touch_arm_hold_steps", 0))
             sc = st.get("since_contact")
+            thru = bool(getattr(self.cfg.reward, "slow_touch_hold_through_lift", False))
+            if H > 0 and sc is not None and thru:
+                # the hold window (and the hand cap) also run after the object starts to rise, so a finger roll can't end it
+                win = ((sc >= 0) & (sc < H * f)).unsqueeze(1)
+                feel = feel | win
+            self._cur_targets[:] = torch.where(feel, capped, self._cur_targets)
             if H > 0 and sc is not None:
                 if not hasattr(self, "_arm_joint_ids"):
                     self._arm_joint_ids = torch.tensor([i for i, n in enumerate(self.robot.joint_names) if n.startswith("iiwa14_joint")],
