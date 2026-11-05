@@ -410,6 +410,10 @@ class RewardCfg:
     # A resume restarts the env step counter, so set slow_touch_rate_offset_steps to continue a ramp.
     slow_touch_rate_ramp_steps: int = 0
     slow_touch_rate_offset_steps: int = 0
+    # arm hold: for the first slow_touch_arm_hold_steps policy steps after the episode's first contact (pad / skin, not
+    # the near zone), while the object has not risen, the 7 arm joint targets stay where they were (hand still capped
+    # by slow_touch_rate), so a lift needs at least that long after first touch. Ramped like the rate (same ramp/offset).
+    slow_touch_arm_hold_steps: int = 0
     # also in the feel phase: keep every joint target within slow_touch_max_err rad of the actual joint position (0 = off),
     # so targets set before contact can't keep driving the hand fast (PD tracking lag). Ramped with the rate cap.
     slow_touch_max_err: float = 0.0
