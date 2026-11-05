@@ -873,6 +873,8 @@ class PreciseAssemblyEnv(PlayEnv):
                         self.latch_check_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
                         self._latch_quiet = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
                         self._latch_prev_loaded = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                    # a pull = door up to the keeper (rest + latch_force_deg), like the tug count; light loads are free
+                    door_loaded = door >= rest + math.radians(float(c.latch_force_deg))
                     onset = door_loaded & ~self._latch_prev_loaded & ~self.latch_open
                     chk = onset & (self._latch_quiet >= int(c.latch_dwell_steps))
                     self.latch_check_count += chk.long()
