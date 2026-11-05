@@ -626,6 +626,18 @@ class PreciseAssemblyEnv(PlayEnv):
                 capped = q + torch.clamp(capped - q, -e, e)
                 self.extras["slow/max_err"] = e
             self._cur_targets[:] = torch.where(feel, capped, self._cur_targets)
+            H = int(getattr(self.cfg.reward, "slow_touch_arm_hold_steps", 0))
+            sc = st.get("since_contact")
+            if H > 0 and sc is not None:
+                if not hasattr(self, "_arm_joint_ids"):
+                    self._arm_joint_ids = torch.tensor([i for i, n in enumerate(self.robot.joint_names) if n.startswith("iiwa14_joint")],
+                                                       device=self.device, dtype=torch.long)
+                hreq = H * f
+                hold = (feel.squeeze(1) & (sc >= 0) & (sc < hreq)).unsqueeze(1)
+                a = self._arm_joint_ids
+                self._cur_targets[:, a] = torch.where(hold, prev[:, a], self._cur_targets[:, a])
+                self.extras["slow/arm_hold_req"] = float(hreq)
+                self.extras["slow/arm_hold_share"] = float(hold.float().mean())
             self._prev_targets = self._cur_targets.clone()
         self._apply_joint_detents()
 

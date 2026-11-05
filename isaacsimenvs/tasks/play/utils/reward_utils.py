@@ -209,11 +209,13 @@ def slow_touch_reward(env) -> torch.Tensor:
     st = getattr(env, "_slow_state", None)
     if st is None or st["touched"].shape[0] != N:
         st = {"touched": torch.zeros(N, dtype=torch.bool, device=dev), "lifted": torch.zeros(N, dtype=torch.bool, device=dev),
-              "steps": zero.clone(), "feel": zero.clone(), "lift_ok": torch.zeros(N, dtype=torch.bool, device=dev)}
+              "steps": zero.clone(), "feel": zero.clone(), "lift_ok": torch.zeros(N, dtype=torch.bool, device=dev),
+              "c0": torch.full((N,), -1.0, device=dev)}
     for k in ("touched", "lifted", "lift_ok"):
         st[k] = st[k] & ~fresh
     for k in ("steps", "feel"):
         st[k] = torch.where(fresh, zero, st[k])
+    st["c0"] = torch.where(fresh, torch.full_like(zero, -1.0), st["c0"])
     rise = env.object.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2] - env._object_init_z
     up = rise > rc.contact_gate_rise
     near_m = float(getattr(rc, "slow_touch_near_m", 0.0))
@@ -225,6 +227,9 @@ def slow_touch_reward(env) -> torch.Tensor:
     qd = env.robot.data.joint_vel.abs().mean(-1)
     speed = palm_v + float(rc.slow_touch_joint_weight) * qd
     st["steps"] = st["steps"] + (feel & on).float()
+    t_ep = env.episode_length_buf.float()
+    st["c0"] = torch.where((st["c0"] < 0) & on & ~st["lifted"], t_ep, st["c0"])
+    st["since_contact"] = torch.where(st["c0"] >= 0, t_ep - st["c0"], torch.full_like(zero, -1.0))
     st["feel"] = st["feel"] + feel.float()
     D = max(int(rc.slow_touch_dwell_steps), 1)
     dwell = torch.clamp(st["steps"], max=D) / D
