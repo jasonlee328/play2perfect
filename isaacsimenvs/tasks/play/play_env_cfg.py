@@ -415,6 +415,7 @@ class RewardCfg:
     # arm hold: for the first slow_touch_arm_hold_steps policy steps after the episode's first contact (pad / skin, not
     # keep the arm hold + hand cap for the whole window even after the object rises (else a finger roll ends it)
     slow_touch_hold_through_lift: bool = False
+    slow_touch_cap_window_steps: int = 0
     # the near zone), while the object has not risen, the 7 arm joint targets stay where they were (hand still capped
     # by slow_touch_rate), so a lift needs at least that long after first touch. Ramped like the rate (same ramp/offset).
     slow_touch_arm_hold_steps: int = 0

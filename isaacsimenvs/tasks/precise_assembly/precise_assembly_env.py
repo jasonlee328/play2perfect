@@ -632,6 +632,12 @@ class PreciseAssemblyEnv(PlayEnv):
                 # the hold window (and the hand cap) also run after the object starts to rise, so a finger roll can't end it
                 win = ((sc >= 0) & (sc < H * f)).unsqueeze(1)
                 feel = feel | win
+            W = int(getattr(self.cfg.reward, "slow_touch_cap_window_steps", 0))
+            if W > 0 and sc is not None:
+                # contact-time cap: the hand/arm rate cap runs for exactly the first W steps after first contact
+                # (lifted or not), then is off, so the feel time can't be shortened and the lift itself isn't slowed
+                feel = ((sc >= 0) & (sc < W)).unsqueeze(1)
+                self.extras["slow/cap_window_share"] = float(feel.float().mean())
             self._cur_targets[:] = torch.where(feel, capped, self._cur_targets)
             if H > 0 and sc is not None:
                 if not hasattr(self, "_arm_joint_ids"):
