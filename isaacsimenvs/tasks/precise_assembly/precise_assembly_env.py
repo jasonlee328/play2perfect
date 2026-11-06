@@ -930,7 +930,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.latch_cue_frac = torch.where(d > math.radians(w_deg), torch.zeros_like(frac), frac)
             else:
                 self.latch_cue_frac = in_win.float()
-            new = torch.where(self.latch_open, ~(closed & ~in_win), unlocked)
+            keep_win = in_win
+            if float(c.latch_relock_over_deg) > 0.0:
+                keep_win = (d >= -math.radians(float(c.latch_window_deg))) & (
+                    d <= math.radians(w_deg + float(c.latch_relock_over_deg)))
+            new = torch.where(self.latch_open, ~(closed & ~keep_win), unlocked)
             if c.latch_relock_on_motion and hasattr(self, "_latch_motion_relock"):
                 new = new & ~(self.latch_open & self._latch_motion_relock)
             self._apply_latch_pop(in_win & ~new, door)

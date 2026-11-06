@@ -227,6 +227,9 @@ class PreciseAssemblyCfg:
     # True: an open latch re-locks when the knob moves faster than latch_still_deg_s while the door is still below
     # latch_reengage_deg, so a useful pull must start from a still knob (closes the dwell-twitch-pull loophole).
     latch_relock_on_motion: bool = False
+    # once open, the latch only relocks (door closed) if the knob leaves [theta-window, theta+w+relock_over_deg]:
+    # an overshoot right after the release does not relock it (0 = old behaviour)
+    latch_relock_over_deg: float = 0.0
     # > 0: touch-only latch cue. While the knob is in the unlock window and the latch is still closed, the fingertip
     # tactile ray-casts the knob shifted latch_tactile_pop_mm up along world z (into the grip); physics is unchanged,
     # so joint state carries nothing. Use with latch_pop_deg=0 (no physical pop).
