@@ -232,6 +232,20 @@ def main() -> None:
         agent_cfg["params"]["config"]["device"] = args_cli.rl_device
         agent_cfg["params"]["config"]["device_name"] = args_cli.rl_device
 
+        # Teacher distillation (doorlatch): P2P_STUDENT_MASK_FIELDS=latch_cue[,tactile] zeroes these obs_list
+        # fields in the student's (actor's) input; rl_games a2c reads the columns from P2P_STUDENT_MASK_COLS.
+        mf = [f for f in os.environ.get("P2P_STUDENT_MASK_FIELDS", "").split(",") if f]
+        if mf:
+            from isaacsimenvs.tasks.play.utils.obs_utils import OBS_FIELD_SIZES
+            fl = list(env.unwrapped.cfg.obs.obs_list)
+            cols = []
+            for f in mf:
+                if f not in fl:
+                    raise ValueError(f"P2P_STUDENT_MASK_FIELDS: {f} not in obs_list {fl}")
+                a = sum(OBS_FIELD_SIZES[g] for g in fl[:fl.index(f)])
+                cols.append(f"{a}:{a + OBS_FIELD_SIZES[f]}")
+            os.environ["P2P_STUDENT_MASK_COLS"] = ",".join(cols)
+            print(f"[distill] student mask {mf} -> cols {os.environ['P2P_STUDENT_MASK_COLS']}", flush=True)
         runner.load(agent_cfg)
         runner.reset()
         runner.run(

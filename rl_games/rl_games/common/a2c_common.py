@@ -423,6 +423,8 @@ class A2CBase(BaseAlgorithm):
         self.writer.add_scalar('performance/step_inference_time', play_time, frame)
         self.writer.add_scalar('performance/step_time', step_time, frame)
         self.writer.add_scalar('losses/a_loss', torch_ext.mean_list(a_losses).item(), frame)
+        if getattr(self, '_teacher', None) is not None:
+            self.writer.add_scalar('losses/distill', float(getattr(self, '_distill_last', 0.0)), frame)
         self.writer.add_scalar('losses/c_loss', torch_ext.mean_list(c_losses).item(), frame)
 
         self.writer.add_scalar('losses/entropy', torch_ext.mean_list(entropies).item(), frame)
@@ -862,6 +864,53 @@ class A2CBase(BaseAlgorithm):
                 obs_batch = obs_batch.float() / 255.0
         return obs_batch
 
+    # ---- teacher distillation (P2P_DISTILL_TEACHER / P2P_DISTILL_COEF / P2P_STUDENT_MASK_COLS) ----
+    def _distill_setup(self):
+        if getattr(self, "_distill_ready", False):
+            return
+        self._distill_ready = True
+        cols = [c for c in os.environ.get("P2P_STUDENT_MASK_COLS", "").split(",") if c]
+        self._student_mask = [tuple(int(x) for x in c.split(":")) for c in cols]
+        self._distill_coef = float(os.environ.get("P2P_DISTILL_COEF", "0"))
+        self._teacher = None
+        tp = os.environ.get("P2P_DISTILL_TEACHER", "")
+        if tp and self._distill_coef > 0:
+            from rl_games.algos_torch import torch_ext as _te
+            ck = _te.load_checkpoint(tp)
+            w = ck[0] if 0 in ck else ck
+            self._teacher = self.network.build(self._build_config)
+            self._teacher.to(self.ppo_device)
+            self._teacher.load_state_dict(w["model"])
+            self._teacher.eval()
+            for p_ in self._teacher.parameters():
+                p_.requires_grad_(False)
+            self._t_rnn = [s.to(self.ppo_device) for s in self._teacher.get_default_rnn_state()] if self._teacher.is_rnn() else None
+            self._t_mu = None
+            print(f"[distill] teacher {tp} coef {self._distill_coef} mask {self._student_mask}", flush=True)
+        self._distill_last = 0.0
+
+    def _student_obs(self, obs):
+        if not self._student_mask:
+            return obs
+        o = obs["obs"].clone()
+        for a, b in self._student_mask:
+            o[:, a:b] = 0.0
+        out = dict(obs)
+        out["obs"] = o
+        return out
+
+    def _teacher_mu(self, obs):
+        o = obs["obs"].clone()
+        if self.intr_reward_coef_embd is not None:
+            # label with the teacher's no-exploration block (last env's id = block 0)
+            e = self.intr_reward_coef_embd.shape[-1]
+            o[:, -e:] = self.intr_reward_coef_embd[-1:].expand(o.shape[0], -1)
+        with torch.no_grad():
+            r = self._teacher({"is_train": False, "prev_actions": None, "obs": self._preproc_obs(o), "rnn_states": self._t_rnn})
+        if self._t_rnn is not None:
+            self._t_rnn = r["rnn_states"]
+        return r["mus"]
+
     def play_steps(self):
         update_list = self.update_list
         step_time = 0.0
@@ -870,6 +919,9 @@ class A2CBase(BaseAlgorithm):
             mb_rnn_states = self.mb_rnn_states
             rnn_state_buffer = [torch.zeros((self.horizon_length, *s.shape), dtype=s.dtype, device=s.device) for s in self.rnn_states]
 
+        self._distill_setup()
+        if self._teacher is not None and (self._t_mu is None or self._t_mu.shape[0] != self.horizon_length):
+            self._t_mu = torch.zeros((self.horizon_length, self.num_actors * self.num_agents, self.actions_num), device=self.ppo_device)
         for n in range(self.horizon_length):
             if self.is_rnn:
                 if n % self.seq_length == 0:
@@ -886,11 +938,13 @@ class A2CBase(BaseAlgorithm):
                 masks = self.vec_env.get_action_masks()
                 res_dict = self.get_masked_action_values(self.obs, masks)
             else:
-                res_dict = self.get_action_values(self.obs, self.rnn_states)
+                res_dict = self.get_action_values(self._student_obs(self.obs), self.rnn_states)
+            if self._teacher is not None:
+                self._t_mu[n] = self._teacher_mu(self.obs)
 
             if self.is_rnn:
                 self.rnn_states = res_dict['rnn_states']
-            self.experience_buffer.update_data('obses', n, self.obs['obs'])
+            self.experience_buffer.update_data('obses', n, self._student_obs(self.obs)['obs'])
             self.experience_buffer.update_data('dones', n, self.dones.byte())
 
             for k in update_list:
@@ -923,6 +977,9 @@ class A2CBase(BaseAlgorithm):
                 if self.zero_rnn_on_done:
                     for s in self.rnn_states:
                         s[:, all_done_indices, :] = s[:, all_done_indices, :] * 0.0
+                    if self._teacher is not None and self._t_rnn is not None:
+                        for s in self._t_rnn:
+                            s[:, all_done_indices, :] = s[:, all_done_indices, :] * 0.0
                 if self.has_central_value:
                     self.central_value_net.post_step_rnn(all_done_indices)
 
@@ -939,7 +996,7 @@ class A2CBase(BaseAlgorithm):
             self.current_shaped_rewards = self.current_shaped_rewards * not_dones.unsqueeze(1)
             self.current_lengths = self.current_lengths * not_dones
 
-        last_values = self.get_values(self.obs, self.rnn_states)
+        last_values = self.get_values(self._student_obs(self.obs), self.rnn_states)
 
         fdones = self.dones.float()
         mb_fdones = self.experience_buffer.tensor_dict['dones'].float()
@@ -958,6 +1015,8 @@ class A2CBase(BaseAlgorithm):
 
         batch_dict['returns'] = swap_and_flatten01(mb_returns)
         batch_dict['played_frames'] = self.batch_size
+        if self._teacher is not None:
+            batch_dict['teacher_mu'] = swap_and_flatten01(self._t_mu)
         if self.is_rnn:
             states = []
             for mb_s in mb_rnn_states:
@@ -971,7 +1030,7 @@ class A2CBase(BaseAlgorithm):
         extras = {
             'rewards' : mb_rewards, 
             'obs' : self.experience_buffer.tensor_dict['obses'], 
-            'last_obs' : self.obs,
+            'last_obs' : self._student_obs(self.obs),
             'states' : self.experience_buffer.tensor_dict.get('states', None),
             'dones' : mb_fdones,
             'last_dones' : fdones,
@@ -1206,6 +1265,8 @@ class DiscreteA2CBase(A2CBase):
         dataset_dict['dones'] = dones
         dataset_dict['rnn_states'] = rnn_states
         dataset_dict['rnn_masks'] = rnn_masks
+        if 'teacher_mu' in batch_dict:
+            dataset_dict['teacher_mu'] = batch_dict['teacher_mu']
 
         if self.use_action_masks:
             dataset_dict['action_masks'] = batch_dict['action_masks']
@@ -1524,6 +1585,8 @@ class ContinuousA2CBase(A2CBase):
         dataset_dict['dones'] = dones
         dataset_dict['rnn_states'] = rnn_states
         dataset_dict['rnn_masks'] = rnn_masks
+        if 'teacher_mu' in batch_dict:
+            dataset_dict['teacher_mu'] = batch_dict['teacher_mu']
         dataset_dict['mu'] = mus
         dataset_dict['sigma'] = sigmas
         dataset_dict['off_policy_mask'] = batch_dict.get('off_policy_mask', None)

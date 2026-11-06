@@ -34,6 +34,7 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
             build_config['coef_ids'] = self.intr_reward_coef_embd[::self.intr_coef_block_size,0]
             build_config['coef_id_idx'] = self.obs_shape[0]
         
+        self._build_config = build_config
         self.model = self.network.build(build_config)
         self.model.to(self.ppo_device)
         self.states = None
@@ -173,6 +174,11 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
             a_loss, c_loss, entropy_loss, b_loss = losses[0], losses[1], losses[2], losses[3]
 
             loss = a_loss + 0.5 * c_loss * self.critic_coef - entropy_loss + b_loss * self.bounds_loss_coef
+            if 'teacher_mu' in input_dict and getattr(self, '_distill_coef', 0.0) > 0:
+                d_loss = ((mu - input_dict['teacher_mu'].detach()) ** 2).sum(-1, keepdim=True)
+                d_loss = torch_ext.apply_masks([d_loss], rnn_masks)[0][0]
+                loss = loss + self._distill_coef * d_loss
+                self._distill_last = float(d_loss.detach())
 
             if self.multi_gpu:
                 self.optimizer.zero_grad()
