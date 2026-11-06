@@ -339,6 +339,10 @@ class PreciseAssemblyEnv(PlayEnv):
             OBS_FIELD_SIZES["latch_hint"] = 2
             if "latch_hint" not in cfg.obs.obs_list:
                 cfg.obs.obs_list = (*cfg.obs.obs_list, "latch_hint")
+            if cfg.precise_assembly.latch_cue_obs:
+                OBS_FIELD_SIZES["latch_cue"] = 3
+                if "latch_cue" not in cfg.obs.obs_list:
+                    cfg.obs.obs_list = (*cfg.obs.obs_list, "latch_cue")
         if cfg.precise_assembly.latch_critic_obs and int(cfg.precise_assembly.latch_door_joint) >= 0:
             OBS_FIELD_SIZES["latch_state"] = 5
             if "latch_state" not in cfg.obs.state_list:

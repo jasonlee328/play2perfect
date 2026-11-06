@@ -186,6 +186,11 @@ class PreciseAssemblyCfg:
     latch_hint_ramp_steps: int = 0
     latch_hint_offset_steps: int = 0
     latch_hint_final: float = 0.0
+    # Cue mode: actor field "latch_cue" = [knob in window * m, latch open * m, m] with the same per-episode m as the
+    # hint (needs latch_hint_obs=true for the m schedule). latch_hint_theta=false zeroes theta in latch_hint
+    # ([0, m]) so only the cue is privileged. Warm-start with P2P_NEW_OBS_FIELD=latch_cue.
+    latch_cue_obs: bool = False
+    latch_hint_theta: bool = True
     # The door goal (last waypoint) counts only if the latch cleared this episode (latch_open_ep).
     latch_success_requires_open: bool = True
     # Forced-door fail (0 = off): every policy step the latch is closed with the door hinge >= latch_force_deg (i.e.

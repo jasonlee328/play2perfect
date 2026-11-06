@@ -358,9 +358,20 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         n = env.num_envs
         if getattr(env, "unlock_angle", None) is not None and hasattr(env, "latch_hint_on"):
             m = env.latch_hint_on.float()
-            obs_clean["latch_hint"] = torch.stack([env.unlock_angle / math.radians(90.0) * m, m], dim=-1)
+            th = env.unlock_angle / math.radians(90.0)
+            if not bool(getattr(env.cfg.precise_assembly, "latch_hint_theta", True)):
+                th = torch.zeros_like(th)
+            obs_clean["latch_hint"] = torch.stack([th * m, m], dim=-1)
         else:
             obs_clean["latch_hint"] = torch.zeros(n, 2, device=env.device)
+
+    if "latch_cue" in OBS_FIELD_SIZES:
+        n = env.num_envs
+        if hasattr(env, "latch_hint_on") and hasattr(env, "latch_open") and hasattr(env, "latch_in_window"):
+            m = env.latch_hint_on.float()
+            obs_clean["latch_cue"] = torch.stack([env.latch_in_window.float() * m, env.latch_open.float() * m, m], dim=-1)
+        else:
+            obs_clean["latch_cue"] = torch.zeros(n, 3, device=env.device)
 
     if "latch_state" in OBS_FIELD_SIZES and getattr(env, "_pih_joints", ()):
         n = env.num_envs
