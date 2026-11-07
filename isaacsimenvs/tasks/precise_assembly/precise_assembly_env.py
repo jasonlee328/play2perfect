@@ -832,6 +832,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.latch_check_count[env_ids] = 0
                 self._latch_quiet[env_ids] = 0
                 self._latch_prev_loaded[env_ids] = False
+            if hasattr(self, "_latch_armed"):
+                self._latch_armed[env_ids] = False
             if hasattr(self, "latch_overturned"):
                 self.latch_overturned[env_ids] = False
             if hasattr(self, "latch_false_stop"):
@@ -890,13 +892,21 @@ class PreciseAssemblyEnv(PlayEnv):
                     # a pull = door up to the keeper (rest + latch_force_deg), like the tug count; light loads are free
                     door_loaded = door >= rest + math.radians(float(c.latch_force_deg))
                     onset = door_loaded & ~self._latch_prev_loaded & ~self.latch_open
-                    chk = onset & (self._latch_quiet >= int(c.latch_dwell_steps))
+                    if getattr(c, "latch_check_quiet_light", False):
+                        # armed once a dwell-eligible run completes; stays armed (through light loads) until the knob moves
+                        if not hasattr(self, "_latch_armed"):
+                            self._latch_armed = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                        chk = onset & (self._latch_armed | (self._latch_quiet >= int(c.latch_dwell_steps)))
+                    else:
+                        chk = onset & (self._latch_quiet >= int(c.latch_dwell_steps))
                     self.latch_check_count += chk.long()
                     # quiet = a step that would advance the latch dwell (still and below the light-load margin);
                     # with latch_check_quiet_light a lightly loaded hold is not quiet: no pull after it can be informative
                     q_ok = ~moving & (~loaded if getattr(c, "latch_check_quiet_light", False) else ~door_loaded)
                     self._latch_quiet = torch.where(q_ok, self._latch_quiet + 1,
                                                     torch.zeros_like(self._latch_quiet))
+                    if getattr(c, "latch_check_quiet_light", False):
+                        self._latch_armed = (self._latch_armed | (self._latch_quiet >= int(c.latch_dwell_steps))) & ~moving
                     self._latch_prev_loaded = door_loaded
                     self.extras["latch_check_count_mean"] = self.latch_check_count.float().mean()
                 if c.latch_relock_on_motion:
