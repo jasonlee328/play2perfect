@@ -243,6 +243,9 @@ class PreciseAssemblyCfg:
     # tactile ray-casts the knob shifted latch_tactile_pop_mm up along world z (into the grip); physics is unchanged,
     # so joint state carries nothing. Use with latch_pop_deg=0 (no physical pop).
     latch_tactile_pop_mm: float = 0.0
+    # != 0: touch-only release click. While the latch is open (and the door still closed) the tactile ray-casts the knob
+    # shifted this many mm along world z (negative = down, distinct from the pop cue); physics unchanged.
+    latch_tactile_open_mm: float = 0.0
     # > 0: the touch cue ramps up over this many degrees below the window (graded approach cue, touch only)
     latch_tactile_ramp_deg: float = 0.0
     latch_keeper: int = -1
