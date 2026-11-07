@@ -776,7 +776,17 @@ class PreciseAssemblyEnv(PlayEnv):
     def _apply_latch_pop(self, pop: torch.Tensor, door: torch.Tensor) -> None:
         """Felt cue: lift the door to latch_pop_deg (bang-bang torque about the hinge) where pop is set."""
         c = self.cfg.precise_assembly
+        close_tau = float(getattr(c, "latch_door_close_torque", 0.0))
         if float(c.latch_pop_deg) <= 0.0:
+            if close_tau <= 0.0:
+                return
+            # door closer: constant torque about the hinge pushing the door shut (theta-independent physics)
+            jd = self._pih_joints[int(c.latch_door_joint)]
+            body = self._joint_bodies()[int(c.latch_door_joint)]
+            axis_w = quat_apply(self.hole_quat_wxyz, torch.tensor(jd.axis, device=self.device,
+                                                                  dtype=torch.float32).expand(self.num_envs, 3))
+            torque = (-close_tau * axis_w).unsqueeze(1)
+            body.set_external_force_and_torque(torch.zeros_like(torque), torque, is_global=True)
             return
         jd = self._pih_joints[int(c.latch_door_joint)]
         body = self._joint_bodies()[int(c.latch_door_joint)]

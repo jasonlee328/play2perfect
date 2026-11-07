@@ -270,6 +270,8 @@ class PreciseAssemblyCfg:
     # kp (pop - door) - kd * door speed, clamped >= 0 (bang-bang at one update per policy step overshoots).
     latch_pop_kp: float = 0.0
     latch_pop_kd: float = 0.0
+    # door closer torque (N m) about the hinge, always on (needs latch_pop_deg=0)
+    latch_door_close_torque: float = 0.0
     # One-time reward when the latch clears (privileged); critic-only field latch_state (theta / 90 deg, knob in
     # window, dwell fraction, latch open, door angle / 10 deg), never in the actor's obs_list.
     latch_unlock_bonus: float = 0.0
