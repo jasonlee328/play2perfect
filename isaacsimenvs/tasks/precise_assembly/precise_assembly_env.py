@@ -1610,7 +1610,7 @@ class PreciseAssemblyEnv(PlayEnv):
             if over_deg > 0.0:
                 # two-sided: the potential falls past theta (1 per over_deg of over-turn), so overshoot costs reward
                 over = (knob - self.unlock_angle).clamp(min=0.0) / math.radians(over_deg)
-                phi = phi - over.clamp(max=2.0)
+                phi = phi - over.clamp(max=float(getattr(pih_cfg, "latch_approach_over_cap", 2.0)))
             if not hasattr(self, "_latch_phi_prev"):
                 self._latch_phi_prev = phi.clone()
             gate = (~self.latch_open_ep).float()
