@@ -721,7 +721,7 @@ class PreciseAssemblyEnv(PlayEnv):
             return None
         cue = getattr(self, "latch_cue_frac", self.latch_in_window.float()) * (~self.latch_open).float()
         dz = cue * (mm * 1e-3)
-        if om != 0.0:
+        if om != 0.0 and hasattr(self, "cb_joint_angle"):
             door = self.cb_joint_angle[int(self.cfg.precise_assembly.latch_door_joint)]
             shut = door < math.radians(float(self.cfg.precise_assembly.latch_soft_stop_deg) + 0.5)
             dz = dz + (self.latch_open & shut).float() * (om * 1e-3)
