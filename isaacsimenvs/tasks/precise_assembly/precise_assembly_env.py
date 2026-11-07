@@ -1584,7 +1584,13 @@ class PreciseAssemblyEnv(PlayEnv):
                 phi = phi - over.clamp(max=2.0)
             if not hasattr(self, "_latch_phi_prev"):
                 self._latch_phi_prev = phi.clone()
-            ar = float(pih_cfg.latch_approach_rew_scale) * (phi - self._latch_phi_prev) * (~self.latch_open_ep).float()
+            gate = (~self.latch_open_ep).float()
+            if bool(getattr(pih_cfg, "latch_approach_after_open", False)):
+                # keep the over-turn part of the potential after the latch opened (until the door is open)
+                dj = int(getattr(pih_cfg, "latch_door_joint", -1))
+                still = (self.cb_joint_angle[dj] < math.radians(5.0)).float() if dj >= 0 else torch.ones_like(gate)
+                gate = gate + (1.0 - gate) * still * ((phi - self._latch_phi_prev) < 0).float()
+            ar = float(pih_cfg.latch_approach_rew_scale) * (phi - self._latch_phi_prev) * gate
             self._latch_phi_prev = phi.clone()
             reward = reward + ar
             self._reward_terms["latch_approach_rew"] = ar

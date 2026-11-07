@@ -222,6 +222,8 @@ class PreciseAssemblyCfg:
     latch_approach_rew_scale: float = 0.0
     # > 0: the approach potential also falls past theta (by 1 per latch_approach_over_deg of over-turn, capped at -2)
     latch_approach_over_deg: float = 0.0
+    # keep only the falling (over-turn) part of the approach potential after the latch opened, until the door is open
+    latch_approach_after_open: bool = False
     # True: the forced-door fail counts consecutive tug steps (reset when the door drops back), not the episode total
     latch_force_consecutive: bool = False
     # > 0: check-pull fail (replaces the cumulative tug budget; set latch_force_fail_steps=0). A check pull = the door
