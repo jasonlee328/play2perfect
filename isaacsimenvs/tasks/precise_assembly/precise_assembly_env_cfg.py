@@ -234,6 +234,8 @@ class PreciseAssemblyCfg:
     # True: an open latch re-locks when the knob moves faster than latch_still_deg_s while the door is still below
     # latch_reengage_deg, so a useful pull must start from a still knob (closes the dwell-twitch-pull loophole).
     latch_relock_on_motion: bool = False
+    # check-pull quiet steps use the latch dwell load margin (latch_load_margin_deg), not latch_force_deg
+    latch_check_quiet_light: bool = False
     # once open, the latch only relocks (door closed) if the knob leaves [theta-window, theta+w+relock_over_deg]:
     # an overshoot right after the release does not relock it (0 = old behaviour)
     latch_relock_over_deg: float = 0.0

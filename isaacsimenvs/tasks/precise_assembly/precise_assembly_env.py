@@ -892,7 +892,10 @@ class PreciseAssemblyEnv(PlayEnv):
                     onset = door_loaded & ~self._latch_prev_loaded & ~self.latch_open
                     chk = onset & (self._latch_quiet >= int(c.latch_dwell_steps))
                     self.latch_check_count += chk.long()
-                    self._latch_quiet = torch.where(~moving & ~door_loaded, self._latch_quiet + 1,
+                    # quiet = a step that would advance the latch dwell (still and below the light-load margin);
+                    # with latch_check_quiet_light a lightly loaded hold is not quiet: no pull after it can be informative
+                    q_ok = ~moving & (~loaded if getattr(c, "latch_check_quiet_light", False) else ~door_loaded)
+                    self._latch_quiet = torch.where(q_ok, self._latch_quiet + 1,
                                                     torch.zeros_like(self._latch_quiet))
                     self._latch_prev_loaded = door_loaded
                     self.extras["latch_check_count_mean"] = self.latch_check_count.float().mean()
