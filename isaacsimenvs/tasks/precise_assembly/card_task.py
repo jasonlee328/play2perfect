@@ -183,8 +183,17 @@ class CardTask:
         F_rd = torch.stack([v.get_contact_force_matrix(dt).to(env.device).norm(dim=-1).sum(-1) for v in self.v_rob_deck], -1) \
             if self.v_rob_deck else torch.zeros(env.num_envs, 1, device=env.device)
         tips = F_rc[:, self.tip_ids] > c.card_pad_force
-        pinch = tips[:, 0] & (tips[:, 1:].sum(-1) >= 1)
+        pinch_f = tips[:, 0] & (tips[:, 1:].sum(-1) >= 1)
         f_robot_card = F_rc.sum(-1)
+        # the force view reads one substep and flickers on a held card (A10 11-17: 0 N for 15+ steps while the card
+        # stayed in the pinch), so pad contact also comes from the TacMap ray-cast (FINGERS: thumb, index, middle, ...)
+        tac_on = None
+        if getattr(env, "_tactile", None) is not None:
+            T = env._tactile.compute().view(env.num_envs, 5, -1)
+            tac_on = T.amax(-1) > 0.0
+            pinch = pinch_f | (tac_on[:, 0] & (tac_on[:, 1] | tac_on[:, 2]))
+        else:
+            pinch = pinch_f
         self.f_env = F_ce.sum(-1)
         self.f_env_ep_max = torch.maximum(self.f_env_ep_max, self.f_env)
         f_rob_scene = f_robot_card + F_rd.sum(-1)
@@ -215,7 +224,7 @@ class CardTask:
         # card + deck in the receptive frame
         pc, qc = self._rel_hole(op, oq)
         bot = self._pts(pc, qc, self.bottom)
-        free = f_robot_card < c.card_clear_force
+        free = (f_robot_card < c.card_clear_force) if tac_on is None else (f_robot_card < c.card_clear_force) & ~tac_on.any(-1)
         self.nocontact = torch.where(free, self.nocontact + 1, torch.zeros_like(self.nocontact))
         # release = pads off the card for card_release_steps AND the card moved > 2 mm in the hand frame (a real
         # release: it slides / drops), or no contact at all for 15 steps; a few contact-free substep reads while the
