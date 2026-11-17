@@ -137,8 +137,16 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_drag_scale_np = scale
         self._key_tau_f_np = np.asarray(cbf["drag_Nm"], dtype=np.float64) * scale
         k = int(self.cfg.precise_assembly.unlock_joint)
+        stops = np.asarray(cbf["stop_deg"], dtype=np.float64)
+        self._key_soft_stop_np = stops > 179.0
         for i in range(n):
             jp = stage.GetPrimAtPath(f"/World/envs/env_{i}/FixtureJoint{k}")
+            if self._key_soft_stop_np[i]:
+                # PhysX clamps a revolute D6 limit to 180 deg ("Upper angle limit ... clamped to 180 degrees"): the
+                # 270 / 360 deg locks get no USD limits; both stops are enforced in software (_key_soft_stop)
+                for nm in ("physics:lowerLimit", "physics:upperLimit"):
+                    if jp.HasAttribute(nm):
+                        jp.RemoveProperty(nm)
             drive = UsdPhysics.DriveAPI.Apply(jp, "angular")
             drive.CreateTypeAttr("force")
             drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
@@ -235,9 +243,55 @@ class KeyLockEnv(PreciseAssemblyEnv):
         return quat_from_angle_axis(-ang, axis_w), axis_w
 
     # ---- physics substep: hinge probes (replaces the knob spring correction of latch_cbf) ----------------------
+    def _key_soft_stop(self) -> None:
+        """Locks whose stop is past 179 deg: pose-level stops on the unwrapped key angle, every physics substep. Past
+        the plug stop (or below the lower limit) the key is rotated back about the lock axis by the excess and its
+        spin in that direction removed (a velocity / torque stop is out-pushed by the hand)."""
+        if not hasattr(self, "_key_soft_stop_t"):
+            self._key_soft_stop_t = torch.as_tensor(self._key_soft_stop_np, device=self.device)
+            self._key_stop_hi = torch.as_tensor(np.radians(self._cbf["stop_deg"]), device=self.device, dtype=torch.float32)
+            j = self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)]
+            self._key_stop_lo = math.radians(float(j.lower_deg if j.lower_deg is not None else -1.0))
+        if not bool(self._key_soft_stop_t.any()):
+            return
+        c = self.cfg.precise_assembly
+        k = int(c.unlock_joint)
+        ang = self.cb_joint_angle[k]
+        over = torch.where(ang > self._key_stop_hi, ang - self._key_stop_hi,
+                           torch.where(ang < self._key_stop_lo, ang - self._key_stop_lo, torch.zeros_like(ang)))
+        over = torch.where(self._key_soft_stop_t, over, torch.zeros_like(over))
+        ids = (over != 0).nonzero(as_tuple=False).squeeze(-1)
+        if ids.numel() == 0:
+            return
+        from isaaclab.utils.math import quat_from_angle_axis, quat_mul
+        j = self._pih_joints[k]
+        door = self.distractors[int(j.parent[10:])]
+        dq = door.data.root_quat_w[ids]
+        ax = quat_apply(dq, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(ids.numel(), 3))
+        an = door.data.root_pos_w[ids] + quat_apply(dq, torch.tensor(j.anchor, device=self.device, dtype=torch.float32).expand(ids.numel(), 3))
+        rot = quat_from_angle_axis(-over[ids], ax)
+        pos, quat = self.object.data.root_pos_w[ids], self.object.data.root_quat_w[ids]
+        self.object.write_root_pose_to_sim(torch.cat([an + quat_apply(rot, pos - an), quat_mul(rot, quat)], -1), env_ids=ids)
+        vel = self.object.data.root_vel_w[ids].clone()
+        wd = vel[:, 3:6] - door.data.root_vel_w[ids, 3:6]
+        w_ax = (wd * ax).sum(-1)
+        sgn = torch.sign(over[ids])
+        bad = (w_ax * sgn).clamp(min=0.0) * sgn          # spin further past the stop
+        vel[:, 3:6] -= bad.unsqueeze(-1) * ax
+        vel[:, 0:3] = door.data.root_vel_w[ids, 0:3]
+        self.object.write_root_velocity_to_sim(vel, env_ids=ids)
+        self.cb_joint_angle[k, ids] -= over[ids]
+        if self._ja_unwrap is not None:
+            # keep the unwrap continuous: the next measurement already includes the correction
+            self._ja_unwrap[ids] -= over[ids]
+            pv = self._ja_prev[ids] - over[ids]
+            self._ja_prev[ids] = torch.atan2(torch.sin(pv), torch.cos(pv))
+        self._key_stop_hits = getattr(self, "_key_stop_hits", 0) + int(ids.numel())
+
     def _cbf_spring_correction(self, knob: torch.Tensor) -> None:
         if not hasattr(self, "_key_probe_on"):
             return
+        self._key_soft_stop()
         kl = self.cfg.key_lock
         c = self.cfg.precise_assembly
         t = self._key_t
