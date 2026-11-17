@@ -76,7 +76,8 @@ class KeyLockCfg:
     release_rew_scale: float = 300.0     # potential on min(tip dist, release_dist) / release_dist after the clear goal
     still_rew_scale: float = 200.0       # potential on still_count / still_steps
     turnback_penalty: float = 2.0        # per step with the key back below its clear angle after the clear goal
-    pinch_rew: float = 0.2               # per turning step with a valid pinch
+    pinch_rew: float = 0.5               # per turning step with a valid pinch
+    approach_unpinched_scale: float = 0.25   # latch_approach_rew gain on turning progress made without a 2-pad pinch
     fail_penalty: float = 100.0          # probe / pinch fail, broken
     # phase 2
     break_ratio: float = 0.0             # 0 = off; F_break = break_ratio x F_min(env)
@@ -367,9 +368,14 @@ class KeyLockEnv(PreciseAssemblyEnv):
         back = float(kl.turnback_penalty) * (self.retract_phase & (ang < self.key_clear)).float()
         pinch = float(kl.pinch_rew) * self._key_turning_ok.float()
         fail = float(kl.fail_penalty) * self._key_term.float()
-        extra = rel - back + pinch - fail
+        # the official check needs a 2-pad pinch: progress made by poking the bow (thumb only) pays less
+        ar = self._reward_terms.get("latch_approach_rew")
+        unp = torch.zeros_like(r)
+        if ar is not None:
+            unp = (1.0 - float(kl.approach_unpinched_scale)) * ar.clamp(min=0.0) * (~self._key_turning_ok).float()
+        extra = rel - back + pinch - fail - unp
         r = r + extra
-        for name, v in (("key_release_rew", rel), ("key_turnback_pen", -back), ("key_pinch_rew", pinch),
+        for name, v in (("key_release_rew", rel), ("key_turnback_pen", -back), ("key_pinch_rew", pinch), ("key_unpinched_cut", -unp),
                         ("key_fail_pen", -fail)):
             self._reward_terms[name] = v
         self._reward_terms["total_reward"] = r
