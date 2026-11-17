@@ -374,6 +374,8 @@ class PreciseAssemblyEnv(PlayEnv):
             for k, v in list(card.checks.items()) + list(card.meas.items()):
                 self.card_last[k][env_ids] = v[env_ids].float()
             self.card_last["success"][env_ids] = card.success[env_ids].float()
+            self.card_last.setdefault("goals", torch.zeros(self.num_envs, device=self.device))[env_ids] = self._successes[env_ids].float()
+            self.card_last.setdefault("kp_max_dist", torch.zeros(self.num_envs, device=self.device))[env_ids] = self._keypoints_max_dist[env_ids].float()
             for f, v in card.fail.items():
                 self.card_last[f"fail_{f}"][env_ids] = v[env_ids].float()
         super()._reset_idx(env_ids)
