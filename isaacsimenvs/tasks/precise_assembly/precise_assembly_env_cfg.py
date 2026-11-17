@@ -317,6 +317,8 @@ class PreciseAssemblyCfg:
     latch_cbf_stop_K: float = 100.0      # N m/rad (1 N m -> 0.57 deg past the stop)
     latch_cbf_stop_D: float = 0.5
     latch_cbf_stop_back_deg: float = 3.0
+    latch_cbf_stop_cal_gain: float = 0.96    # stop reading calibration (see _cbf_elastic_substep)
+    latch_cbf_stop_cal_spring: float = 0.40
     latch_cbf_hinge_K: float = 300.0     # N m/rad (1.5 N m -> 0.29 deg: keeps the official locked < 0.6 deg)
     latch_cbf_hinge_D: float = 2.0
     latch_cbf_hinge_back_deg: float = 2.0

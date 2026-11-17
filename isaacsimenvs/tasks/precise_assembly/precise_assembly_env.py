@@ -938,6 +938,15 @@ class PreciseAssemblyEnv(PlayEnv):
             self.door_stop_torque, self.door_pull_torque, self.door_pull_force = z(), z(), z()
             self._door_break_count = torch.zeros(n, dtype=torch.long, device=self.device)
         r_k = torch.linalg.norm(torch.cross(self.object.data.root_pos_w - an_h, ax_h, dim=-1), dim=-1).clamp_min(1e-3)
+        # calibration (a1_door_probe --elastic, 11-17, stop K 30-300 / D 0-2, springs 5 / 10 mm, stops 40 / 80): the
+        # raw stop reading = 0.96 x (torque into the stop) + 0.40 x (spring torque at the stop, tau0 + K stop) for every
+        # K / D, so the spring's pull is only partly seen by the implicit step; subtract it (known per env) and rescale.
+        if not hasattr(self, "_cbf_spring_at_stop"):
+            self._cbf_spring_at_stop = (torch.as_tensor(self._cbf["tau0"], device=self.device, dtype=torch.float32)
+                                        + torch.as_tensor(self._cbf["K"], device=self.device, dtype=torch.float32)
+                                        * self._cbf_stop_rad)
+        a_cal, b_cal = float(getattr(c, "latch_cbf_stop_cal_gain", 0.96)), float(getattr(c, "latch_cbf_stop_cal_spring", 0.40))
+        tau_k = torch.where(tau_k > 0, torch.clamp((tau_k - b_cal * self._cbf_spring_at_stop) / a_cal, min=0.0), tau_k)
         self.door_stop_torque_now, self.door_pull_torque_now = tau_k, tau_h     # last substep (probes)
         self.door_stop_torque = torch.maximum(self.door_stop_torque, tau_k)
         self.door_pull_torque = torch.maximum(self.door_pull_torque, tau_h)
