@@ -271,6 +271,7 @@ class PreciseAssemblyCfg:
     turn_thread_axial_k: float = 0.0
     turn_thread_axial_d: float = 0.0
     turn_thread_axial_backstop_m: float = 0.0015
+    turn_thread_gravity_comp: bool = False   # cancel the jointed body's weight (heavy body on the exact pose band)
     # Turn mode: the first N goals are ordinary object-pose goals (tool above the screw, tool engaged), the last two
     # the turn goals (turn_first_goal_deg, then the stop / tight). 0 = all goals are turn goals (bottle).
     turn_prelude_goals: int = 0

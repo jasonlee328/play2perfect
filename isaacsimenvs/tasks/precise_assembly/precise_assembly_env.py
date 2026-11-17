@@ -908,6 +908,12 @@ class PreciseAssemblyEnv(PlayEnv):
             tau_fric = tau_c * torch.tanh(w_f / float(pc.turn_thread_stiction_w))
         k_ax = float(getattr(pc, "turn_thread_axial_k", 0.0))
         f_ax = torch.zeros(n, device=self.device)
+        g_comp = bool(getattr(pc, "turn_thread_gravity_comp", False))
+        if g_comp and k_ax <= 0.0:
+            # heavy jointed body on the exact pose band: only cancel its weight (the band holds the height)
+            if not hasattr(self, "_turn_body_mass"):
+                self._turn_body_mass = body.root_physx_view.get_masses().to(self.device).reshape(n, -1)[:, 0]
+            f_ax = self._turn_body_mass * 9.81
         if k_ax > 0.0:
             # A7 implicit-enough helix: an axial spring + damper pulls the body to its helix height (band clamp of the
             # current height), + gravity compensation (the body's mass is raised so the explicit spring is stiff and
@@ -938,7 +944,7 @@ class PreciseAssemblyEnv(PlayEnv):
             tau_l = torch.where(elastic, K_lock * over_e + float(pc.turn_lock_damping) * w_now.clamp_min(0.0),
                                 torch.zeros_like(over_l))
             self._turn_dbg_el = (elastic.clone(), tau_l.clone(), over_l.clone(), w_now.clone())
-        if K_lock > 0.0 or tau_c0 > 0.0 or k_ax > 0.0:
+        if K_lock > 0.0 or tau_c0 > 0.0 or k_ax > 0.0 or g_comp:
             tau_tot = (tau_l if K_lock > 0.0 else torch.zeros(n, device=self.device)) + tau_fric   # both oppose +spin
             zero = torch.zeros(n, 1, 3, device=self.device)
             # world -> body frame with the CURRENT orientation (IsaacLab's permanent wrench composer caches the link
