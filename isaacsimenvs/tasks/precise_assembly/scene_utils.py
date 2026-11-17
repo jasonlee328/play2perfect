@@ -199,7 +199,7 @@ def setup_scene(env) -> None:
             props=dict(
                 kinematic_enabled=False,
                 disable_gravity=False,
-                max_depenetration_velocity=1000.0,
+                max_depenetration_velocity=float(getattr(env.cfg.precise_assembly, "object_max_depenetration_velocity", 1000.0)),
                 rb_solver_position_iterations=int(env.cfg.precise_assembly.object_position_iterations) or 4,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,

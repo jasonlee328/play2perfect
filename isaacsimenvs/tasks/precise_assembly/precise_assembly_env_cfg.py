@@ -278,6 +278,9 @@ class PreciseAssemblyCfg:
     # (printed cap ~2.7e-6). Needed for a physical elastic-lock torque reading (see _turn_apply_cap_izz); 1e-4 adds
     # ~0.03 N m of flywheel torque when the hand spins the cap up to ~14 rad/s in 0.05 s.
     turn_cap_izz: float = 0.0
+    # held object's PhysX max depenetration velocity (m/s); 1000 = previous hard-coded value. Low values stop the hard
+    # stop's pose snap-back from flinging the cap out of the fingers (fake lock torque under hand contact).
+    object_max_depenetration_velocity: float = 1000.0
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0
