@@ -624,6 +624,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.turn_lock_torque[env_ids] = 0.0
                 self.turn_lock_torque_max[env_ids] = 0.0
                 if getattr(self, "_turn_tau_hist", None) is not None:
+                    if not hasattr(self, "turn_prev_ep_hold_max"):
+                        self.turn_prev_ep_hold_max = torch.zeros_like(self.turn_lock_torque_hold_max)
+                    self.turn_prev_ep_hold_max[env_ids] = self.turn_lock_torque_hold_max[env_ids]
                     self._turn_tau_hist[:, env_ids] = 0.0
                     self.turn_lock_torque_hold_max[env_ids] = 0.0
                 self.turn_tau_acc[env_ids] = 0.0
@@ -634,6 +637,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_max_angle[env_ids] = self.turn_offset[env_ids]
             self.turn_strip_count[env_ids] = 0
             self.turn_stripped[env_ids] = False
+            if not hasattr(self, "turn_prev_ep_toolless_deg"):
+                self.turn_prev_ep_toolless_deg = torch.zeros_like(self.turn_toolless_deg)
+            self.turn_prev_ep_toolless_deg[env_ids] = self.turn_toolless_deg[env_ids]
             self.turn_toolless_deg[env_ids] = 0.0
             self.turn_toolless[env_ids] = False
             self._turn_prev_step_angle[env_ids] = self.turn_angle[env_ids]
