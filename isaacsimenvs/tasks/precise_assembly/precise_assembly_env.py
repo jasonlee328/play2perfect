@@ -1105,8 +1105,9 @@ class PreciseAssemblyEnv(PlayEnv):
         self.turn_max_angle = torch.maximum(self.turn_max_angle, self.turn_angle)
         self._turn_over_inc = torch.clamp(self.turn_max_angle - self.unlock_angle, min=0.0) - over_prev
         at_last = self._successes >= self.env_max_goals - 1
-        target = torch.where(at_last, self.unlock_angle,
-                             self.turn_offset + math.radians(float(pih_cfg.turn_first_goal_deg)))
+        first = torch.minimum(self.turn_offset + math.radians(float(pih_cfg.turn_first_goal_deg)),
+                              self.unlock_angle - math.radians(float(pih_cfg.unlock_tol_deg)))   # starts near the seat
+        target = torch.where(at_last, self.unlock_angle, first)
         rem = torch.clamp(target - self.turn_angle, min=0.0)
         self._keypoints_max_dist = rem * float(pih_cfg.turn_progress_m_per_rad)
         # goal trackers cleared this step (-1 sentinel, replaced by the real keypoint distance in
@@ -1188,7 +1189,14 @@ class PreciseAssemblyEnv(PlayEnv):
         before the thread bites. w = its seated world pose (n, 7); returns the lifted pose."""
         pc = self.cfg.precise_assembly
         drop = torch.rand(env_ids.numel(), device=self.device) * self.turn_play[env_ids]
-        self.turn_u_start[env_ids] = float(pc.turn_thread_engaged_mm) * 1e-3 - drop
+        rng = getattr(pc, "turn_thread_engaged_range_mm", ())
+        if rng:
+            # A7 (OmniReset-style near-goal resets): each episode starts at a random point along the thread, from
+            # rng[1] mm above the seat (rng[1] / lead turns to go) down to rng[0] mm
+            lo, hi = (float(v) * 1e-3 for v in rng)
+            self.turn_u_start[env_ids] = lo + (hi - lo) * torch.rand(env_ids.numel(), device=self.device)
+        else:
+            self.turn_u_start[env_ids] = float(pc.turn_thread_engaged_mm) * 1e-3 - drop
         axis_w, _ = self._turn_axis_w()
         w = w.clone()
         w[:, 0:3] -= axis_w[env_ids] * self.turn_u_start[env_ids].unsqueeze(-1)   # axis points into the bottle
@@ -1269,6 +1277,13 @@ class PreciseAssemblyEnv(PlayEnv):
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
         if getattr(self, "turn_thread", False) and self._turn_thread_body_is_object():
             w = self._turn_thread_lift(env_ids, w)
+        elif getattr(self, "turn_thread", False) and bool(getattr(self.cfg.precise_assembly, "object_start_follow_thread", False)):
+            # A7: the held tool starts at a pose built for the nominal start height (turn_thread_engaged_mm): move it
+            # along the axis with the screw's actual start height (tool standing in the recess at any thread progress)
+            axis_w, _ = self._turn_axis_w()
+            dz = self.turn_u_start[env_ids] - float(self.cfg.precise_assembly.turn_thread_engaged_mm) * 1e-3
+            w = w.clone()
+            w[:, 0:3] -= axis_w[env_ids] * dz.unsqueeze(-1)
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         if int(getattr(self.cfg.precise_assembly, "object_start_hold_steps", 0)) > 0:
             if getattr(self, "_object_start_pose_w", None) is None:

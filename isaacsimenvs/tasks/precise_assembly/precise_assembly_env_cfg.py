@@ -259,6 +259,11 @@ class PreciseAssemblyCfg:
     turn_thread_lead_k_mm: float = 9.33
     turn_thread_ridge_mm: float = 1.75
     turn_thread_engaged_mm: float = 9.4
+    # A7 (OmniReset-style near-goal resets): non-empty [lo, hi] mm = the start height above the seat is U(lo, hi) per
+    # episode (replaces turn_thread_engaged_mm - drop); 0 = seated. object_start_follow_thread: the held tool's start
+    # pose (built for turn_thread_engaged_mm) moves along the axis with the actual start height.
+    turn_thread_engaged_range_mm: tuple[float, ...] = ()
+    object_start_follow_thread: bool = False
     # A7 (Allen key screw): thread drag on the jointed body, applied every substep at the velocity level (official
     # _allen_key ThreadModel): Coulomb running friction (N m; official TAU_RUN0 0.0015) + viscous (N m s / rad; official
     # SCREW_KD 0.004). Never reverses the spin, so an undriven light screw stops (stiction). 0 = off (bottle default).
