@@ -767,8 +767,26 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _apply_action(self) -> None:
         super()._apply_action()
+        self._object_start_hold()
         if getattr(self, "turn_mode", False):
             self._turn_substep()
+
+    def _object_start_hold(self) -> None:
+        """A7: object_start_hold_steps N > 0 = for the first N policy steps of every episode the object is pinned at its
+        start pose (pose write + zero velocity every physics substep), like a tool standing in a holder, so the hand can
+        grasp it before physics takes over (e.g. an Allen key standing in the screw's recess, which tips over alone)."""
+        N = int(getattr(self.cfg.precise_assembly, "object_start_hold_steps", 0))
+        if N <= 0 or getattr(self, "_object_start_pose_w", None) is None:
+            return
+        if not hasattr(self, "_hold_substeps"):
+            self._hold_substeps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        held = self._hold_substeps < N * int(self.cfg.decimation)
+        self._hold_substeps += 1
+        ids = held.nonzero(as_tuple=False).squeeze(-1)
+        if ids.numel() == 0:
+            return
+        self.object.write_root_pose_to_sim(self._object_start_pose_w[ids], env_ids=ids)
+        self.object.write_root_velocity_to_sim(torch.zeros(ids.numel(), 6, device=self.device), env_ids=ids)
 
     def _turn_axis_w(self) -> tuple[torch.Tensor, torch.Tensor]:
         """World axis direction and a world point on the turn joint's axis, (N, 3) each."""
@@ -1019,6 +1037,11 @@ class PreciseAssemblyEnv(PlayEnv):
         lo = torch.clamp(helix, min=0.0)
         hi = torch.clamp(helix + self.turn_play, min=0.0)
         du = torch.where(u < lo, lo - u, torch.where(u > hi, hi - u, torch.zeros_like(u)))
+        tol = float(getattr(pc, "turn_thread_band_tol_m", 0.0))
+        if tol > 0.0:
+            # A7: write the pose only when the body is more than tol off its helix band (per-substep pose writes of a
+            # body in contact with a light tool may disturb that contact); the full error is corrected then
+            du = torch.where(du.abs() > tol, du, torch.zeros_like(du))
         if float(getattr(pc, "turn_thread_axial_k", 0.0)) > 0.0:
             bs = float(pc.turn_thread_axial_backstop_m)
             du = torch.where(du.abs() > bs, du - torch.sign(du) * bs, torch.zeros_like(du))
@@ -1240,6 +1263,12 @@ class PreciseAssemblyEnv(PlayEnv):
         if getattr(self, "turn_thread", False) and self._turn_thread_body_is_object():
             w = self._turn_thread_lift(env_ids, w)
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
+        if int(getattr(self.cfg.precise_assembly, "object_start_hold_steps", 0)) > 0:
+            if getattr(self, "_object_start_pose_w", None) is None:
+                self._object_start_pose_w = torch.zeros(self.num_envs, 7, device=self.device)
+                self._hold_substeps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+            self._object_start_pose_w[env_ids] = w
+            self._hold_substeps[env_ids] = 0
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
         # (z - init_z > 0.10, which gates the keypoint reward) would need ~20 cm above the bin. Measure from here.

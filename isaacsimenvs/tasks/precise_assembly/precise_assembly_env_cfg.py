@@ -281,6 +281,7 @@ class PreciseAssemblyCfg:
     turn_thread_axial_k: float = 0.0
     turn_thread_axial_d: float = 0.0
     turn_thread_axial_backstop_m: float = 0.0015
+    turn_thread_band_tol_m: float = 0.0   # A7: pose band writes only beyond this error (m); 0 = every substep
     turn_thread_gravity_comp: bool = False   # cancel the jointed body's weight (heavy body on the exact pose band)
     # Turn mode: the first N goals are ordinary object-pose goals (tool above the screw, tool engaged), the last two
     # the turn goals (turn_first_goal_deg, then the stop / tight). 0 = all goals are turn goals (bottle).
@@ -329,6 +330,8 @@ class PreciseAssemblyCfg:
     # recess against a heavy jointed body needs velocity-level contact resolution.
     object_velocity_iterations: int = 0
     # A7 no-hand probe only: D6 joint GoalViz -> Object with an implicit yaw drive (N m/rad, N m s/rad); 0 = off.
+    # A7: pin the object at its start pose for the first N policy steps of each episode (a tool in a holder; 0 = off).
+    object_start_hold_steps: int = 0
     probe_key_driver_k: float = 0.0
     probe_key_driver_d: float = 0.0
     distractor_velocity_iterations: int = 0
