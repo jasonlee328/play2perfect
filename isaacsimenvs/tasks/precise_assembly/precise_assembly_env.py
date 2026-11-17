@@ -1355,6 +1355,7 @@ class PreciseAssemblyEnv(PlayEnv):
         pc = self.cfg.precise_assembly
         tips = getattr(pc, "turn_tool_tips_m", ())
         d = (self.turn_angle - self._turn_prev_step_angle).abs()
+        prev_angle = self._turn_prev_step_angle.clone()
         self._turn_prev_step_angle = self.turn_angle.clone()
         self._turn_just_toolless = torch.zeros_like(self.turn_toolless)
         if not tips:
@@ -1382,7 +1383,14 @@ class PreciseAssemblyEnv(PlayEnv):
         self._tl_seg_start = torch.where(starts, self.turn_angle, self._tl_seg_start)
         cur = torch.rad2deg((self.turn_angle - self._tl_seg_start).abs())
         ends = inside & self._tl_out
-        self._tl_committed = self._tl_committed + torch.where(ends, cur, torch.zeros_like(cur))
+        if bool(getattr(pc, "turn_toolless_reentry_fix", False)):
+            # A9: the tip was back in the recess by the end of this step and the tool drives within it, so this step's
+            # rotation is the tool's: close the stretch at the previous step's angle (else every regrasp stroke charged up
+            # to ~3 deg of tool turning to `toolless`; eval eng5cs: median 2.4 deg over 2 strokes -> fail)
+            cur_end = torch.rad2deg((prev_angle - self._tl_seg_start).abs())
+        else:
+            cur_end = cur
+        self._tl_committed = self._tl_committed + torch.where(ends, cur_end, torch.zeros_like(cur))
         self._tl_out = ~inside
         self.turn_toolless_deg = self._tl_committed + torch.where(self._tl_out, cur, torch.zeros_like(cur))
         self.extras["turn_tool_in_recess_frac"] = inside.float().mean()
