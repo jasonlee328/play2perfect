@@ -329,6 +329,18 @@ class PreciseAssemblyCfg:
     door_break_pull: float = 0.0
     door_break_steps: int = 3
     door_break_penalty: float = 200.0
+    # A1 hand force (ported by A8 from a1-cup 6a76824): PhysX contact report on the object filtered to the robot links,
+    # hand_force = sum over links of |contact force on the object| (N; normal-only, a flat contact reads 2x per A1 ->
+    # hand_force_gain 0.5). Rule: hand_force > crush_force for crush_steps steps in a row = termination "crushed".
+    hand_force_sense: bool = False
+    # A8 (A3's force_window recipe): > 0 = compliant-contact PhysX material on the object (N/m, damping N s/m), so
+    # contact depth and the ray-cast taxels read force (A3: k 2000 ~ 0.09 mm/N on a grasped body). 0 = rigid.
+    object_compliant_stiffness: float = 0.0
+    object_compliant_damping: float = 0.0
+    hand_force_gain: float = 0.5
+    crush_force: float = 0.0
+    crush_steps: int = 3
+    crush_penalty: float = 200.0
     latch_cbf_grasp_fingers: int = 2
     latch_cbf_grasp_dist: float = 0.05
     latch_cbf_door_still_deg_s: float = 0.0

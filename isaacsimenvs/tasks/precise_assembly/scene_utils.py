@@ -298,7 +298,10 @@ def setup_scene(env) -> None:
         env.goal_viz = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths))
     else:
         env.hole = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0]))
-        env.object = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0]))
+        _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0])
+        if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)):
+            _ocfg.spawn.activate_contact_sensors = True   # PhysxContactReportAPI: hand-on-object force (A1, ported by A8)
+        env.object = RigidObject(_ocfg)
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
     env.distractors = tuple(
         RigidObject(_pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd))

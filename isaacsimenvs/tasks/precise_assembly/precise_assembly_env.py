@@ -94,7 +94,23 @@ class PreciseAssemblyEnv(PlayEnv):
     ) -> None:
         self._configure_problem(cfg)
 
-        super().__init__(cfg, render_mode, **kwargs)
+        import isaacsimenvs.tasks.play.play_env as _pe
+        _orig_mat = _pe.apply_physx_material_properties
+        if float(getattr(cfg.precise_assembly, "object_compliant_stiffness", 0.0)) > 0.0:
+            # A8 (A3's force_window recipe): the tensor-API material write replaces the object's USD material (and the
+            # compliant contact with it); run it with the object hidden so the object keeps the compliant material.
+            def _mat_without_object(env):
+                obj = env.__dict__.pop("object", None)
+                try:
+                    _orig_mat(env)
+                finally:
+                    if obj is not None:
+                        env.object = obj
+            _pe.apply_physx_material_properties = _mat_without_object
+        try:
+            super().__init__(cfg, render_mode, **kwargs)
+        finally:
+            _pe.apply_physx_material_properties = _orig_mat
 
         # When student_obs is enabled, the env exposes three obs groups via
         # `_get_observations`: "policy" = student obs (image+proprio, what
@@ -435,6 +451,29 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _setup_scene(self) -> None:
         setup_scene(self)
+        k = float(getattr(self.cfg.precise_assembly, "object_compliant_stiffness", 0.0))
+        if k > 0.0:
+            # A8 (A3's force_window recipe): compliant-contact PhysX material on every object collision prim, so
+            # contact depth (and the ray-cast taxels) grows with force; friction = assets.object_friction.
+            from pxr import PhysxSchema, Usd, UsdPhysics, UsdShade
+            import omni.usd
+            stage = omni.usd.get_context().get_stage()
+            mat = UsdShade.Material.Define(stage, "/World/A8CompliantMaterial")
+            UsdPhysics.MaterialAPI.Apply(mat.GetPrim())
+            pm = UsdPhysics.MaterialAPI(mat.GetPrim())
+            mu = float(self.cfg.assets.object_friction)
+            pm.CreateStaticFrictionAttr(mu); pm.CreateDynamicFrictionAttr(mu); pm.CreateRestitutionAttr(0.0)
+            px = PhysxSchema.PhysxMaterialAPI.Apply(mat.GetPrim())
+            px.CreateCompliantContactStiffnessAttr(k)
+            px.CreateCompliantContactDampingAttr(float(getattr(self.cfg.precise_assembly, "object_compliant_damping", 0.0)))
+            n = 0
+            for i in range(self.cfg.scene.num_envs):
+                root = stage.GetPrimAtPath(f"/World/envs/env_{i}/Object")
+                for prim in Usd.PrimRange(root):
+                    if prim.HasAPI(UsdPhysics.CollisionAPI):
+                        UsdShade.MaterialBindingAPI.Apply(prim).Bind(mat, UsdShade.Tokens.weakerThanDescendants, "physics")
+                        n += 1
+            print(f"[a8] compliant object material k={k} bound to {n} collision prims", flush=True)
 
     def _reset_idx(self, env_ids) -> None:
         if env_ids is None:
@@ -1007,6 +1046,12 @@ class PreciseAssemblyEnv(PlayEnv):
             self._cbf_prev_door[env_ids] = 0.0
             if hasattr(self, "_cbf_grasp_miss"):
                 self._cbf_grasp_miss[env_ids] = 0.0
+            if hasattr(self, "hand_force_ep_max"):
+                self.hand_force_last_ep_max[env_ids] = self.hand_force_ep_max[env_ids]
+                self.hand_force_ep_max[env_ids] = 0.0
+                self._crush_count[env_ids] = 0
+            if hasattr(self, "_brk_t"):
+                self._brk_t[env_ids] = 0; self._brk_f[env_ids] = 0
             if hasattr(self, "_cbf_run"):
                 self._cbf_run[env_ids] = 0.0
                 self._cbf_run_prev[env_ids] = 0.0
@@ -1634,6 +1679,33 @@ class PreciseAssemblyEnv(PlayEnv):
         self.extras["latch_cbf_open_grasped_frac"] = (open_ & self._cbf_grasp_ok).float().mean()
         return open_ & ok
 
+    def _hand_force_update(self) -> None:
+        """hand_force_sense (A1 a1-cup 6a76824, ported by A8): sum over robot links of |contact force on the object| (N,
+        x hand_force_gain), physical PhysX contact report; per-link max in self.hand_force_link_max."""
+        if not bool(getattr(self.cfg.precise_assembly, "hand_force_sense", False)):
+            return
+        import re as _re
+        if getattr(self, "_hf_view", None) is None:
+            glob = lambda p: _re.sub(r"env_\d+", "env_*", p)
+            links = [glob(p) for p in self.robot.root_physx_view.link_paths[0]]
+            self._hf_view = self.object._physics_sim_view.create_rigid_contact_view(
+                glob(self.object.root_physx_view.prim_paths[0]), filter_patterns=links)
+            self.hand_force = torch.zeros(self.num_envs, device=self.device)
+            self.hand_force_ep_max = torch.zeros(self.num_envs, device=self.device)
+            self.hand_force_last_ep_max = torch.zeros(self.num_envs, device=self.device)
+            self._crush_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        F = self._hf_view.get_contact_force_matrix(float(self.physics_dt)).to(self.device)   # (N, links, 3)
+        g = float(getattr(self.cfg.precise_assembly, "hand_force_gain", 0.5))
+        nrm = F.norm(dim=-1) * g
+        self.hand_force = nrm.sum(-1)
+        self.hand_force_link_max = nrm.amax(-1)
+        self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
+        thr = float(self.cfg.precise_assembly.crush_force)
+        over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
+        self._crush_count = torch.where(over, self._crush_count + 1, torch.zeros_like(self._crush_count))
+        self.extras["hand_force_mean"] = self.hand_force.mean()
+        self.extras["hand_force_max"] = self.hand_force.max()
+
     def _cbf_fingers_on_knob(self) -> torch.Tensor:
         """Fingertips touching the knob: with tactile on, pads with any taxel deformed by the knob mesh in the last
         (clean, pre-override) tactile reading; otherwise fingertips within latch_cbf_grasp_dist of the knob's centre."""
@@ -1803,6 +1875,15 @@ class PreciseAssemblyEnv(PlayEnv):
                 over |= self.door_pull_force > lim_f
             self._door_break_count = torch.where(over, self._door_break_count + 1, torch.zeros_like(self._door_break_count))
             broken = (self._door_break_count >= int(pih_cfg.door_break_steps)) & ~max_successes
+            # A8: per-kind counters for the break-reason split (strip = torque into the knob stop, latch = pull while latched)
+            if not hasattr(self, "_brk_t"):
+                self._brk_t = torch.zeros_like(self._door_break_count); self._brk_f = torch.zeros_like(self._door_break_count)
+            ot = (self.door_stop_torque > lim_t) if lim_t > 0.0 else torch.zeros_like(fall)
+            of = (self.door_pull_force > lim_f) if lim_f > 0.0 else torch.zeros_like(fall)
+            self._brk_t = torch.where(ot, self._brk_t + 1, torch.zeros_like(self._brk_t))
+            self._brk_f = torch.where(of, self._brk_f + 1, torch.zeros_like(self._brk_f))
+            self.broken_strip = broken & (self._brk_t >= int(pih_cfg.door_break_steps))
+            self.broken_latch = broken & (self._brk_f >= int(pih_cfg.door_break_steps))
             self.extras["door_stop_torque_mean"] = self.door_stop_torque.mean()
             self.extras["door_pull_force_mean"] = self.door_pull_force.mean()
             self.door_stop_torque_step, self.door_pull_force_step = self.door_stop_torque.clone(), self.door_pull_force.clone()
@@ -1814,7 +1895,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self.door_stop_torque_ep_max = torch.maximum(self.door_stop_torque_ep_max, self.door_stop_torque)
             self.door_pull_force_ep_max = torch.maximum(self.door_pull_force_ep_max, self.door_pull_force)
             self.door_stop_torque.zero_(); self.door_pull_torque.zero_(); self.door_pull_force.zero_()
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop | broken
+        self._hand_force_update()
+        crushed = torch.zeros_like(fall)
+        if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and hasattr(self, "_crush_count"):
+            crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop | broken | crushed
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1827,6 +1912,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "overturned": overturned,
             "false_stop": false_stop,
             "broken": broken,
+            "crushed": crushed,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1926,6 +2012,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["fall_terminal_penalty"] = -fall_pen
             self._reward_terms["total_reward"] = reward
 
+        if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and "crushed" in getattr(self, "_termination_reasons", {}):
+            c_pen = float(pih_cfg.crush_penalty) * self._termination_reasons["crushed"].float()
+            reward = reward - c_pen
+            self._reward_terms["crush_penalty"] = -c_pen
+            self._reward_terms["total_reward"] = reward
         if float(getattr(pih_cfg, "door_break_penalty", 0.0)) > 0.0 and "broken" in self._termination_reasons:
             bpen = float(pih_cfg.door_break_penalty) * self._termination_reasons["broken"].float()
             reward = reward - bpen
