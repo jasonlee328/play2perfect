@@ -87,7 +87,17 @@ class KeyLockCfg:
     pinch_rew: float = 1.0               # per turning step with a valid pinch
     approach_unpinched_scale: float = 0.5
     pad_contact_rew: float = 0.0         # per step before the clear goal: x (# fingertip pads on the key > pad_contact_n, max 2) / 2
-    pad_contact_n: float = 0.5   # latch_approach_rew gain on turning progress made without a 2-pad pinch
+    pad_contact_n: float = 0.5
+    # grasp shaping (human demo: thumb + index pinch the bow from above): per step before the clear goal, for the thumb
+    # and index pads on OPPOSITE sides of the bow plate: straddle_rew x exp(-(in-plane dist) / s_plane) x
+    # exp(-(normal dist) / s_normal), summed over the two pads / 2. Bow centre / plate normal in the key object frame.
+    straddle_rew: float = 0.0
+    straddle_sigma_plane: float = 0.02
+    straddle_sigma_normal: float = 0.02
+    bow_center_obj: tuple[float, float, float] = (-0.00747, 0.00024, 0.0)
+    # check the pinch when the key first clears: a turn without the required pinch share ends the episode there
+    # (pinch_fail), so an unpinched turn earns none of the release / probe rewards
+    pinch_fail_at_clear: bool = False   # latch_approach_rew gain on turning progress made without a 2-pad pinch
     fail_penalty: float = 100.0          # probe / pinch fail, broken
     # phase 2
     break_ratio: float = 0.0             # 0 = off; F_break = break_ratio x F_min(env)
@@ -188,6 +198,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
             _glob(door.root_physx_view.prim_paths[0]), filter_patterns=[_glob(p) for p in links])
         self._key_nl = len(links)
         self._palm_id = int(self.robot.find_bodies("iiwa14_link_7")[0][0])
+        ft_names = [self.robot.body_names[i] for i in self._fingertip_body_ids]
+        self._key_thumb_i = next(i for i, nm in enumerate(ft_names) if "thumb" in nm)
+        self._key_index_i = next(i for i, nm in enumerate(ft_names) if "index" in nm)
         # per-episode state
         self.key_pad_f = torch.zeros(N, len(PADS), device=dev)
         self.key_hand_f = z(); self.door_hand_f = z()
@@ -400,12 +413,36 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_pinch_ok_ep = pinch_ok
         if not bool(kl.require_pinch):
             pinch_ok = torch.ones_like(pinch_ok)
+        first_clear = cleared & ~self._key_cleared_ep
         self._key_amax = torch.maximum(self._key_amax, ang)
         self._key_dmax = torch.maximum(self._key_dmax, door)
         self._key_cleared_ep |= cleared
         self._key_released_ep |= released
         self._key_ok = opened & pinch_ok
         self._key_fail_pinch = opened & ~pinch_ok
+        if bool(kl.pinch_fail_at_clear) and bool(kl.require_pinch):
+            self._key_fail_pinch = self._key_fail_pinch | (first_clear & ~pinch_ok)
+        self.extras["key/pinch_ok_at_clear_frac"] = (first_clear & pinch_ok).float().sum() / first_clear.float().sum().clamp(min=1.0)
+        # grasp shaping: thumb + index pads straddling the bow plate
+        self._key_straddle = torch.zeros_like(ang)
+        if float(kl.straddle_rew) > 0.0:
+            from isaaclab.utils.math import quat_apply as qa
+            ft = self.robot.data.body_state_w[:, self._fingertip_body_ids, :]
+            off = torch.tensor([0.02, 0.002, 0.0], device=self.device).expand(ft.shape[0], ft.shape[1], 3)
+            pads = ft[..., 0:3] + qa(ft[..., 3:7].reshape(-1, 4), off.reshape(-1, 3)).reshape(ft.shape[0], ft.shape[1], 3)
+            oq = self.object.data.root_quat_w
+            cw = self.object.data.root_pos_w + qa(oq, torch.tensor(kl.bow_center_obj, device=self.device).expand(oq.shape[0], 3))
+            nw = qa(oq, torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(oq.shape[0], 3))
+            terms, sides = [], []
+            for i in (self._key_thumb_i, self._key_index_i):
+                d = pads[:, i] - cw
+                sn = (d * nw).sum(-1)
+                dp = (d - sn.unsqueeze(-1) * nw).norm(dim=-1)
+                terms.append(torch.exp(-dp / float(kl.straddle_sigma_plane)) * torch.exp(-sn.abs() / float(kl.straddle_sigma_normal)))
+                sides.append(sn)
+            opp = (sides[0] * sides[1] < 0).float()
+            self._key_straddle = opp * 0.5 * (terms[0] + terms[1]) * (~self.retract_phase).float()
+            self.extras["key/straddle_mean"] = self._key_straddle.mean()
         self._key_fail_probe = self._key_probe_on & (self._key_probe_t > int(kl.end_probe_steps)) & ~opened
         # phase 2: breaking force
         if float(kl.break_ratio) > 0.0:
@@ -460,7 +497,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
         rel = float(kl.release_rew_scale) * (phi - self._key_rel_phi) + float(kl.still_rew_scale) * (sphi - self._key_still_phi)
         self._key_rel_phi, self._key_still_phi = phi, sphi
         back = float(kl.turnback_penalty) * (self.retract_phase & (ang < self.key_clear)).float()
-        pinch = float(kl.pinch_rew) * self._key_turning_ok.float()
+        pinch = float(kl.pinch_rew) * self._key_turning_ok.float() + float(kl.straddle_rew) * self._key_straddle
         if float(kl.pad_contact_rew) > 0.0:
             npads = (self.key_pad_f > float(kl.pad_contact_n)).sum(-1).clamp(max=2).float()
             pinch = pinch + float(kl.pad_contact_rew) * (npads / 2.0) * (~self.retract_phase).float()
