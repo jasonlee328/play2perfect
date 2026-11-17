@@ -107,6 +107,22 @@ class KeyLockCfg:
     fmin_per_Nm: float = 0.0             # F_min = fmin_per_Nm x tau_f (N per N m), calibrated
     break_steps: int = 3
     hide_key_angle: bool = False
+    # phase 2 v2 (touch-only slip cue, like the bottle clutch): per-episode hidden F_min ~ log-uniform p2_fmin_range (N);
+    # hand force on the key below F_min while the key turns = SLIP: physics unchanged (joint state carries nothing),
+    # the tactile ray-cast sees the key lag behind (felt key rotated back by p2_cue_gain x slipped angle, capped,
+    # decaying p2_cue_decay / step once the grip holds); slipped angle > p2_slip_fail_deg = fail "slipped".
+    # Hand force > p2_rho x F_min for break_steps = "key_broken". p2_rho <= 0 = no break limit.
+    p2_enabled: bool = False
+    p2_fmin_range: tuple[float, float] = (4.0, 24.0)
+    p2_rho: float = 0.0
+    p2_rho_start: float = 0.0            # > 0: rho ramps p2_rho_start -> p2_rho over p2_rho_ramp_steps (curriculum)
+    p2_rho_ramp_steps: int = 0
+    p2_rho_offset_steps: int = 0
+    p2_slip_fail_deg: float = 30.0
+    p2_cue_gain: float = 3.0
+    p2_cue_cap_deg: float = 25.0
+    p2_cue_decay: float = 0.2
+    p2_slip_penalty: float = 2.0         # per slipping step
 
 
 @configclass
@@ -222,6 +238,12 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_min_tip = z()
         self._key_amax, self._key_dmax = z(), z()
         self._key_t = z(torch.long)
+        lo, hi = (float(v) for v in kl.p2_fmin_range)
+        self._p2_lo, self._p2_hi = math.log(lo), math.log(hi)
+        self.key_fmin2 = torch.exp(torch.empty(N, device=dev).uniform_(self._p2_lo, self._p2_hi))
+        self._p2_slip_acc, self._p2_lag = z(), z()
+        self._p2_slipping = z(torch.bool)
+        self._key_slipped = z(torch.bool)
         self._key_turn_touch = z()                       # turning steps with any hand-key force > pinch_pad_n
         self._key_turn_linkf = torch.zeros(N, len(HAND_LINKS), device=dev)   # sum of per-link force on turning steps      # policy steps since reset (episode_length_buf restarts on every goal credit)
         self._key_cleared_ep, self._key_released_ep = z(torch.bool), z(torch.bool)
@@ -259,6 +281,22 @@ class KeyLockEnv(PreciseAssemblyEnv):
         axis_w = quat_apply(q_par, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(self.num_envs, 3))
         ang = self.cb_joint_angle[int(c.unlock_joint)]
         return quat_from_angle_axis(-ang, axis_w), axis_w
+
+    def _tactile_object_pose(self):
+        """Phase 2 v2: the tactile ray-cast sees the key rotated back about the lock axis by the slip lag (physics and
+        joint state unchanged). None = the real pose."""
+        if not bool(self.cfg.key_lock.p2_enabled) or not hasattr(self, "_p2_lag") or not bool((self._p2_lag > 0).any()):
+            return None
+        from isaaclab.utils.math import quat_from_angle_axis, quat_mul
+        c = self.cfg.precise_assembly
+        j = self._pih_joints[int(c.unlock_joint)]
+        door = self.distractors[int(j.parent[10:])]
+        dq = door.data.root_quat_w
+        ax = quat_apply(dq, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(dq.shape[0], 3))
+        an = door.data.root_pos_w + quat_apply(dq, torch.tensor(j.anchor, device=self.device, dtype=torch.float32).expand(dq.shape[0], 3))
+        rot = quat_from_angle_axis(-self._p2_lag, ax)
+        pos, quat = self.object.data.root_pos_w, self.object.data.root_quat_w
+        return an + quat_apply(rot, pos - an), quat_mul(rot, quat)
 
     # ---- physics substep: hinge probes (replaces the knob spring correction of latch_cbf) ----------------------
     def _key_soft_stop(self) -> None:
@@ -456,7 +494,31 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self._key_straddle = opp * 0.5 * (terms[0] + terms[1]) * (~self.retract_phase).float()
             self.extras["key/straddle_mean"] = self._key_straddle.mean()
         self._key_fail_probe = self._key_probe_on & (self._key_probe_t > int(kl.end_probe_steps)) & ~opened
-        # phase 2: breaking force
+        # phase 2 v2: hidden F_min, touch-only slip cue, break above rho x F_min
+        if bool(kl.p2_enabled):
+            dth = (ang - self._key_prev_ang_p2) if hasattr(self, "_key_prev_ang_p2") else torch.zeros_like(ang)
+            self._key_prev_ang_p2 = ang.clone()
+            turn2 = (dth > 0) & ~self.retract_phase & (self.key_hand_f > float(kl.contact_n))
+            slipping = turn2 & (self.key_hand_f < self.key_fmin2)
+            self._p2_slipping = slipping
+            self._p2_slip_acc = self._p2_slip_acc + torch.where(slipping, dth, torch.zeros_like(dth))
+            cap = math.radians(float(kl.p2_cue_cap_deg))
+            lag = torch.where(slipping, (self._p2_lag + float(kl.p2_cue_gain) * dth).clamp(max=cap),
+                              self._p2_lag * (1.0 - float(kl.p2_cue_decay)))
+            self._p2_lag = lag
+            self._key_slipped = self._p2_slip_acc > math.radians(float(kl.p2_slip_fail_deg))
+            rho = float(kl.p2_rho)
+            if float(kl.p2_rho_start) > 0.0 and int(kl.p2_rho_ramp_steps) > 0:
+                f = min(1.0, float(self.common_step_counter + int(kl.p2_rho_offset_steps)) / float(kl.p2_rho_ramp_steps))
+                rho = float(kl.p2_rho_start) + f * (rho - float(kl.p2_rho_start))
+            self.extras["key/p2_rho_cur"] = torch.tensor(rho, device=self.device)
+            if rho > 0.0:
+                over = self.key_hand_f > rho * self.key_fmin2
+                self._key_break_count = torch.where(over, self._key_break_count + 1, torch.zeros_like(self._key_break_count))
+                self._key_broken = self._key_break_count >= int(kl.break_steps)
+            self.extras["key/p2_slipping_frac"] = slipping.float().mean()
+            self.extras["key/p2_lag_deg_mean"] = torch.rad2deg(self._p2_lag).mean()
+        # phase 2 (v1): breaking force
         if float(kl.break_ratio) > 0.0:
             over = self.key_hand_f > float(kl.break_ratio) * self.key_fmin
             self._key_break_count = torch.where(over, self._key_break_count + 1, torch.zeros_like(self._key_break_count))
@@ -480,10 +542,11 @@ class KeyLockEnv(PreciseAssemblyEnv):
         probe_fail = self._key_fail_probe & ~succ
         pinch_fail = self._key_fail_pinch & ~succ
         broken = self._key_broken & ~succ
+        slipped = self._key_slipped & ~succ & ~broken
         start_unl = self._key_start_unlocked & ~succ
-        self._termination_reasons = {"key_broken": broken, "probe_fail": probe_fail, "pinch_fail": pinch_fail,
+        self._termination_reasons = {"key_broken": broken, "slipped": slipped, "probe_fail": probe_fail, "pinch_fail": pinch_fail,
                                      "start_unlocked": start_unl, **tr}
-        self._key_term = broken | probe_fail | pinch_fail | start_unl
+        self._key_term = broken | slipped | probe_fail | pinch_fail | start_unl
         # end-of-episode snapshots for evals (the auto reset after _get_dones clears the live counters)
         self._key_last_turn = self._key_turn_steps.clone()
         self._key_last_pinch = self._key_pinch_ok.clone()
@@ -519,7 +582,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
         unp = torch.zeros_like(r)
         if ar is not None:
             unp = (1.0 - float(kl.approach_unpinched_scale)) * ar.clamp(min=0.0) * (~self._key_turning_ok).float()
-        extra = rel - back + pinch - fail - unp
+        slip_pen = float(kl.p2_slip_penalty) * self._p2_slipping.float() if bool(kl.p2_enabled) else torch.zeros_like(r)
+        extra = rel - back + pinch - fail - unp - slip_pen
         r = r + extra
         for name, v in (("key_release_rew", rel), ("key_turnback_pen", -back), ("key_pinch_rew", pinch), ("key_unpinched_cut", -unp),
                         ("key_fail_pen", -fail)):
@@ -541,6 +605,13 @@ class KeyLockEnv(PreciseAssemblyEnv):
                   self._key_start_max, self._key_rel_phi, self._key_still_phi, self._key_amax, self._key_dmax,
                   self._key_turn_touch, self._key_turn_linkf):
             t[env_ids] = 0.0
+        if hasattr(self, "key_fmin2"):
+            self.key_fmin2[env_ids] = torch.exp(torch.empty(len(env_ids), device=self.device).uniform_(self._p2_lo, self._p2_hi))
+            self._p2_slip_acc[env_ids] = 0.0; self._p2_lag[env_ids] = 0.0
+            self._key_slipped[env_ids] = False; self._p2_slipping[env_ids] = False
+            self._key_broken[env_ids] = False
+            if hasattr(self, "_key_prev_ang_p2"):
+                self._key_prev_ang_p2[env_ids] = 0.0
         for t in (self._key_still, self._key_probe_t, self._key_break_count, self._key_t):
             t[env_ids] = 0
         if hasattr(self, "_key_kp_fresh"):
