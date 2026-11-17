@@ -1683,6 +1683,10 @@ class PreciseAssemblyEnv(PlayEnv):
         if pih_cfg.allow_goal_skip:
             self._apply_goal_skip()
         is_success = self._is_success.clone()
+        if bool(getattr(pih_cfg, "object_start_hold_gate_goals", False)) and hasattr(self, "_hold_grasped"):
+            # A7 grasp stage: goals only count once the hand has the object and the holder has let go
+            held_now = self._hold_substeps < int(pih_cfg.object_start_hold_steps) * int(self.cfg.decimation)
+            is_success &= self._hold_grasped & ~held_now
         if pih_cfg.enable_retract:
             is_success &= ~self.retract_phase
         self._is_success = is_success
