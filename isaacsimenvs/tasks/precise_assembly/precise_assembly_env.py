@@ -1268,7 +1268,11 @@ class PreciseAssemblyEnv(PlayEnv):
             h = (rel * up).sum(-1)
             radial = (rel - h.unsqueeze(-1) * up).norm(dim=-1)
             inside |= (radial < float(pc.turn_tool_radial_m)) & (h < float(pc.turn_tool_out_m))
-        self.turn_toolless_deg += torch.where(inside, torch.zeros_like(d), torch.rad2deg(d))
+        d_deg = torch.rad2deg(d)
+        db = float(getattr(pc, "turn_toolless_deadband_deg", 0.0))
+        if db > 0.0:   # A9: ignore sim jitter
+            d_deg = torch.where(d_deg < db, torch.zeros_like(d_deg), d_deg)
+        self.turn_toolless_deg += torch.where(inside, torch.zeros_like(d_deg), d_deg)
         self.extras["turn_tool_in_recess_frac"] = inside.float().mean()
         lim = float(pc.turn_toolless_max_deg)
         if lim > 0.0:
