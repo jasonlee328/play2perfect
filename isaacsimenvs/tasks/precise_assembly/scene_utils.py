@@ -147,7 +147,7 @@ def setup_scene(env) -> None:
             props=dict(
                 kinematic_enabled=False,
                 disable_gravity=False,
-                max_depenetration_velocity=1000.0,
+                max_depenetration_velocity=float(getattr(pa_cfg, "object_max_depenetration_velocity", 1000.0)),
                 rb_solver_position_iterations=obj_iters,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
@@ -192,7 +192,7 @@ def setup_scene(env) -> None:
             props=dict(
                 kinematic_enabled=False,
                 disable_gravity=False,
-                max_depenetration_velocity=1000.0,
+                max_depenetration_velocity=float(getattr(pa_cfg, "object_max_depenetration_velocity", 1000.0)),
                 rb_solver_position_iterations=obj_iters,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,

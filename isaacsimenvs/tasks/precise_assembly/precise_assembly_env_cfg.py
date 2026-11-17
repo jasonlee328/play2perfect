@@ -159,6 +159,8 @@ class PreciseAssemblyCfg:
     # rest offset (m, may be negative) of the object, distractor and receptive shapes (None: play scene_utils
     # _REST_OFFSET = 0). A pair rests at the sum of its two shapes' rest offsets.
     object_solver_position_iterations: int = 4
+    object_max_depenetration_velocity: float = 1000.0  # A10: m/s, object + distractors (1000 = old default; a restored
+    #   pinch with pad penetration ejects the 6.9 g card at 1000)
     object_torsional_patch_radius: float = 0.0   # A10: m, PhysX torsional friction patch radius (object + distractors)
     object_rest_offset: float = 0.0   # 0.0 = the play default _REST_OFFSET (a None default rejects float overrides)
 
