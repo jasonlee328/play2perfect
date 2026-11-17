@@ -623,6 +623,12 @@ class PreciseAssemblyEnv(PlayEnv):
             if hasattr(self, "turn_slip_acc"):
                 self.turn_slip_last_ep[env_ids] = self.turn_slip_acc[env_ids]
                 self.turn_slip_acc[env_ids] = 0.0
+            for _k in ("turn_thread_drag_range", "turn_lock_stiffness_range"):
+                _r = getattr(self.cfg.precise_assembly, _k, ())
+                if _r:
+                    _t = self._turn_env_param(_k, 0.0)
+                    lo, hi = float(_r[0]), float(_r[1])
+                    _t[env_ids] = lo + (hi - lo) * torch.rand(len(env_ids), device=self.device)
             self.turn_released_early[env_ids] = False
             self._turn_early_clear[env_ids] = 0
             self.turn_at_stop_steps[env_ids] = 0
@@ -886,8 +892,10 @@ class PreciseAssemblyEnv(PlayEnv):
         vel = body.data.root_vel_w.clone()
         pc = self.cfg.precise_assembly
         K_lock = float(getattr(pc, "turn_lock_stiffness", 0.0))
+        if getattr(pc, "turn_lock_stiffness_range", ()):
+            K_lock = self._turn_env_param("turn_lock_stiffness_range", K_lock)
         elastic = None
-        if K_lock > 0.0:
+        if (K_lock > 0.0) if isinstance(K_lock, float) else True:
             # elastic lock, implicit (stable at the cap's real inertia, no inertia switch): past the lock the over-angle
             # x obeys I x'' = tau_contacts - K x - D x'. PhysX has already integrated the contacts (x_phys, v_phys from
             # the pose); the spring + damper are applied implicitly:
@@ -920,9 +928,11 @@ class PreciseAssemblyEnv(PlayEnv):
         # substep): v_phys = this substep's angle change / dt, v = sign(v_phys) max(|v_phys| - D dt / I, 0); the cap is
         # rotated back by (v - v_phys) dt and its spin set to v. Below D the cap holds still. Needs turn_cap_izz.
         D_thr = float(getattr(pc, "turn_thread_drag_torque", 0.0))
+        if getattr(pc, "turn_thread_drag_range", ()):
+            D_thr = self._turn_env_param("turn_thread_drag_range", D_thr)
         c_drag = torch.zeros_like(corr)
         drag_m = torch.zeros_like(touched)
-        if D_thr > 0.0 and getattr(self, "_turn_last_d", None) is not None:
+        if ((D_thr > 0.0) if isinstance(D_thr, float) else True) and getattr(self, "_turn_last_d", None) is not None:
             drag_m = ~touched
             I_d = self._turn_axis_inertia(body, axis_w)
             v_phys = self._turn_last_d / dt
@@ -1102,6 +1112,16 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["turn_clutch_brake_cur"] = self._turn_clutch_brake()
         self.extras["turn_over_deg_mean"] = torch.rad2deg(torch.clamp(self.turn_angle - self.unlock_angle, min=0.0)).mean()
         self.extras["turn_contact_frac"] = contact.float().mean()
+
+    def _turn_env_param(self, key, default):
+        """Per-env tensor for a randomized turn parameter (A1 11-17), created on first use as U(lo, hi)."""
+        name = "_rand_" + key
+        t = getattr(self, name, None)
+        if t is None or t.shape[0] != self.num_envs:
+            lo, hi = (float(v) for v in getattr(self.cfg.precise_assembly, key))
+            t = lo + (hi - lo) * torch.rand(self.num_envs, device=self.device)
+            setattr(self, name, t)
+        return t
 
     def _turn_update_slip(self, contact) -> None:
         """turn_thread (A1 11-17): finger slip on the locked cap, once per policy step. Per fingertip within

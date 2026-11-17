@@ -282,6 +282,11 @@ class PreciseAssemblyCfg:
     # previous behaviour). A1 11-17 slip test: set near the grip's slip torque so hitting the lock is not a torque jump
     # for the hand (it goes from turning the cap to slipping on it at about the same torque). Needs turn_cap_izz.
     turn_thread_drag_torque: float = 0.0
+    # A1 11-17 randomization (empty = off): per-episode U(lo, hi) thread drag (N m) and elastic-lock stiffness (N m/rad),
+    # resampled at every reset, replacing turn_thread_drag_torque / turn_lock_stiffness for that env. Blurs the joint
+    # cue at the lock (a slow turn = stiff thread or the stop; the stall differs per episode).
+    turn_thread_drag_range: tuple[float, ...] = ()
+    turn_lock_stiffness_range: tuple[float, ...] = ()
     # A1 slip rule (11-17, 0 = off): stripped once the fingers have slipped more than this many degrees (about the
     # bottle axis, relative to the cap) over the locked cap, counted while a pad touches it (see _turn_update_slip).
     # The physical version of the 11/4 over-turn window: the cap stops, the hand over-spins on it.
