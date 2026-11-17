@@ -254,6 +254,18 @@ class PreciseAssemblyCfg:
     turn_thread_lead_k_mm: float = 9.33
     turn_thread_ridge_mm: float = 1.75
     turn_thread_engaged_mm: float = 9.4
+    # A7 (Allen key screw): thread drag on the jointed body, applied every substep at the velocity level (official
+    # _allen_key ThreadModel): Coulomb running friction (N m; official TAU_RUN0 0.0015) + viscous (N m s / rad; official
+    # SCREW_KD 0.004). Never reverses the spin, so an undriven light screw stops (stiction). 0 = off (bottle default).
+    turn_thread_friction: float = 0.0
+    turn_thread_viscous: float = 0.0
+    # Turn mode: the first N goals are ordinary object-pose goals (tool above the screw, tool engaged), the last two
+    # the turn goals (turn_first_goal_deg, then the stop / tight). 0 = all goals are turn goals (bottle).
+    turn_prelude_goals: int = 0
+    # Seat preload (official _allen_key): the friction cap rises by this fraction of turn_lock_torque_max (the torque
+    # pushed into the seat, per policy step) while within turn_preload_free_deg of the seat; 0 = off.
+    turn_seat_preload_frac: float = 0.0
+    turn_preload_free_deg: float = 10.0
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9
     turn_strip_torque: float = 0.0
