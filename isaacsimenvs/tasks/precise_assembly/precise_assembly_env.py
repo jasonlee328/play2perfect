@@ -941,18 +941,24 @@ class PreciseAssemblyEnv(PlayEnv):
         if K_lock > 0.0 or tau_c0 > 0.0 or k_ax > 0.0:
             tau_tot = (tau_l if K_lock > 0.0 else torch.zeros(n, device=self.device)) + tau_fric   # both oppose +spin
             zero = torch.zeros(n, 1, 3, device=self.device)
+            # world -> body frame with the CURRENT orientation (IsaacLab's permanent wrench composer caches the link
+            # orientation from its first call for is_global=True, so global wrenches on a turning body go wrong)
+            q_b = body.data.root_quat_w.unsqueeze(1)
             if body is self.object:
                 f = getattr(self, "_object_forces", None); t = getattr(self, "_object_torques", None)
-                self.object.set_external_force_and_torque(zero if f is None else f,
-                                                          (zero if t is None else t) - (tau_tot.unsqueeze(-1) * axis_w).unsqueeze(1),
-                                                          is_global=True)
+                f_w = zero if f is None else f
+                t_w = (zero if t is None else t) - (tau_tot.unsqueeze(-1) * axis_w).unsqueeze(1)
+                self.object.set_external_force_and_torque(quat_apply_inverse(q_b.expand(-1, f_w.shape[1], 4), f_w),
+                                                          quat_apply_inverse(q_b.expand(-1, t_w.shape[1], 4), t_w),
+                                                          is_global=False)
             else:
                 # _turn_ext_force / _turn_ext_torque: an extra wrench on the jointed body (no-hand probes), kept
                 f_x = getattr(self, "_turn_ext_force", None); t_x = getattr(self, "_turn_ext_torque", None)
-                f_x = (zero if f_x is None else f_x) + (f_ax.unsqueeze(-1) * -axis_w).unsqueeze(1)
-                body.set_external_force_and_torque(f_x,
-                                                   (zero if t_x is None else t_x) - (tau_tot.unsqueeze(-1) * axis_w).unsqueeze(1),
-                                                   is_global=True)
+                f_w = (zero if f_x is None else f_x) + (f_ax.unsqueeze(-1) * -axis_w).unsqueeze(1)
+                t_w = (zero if t_x is None else t_x) - (tau_tot.unsqueeze(-1) * axis_w).unsqueeze(1)
+                body.set_external_force_and_torque(quat_apply_inverse(q_b.expand(-1, f_w.shape[1], 4), f_w),
+                                                   quat_apply_inverse(q_b.expand(-1, t_w.shape[1], 4), t_w),
+                                                   is_global=False)
         touched = corr != 0
         # (1) angle: stop / lower bound
         c = corr
