@@ -335,6 +335,10 @@ class PreciseAssemblyCfg:
     # A7 no-hand probe only: D6 joint GoalViz -> Object with an implicit yaw drive (N m/rad, N m s/rad); 0 = off.
     # A7: pin the object at its start pose for the first N policy steps of each episode (a tool in a holder; 0 = off).
     object_start_hold_steps: int = 0
+    # A7: > 0 = after object_start_hold_steps keep holding until >= this many fingertip pads touch the object (a tool in
+    # a holder until the hand has it), at most object_start_hold_max_steps policy steps.
+    object_start_hold_until_grasp: int = 0
+    object_start_hold_max_steps: int = 360
     probe_key_driver_k: float = 0.0
     probe_key_driver_d: float = 0.0
     distractor_velocity_iterations: int = 0

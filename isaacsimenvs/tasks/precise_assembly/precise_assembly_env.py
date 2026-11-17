@@ -776,7 +776,23 @@ class PreciseAssemblyEnv(PlayEnv):
             return
         if not hasattr(self, "_hold_substeps"):
             self._hold_substeps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
-        held = self._hold_substeps < N * int(self.cfg.decimation)
+        dec = int(self.cfg.decimation)
+        held = self._hold_substeps < N * dec
+        pads_req = int(getattr(self.cfg.precise_assembly, "object_start_hold_until_grasp", 0))
+        if pads_req > 0:
+            # hold until the hand has the tool: >= pads_req fingertip pads touching it (last policy step's taxels),
+            # at most object_start_hold_max_steps; the release is latched per episode
+            if not hasattr(self, "_hold_grasped"):
+                self._hold_grasped = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                self._hold_released_by_grasp = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            tac = getattr(self, "_last_tactile", None)
+            if tac is not None:
+                pads = (tac.reshape(self.num_envs, 5, -1).sum(-1) > 0).sum(-1)
+                newly = (pads >= pads_req) & ~self._hold_grasped & (self._hold_substeps >= N * dec)
+                self._hold_released_by_grasp |= newly
+                self._hold_grasped |= newly
+            nmax = int(getattr(self.cfg.precise_assembly, "object_start_hold_max_steps", N))
+            held = held | (~self._hold_grasped & (self._hold_substeps < nmax * dec))
         self._hold_substeps += 1
         ids = held.nonzero(as_tuple=False).squeeze(-1)
         if ids.numel() == 0:
@@ -1303,6 +1319,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._hold_substeps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
             self._object_start_pose_w[env_ids] = w
             self._hold_substeps[env_ids] = 0
+            if hasattr(self, "_hold_grasped"):
+                self._hold_grasped[env_ids] = False
+                self._hold_released_by_grasp[env_ids] = False
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
         # (z - init_z > 0.10, which gates the keypoint reward) would need ~20 cm above the bin. Measure from here.
@@ -1369,6 +1388,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 and getattr(self, "_object_start_pose_w", None) is not None:
             self._object_start_pose_w[env_ids] = torch.cat([pos + self.scene.env_origins[env_ids], quat], -1)
             self._hold_substeps[env_ids] = 0
+            if hasattr(self, "_hold_grasped"):
+                self._hold_grasped[env_ids] = False
+                self._hold_released_by_grasp[env_ids] = False
         self._successes[env_ids] = b["successes"][k].long()
         self._start_successes[env_ids] = b["successes"][k].long()
         self._lifted_object[env_ids] = b["lifted"][k].bool()
