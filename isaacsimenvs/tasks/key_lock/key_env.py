@@ -157,6 +157,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
         links = [p for p in p0 if p.split("/")[-1] in HAND_LINKS]
         names = [p.split("/")[-1] for p in links]
         self._key_pad_idx = torch.tensor([names.index(p) for p in PADS], device=dev)
+        self.key_link_names = names
         sim_view = self.object._physics_sim_view
         self._key_view = sim_view.create_rigid_contact_view(
             _glob(self.object.root_physx_view.prim_paths[0]), filter_patterns=[_glob(p) for p in links])
@@ -182,6 +183,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_rel_phi = z(); self._key_still_phi = z()
         self._key_min_tip = z()
         self._key_amax, self._key_dmax = z(), z()
+        self._key_t = z(torch.long)
+        self._key_turn_touch = z()                       # turning steps with any hand-key force > pinch_pad_n
+        self._key_turn_linkf = torch.zeros(N, len(HAND_LINKS), device=dev)   # sum of per-link force on turning steps      # policy steps since reset (episode_length_buf restarts on every goal credit)
         self._key_cleared_ep, self._key_released_ep = z(torch.bool), z(torch.bool)
         print(f"[key_lock] contact views: key / door vs {self._key_nl} hand links; clear "
               f"{torch.rad2deg(self.key_clear[:4]).tolist()} deg; break_ratio {kl.break_ratio}", flush=True)
@@ -224,7 +228,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
             return
         kl = self.cfg.key_lock
         c = self.cfg.precise_assembly
-        t = self.episode_length_buf
+        t = self._key_t
         s0, s1 = (int(v) for v in kl.start_probe_steps)
         on = ((t >= s0) & (t <= s1)) | self._key_probe_on
         jd = self._pih_joints[int(c.latch_door_joint)]
@@ -251,13 +255,15 @@ class KeyLockEnv(PreciseAssemblyEnv):
         F = self._key_view.get_contact_force_matrix(self.physics_dt).reshape(N, self._key_nl, 3).norm(dim=-1)
         Fd = self._door_view.get_contact_force_matrix(self.physics_dt).reshape(N, self._key_nl, 3).norm(dim=-1)
         self.key_pad_f = F[:, self._key_pad_idx]
+        self.key_link_f = F
         self.key_hand_f = F.sum(-1)
         self.door_hand_f = Fd.sum(-1)
         self._update_joint_angles()
         k = int(c.unlock_joint)
         ang = self.cb_joint_angle[k]
         door = self.cb_joint_angle[int(c.latch_door_joint)]
-        t = self.episode_length_buf
+        self._key_t += 1
+        t = self._key_t
         # start lock probe
         s0, s1 = (int(v) for v in kl.start_probe_steps)
         inwin = (t >= s0) & (t <= s1 + 6)
@@ -270,6 +276,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_pinch_ok += (turning & (npad >= 2)).float()
         self._key_pinch_over += (turning & (self.key_pad_f.max(-1).values > float(kl.pinch_max_n))).float()
         self._key_turning_ok = turning & (npad >= 2)
+        self._key_turn_touch += (turning & (self.key_hand_f > float(kl.pinch_pad_n))).float()
+        self._key_turn_linkf += turning.float().unsqueeze(-1) * self.key_link_f[:, :self._key_turn_linkf.shape[1]]
         self._key_prev_ang = ang.clone()
         # release / still / probe (after the clear goal = retract phase)
         tips = self.robot.data.body_pos_w[:, self._fingertip_body_ids, 0:3]
@@ -342,6 +350,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_last_released = self._key_released_ep.clone()
         self._key_last_probe = self._key_probe_on.clone()
         self._key_last_handf = self.key_hand_f.clone()
+        self._key_last_touch = self._key_turn_touch.clone()
+        self._key_last_linkf = self._key_turn_linkf.clone()
         return terminated | self._key_term, truncated
 
     def _get_rewards(self):
@@ -376,9 +386,10 @@ class KeyLockEnv(PreciseAssemblyEnv):
             return
         self._ja_reinit[env_ids] = True
         for t in (self._key_turn_steps, self._key_pinch_ok, self._key_pinch_over, self._key_prev_ang,
-                  self._key_start_max, self._key_rel_phi, self._key_still_phi, self._key_amax, self._key_dmax):
+                  self._key_start_max, self._key_rel_phi, self._key_still_phi, self._key_amax, self._key_dmax,
+                  self._key_turn_touch, self._key_turn_linkf):
             t[env_ids] = 0.0
-        for t in (self._key_still, self._key_probe_t, self._key_break_count):
+        for t in (self._key_still, self._key_probe_t, self._key_break_count, self._key_t):
             t[env_ids] = 0
         for t in (self._key_probe_on, self._key_ok, self._key_cleared_ep, self._key_released_ep):
             t[env_ids] = False
