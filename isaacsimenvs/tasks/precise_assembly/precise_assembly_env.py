@@ -654,6 +654,10 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_prev_ep_toolless_deg[env_ids] = self.turn_toolless_deg[env_ids]
             self.turn_toolless_deg[env_ids] = 0.0
             self.turn_toolless[env_ids] = False
+            if getattr(self, "_tl_seg_start", None) is not None:
+                self._tl_seg_start[env_ids] = self.turn_angle[env_ids]
+                self._tl_out[env_ids] = False
+                self._tl_committed[env_ids] = 0.0
             self._turn_prev_step_angle[env_ids] = self.turn_angle[env_ids]
             self.turn_released_early[env_ids] = False
             self._turn_early_clear[env_ids] = 0
@@ -942,7 +946,7 @@ class PreciseAssemblyEnv(PlayEnv):
                         tau_c = tau_c + frac * hm * self.turn_lock_flag.float()
             w_f = (vel[:, 3:6] * axis_w).sum(-1)
             kb = float(getattr(pc, "turn_thread_bristle_k", 0.0))
-            if kb > 0.0:   # A9: elasto-plastic stiction (official STICTION_K), holds below breakaway without creep
+            if kb > 0.0:   # A9 (f652587): elasto-plastic stiction (official STICTION_K), holds below breakaway, no creep
                 if getattr(self, "_turn_bristle_z", None) is None:
                     self._turn_bristle_z = torch.zeros(n, device=self.device)
                 zmax = tau_c / kb
@@ -1268,11 +1272,19 @@ class PreciseAssemblyEnv(PlayEnv):
             h = (rel * up).sum(-1)
             radial = (rel - h.unsqueeze(-1) * up).norm(dim=-1)
             inside |= (radial < float(pc.turn_tool_radial_m)) & (h < float(pc.turn_tool_out_m))
-        d_deg = torch.rad2deg(d)
-        db = float(getattr(pc, "turn_toolless_deadband_deg", 0.0))
-        if db > 0.0:   # A9: ignore sim jitter
-            d_deg = torch.where(d_deg < db, torch.zeros_like(d_deg), d_deg)
-        self.turn_toolless_deg += torch.where(inside, torch.zeros_like(d_deg), d_deg)
+        # NET rotation over each stretch with no tool tip in the recess (sim jitter averages out; a slow real turn by
+        # fingers still accumulates): committed (closed stretches) + |angle - angle at the stretch's start|
+        if getattr(self, "_tl_seg_start", None) is None:
+            self._tl_seg_start = self.turn_angle.clone()
+            self._tl_out = torch.zeros_like(inside)
+            self._tl_committed = torch.zeros_like(self.turn_toolless_deg)
+        starts = ~inside & ~self._tl_out
+        self._tl_seg_start = torch.where(starts, self.turn_angle, self._tl_seg_start)
+        cur = torch.rad2deg((self.turn_angle - self._tl_seg_start).abs())
+        ends = inside & self._tl_out
+        self._tl_committed = self._tl_committed + torch.where(ends, cur, torch.zeros_like(cur))
+        self._tl_out = ~inside
+        self.turn_toolless_deg = self._tl_committed + torch.where(self._tl_out, cur, torch.zeros_like(cur))
         self.extras["turn_tool_in_recess_frac"] = inside.float().mean()
         lim = float(pc.turn_toolless_max_deg)
         if lim > 0.0:

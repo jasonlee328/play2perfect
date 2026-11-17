@@ -281,6 +281,11 @@ class PreciseAssemblyCfg:
     turn_thread_friction: float = 0.0
     turn_thread_viscous: float = 0.0   # unused (11-17: viscous drag = JointSpec.damping on the PhysX drive)
     turn_thread_stiction_w: float = 0.03   # rad/s: tanh width of the Coulomb friction torque
+    # A9 (f652587): > 0 = elasto-plastic bristle stiction instead of the tanh Coulomb (official ThreadModel,
+    # STICTION_K 2 N m/rad): bristle z integrates the spin, |k z| capped at the friction cap (running drag + seat
+    # preload); torque k z + d w while sticking. The tanh model creeps below breakaway; the bristle holds.
+    turn_thread_bristle_k: float = 0.0
+    turn_thread_bristle_d: float = 0.02
     # A7 axial helix spring (N/m, N s/m; 0 = off = pose-level band only, which a press undoes within one physics step
     # for a light body): force toward the helix height + the body's weight; the pose band then only clamps errors
     # beyond turn_thread_axial_backstop_m. Needs a heavy enough jointed body (k dt^2 / m < 1).
