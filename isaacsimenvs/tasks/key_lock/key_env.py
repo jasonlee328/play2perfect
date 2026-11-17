@@ -270,6 +270,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
     def _actor_turn_hide(self):
         if not bool(self.cfg.key_lock.hide_key_angle) or not hasattr(self, "_ja_reinit"):
             return None
+        if not hasattr(self, "cb_joint_angle"):
+            self._update_joint_angles()          # first obs build at reset, before any measurement
         c = self.cfg.precise_assembly
         j = self._pih_joints[int(c.unlock_joint)]
         door = self.distractors[int(j.parent[10:])]
