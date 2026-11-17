@@ -315,6 +315,9 @@ class PreciseAssemblyCfg:
     # A7: the turn-progress reward / turn goals count only while a tool tip is in the recess (no reward for turning the
     # head with the fingers).
     turn_progress_requires_tool: bool = False
+    # A9: no tool tip in the recess -> the screw's axial spin is removed every substep (official: undriven screw stops at
+    # once, armature 2e-7; ours coasts on its 2e-4 inertia). Off = A7 behaviour.
+    turn_coast_stop: bool = False
     turn_preload_free_deg: float = 10.0
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9
