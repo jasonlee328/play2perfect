@@ -1323,6 +1323,10 @@ class PreciseAssemblyEnv(PlayEnv):
             # Robot joints are absolute, so the bank only fits the hole layout it was recorded on.
             self._start_bank_hole_pos = (torch.as_tensor(d["hole_pos"], device=self.device).float()
                                          if "hole_pos" in d.files else None)
+            # A7: in-hand banks also carry the screw's start height on its thread (recorded at the end of the start
+            # hold, when the screw has not moved from its reset pose)
+            self._start_bank_u = (torch.as_tensor(d["turn_u_start"], device=self.device).float()
+                                  if "turn_u_start" in d.files else None)
             if self._start_bank_hole_pos is None:
                 print("[PreciseAssemblyEnv] start-state bank has no hole_pos; can't check the hole "
                       "layout matches (use the layout it was recorded on)", flush=True)
@@ -1350,6 +1354,21 @@ class PreciseAssemblyEnv(PlayEnv):
         self.object.write_root_pose_to_sim(torch.cat([pos + self.scene.env_origins[env_ids], quat], -1), env_ids=env_ids)
         self.object.write_root_velocity_to_sim(vel, env_ids=env_ids)
 
+        if getattr(self, "_start_bank_u", None) is not None and getattr(self, "turn_thread", False) \
+                and not self._turn_thread_body_is_object():
+            # screw back on its thread at the bank entry's start height (same orientation as its reset pose)
+            kk = int(self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)].body[10:])
+            w = self._pose_rel_hole_to_world(env_ids, self._pih_distractor_pose_rel[kk]).clone()
+            axis_w, _ = self._turn_axis_w()
+            u = self._start_bank_u[k]
+            self.turn_u_start[env_ids] = u
+            w[:, 0:3] -= axis_w[env_ids] * u.unsqueeze(-1)
+            self.distractors[kk].write_root_pose_to_sim(w, env_ids=env_ids)
+            self.distractors[kk].write_root_velocity_to_sim(torch.zeros(n, 6, device=self.device), env_ids=env_ids)
+        if int(getattr(self.cfg.precise_assembly, "object_start_hold_steps", 0)) > 0 \
+                and getattr(self, "_object_start_pose_w", None) is not None:
+            self._object_start_pose_w[env_ids] = torch.cat([pos + self.scene.env_origins[env_ids], quat], -1)
+            self._hold_substeps[env_ids] = 0
         self._successes[env_ids] = b["successes"][k].long()
         self._start_successes[env_ids] = b["successes"][k].long()
         self._lifted_object[env_ids] = b["lifted"][k].bool()
