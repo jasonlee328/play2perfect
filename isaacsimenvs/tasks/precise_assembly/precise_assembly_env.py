@@ -903,6 +903,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self._soft_stop_hits[env_ids] = 0.0
             self._cbf_over_max[env_ids] = 0.0
             self._cbf_prev_door[env_ids] = 0.0
+            if hasattr(self, "_cbf_grasp_miss"):
+                self._cbf_grasp_miss[env_ids] = 0.0
             if hasattr(self, "_cbf_run"):
                 self._cbf_run[env_ids] = 0.0
                 self._cbf_run_prev[env_ids] = 0.0
@@ -1479,7 +1481,16 @@ class PreciseAssemblyEnv(PlayEnv):
         open_ = (door >= math.radians(float(c.door_open_deg))) & self.latch_open_ep
         ok = torch.ones_like(open_)
         if int(c.latch_cbf_grasp_fingers) > 0:
-            self._cbf_grasp_ok = self._cbf_fingers_on_knob() >= int(c.latch_cbf_grasp_fingers)
+            raw = self._cbf_fingers_on_knob() >= int(c.latch_cbf_grasp_fingers)
+            g = int(getattr(c, "latch_cbf_grasp_grace_steps", 0))
+            if g > 0:
+                # A8 (official finger_grip_sustained tolerates single-frame pad zeros, gated per 50 ms = 3 frames):
+                # up to g consecutive steps without the pads count as still grasped
+                if not hasattr(self, "_cbf_grasp_miss"):
+                    self._cbf_grasp_miss = torch.zeros(self.num_envs, device=self.device)
+                self._cbf_grasp_miss = torch.where(raw, torch.zeros_like(self._cbf_grasp_miss), self._cbf_grasp_miss + 1.0)
+                raw = self._cbf_grasp_miss <= g
+            self._cbf_grasp_ok = raw
             ok = ok & self._cbf_grasp_ok
         rate = torch.rad2deg((door - self._cbf_prev_door).abs()) / float(self.step_dt)
         self._cbf_prev_door = door.clone()

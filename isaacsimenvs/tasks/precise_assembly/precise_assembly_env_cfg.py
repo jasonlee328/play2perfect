@@ -323,6 +323,9 @@ class PreciseAssemblyCfg:
     # true: the hold reward is potential-based on the run length (scale x delta(run / success_steps)), so it totals
     # latch_cbf_hold_rew_scale at success and a broken run gives it back (the per-step version was farmed, 11-17).
     latch_cbf_hold_potential: bool = False
+    # A8: up to this many consecutive steps without >= latch_cbf_grasp_fingers pads on the knob still count as grasped
+    # (official finger_grip_sustained is gated per 50 ms = 3 frames); 0 = every step.
+    latch_cbf_grasp_grace_steps: int = 0
     # Distractor indices baked kinematic (no gravity; posed only by resets / the env), e.g. the latch keeper.
     kinematic_distractors: tuple[int, ...] = ()
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
