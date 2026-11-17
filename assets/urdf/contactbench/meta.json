@@ -722,7 +722,7 @@
     0.375,
     0.5875
    ],
-   "collision": "head: floor disc + 4 recess-ring sectors (exact convex), +0.3 mm",
+   "collision": "head: floor disc + 4 recess wall boxes (inner faces on the 5.5 mm square, past the corners) + 4 outer ring sectors (chord at 2.85 mm), +0.3 mm",
    "frame": "origin on the axis at the head underside"
   },
   "ak_key": {
