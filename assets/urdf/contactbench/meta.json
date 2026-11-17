@@ -727,7 +727,7 @@
   },
   "ak_key": {
    "mass_scale": 1.0,
-   "inertia_scale": 1.0,
+   "inertia_scale": 100.0,
    "src": "official bodies_kit/allen_key/allen_key.stl",
    "extents_mm": [
     67.5,
