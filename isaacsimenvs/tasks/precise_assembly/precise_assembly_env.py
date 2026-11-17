@@ -644,6 +644,10 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_prev_ep_toolless_deg[env_ids] = self.turn_toolless_deg[env_ids]
             self.turn_toolless_deg[env_ids] = 0.0
             self.turn_toolless[env_ids] = False
+            if getattr(self, "_tl_seg_start", None) is not None:
+                self._tl_seg_start[env_ids] = self.turn_angle[env_ids]
+                self._tl_out[env_ids] = False
+                self._tl_committed[env_ids] = 0.0
             self._turn_prev_step_angle[env_ids] = self.turn_angle[env_ids]
             self.turn_released_early[env_ids] = False
             self._turn_early_clear[env_ids] = 0
@@ -1241,7 +1245,19 @@ class PreciseAssemblyEnv(PlayEnv):
             h = (rel * up).sum(-1)
             radial = (rel - h.unsqueeze(-1) * up).norm(dim=-1)
             inside |= (radial < float(pc.turn_tool_radial_m)) & (h < float(pc.turn_tool_out_m))
-        self.turn_toolless_deg += torch.where(inside, torch.zeros_like(d), torch.rad2deg(d))
+        # NET rotation over each stretch with no tool tip in the recess (sim jitter averages out; a slow real turn by
+        # fingers still accumulates): committed (closed stretches) + |angle - angle at the stretch's start|
+        if getattr(self, "_tl_seg_start", None) is None:
+            self._tl_seg_start = self.turn_angle.clone()
+            self._tl_out = torch.zeros_like(inside)
+            self._tl_committed = torch.zeros_like(self.turn_toolless_deg)
+        starts = ~inside & ~self._tl_out
+        self._tl_seg_start = torch.where(starts, self.turn_angle, self._tl_seg_start)
+        cur = torch.rad2deg((self.turn_angle - self._tl_seg_start).abs())
+        ends = inside & self._tl_out
+        self._tl_committed = self._tl_committed + torch.where(ends, cur, torch.zeros_like(cur))
+        self._tl_out = ~inside
+        self.turn_toolless_deg = self._tl_committed + torch.where(self._tl_out, cur, torch.zeros_like(cur))
         self.extras["turn_tool_in_recess_frac"] = inside.float().mean()
         lim = float(pc.turn_toolless_max_deg)
         if lim > 0.0:
