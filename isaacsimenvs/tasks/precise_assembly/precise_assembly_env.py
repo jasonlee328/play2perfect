@@ -1725,6 +1725,7 @@ class PreciseAssemblyEnv(PlayEnv):
             on = nrm > float(c.hs_link_force_min)
             palm = on[:, self._hs_palm_idx] if self._hs_palm_idx >= 0 else torch.zeros_like(on[:, 0])
             self.hs_links = on.sum(-1)
+            self.hs_palm = palm
             self.hs_power = palm & (self.hs_links >= int(c.hs_grasp_links_min))
             self.hs_touched |= on.any(-1)
             Fd = self._hs_door_view.get_contact_force_matrix(float(self.physics_dt)).to(self.device)
@@ -2123,8 +2124,13 @@ class PreciseAssemblyEnv(PlayEnv):
 
         # A8 human-style shaping (human_style): power grasp, no hand on the door panel, swing the door toward ~40 deg
         if bool(getattr(pih_cfg, "human_style", False)) and hasattr(self, "hs_power"):
-            gr = float(pih_cfg.hs_grasp_rew_scale) * (self.hs_power & self.hs_touched).float()
-            pp = -float(pih_cfg.hs_panel_pen_scale) * self.hs_panel_force.clamp(max=10.0)
+            if bool(getattr(pih_cfg, "hs_grasp_dense", False)):
+                m = float(pih_cfg.hs_grasp_links_min)
+                gq = 0.5 * self.hs_links.float().clamp(max=m) / m + 0.5 * self.hs_palm.float()
+            else:
+                gq = (self.hs_power & self.hs_touched).float()
+            gr = float(pih_cfg.hs_grasp_rew_scale) * gq
+            pp = -float(pih_cfg.hs_panel_pen_scale) * self.hs_panel_force.clamp(max=float(getattr(pih_cfg, "hs_panel_cap", 10.0)))
             dj = int(pih_cfg.latch_door_joint)
             phi = (self.cb_joint_angle[dj] / math.radians(float(pih_cfg.hs_door_target_deg))).clamp(0.0, 1.0)
             phi = phi * getattr(self, "latch_open_ep", torch.ones_like(phi, dtype=torch.bool)).float()

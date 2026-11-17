@@ -347,6 +347,9 @@ class PreciseAssemblyCfg:
     hs_door_target_deg: float = 40.0
     hs_door_rew_scale: float = 0.0        # potential S x delta clamp(door / target, 0, 1) after the latch cleared
     hs_success_requires_grasp: bool = False   # the held-open success run also needs the power grasp
+    # dense grasp reward: scale x (0.5 x min(links on the knob, hs_grasp_links_min) / hs_grasp_links_min + 0.5 x palm on)
+    hs_grasp_dense: bool = False
+    hs_panel_cap: float = 10.0            # N, cap of the hand-on-panel force in the penalty
     object_compliant_damping: float = 0.0
     hand_force_gain: float = 0.5
     crush_force: float = 0.0
