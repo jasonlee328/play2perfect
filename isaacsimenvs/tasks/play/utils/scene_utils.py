@@ -1428,8 +1428,11 @@ def _bake_usd(
     props: dict | None = None,
     apply_physx_articulation: bool = False,
     collision_enabled: bool | None = None,
+    rest_offset: float | None = None,
 ) -> str:
     """Copy raw USD into bake_root/baked_subdir and pre-author physics props.
+
+    ``rest_offset`` (m) replaces _REST_OFFSET on this asset's collision shapes (None = _REST_OFFSET).
 
     ``props`` keys come from ``_PHYSICS_SPECS``; ``None`` values are skipped,
     and keys whose group doesn't match a prim's APIs are skipped per-prim.
@@ -1490,7 +1493,7 @@ def _bake_usd(
         if prim.HasAPI(UsdPhysics.CollisionAPI):
             px = PhysxSchema.PhysxCollisionAPI(prim) or PhysxSchema.PhysxCollisionAPI.Apply(prim)
             px.CreateContactOffsetAttr().Set(_CONTACT_OFFSET)
-            px.CreateRestOffsetAttr().Set(_REST_OFFSET)
+            px.CreateRestOffsetAttr().Set(_REST_OFFSET if rest_offset is None else float(rest_offset))
             if collision_enabled is not None:
                 ce = UsdPhysics.CollisionAPI(prim)
                 (ce.GetCollisionEnabledAttr() or ce.CreateCollisionEnabledAttr()).Set(

@@ -147,6 +147,24 @@ class PreciseAssemblyCfg:
     start_state_sequential: bool = False
     start_state_offset: int = 0
 
+    # Object / distractor rigid bodies: PhysX position iterations (4 = unchanged) and, when not None, the collision
+    # rest offset (m, may be negative) of the object, distractor and receptive shapes (None: play scene_utils
+    # _REST_OFFSET = 0). A pair rests at the sum of its two shapes' rest offsets.
+    object_solver_position_iterations: int = 4
+    object_rest_offset: float = 0.0   # 0.0 = the play default _REST_OFFSET (a None default rejects float overrides)
+
+    # Official-style ("strict") success for the last goal, from the ContactBench sim's retrieve_top_cup_from_stack
+    # verdict (force_bench appendix_tasks): the object upright (tilt < strict_max_tilt_deg) and every distractor
+    # still where it was reset ("stack_remains_neat": reference point strict_ref_local (object frame, m; the cup's
+    # base centre) within strict_neat_axis_tol sideways and strict_neat_step_tol vertically of its reset position,
+    # tilt < strict_max_tilt_deg). "off" = old rule; "report" = old rule, but the checks at the moment the last goal
+    # is credited are recorded (env._strict_at_success, for evals); "gate" = the last goal only counts while they hold.
+    strict_success: str = "off"
+    strict_max_tilt_deg: float = 3.0
+    strict_neat_axis_tol: float = 0.002
+    strict_neat_step_tol: float = 0.0015
+    strict_ref_local: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
     """Return a render-overlay-compatible sim cfg for teacher and student tasks."""

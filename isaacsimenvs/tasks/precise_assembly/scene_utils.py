@@ -133,6 +133,9 @@ def setup_scene(env) -> None:
     usd_work_dir.mkdir(parents=True, exist_ok=True)
 
     multi = len(obj_urdfs) > 1
+    pa_cfg = env.cfg.precise_assembly
+    obj_iters = int(getattr(pa_cfg, "object_solver_position_iterations", 4))
+    rest = getattr(pa_cfg, "object_rest_offset", None)  # None = the play default (_REST_OFFSET)
     object_usd_paths, goalviz_usd_paths, hole_usd_paths = [], [], []
     for k, (obj_urdf, hole_urdf) in enumerate(zip(obj_urdfs, hole_urdfs)):
         sfx = f"_{k}" if multi else ""
@@ -145,10 +148,11 @@ def setup_scene(env) -> None:
                 kinematic_enabled=False,
                 disable_gravity=False,
                 max_depenetration_velocity=1000.0,
-                rb_solver_position_iterations=4,
+                rb_solver_position_iterations=obj_iters,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
             ),
+            rest_offset=rest,
         ))
         goalviz_usd_paths.append(_bake_usd(
             object_raw_usd,
@@ -174,6 +178,7 @@ def setup_scene(env) -> None:
                 rb_solver_position_iterations=4,
                 rb_solver_velocity_iterations=0,
             ),
+            rest_offset=rest,
         ))
 
     distractor_usd_paths = []
@@ -186,10 +191,11 @@ def setup_scene(env) -> None:
                 kinematic_enabled=False,
                 disable_gravity=False,
                 max_depenetration_velocity=1000.0,
-                rb_solver_position_iterations=4,
+                rb_solver_position_iterations=obj_iters,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
             ),
+            rest_offset=rest,
         ))
 
     robot_usd_path = _bake_usd(

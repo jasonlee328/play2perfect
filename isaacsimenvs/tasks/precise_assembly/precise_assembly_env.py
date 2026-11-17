@@ -509,15 +509,70 @@ class PreciseAssemblyEnv(PlayEnv):
             self.distractor_disp_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_moved_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_rise = torch.zeros(self.num_envs, device=self.device)
+            self._distractor_reset_ref = torch.zeros(len(dists), self.num_envs, 3, device=self.device)
+        ref = torch.tensor(self.cfg.precise_assembly.strict_ref_local, device=self.device, dtype=torch.float32)
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
             w = self._pose_rel_hole_to_world(env_ids, pose)
             body.write_root_pose_to_sim(w, env_ids=env_ids)
             body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
             self._distractor_reset_pos[k, env_ids] = w[:, :3]
+            self._distractor_reset_ref[k, env_ids] = w[:, :3] + quat_apply(w[:, 3:7], ref.expand(env_ids.numel(), 3))
         self.distractor_disp[env_ids] = 0.0
         self.distractor_disp_ep_max[env_ids] = 0.0
         self.distractor_moved_ep_max[env_ids] = 0.0
         self.distractor_rise[env_ids] = 0.0
+
+    def _strict_checks(self) -> dict[str, torch.Tensor]:
+        """Official-style end checks (cfg strict_*; retrieve_top_cup_from_stack's top_cup_on_table tilt and
+        stack_remains_neat): object tilt from world +z (deg) and, over the distractors, the largest sideways /
+        vertical offset of the reference point from its reset position (m) and the largest tilt (deg)."""
+        c = self.cfg.precise_assembly
+        z = torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(self.num_envs, 3)
+        tilt = torch.rad2deg(torch.acos(quat_apply(self.object.data.root_quat_w, z)[:, 2].clamp(-1.0, 1.0)))
+        out = {"tilt_deg": tilt}
+        dists = getattr(self, "distractors", ())
+        zeros = torch.zeros(self.num_envs, device=self.device)
+        if dists and hasattr(self, "_distractor_reset_ref"):
+            ref = torch.tensor(c.strict_ref_local, device=self.device, dtype=torch.float32).expand(self.num_envs, 3)
+            pts = torch.stack([b.data.root_pos_w + quat_apply(b.data.root_quat_w, ref) for b in dists])  # (K, N, 3)
+            d = pts - self._distractor_reset_ref
+            out["nb_axis_m"] = d[..., :2].norm(dim=-1).max(dim=0).values
+            out["nb_step_m"] = d[..., 2].abs().max(dim=0).values
+            out["nb_rise_m"] = d[..., 2].max(dim=0).values
+            out["nb_tilt_deg"] = torch.stack([torch.rad2deg(torch.acos(
+                quat_apply(b.data.root_quat_w, z)[:, 2].clamp(-1.0, 1.0))) for b in dists]).max(dim=0).values
+        else:
+            out.update(nb_axis_m=zeros, nb_step_m=zeros, nb_rise_m=zeros, nb_tilt_deg=zeros)
+        out["upright"] = tilt < c.strict_max_tilt_deg
+        out["neat"] = ((out["nb_axis_m"] <= c.strict_neat_axis_tol) & (out["nb_step_m"] <= c.strict_neat_step_tol)
+                       & (out["nb_tilt_deg"] < c.strict_max_tilt_deg))
+        out["ok"] = out["upright"] & out["neat"]
+        return out
+
+    def _apply_strict_success(self, is_success: torch.Tensor) -> torch.Tensor:
+        """strict_success "report" / "gate" for the last goal (see the cfg). Records the checks at the step the
+        last goal is (or, in report mode, would be) credited in self._strict_at_success (NaN until then)."""
+        mode = self.cfg.precise_assembly.strict_success
+        if mode == "off":
+            return is_success
+        if mode not in ("report", "gate"):
+            raise ValueError(f"strict_success must be off / report / gate, got {mode!r}")
+        last = is_success & (self._successes + 1 >= self.env_max_goals) & ~self.is_random_goal_env
+        chk = self._strict_checks()
+        if not hasattr(self, "_strict_at_success"):
+            self._strict_at_success = {k: torch.full((self.num_envs,), float("nan"), device=self.device)
+                                       for k in chk}
+        if mode == "gate":
+            is_success = is_success & ~(last & ~chk["ok"])
+            last = last & chk["ok"]
+            # consecutive hold: at the last goal every step the checks fail restarts the hold counter, so success
+            # needs termination.success_steps consecutive near-goal steps WITH the checks passing
+            at_last = (self._successes + 1 >= self.env_max_goals) & ~self.is_random_goal_env
+            self._near_goal_steps = torch.where(at_last & ~chk["ok"], torch.zeros_like(self._near_goal_steps),
+                                                self._near_goal_steps)
+        for k, v in chk.items():
+            self._strict_at_success[k][last] = v[last].float()
+        return is_success
 
     def _distractor_curriculum(self) -> tuple[float, float]:
         """(disturb tolerance, penalty multiplier in [0, 1]) at the current env step."""
@@ -906,6 +961,7 @@ class PreciseAssemblyEnv(PlayEnv):
         is_success = self._is_success.clone()
         if pih_cfg.enable_retract:
             is_success &= ~self.retract_phase
+        is_success = self._apply_strict_success(is_success)
         self._is_success = is_success
 
         self._successes += is_success.long()

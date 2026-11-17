@@ -5,6 +5,6 @@
   <link name="object">
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="ethernet_plug.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="ethernet_plug.obj" scale="1 1 1"/></geometry><sdf resolution="256"/></collision>
-    <inertial><mass value="0.001401"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="9.777797e-08" ixy="5.135131e-14" ixz="5.895652e-15" iyy="2.336769e-08" iyz="3.743677e-09" izz="1.004463e-07"/></inertial>
+    <inertial><mass value="0.001778"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="1.240886e-07" ixy="6.516918e-14" ixz="7.482084e-15" iyy="2.965558e-08" iyz="4.751044e-09" izz="1.274749e-07"/></inertial>
   </link>
 </robot>

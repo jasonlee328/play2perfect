@@ -11,6 +11,6 @@
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_04.obj" scale="1 1 1"/></geometry></collision>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_05.obj" scale="1 1 1"/></geometry></collision>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_06.obj" scale="1 1 1"/></geometry></collision>
-    <inertial><mass value="0.002620"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="1.459488e-07" ixy="-1.175286e-23" ixz="-2.585118e-09" iyy="2.041162e-07" iyz="-1.922081e-18" izz="3.368696e-07"/></inertial>
+    <inertial><mass value="0.002777"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="1.546951e-07" ixy="-1.245717e-23" ixz="-2.740036e-09" iyy="2.163482e-07" iyz="-2.037265e-18" izz="3.570571e-07"/></inertial>
   </link>
 </robot>
