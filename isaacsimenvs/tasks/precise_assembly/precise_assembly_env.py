@@ -906,6 +906,26 @@ class PreciseAssemblyEnv(PlayEnv):
                     tau_c = tau_c + frac * hm * self.turn_lock_flag.float()
             w_f = (vel[:, 3:6] * axis_w).sum(-1)
             tau_fric = tau_c * torch.tanh(w_f / float(pc.turn_thread_stiction_w))
+        k_ax = float(getattr(pc, "turn_thread_axial_k", 0.0))
+        f_ax = torch.zeros(n, device=self.device)
+        if k_ax > 0.0:
+            # A7 implicit-enough helix: an axial spring + damper pulls the body to its helix height (band clamp of the
+            # current height), + gravity compensation (the body's mass is raised so the explicit spring is stiff and
+            # stable; official: helix potential 1/2 k (z + L q)^2). The pose band below only acts as a backstop.
+            if not hasattr(self, "_turn_seat_pos_w"):
+                ids_all = torch.arange(n, device=self.device)
+                j_t = self._pih_joints[int(pc.unlock_joint)]
+                self._turn_seat_pos_w = (self._pose_rel_hole_to_world(ids_all, self._joint_reset_pose_rel(j_t))[:, 0:3]
+                                         + self.scene.env_origins)
+            up_s = -axis_w
+            u_s = ((pos - self._turn_seat_pos_w) * up_s).sum(-1)
+            r_s = self.turn_seat_angle - self.turn_angle
+            hel = r_s * self.turn_lead / (2.0 * math.pi)
+            tgt = torch.minimum(torch.maximum(u_s, torch.clamp(hel, min=0.0)), torch.clamp(hel + self.turn_play, min=0.0))
+            v_s = (vel[:, 0:3] * up_s).sum(-1)
+            if not hasattr(self, "_turn_body_mass"):
+                self._turn_body_mass = body.root_physx_view.get_masses().to(self.device).reshape(n, -1)[:, 0]
+            f_ax = k_ax * (tgt - u_s) - float(pc.turn_thread_axial_d) * v_s + self._turn_body_mass * 9.81
         elastic = None
         if K_lock > 0.0:
             # elastic lock where the raised inertia is on: no pose correction up to the backstop, spring + damper instead
@@ -918,7 +938,7 @@ class PreciseAssemblyEnv(PlayEnv):
             tau_l = torch.where(elastic, K_lock * over_e + float(pc.turn_lock_damping) * w_now.clamp_min(0.0),
                                 torch.zeros_like(over_l))
             self._turn_dbg_el = (elastic.clone(), tau_l.clone(), over_l.clone(), w_now.clone())
-        if K_lock > 0.0 or tau_c0 > 0.0:
+        if K_lock > 0.0 or tau_c0 > 0.0 or k_ax > 0.0:
             tau_tot = (tau_l if K_lock > 0.0 else torch.zeros(n, device=self.device)) + tau_fric   # both oppose +spin
             zero = torch.zeros(n, 1, 3, device=self.device)
             if body is self.object:
@@ -929,7 +949,8 @@ class PreciseAssemblyEnv(PlayEnv):
             else:
                 # _turn_ext_force / _turn_ext_torque: an extra wrench on the jointed body (no-hand probes), kept
                 f_x = getattr(self, "_turn_ext_force", None); t_x = getattr(self, "_turn_ext_torque", None)
-                body.set_external_force_and_torque(zero if f_x is None else f_x,
+                f_x = (zero if f_x is None else f_x) + (f_ax.unsqueeze(-1) * -axis_w).unsqueeze(1)
+                body.set_external_force_and_torque(f_x,
                                                    (zero if t_x is None else t_x) - (tau_tot.unsqueeze(-1) * axis_w).unsqueeze(1),
                                                    is_global=True)
         touched = corr != 0
@@ -976,6 +997,9 @@ class PreciseAssemblyEnv(PlayEnv):
         lo = torch.clamp(helix, min=0.0)
         hi = torch.clamp(helix + self.turn_play, min=0.0)
         du = torch.where(u < lo, lo - u, torch.where(u > hi, hi - u, torch.zeros_like(u)))
+        if float(getattr(pc, "turn_thread_axial_k", 0.0)) > 0.0:
+            bs = float(pc.turn_thread_axial_backstop_m)
+            du = torch.where(du.abs() > bs, du - torch.sign(du) * bs, torch.zeros_like(du))
         moved = du != 0
         pos = pos + up * du.unsqueeze(-1)
         v_ax = (vel[:, 0:3] * up).sum(-1)

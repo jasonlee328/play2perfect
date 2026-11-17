@@ -265,6 +265,12 @@ class PreciseAssemblyCfg:
     turn_thread_friction: float = 0.0
     turn_thread_viscous: float = 0.0   # unused (11-17: viscous drag = JointSpec.damping on the PhysX drive)
     turn_thread_stiction_w: float = 0.03   # rad/s: tanh width of the Coulomb friction torque
+    # A7 axial helix spring (N/m, N s/m; 0 = off = pose-level band only, which a press undoes within one physics step
+    # for a light body): force toward the helix height + the body's weight; the pose band then only clamps errors
+    # beyond turn_thread_axial_backstop_m. Needs a heavy enough jointed body (k dt^2 / m < 1).
+    turn_thread_axial_k: float = 0.0
+    turn_thread_axial_d: float = 0.0
+    turn_thread_axial_backstop_m: float = 0.0015
     # Turn mode: the first N goals are ordinary object-pose goals (tool above the screw, tool engaged), the last two
     # the turn goals (turn_first_goal_deg, then the stop / tight). 0 = all goals are turn goals (bottle).
     turn_prelude_goals: int = 0
