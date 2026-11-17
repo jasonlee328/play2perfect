@@ -699,7 +699,7 @@
   "key1_lock90": {
    "src": "for_printing/keys/key_1.stl + lock_module_zip gear_<n>_deg.stl",
    "extents_mm": [
-    24.23,
+    22.73,
     20.0,
     2.5
    ],
@@ -707,7 +707,7 @@
    "key_g": 1.374,
    "plug_g": 7.643,
    "object_scale": [
-    0.6059,
+    0.5684,
     0.5,
     0.25
    ],
@@ -739,7 +739,7 @@
   "key1_lock180": {
    "src": "for_printing/keys/key_1.stl + lock_module_zip gear_<n>_deg.stl",
    "extents_mm": [
-    24.23,
+    22.73,
     20.0,
     2.5
    ],
@@ -747,7 +747,7 @@
    "key_g": 1.374,
    "plug_g": 4.58,
    "object_scale": [
-    0.6059,
+    0.5684,
     0.5,
     0.25
    ],
@@ -779,7 +779,7 @@
   "key1_lock270": {
    "src": "for_printing/keys/key_1.stl + lock_module_zip gear_<n>_deg.stl",
    "extents_mm": [
-    24.23,
+    22.73,
     20.0,
     2.5
    ],
@@ -787,7 +787,7 @@
    "key_g": 1.374,
    "plug_g": 4.158,
    "object_scale": [
-    0.6059,
+    0.5684,
     0.5,
     0.25
    ],
@@ -819,7 +819,7 @@
   "key1_lock360": {
    "src": "for_printing/keys/key_1.stl + lock_module_zip gear_<n>_deg.stl",
    "extents_mm": [
-    24.23,
+    22.73,
     20.0,
     2.5
    ],
@@ -827,7 +827,7 @@
    "key_g": 1.374,
    "plug_g": 3.881,
    "object_scale": [
-    0.6059,
+    0.5684,
     0.5,
     0.25
    ],
