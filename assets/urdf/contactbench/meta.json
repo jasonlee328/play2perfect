@@ -695,6 +695,166 @@
     0.001010576
    ],
    "spindle_armature_kgm2": 0.001
+  },
+  "key1_lock90": {
+   "src": "for_printing/keys/key_1.stl + lock_module_zip gear_<n>_deg.stl",
+   "extents_mm": [
+    24.23,
+    20.0,
+    2.5
+   ],
+   "mass_g": 9.018,
+   "key_g": 1.374,
+   "plug_g": 7.643,
+   "object_scale": [
+    0.6059,
+    0.5,
+    0.25
+   ],
+   "collision": "coacd 8 (key above the plug face)",
+   "inertia_print_kgm2": [
+    [
+     7.4024e-07,
+     -9.4483e-10,
+     -9.0619e-11
+    ],
+    [
+     -9.4483e-10,
+     2.2171e-06,
+     -1.2129e-10
+    ],
+    [
+     -9.0619e-11,
+     -1.2129e-10,
+     2.2463e-06
+    ]
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "com_offset_mm": [
+    24.339,
+    0.234,
+    0.009
+   ]
+  },
+  "key1_lock180": {
+   "src": "for_printing/keys/key_1.stl + lock_module_zip gear_<n>_deg.stl",
+   "extents_mm": [
+    24.23,
+    20.0,
+    2.5
+   ],
+   "mass_g": 5.955,
+   "key_g": 1.374,
+   "plug_g": 4.58,
+   "object_scale": [
+    0.6059,
+    0.5,
+    0.25
+   ],
+   "collision": "coacd 8 (key above the plug face)",
+   "inertia_print_kgm2": [
+    [
+     2.1163e-07,
+     -3.5177e-10,
+     1.7898e-11
+    ],
+    [
+     -3.5177e-10,
+     1.2768e-06,
+     -1.2571e-10
+    ],
+    [
+     1.7898e-11,
+     -1.2571e-10,
+     1.3057e-06
+    ]
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "com_offset_mm": [
+    17.869,
+    0.231,
+    0.008
+   ]
+  },
+  "key1_lock270": {
+   "src": "for_printing/keys/key_1.stl + lock_module_zip gear_<n>_deg.stl",
+   "extents_mm": [
+    24.23,
+    20.0,
+    2.5
+   ],
+   "mass_g": 5.533,
+   "key_g": 1.374,
+   "plug_g": 4.158,
+   "object_scale": [
+    0.6059,
+    0.5,
+    0.25
+   ],
+   "collision": "coacd 8 (key above the plug face)",
+   "inertia_print_kgm2": [
+    [
+     1.913e-07,
+     7.0975e-10,
+     9.3855e-10
+    ],
+    [
+     7.0975e-10,
+     1.0872e-06,
+     6.427e-11
+    ],
+    [
+     9.3855e-10,
+     6.427e-11,
+     1.1162e-06
+    ]
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "com_offset_mm": [
+    16.295,
+    0.222,
+    -0.001
+   ]
+  },
+  "key1_lock360": {
+   "src": "for_printing/keys/key_1.stl + lock_module_zip gear_<n>_deg.stl",
+   "extents_mm": [
+    24.23,
+    20.0,
+    2.5
+   ],
+   "mass_g": 5.255,
+   "key_g": 1.374,
+   "plug_g": 3.881,
+   "object_scale": [
+    0.6059,
+    0.5,
+    0.25
+   ],
+   "collision": "coacd 8 (key above the plug face)",
+   "inertia_print_kgm2": [
+    [
+     1.8359e-07,
+     -1.67e-10,
+     6.168e-11
+    ],
+    [
+     -1.67e-10,
+     9.6883e-07,
+     -1.2656e-10
+    ],
+    [
+     6.168e-11,
+     -1.2656e-10,
+     9.9775e-07
+    ]
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "com_offset_mm": [
+    15.263,
+    0.23,
+    0.007
+   ]
   }
  },
  "fixtures": {
@@ -11787,6 +11947,426 @@
     "door_mass_g": 386.8,
     "note": "faithful ContactBench door (contactbench-sim f51f6aa): no keeper; the env's software latch (precise_assembly.latch_cbf=true) holds the hinge until the knob passes the clear angle of the env's pinion; knob stop / spring per env. Needs precise_assembly.latch_door_joint=0 unlock_joint=1 latch_keeper=-1 latch_cbf=true kinematic_distractors=[] unlock_angle_values_deg=[40,48,60,72,80] (subset)."
    }
+  },
+  "cb_key": {
+   "object": "key1_lock90",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    0.09925616475291729,
+    1.051928971828553e-05,
+    0.05440187106864793,
+    0.4999999999999999,
+    0.5,
+    -0.5,
+    0.49999999999999983
+   ],
+   "waypoints": [
+    [
+     0.099274467626606,
+     9.328146507926616e-05,
+     0.05440187106864793,
+     0.5792279653395692,
+     0.405579787672639,
+     -0.5792279653395692,
+     0.40557978767263886
+    ],
+    [
+     0.09951051928971831,
+     0.00024383524708270572,
+     0.05440187106864793,
+     -0.7071067811865475,
+     0.0,
+     0.7071067811865475,
+     0.0
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/doorlatch_door_key90/doorlatch_door_key90.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0995,
+      -0.0,
+      0.049
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": -1.0,
+     "upper_deg": 89.56,
+     "stiffness": 0.0,
+     "damping": 0.0
+    }
+   ],
+   "layout": {
+    "lock_deg": 90,
+    "travel_per_rad_mm": 16.0,
+    "stop_deg": 89.56,
+    "jamb_clear_deg": 87.7,
+    "friction_N": 1.25,
+    "plug_drag_Nm": 0.02,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "lock_axis_m": [
+     0.0995,
+     -0.0,
+     0.049
+    ],
+    "key_mass_g": 9.018,
+    "door_mass_g": 414.1,
+    "note": "A11 key task: needs the key_lock env (Isaacsimenvs-KeyLock-Direct-v0) with precise_assembly.latch_cbf=true latch_cbf_mechanism=key unlock_angle_values_deg=[90] latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[]."
+   }
+  },
+  "cb_key_lock180": {
+   "object": "key1_lock180",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    0.09925616475291729,
+    1.051928971828553e-05,
+    0.05440187106864793,
+    0.4999999999999999,
+    0.5,
+    -0.5,
+    0.49999999999999983
+   ],
+   "waypoints": [
+    [
+     0.099274467626606,
+     9.328146507926616e-05,
+     0.05440187106864793,
+     0.5792279653395692,
+     0.405579787672639,
+     -0.5792279653395692,
+     0.40557978767263886
+    ],
+    [
+     0.09951051928971831,
+     0.00024383524708270572,
+     0.05440187106864793,
+     -0.7071067811865475,
+     0.0,
+     0.7071067811865475,
+     0.0
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/doorlatch_door_key180/doorlatch_door_key180.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0995,
+      -0.0,
+      0.049
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": -1.0,
+     "upper_deg": 179.121,
+     "stiffness": 0.0,
+     "damping": 0.0
+    }
+   ],
+   "layout": {
+    "lock_deg": 180,
+    "travel_per_rad_mm": 8.0,
+    "stop_deg": 179.12,
+    "jamb_clear_deg": 175.4,
+    "friction_N": 1.25,
+    "plug_drag_Nm": 0.01,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "lock_axis_m": [
+     0.0995,
+     -0.0,
+     0.049
+    ],
+    "key_mass_g": 5.955,
+    "door_mass_g": 417.5,
+    "note": "A11 key task: needs the key_lock env (Isaacsimenvs-KeyLock-Direct-v0) with precise_assembly.latch_cbf=true latch_cbf_mechanism=key unlock_angle_values_deg=[180] latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[]."
+   }
+  },
+  "cb_key_lock270": {
+   "object": "key1_lock270",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    0.09925616475291729,
+    1.051928971828553e-05,
+    0.05440187106864793,
+    0.4999999999999999,
+    0.5,
+    -0.5,
+    0.49999999999999983
+   ],
+   "waypoints": [
+    [
+     0.099274467626606,
+     9.328146507926616e-05,
+     0.05440187106864793,
+     0.5792279653395692,
+     0.405579787672639,
+     -0.5792279653395692,
+     0.40557978767263886
+    ],
+    [
+     0.09951051928971831,
+     0.00024383524708270572,
+     0.05440187106864793,
+     -0.7071067811865475,
+     0.0,
+     0.7071067811865475,
+     0.0
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/doorlatch_door_key270/doorlatch_door_key270.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0995,
+      -0.0,
+      0.049
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": -1.0,
+     "upper_deg": 268.681,
+     "stiffness": 0.0,
+     "damping": 0.0
+    }
+   ],
+   "layout": {
+    "lock_deg": 270,
+    "travel_per_rad_mm": 5.3333,
+    "stop_deg": 268.68,
+    "jamb_clear_deg": 263.1,
+    "friction_N": 1.25,
+    "plug_drag_Nm": 0.00667,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "lock_axis_m": [
+     0.0995,
+     -0.0,
+     0.049
+    ],
+    "key_mass_g": 5.533,
+    "door_mass_g": 418.3,
+    "note": "A11 key task: needs the key_lock env (Isaacsimenvs-KeyLock-Direct-v0) with precise_assembly.latch_cbf=true latch_cbf_mechanism=key unlock_angle_values_deg=[270] latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[]."
+   }
+  },
+  "cb_key_lock360": {
+   "object": "key1_lock360",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    0.09925616475291729,
+    1.051928971828553e-05,
+    0.05440187106864793,
+    0.4999999999999999,
+    0.5,
+    -0.5,
+    0.49999999999999983
+   ],
+   "waypoints": [
+    [
+     0.099274467626606,
+     9.328146507926616e-05,
+     0.05440187106864793,
+     0.5792279653395692,
+     0.405579787672639,
+     -0.5792279653395692,
+     0.40557978767263886
+    ],
+    [
+     0.09951051928971831,
+     0.00024383524708270572,
+     0.05440187106864793,
+     -0.7071067811865475,
+     0.0,
+     0.7071067811865475,
+     0.0
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/doorlatch_door_key360/doorlatch_door_key360.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0995,
+      -0.0,
+      0.049
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": -1.0,
+     "upper_deg": 358.242,
+     "stiffness": 0.0,
+     "damping": 0.0
+    }
+   ],
+   "layout": {
+    "lock_deg": 360,
+    "travel_per_rad_mm": 4.0,
+    "stop_deg": 358.24,
+    "jamb_clear_deg": 350.79,
+    "friction_N": 1.25,
+    "plug_drag_Nm": 0.005,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "lock_axis_m": [
+     0.0995,
+     -0.0,
+     0.049
+    ],
+    "key_mass_g": 5.255,
+    "door_mass_g": 419.2,
+    "note": "A11 key task: needs the key_lock env (Isaacsimenvs-KeyLock-Direct-v0) with precise_assembly.latch_cbf=true latch_cbf_mechanism=key unlock_angle_values_deg=[360] latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[]."
+   }
   }
  },
  "parts": {
@@ -11853,6 +12433,98 @@
      32.0
     ]
    }
+  },
+  "doorlatch_door_key90": {
+   "src": "door.stl + doorknob module (base, spring 5mm, latch 60, knob 1 55mm + gear 60 at its stop) + lock module (bottom, top, friction spring, deadbolt_90_deg at rest)",
+   "mass_g": 414.12,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_5mm": 7.51,
+    "doorknob_module_latch_60_deg": 9.86,
+    "lock_bottom": 38.16,
+    "lock_top": 31.83,
+    "lock_friction_spring": 2.27,
+    "deadbolt_90_deg(rest)": 10.39,
+    "doorknob_1_55mm(held at stop)": 32.25,
+    "doorknob_module_gear_60_deg(held)": 2.75
+   },
+   "com_m": [
+    0.03781,
+    -0.0422,
+    0.02548
+   ],
+   "weight_moment_closed_Nm": 0.5263
+  },
+  "doorlatch_door_key180": {
+   "src": "door.stl + doorknob module (base, spring 5mm, latch 60, knob 1 55mm + gear 60 at its stop) + lock module (bottom, top, friction spring, deadbolt_180_deg at rest)",
+   "mass_g": 417.51,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_5mm": 7.51,
+    "doorknob_module_latch_60_deg": 9.86,
+    "lock_bottom": 38.16,
+    "lock_top": 31.83,
+    "lock_friction_spring": 2.27,
+    "deadbolt_180_deg(rest)": 13.78,
+    "doorknob_1_55mm(held at stop)": 32.25,
+    "doorknob_module_gear_60_deg(held)": 2.75
+   },
+   "com_m": [
+    0.0383,
+    -0.04184,
+    0.02542
+   ],
+   "weight_moment_closed_Nm": 0.5321
+  },
+  "doorlatch_door_key270": {
+   "src": "door.stl + doorknob module (base, spring 5mm, latch 60, knob 1 55mm + gear 60 at its stop) + lock module (bottom, top, friction spring, deadbolt_270_deg at rest)",
+   "mass_g": 418.32,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_5mm": 7.51,
+    "doorknob_module_latch_60_deg": 9.86,
+    "lock_bottom": 38.16,
+    "lock_top": 31.83,
+    "lock_friction_spring": 2.27,
+    "deadbolt_270_deg(rest)": 14.59,
+    "doorknob_1_55mm(held at stop)": 32.25,
+    "doorknob_module_gear_60_deg(held)": 2.75
+   },
+   "com_m": [
+    0.03842,
+    -0.04174,
+    0.02541
+   ],
+   "weight_moment_closed_Nm": 0.5335
+  },
+  "doorlatch_door_key360": {
+   "src": "door.stl + doorknob module (base, spring 5mm, latch 60, knob 1 55mm + gear 60 at its stop) + lock module (bottom, top, friction spring, deadbolt_360_deg at rest)",
+   "mass_g": 419.18,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_5mm": 7.51,
+    "doorknob_module_latch_60_deg": 9.86,
+    "lock_bottom": 38.16,
+    "lock_top": 31.83,
+    "lock_friction_spring": 2.27,
+    "deadbolt_360_deg(rest)": 15.45,
+    "doorknob_1_55mm(held at stop)": 32.25,
+    "doorknob_module_gear_60_deg(held)": 2.75
+   },
+   "com_m": [
+    0.03855,
+    -0.04163,
+    0.02539
+   ],
+   "weight_moment_closed_Nm": 0.5351
   }
  }
 }

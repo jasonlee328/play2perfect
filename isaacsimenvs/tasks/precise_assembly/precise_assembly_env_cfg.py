@@ -308,6 +308,9 @@ class PreciseAssemblyCfg:
     # Off: no keeper, no hidden window / dwell / touch-only cues / knob speed cap / soft stop (their flags are ignored).
     latch_cbf: bool = False
     latch_cbf_spring_mm: tuple[float, ...] = (5.0,)
+    # "knob" (doorknob task, above) or "key" (A11 key task: unlock_angle_values_deg = official locks 90 / 180 / 270 /
+    # 360, no spring; the key env adds the friction spring, unwrapped angles, release + hinge probes).
+    latch_cbf_mechanism: str = "knob"
     latch_cbf_gap_deg: float = 0.1
     latch_cbf_grasp_fingers: int = 2
     latch_cbf_grasp_dist: float = 0.05

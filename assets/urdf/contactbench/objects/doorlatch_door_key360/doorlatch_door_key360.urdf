@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!-- ContactBench door leaf for the key task (A11 key_tasks.py): official print-model masses, doorknob held at its stop, lock housings + deadbolt at rest -->
+<robot name="cb_doorlatch_door_key360">
+  <material name="c"><color rgba="0.95 0.95 0.93 1.0"/></material>
+  <link name="door">
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="doorlatch_door_key360.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
+    <collision><origin xyz="0.038850 -0.064750 0.024750" rpy="0 0 0"/><geometry><box size="0.228000 0.224000 0.014500"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/lock_coll_00.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/lock_coll_01.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/lock_coll_02.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/lock_coll_03.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/lock_coll_04.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/lock_coll_05.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/lock_coll_06.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/lock_coll_07.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_00.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_01.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_02.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_03.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_04.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_05.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_06.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_07.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_08.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_09.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_10.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="../doorlatch_door_key_parts/knob_coll_11.obj" scale="1 1 1"/></geometry></collision>
+    <inertial><mass value="0.419182"/><origin xyz="0.038547 -0.041631 0.025393" rpy="0 0 0"/><inertia ixx="1.627658e-03" ixy="-1.384970e-06" ixz="3.995119e-05" iyy="1.697462e-03" iyz="-1.190589e-05" izz="3.181859e-03"/></inertial>
+  </link>
+</robot>

@@ -7,5 +7,6 @@ to expose all task ids to ``gym.make`` / ``gym.spec``.
 
 from . import play              # gym.register("Isaacsimenvs-Play-Direct-v0", ...)
 from . import precise_assembly  # gym.register("Isaacsimenvs-PreciseAssembly-Direct-v0", ...)
+from . import key_lock          # A11: gym.register("Isaacsimenvs-KeyLock-Direct-v0", ...)
 
-__all__ = ["play", "precise_assembly"]
+__all__ = ["play", "precise_assembly", "key_lock"]

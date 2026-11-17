@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- ContactBench key 1 welded to the 360 deg lock plug (A11 key_tasks.py) -->
+<robot name="cb_key1_lock360">
+  <material name="c"><color rgba="0.75 0.70 0.35 1.0"/></material>
+  <link name="object">
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="key1_lock360.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_00.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_01.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_02.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_03.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_04.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_05.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_06.obj" scale="1 1 1"/></geometry></collision>
+    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_07.obj" scale="1 1 1"/></geometry></collision>
+    <inertial><mass value="0.005255"/><origin xyz="0.015263 0.000230 0.000007" rpy="0 0 0"/><inertia ixx="1.000184e-03" ixy="-1.669990e-10" ixz="6.167984e-11" iyy="9.688251e-07" iyz="-1.265589e-10" izz="9.977450e-07"/></inertial>
+  </link>
+</robot>

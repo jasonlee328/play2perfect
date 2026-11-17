@@ -42,9 +42,31 @@ CBF_LATCH_TRAVEL_MM, CBF_JAMB_CLEAR_MM = 15.44, 15.24
 CBF_SPRINGS = {5.0: (0.48, 0.15), 7.5: (0.67, 0.25), 10.0: (0.78, 0.31)}   # spring mm -> (K N m/rad, tau0 N m)
 
 
-def cbf_door_params(unlock_deg, spring_mm) -> dict:
+# A11 key task (contactbench-sim kit/mechanisms/lock_module.py l.56-65): lock label (deg) -> rack travel per radian
+# (mm); the deadbolt stops after TRAVEL 25.01 mm (the plug's hard stop) and clears the strike jamb at 24.49 mm. No
+# return spring: the friction spring is 1.25 N of dry friction on the deadbolt (a plug drag of 1.25 N x r).
+CBF_KEY_RP_MM = {90.0: 16.0, 180.0: 8.0, 270.0: 16.0 / 3.0, 360.0: 4.0}
+CBF_KEY_TRAVEL_MM, CBF_KEY_JAMB_CLEAR_MM, CBF_KEY_FRICTION_N = 25.01, 24.49, 1.25
+
+
+def cbf_key_params(unlock_deg) -> dict:
+    """Per-env official lock parameters (key task): stop / clear angle (deg), rack r (mm/rad), plug drag (N m)."""
+    import numpy as np
+    unlock_deg = np.asarray(unlock_deg, dtype=np.float64)
+    bad = sorted({float(v) for v in unlock_deg} - set(CBF_KEY_RP_MM))
+    if bad:
+        raise ValueError(f"latch_cbf key: unlock angles {bad} are not official locks {sorted(CBF_KEY_RP_MM)}")
+    rp = np.array([CBF_KEY_RP_MM[float(v)] for v in unlock_deg])
+    z = np.zeros_like(rp)
+    return dict(stop_deg=np.degrees(CBF_KEY_TRAVEL_MM / rp), clear_deg=np.degrees(CBF_KEY_JAMB_CLEAR_MM / rp),
+                rp_mm=rp, drag_Nm=CBF_KEY_FRICTION_N * rp * 1e-3, spring_mm=z, K=z, tau0=z, mechanism="key")
+
+
+def cbf_door_params(unlock_deg, spring_mm, mechanism: str = "knob") -> dict:
     """Per-env official knob parameters: stop / clear angle (deg), spring K (N m/rad) and preload tau0 (N m)."""
     import numpy as np
+    if mechanism == "key":
+        return cbf_key_params(unlock_deg)
     unlock_deg = np.asarray(unlock_deg, dtype=np.float64)
     bad = sorted({float(v) for v in unlock_deg} - set(CBF_PINION_RP_MM))
     if bad:
@@ -417,7 +439,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 raise ValueError("latch_cbf needs latch_door_joint >= 0 and unlock_angle_values_deg")
             if int(pih_cfg.latch_keeper) >= 0:
                 raise ValueError("latch_cbf has no keeper: set latch_keeper=-1 (and kinematic_distractors=[])")
-            self._cbf = cbf_door_params(self._unlock_deg_np, pih_cfg.latch_cbf_spring_mm)
+            self._cbf = cbf_door_params(self._unlock_deg_np, pih_cfg.latch_cbf_spring_mm,
+                                        str(getattr(pih_cfg, "latch_cbf_mechanism", "knob")))
 
         cfg.assets.object_name = problem.insertion_object_name if len(problem_names) == 1 else "multi"
         cfg.assets.object_urdf = self._pih_object_urdf_abs

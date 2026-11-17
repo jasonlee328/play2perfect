@@ -145,7 +145,7 @@ def _create_fixture_joints(env) -> None:
                 # (the lower limit) = a drive with stiffness K and its target tau0 / K beyond the rest stop
                 jp.CreateUpperLimitAttr(float(cbf["stop_deg"][i]))
                 stiff = float(cbf["K"][i])
-                target = -math.degrees(float(cbf["tau0"][i]) / stiff) + (float(j.lower_deg or 0.0))
+                target = (-math.degrees(float(cbf["tau0"][i]) / stiff) + (float(j.lower_deg or 0.0))) if stiff > 0.0 else 0.0
             elif unlock is not None and k == int(env.cfg.precise_assembly.unlock_joint):
                 # hidden unlock angle: this env's end stop = its theta + margin
                 fixed = float(getattr(env.cfg.precise_assembly, "unlock_fixed_stop_deg", 0.0))
