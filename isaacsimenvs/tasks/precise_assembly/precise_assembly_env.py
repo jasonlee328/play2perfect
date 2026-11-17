@@ -1110,11 +1110,23 @@ class PreciseAssemblyEnv(PlayEnv):
         target = torch.where(at_last, self.unlock_angle, first)
         rem = torch.clamp(target - self.turn_angle, min=0.0)
         self._keypoints_max_dist = rem * float(pih_cfg.turn_progress_m_per_rad)
+        tool_out = None
+        if bool(getattr(pih_cfg, "turn_progress_requires_tool", False)) and getattr(self, "_tl_out", None) is not None:
+            # A7: turning progress only pays while a tool tip is in the recess (last step's toolless check): degrees turned
+            # by the fingers on the head earn nothing (the keypoint reward pays improvements of the closest distance, so
+            # holding the distance at its best-so-far value freezes it), and the first turn goal can't be credited
+            tool_out = self._tl_out
+            best = torch.where(self._closest_keypoint_max_dist >= 0.0, self._closest_keypoint_max_dist,
+                               self._keypoints_max_dist)
+            self._keypoints_max_dist = torch.where(tool_out, torch.maximum(self._keypoints_max_dist, best),
+                                                   self._keypoints_max_dist)
         # goal trackers cleared this step (-1 sentinel, replaced by the real keypoint distance in
         # compute_intermediate_values): start them from the turn distance instead
         fresh = self._turn_fresh_closest
         self._closest_keypoint_max_dist = torch.where(fresh, self._keypoints_max_dist, self._closest_keypoint_max_dist)
         near = rem <= math.radians(float(pih_cfg.unlock_tol_deg))
+        if tool_out is not None:
+            near = near & ~tool_out
         if getattr(self, "turn_thread", False):
             # tight = the hand has pushed >= turn_tight_torque into the lock for turn_tight_steps consecutive steps;
             # turning the cap back > 1 deg off the lock loosens it (the preload is gone)

@@ -298,6 +298,9 @@ class PreciseAssemblyCfg:
     turn_tool_out_m: float = 0.0005
     turn_toolless_max_deg: float = 0.0
     turn_toolless_penalty: float = 0.0
+    # A7: the turn-progress reward / turn goals count only while a tool tip is in the recess (no reward for turning the
+    # head with the fingers).
+    turn_progress_requires_tool: bool = False
     turn_preload_free_deg: float = 10.0
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9
