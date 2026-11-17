@@ -609,7 +609,7 @@
     36.19,
     13.0
    ],
-   "mass_g": 2.4,
+   "mass_g": 4.79,
    "com_src_mm": [
     -0.0,
     0.164,
@@ -620,7 +620,8 @@
     0.9049,
     0.325
    ],
-   "collision": "convex hull"
+   "collision": "convex hull",
+   "mass_model": "print 1240 kg/m3, 0.8 mm walls + 20% infill (inertia scaled)"
   },
   "bottlecap2": {
    "src": "for_printing/bottles/bottle_2/cap_2_3_rev.stl",
@@ -629,67 +630,7 @@
     46.19,
     13.0
    ],
-   "mass_g": 3.57,
-   "com_src_mm": [
-    -0.008,
-    0.0,
-    7.879
-   ],
-   "object_scale": [
-    1.155,
-    1.1548,
-    0.3251
-   ],
-   "collision": "convex hull"
-  },
-  "bottlecap3": {
-   "src": "for_printing/bottles/bottle_3/cap_3_3_rev.stl",
-   "extents_mm": [
-    66.19,
-    66.19,
-    15.0
-   ],
-   "mass_g": 10.48,
-   "com_src_mm": [
-    -0.004,
-    0.0,
-    10.351
-   ],
-   "object_scale": [
-    1.6546,
-    1.6548,
-    0.3751
-   ],
-   "collision": "convex hull"
-  },
-  "bottlecap2r": {
-   "src": "for_printing/bottles/bottle_2/cap_2_3_rev.stl",
-   "extents_mm": [
-    46.2,
-    46.19,
-    13.0
-   ],
-   "mass_g": 3.57,
-   "com_src_mm": [
-    -0.008,
-    0.0,
-    7.879
-   ],
-   "object_scale": [
-    1.155,
-    1.1548,
-    0.3251
-   ],
-   "collision": "convex hull + 24 side / 12 top rib boxes"
-  },
-  "bottlecap2t": {
-   "src": "for_printing/bottles/bottle_2/cap_2_3_rev.stl",
-   "extents_mm": [
-    46.2,
-    46.19,
-    13.0
-   ],
-   "mass_g": 3.57,
+   "mass_g": 7.14,
    "com_src_mm": [
     -0.008,
     0.0,
@@ -701,7 +642,71 @@
     0.3251
    ],
    "collision": "convex hull",
-   "tactile_extra_mesh": "objects/bottlecap2t/ribs_tactile.obj"
+   "mass_model": "print 1240 kg/m3, 0.8 mm walls + 20% infill (inertia scaled)"
+  },
+  "bottlecap3": {
+   "src": "for_printing/bottles/bottle_3/cap_3_3_rev.stl",
+   "extents_mm": [
+    66.19,
+    66.19,
+    15.0
+   ],
+   "mass_g": 14.43,
+   "com_src_mm": [
+    -0.004,
+    0.0,
+    10.351
+   ],
+   "object_scale": [
+    1.6546,
+    1.6548,
+    0.3751
+   ],
+   "collision": "convex hull",
+   "mass_model": "print 1240 kg/m3, 0.8 mm walls + 20% infill (inertia scaled)"
+  },
+  "bottlecap2r": {
+   "src": "for_printing/bottles/bottle_2/cap_2_3_rev.stl",
+   "extents_mm": [
+    46.2,
+    46.19,
+    13.0
+   ],
+   "mass_g": 7.14,
+   "com_src_mm": [
+    -0.008,
+    0.0,
+    7.879
+   ],
+   "object_scale": [
+    1.155,
+    1.1548,
+    0.3251
+   ],
+   "collision": "convex hull + 24 side / 12 top rib boxes",
+   "mass_model": "print 1240 kg/m3, 0.8 mm walls + 20% infill (inertia scaled)"
+  },
+  "bottlecap2t": {
+   "src": "for_printing/bottles/bottle_2/cap_2_3_rev.stl",
+   "extents_mm": [
+    46.2,
+    46.19,
+    13.0
+   ],
+   "mass_g": 7.14,
+   "com_src_mm": [
+    -0.008,
+    0.0,
+    7.879
+   ],
+   "object_scale": [
+    1.155,
+    1.1548,
+    0.3251
+   ],
+   "collision": "convex hull",
+   "tactile_extra_mesh": "objects/bottlecap2t/ribs_tactile.obj",
+   "mass_model": "print 1240 kg/m3, 0.8 mm walls + 20% infill (inertia scaled)"
   }
  },
  "fixtures": {

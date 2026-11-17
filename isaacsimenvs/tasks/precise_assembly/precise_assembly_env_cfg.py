@@ -236,6 +236,44 @@ class PreciseAssemblyCfg:
     turn_strip_over_ramp_offset_steps: int = 0
     # Dense over-turn cost: reward -= this x (new max over-turn past the stop, rad) each step (total = scale x over).
     turn_over_penalty: float = 0.0
+    # Faithful printed thread (official ContactBench sim, appendix_tasks/_kit_thread.py), turn_mode only. The turn joint
+    # becomes cylindrical (turn + slide along the axis; PhysX limit = the lip seat) and every substep the cap's height
+    # above the seat u is kept in the thread's band for its angle: with r = angle left to the seat, u in
+    # [max(0, r L / 2 pi), r L / 2 pi + play] (self-locking: axial loads never turn it). L = the lead of the env's
+    # revolution count (unlock_angle_values_deg / 360 -> turn_thread_leads_mm, else turn_thread_lead_k_mm / revs),
+    # play = L - turn_thread_ridge_mm (2.9 mm at 2 rev, 0.6 at 4). Each episode the cap starts on the thread
+    # turn_thread_engaged_mm above the seat less a drop U(0, play) (where it bites at a random phase); it descends L per
+    # turn, lands on the lip, turns freely through the take-up (play / L turns) and LOCKS (hard stop = unlock_angle,
+    # recomputed per episode; _unlock_deg_np keeps the nominal revolutions as the label). Tight = the torque the hand
+    # pushes into the locked cap (estimated from the spin the stop removes: I_axis x omega / dt) >= turn_tight_torque
+    # for turn_tight_steps consecutive steps; the last goal needs tight (a cap turned back > 1 deg off the lock loses
+    # it). turn_strip_torque > 0: our own over-torque failure (stripped); the official task has none (0 = off).
+    turn_thread: bool = False
+    turn_thread_leads_mm: tuple[tuple[float, float], ...] = ((2.0, 4.665), (2.5, 3.75), (3.0, 3.13), (3.5, 2.68),
+                                                            (4.0, 2.34))
+    turn_thread_lead_k_mm: float = 9.33
+    turn_thread_ridge_mm: float = 1.75
+    turn_thread_engaged_mm: float = 9.4
+    turn_tight_torque: float = 0.15
+    turn_tight_steps: int = 9
+    turn_strip_torque: float = 0.0
+    # Lock stiffness: the software stop zeroes the cap's spin every substep, which acts as a viscous brake of I_axis / dt
+    # (~1.6e-4 N m s/rad for a 3.6 g cap: the hand would hardly feel the lock). While the cap is within
+    # turn_lock_zone_deg of the lock its moment of inertia about the axis is raised to this value (kg m^2; 0 = off), so
+    # the stop resists like a stiff brake (0.05 -> 6 N m s/rad: 0.3 N m creeps 3 deg/s, undone every substep) and the
+    # spin it removes measures the torque pushed into the lock. Updated once per policy step.
+    turn_lock_inertia: float = 0.05
+    turn_lock_zone_deg: float = 0.5
+    # Elastic lock (A1 11-16; 0 = off = the pose-level hard stop). While the raised lock inertia is active, the lock is
+    # a spring + damper on the cap about its axis, tau = -(K over + D omega) for over = angle past the lock in
+    # (0, turn_lock_backstop_deg] (explicit torque; stable only with the raised inertia, so a cap that reaches the lock
+    # before the inertia switch still gets the hard stop that substep); past the backstop the pose stop holds it there.
+    # The torque pushed into the lock is then the spring torque K over + D omega: a physical reading, bounded by what
+    # the hand can push, unlike the hard stop's I omega / dt (which counts contact depenetration as torque). K default
+    # 30 N m/rad = 0.52 N m per deg: official kit locks within ~1 deg at the 0.3-0.9 N m pad-slip peaks.
+    turn_lock_stiffness: float = 0.0
+    turn_lock_damping: float = 1.0
+    turn_lock_backstop_deg: float = 5.0
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0

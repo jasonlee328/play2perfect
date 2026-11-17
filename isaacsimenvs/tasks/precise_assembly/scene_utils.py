@@ -117,9 +117,31 @@ def _create_fixture_joints(env) -> None:
         pos1 = rot_b.GetInverse().TransformDir(anchor - p_b)
         q1 = (q_b.GetInverse() * Gf.Quatd(q0.GetReal(), Gf.Vec3d(q0.GetImaginary())))
         body_root = "Object" if j.body == "object" else f"Distractor{int(j.body[10:])}"
+        pc = env.cfg.precise_assembly
+        cylindrical = bool(pc.turn_mode and pc.turn_thread and k == int(pc.unlock_joint))
         for i in range(env.num_envs):
             b0 = _rigid_body_prim(stage, f"/World/envs/env_{i}/Hole").GetPath()
             b1 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{body_root}").GetPath()
+            if cylindrical:
+                # turn_thread: D6 joint free in rotZ and transZ (joint z = j.axis, pointing into the bottle), transZ
+                # limited to [-30 mm, 0]: 0 = the lip seat (a stiff PhysX limit carries the preload), negative = above
+                # it. The thread's helix band is enforced in software (env._turn_thread_band).
+                jg = UsdPhysics.Joint.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
+                jg.CreateBody0Rel().SetTargets([b0]); jg.CreateBody1Rel().SetTargets([b1])
+                jg.CreateLocalPos0Attr(Gf.Vec3f(*j.anchor)); jg.CreateLocalRot0Attr(q0)
+                jg.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jg.CreateLocalRot1Attr(Gf.Quatf(q1))
+                for dof in ("transX", "transY", "rotX", "rotY"):
+                    lim = UsdPhysics.LimitAPI.Apply(jg.GetPrim(), dof)
+                    lim.CreateLowAttr(1.0); lim.CreateHighAttr(-1.0)   # low > high = locked
+                lim = UsdPhysics.LimitAPI.Apply(jg.GetPrim(), "transZ")
+                lim.CreateLowAttr(-0.03); lim.CreateHighAttr(0.0)
+                if float(j.damping):
+                    drive = UsdPhysics.DriveAPI.Apply(jg.GetPrim(), "rotZ")
+                    drive.CreateTypeAttr("force")
+                    drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
+                    drive.CreateDampingAttr(float(j.damping) * math.pi / 180.0)
+                    drive.CreateStiffnessAttr(0.0)
+                continue
             jp = UsdPhysics.RevoluteJoint.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
             jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
             jp.CreateAxisAttr("Z")

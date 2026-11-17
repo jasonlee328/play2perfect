@@ -225,6 +225,35 @@ class PreciseAssemblyEnv(PlayEnv):
             self._turn_early_clear = torch.zeros(n, dtype=torch.long, device=self.device)
             self.turn_at_stop_steps = torch.zeros(n, dtype=torch.long, device=self.device)
             self.turn_prev_ep_at_stop_steps = torch.zeros(n, dtype=torch.long, device=self.device)
+            self.turn_thread = bool(pih_cfg.turn_thread)
+            if self.turn_thread:
+                import numpy as np
+                if pih_cfg.turn_clutch:
+                    raise ValueError("precise_assembly.turn_thread and turn_clutch are exclusive")
+                revs = self._unlock_deg_np / 360.0
+                table = {round(float(r), 3): float(l) for r, l in pih_cfg.turn_thread_leads_mm}
+                lead_mm = np.array([table.get(round(float(r), 3), float(pih_cfg.turn_thread_lead_k_mm) / float(r))
+                                    for r in revs])
+                self.turn_lead = torch.as_tensor(lead_mm * 1e-3, device=self.device, dtype=torch.float32)   # m / turn
+                self.turn_play = torch.clamp(self.turn_lead - float(pih_cfg.turn_thread_ridge_mm) * 1e-3, min=0.0)
+                self.turn_u_start = torch.zeros(n, device=self.device)        # start height above the seat (m)
+                self.turn_seat_angle = torch.zeros(n, device=self.device)     # unwrapped angle at which it lands
+                self.turn_tau_acc = torch.zeros(n, device=self.device)        # torque pushed into the lock (sum)
+                self._turn_tau_n = 0
+                self.turn_lock_torque = torch.zeros(n, device=self.device)    # per-step mean (N m)
+                self.turn_lock_torque_max = torch.zeros(n, device=self.device)
+                self.turn_prev_ep_lock_torque_max = torch.zeros(n, device=self.device)
+                self.turn_tight_count = torch.zeros(n, dtype=torch.long, device=self.device)
+                self.turn_tight = torch.zeros(n, dtype=torch.bool, device=self.device)
+                self.turn_prev_ep_tight = torch.zeros(n, dtype=torch.bool, device=self.device)
+                self.turn_u = torch.zeros(n, device=self.device)
+                self._turn_I_axis = None
+                self.turn_lock_flag = torch.zeros(n, dtype=torch.bool, device=self.device)
+                self._turn_I_orig = None
+                print(f"[PreciseAssemblyEnv] turn thread: leads {sorted(set(np.round(lead_mm, 3)))} mm, ridge "
+                      f"{pih_cfg.turn_thread_ridge_mm} mm, engaged {pih_cfg.turn_thread_engaged_mm} mm, tight >= "
+                      f"{pih_cfg.turn_tight_torque} N m x {pih_cfg.turn_tight_steps} steps, strip torque "
+                      f"{pih_cfg.turn_strip_torque}", flush=True)
             print(f"[PreciseAssemblyEnv] turn mode: software stop at {self._unlock_deg_np.min():.0f}-"
                   f"{self._unlock_deg_np.max():.0f} deg, strip after {pih_cfg.turn_strip_steps} steps at the stop "
                   f"with contact, hide from actor {pih_cfg.turn_hide_from_actor}", flush=True)
@@ -566,6 +595,26 @@ class PreciseAssemblyEnv(PlayEnv):
                 lo, hi = (math.radians(float(v)) for v in rng_off)
                 self.turn_offset[env_ids] = lo + (hi - lo) * torch.rand(len(env_ids), device=self.device)
             self.turn_angle[env_ids] = self.turn_offset[env_ids]
+            if getattr(self, "turn_thread", False):
+                # lands on the lip after u_start / L turns, locks play / L turns later (the per-episode stop)
+                two_pi = 2.0 * math.pi
+                if not hasattr(self, 'turn_prev_ep_lock_angle'):
+                    self.turn_prev_ep_lock_angle = torch.zeros_like(self.unlock_angle)
+                self.turn_prev_ep_lock_angle[env_ids] = self.unlock_angle[env_ids]   # absolute, like turn_prev_ep_max
+                self.turn_seat_angle[env_ids] = (self.turn_offset[env_ids]
+                                                 + two_pi * self.turn_u_start[env_ids] / self.turn_lead[env_ids])
+                self.unlock_angle[env_ids] = (self.turn_seat_angle[env_ids]
+                                              + two_pi * self.turn_play[env_ids] / self.turn_lead[env_ids])
+                self.turn_prev_ep_tight[env_ids] = self.turn_tight[env_ids]
+                self.turn_prev_ep_lock_torque_max[env_ids] = self.turn_lock_torque_max[env_ids]
+                self.turn_tight[env_ids] = False
+                self.turn_tight_count[env_ids] = 0
+                self.turn_lock_torque[env_ids] = 0.0
+                self.turn_lock_torque_max[env_ids] = 0.0
+                self.turn_tau_acc[env_ids] = 0.0
+                self.turn_u[env_ids] = self.turn_u_start[env_ids]
+                self._turn_pending_unlock = getattr(self, '_turn_pending_unlock', torch.zeros_like(self.turn_tight))
+                self._turn_pending_unlock[env_ids] |= self.turn_lock_flag[env_ids]
             self._turn_prev_wrapped[env_ids] = 0.0
             self.turn_max_angle[env_ids] = self.turn_offset[env_ids]
             self.turn_strip_count[env_ids] = 0
@@ -723,10 +772,14 @@ class PreciseAssemblyEnv(PlayEnv):
         under = lower + self.turn_offset - self.turn_angle
         corr = torch.where(over > 0, -over, torch.where(under > 0, under, torch.zeros_like(over)))
         ids = (corr != 0).nonzero(as_tuple=False).squeeze(-1)
-        if ids.numel() == 0:
+        thread = getattr(self, "turn_thread", False)
+        if ids.numel() == 0 and not thread:
             return
         body = self._joint_bodies()[k]
         axis_w, anchor_w = self._turn_axis_w()
+        if thread:
+            self._turn_thread_substep(body, axis_w, anchor_w, corr, a)
+            return
         ax, an, c = axis_w[ids], anchor_w[ids], corr[ids]
         rot = quat_from_angle_axis(c, ax)
         pos = body.data.root_pos_w[ids]
@@ -743,6 +796,138 @@ class PreciseAssemblyEnv(PlayEnv):
         body.write_root_velocity_to_sim(vel, env_ids=ids)
         self.turn_angle[ids] += c
         self._turn_prev_wrapped[ids] = torch.atan2(torch.sin(a[ids] + c), torch.cos(a[ids] + c))
+
+    def _turn_axis_inertia(self, body, axis_w) -> torch.Tensor:
+        """Cap moment of inertia about the turn axis (kg m^2, (N,)), from the PhysX body inertia (body frame)."""
+        if self._turn_I_axis is None:
+            I = body.root_physx_view.get_inertias().to(self.device).reshape(self.num_envs, 3, 3)
+            a_b = quat_apply_inverse(body.data.root_quat_w, axis_w)
+            self._turn_I_axis = torch.einsum("ni,nij,nj->n", a_b, I, a_b).clamp_min(1e-9)
+        return self._turn_I_axis
+
+    def _turn_update_lock_inertia(self) -> None:
+        """turn_lock_inertia: cap inside the lock zone -> raised moment of inertia about its axis (see the cfg)."""
+        I_lock = float(self.cfg.precise_assembly.turn_lock_inertia)
+        if I_lock <= 0.0:
+            return
+        zone = self.turn_angle >= self.unlock_angle - math.radians(float(self.cfg.precise_assembly.turn_lock_zone_deg))
+        pend = getattr(self, "_turn_pending_unlock", None)
+        changed = zone != self.turn_lock_flag
+        if pend is not None:
+            changed |= pend
+            pend.zero_()
+        if not bool(changed.any()):
+            return
+        view = self._joint_bodies()[int(self.cfg.precise_assembly.unlock_joint)].root_physx_view
+        inert = view.get_inertias().clone()
+        if self._turn_I_orig is None:
+            self._turn_I_orig = inert.clone()
+        ids = changed.nonzero(as_tuple=False).squeeze(-1).cpu()
+        z = zone.cpu()
+        inert[ids] = self._turn_I_orig[ids]
+        lock_ids = ids[z[ids]]
+        if lock_ids.numel() > 0:
+            # body z = the bottle axis (the cap is COM-centred, fixture-aligned at its reset pose): Izz is entry 8
+            inert[lock_ids, 8] = I_lock
+        view.set_inertias(inert, ids.to(torch.int32) if ids.dtype != torch.int32 else ids)
+        if lock_ids.numel() > 0 and float(getattr(self.cfg.precise_assembly, "turn_lock_stiffness", 0.0)) > 0.0:
+            # conserve the axial angular momentum across the switch (I_orig w -> I_lock w'): keeping w would multiply
+            # the cap's spin energy by I_lock / I_orig (~2e4) and slam an elastic lock into its backstop
+            body = self._joint_bodies()[int(self.cfg.precise_assembly.unlock_joint)]
+            li = lock_ids.to(self.device)
+            axis_w, _ = self._turn_axis_w()
+            ax = axis_w[li]
+            vel = body.data.root_vel_w[li].clone()
+            w = (vel[:, 3:6] * ax).sum(-1)
+            ratio = self._turn_I_orig[lock_ids, 8].to(self.device) / I_lock
+            vel[:, 3:6] -= ((1.0 - ratio) * w).unsqueeze(-1) * ax
+            body.write_root_velocity_to_sim(vel, env_ids=li)
+        self.turn_lock_flag = zone
+
+    def _turn_thread_substep(self, body, axis_w, anchor_w, corr, a) -> None:
+        """turn_thread, every physics substep: (1) the lock (hard stop at unlock_angle, as turn_mode) plus the torque
+        the hand pushes into it, I_axis x (spin the stop removes) / dt; (2) the helix band: height above the seat
+        u in [max(0, r L / 2 pi), r L / 2 pi + play], r = seat angle - angle; outside it the cap is moved back along
+        the axis and its axial velocity into the band's wall removed (a self-locking thread: no turning from axial
+        loads). The lip seat (u >= 0) is also the cylindrical joint's PhysX limit."""
+        n = self.num_envs
+        dt = float(self.physics_dt)
+        pos = body.data.root_pos_w.clone()
+        quat = body.data.root_quat_w.clone()
+        vel = body.data.root_vel_w.clone()
+        pc = self.cfg.precise_assembly
+        K_lock = float(getattr(pc, "turn_lock_stiffness", 0.0))
+        elastic = None
+        if K_lock > 0.0:
+            # elastic lock where the raised inertia is on: no pose correction up to the backstop, spring + damper instead
+            over_l = torch.clamp(-corr, min=0.0)                       # angle past the lock (corr < 0 there)
+            back = math.radians(float(pc.turn_lock_backstop_deg))
+            elastic = self.turn_lock_flag & (over_l > 0)
+            corr = torch.where(elastic, -torch.clamp(over_l - back, min=0.0), corr)
+            w_now = (vel[:, 3:6] * axis_w).sum(-1)
+            over_e = torch.clamp(over_l, max=back)
+            tau_l = torch.where(elastic, K_lock * over_e + float(pc.turn_lock_damping) * w_now.clamp_min(0.0),
+                                torch.zeros_like(over_l))
+            self._turn_dbg_el = (elastic.clone(), tau_l.clone(), over_l.clone(), w_now.clone())
+            f = getattr(self, "_object_forces", None); t = getattr(self, "_object_torques", None)
+            zero = torch.zeros(n, 1, 3, device=self.device)
+            self.object.set_external_force_and_torque(zero if f is None else f,
+                                                      (zero if t is None else t) - (tau_l.unsqueeze(-1) * axis_w).unsqueeze(1),
+                                                      is_global=True)
+        touched = corr != 0
+        # (1) angle: stop / lower bound
+        c = corr
+        rot = quat_from_angle_axis(c, axis_w)
+        pos = torch.where(touched.unsqueeze(-1), anchor_w + quat_apply(rot, pos - anchor_w), pos)
+        quat = torch.where(touched.unsqueeze(-1), quat_mul(rot, quat), quat)
+        w_ax = (vel[:, 3:6] * axis_w).sum(-1)
+        bad = touched & (((c < 0) & (w_ax > 0)) | ((c > 0) & (w_ax < 0)))
+        at_lock = bad & (c < 0)
+        self._turn_dbg = (w_ax.clone(), c.clone(), bad.clone())
+        I_cur = self._turn_axis_inertia(body, axis_w)
+        if float(self.cfg.precise_assembly.turn_lock_inertia) > 0.0:
+            I_cur = torch.where(self.turn_lock_flag, torch.full_like(I_cur, float(self.cfg.precise_assembly.turn_lock_inertia)), I_cur)
+        # only substeps where the cap already sat on the lock the substep before: there the spin removed is what the
+        # hand's torque built up in one substep (I w / dt); on the first contact substep it is the cap's arrival
+        # momentum (an impact, x I_lock / I_orig after the zone's inertia switch), not a held torque
+        prev = getattr(self, "_turn_at_lock_prev", None)
+        if prev is None:
+            prev = torch.zeros_like(at_lock)
+        tau = torch.where(at_lock & prev, I_cur * w_ax / dt, torch.zeros_like(w_ax))
+        self._turn_at_lock_prev = at_lock.clone()
+        if elastic is not None:
+            # elastic lock: the torque pushed into it is the spring + damper torque (physical); pose-stop substeps
+            # (backstop / before the inertia switch) are not counted
+            tau = torch.where(elastic, tau_l, torch.zeros_like(tau))
+        self.turn_tau_acc += tau
+        self._turn_tau_n += 1
+        vel[:, 3:6] -= (w_ax * bad.float()).unsqueeze(-1) * axis_w
+        self.turn_angle += c
+        self._turn_prev_wrapped = torch.where(touched, torch.atan2(torch.sin(a + c), torch.cos(a + c)),
+                                              self._turn_prev_wrapped)
+        # (2) height: helix band
+        if not hasattr(self, "_turn_seat_pos_w"):
+            ids_all = torch.arange(n, device=self.device)
+            self._turn_seat_pos_w = (self._pose_rel_hole_to_world(ids_all, self._pih_object_start_rel)[:, 0:3]
+                                     + self.scene.env_origins)
+        up = -axis_w
+        u = ((pos - self._turn_seat_pos_w) * up).sum(-1)
+        r = self.turn_seat_angle - self.turn_angle
+        helix = r * self.turn_lead / (2.0 * math.pi)
+        lo = torch.clamp(helix, min=0.0)
+        hi = torch.clamp(helix + self.turn_play, min=0.0)
+        du = torch.where(u < lo, lo - u, torch.where(u > hi, hi - u, torch.zeros_like(u)))
+        moved = du != 0
+        pos = pos + up * du.unsqueeze(-1)
+        v_ax = (vel[:, 0:3] * up).sum(-1)
+        into = moved & (((du > 0) & (v_ax < 0)) | ((du < 0) & (v_ax > 0)))
+        vel[:, 0:3] -= (v_ax * into.float()).unsqueeze(-1) * up
+        self.turn_u = u + du
+        ids = (touched | moved).nonzero(as_tuple=False).squeeze(-1)
+        if ids.numel() == 0:
+            return
+        body.write_root_pose_to_sim(torch.cat([pos[ids], quat[ids]], -1), env_ids=ids)
+        body.write_root_velocity_to_sim(vel[ids], env_ids=ids)
 
     def _turn_clutch_brake(self) -> float:
         pc = self.cfg.precise_assembly
@@ -788,6 +973,22 @@ class PreciseAssemblyEnv(PlayEnv):
         fresh = self._turn_fresh_closest
         self._closest_keypoint_max_dist = torch.where(fresh, self._keypoints_max_dist, self._closest_keypoint_max_dist)
         near = rem <= math.radians(float(pih_cfg.unlock_tol_deg))
+        if getattr(self, "turn_thread", False):
+            # tight = the hand has pushed >= turn_tight_torque into the lock for turn_tight_steps consecutive steps;
+            # turning the cap back > 1 deg off the lock loosens it (the preload is gone)
+            self.turn_lock_torque = self.turn_tau_acc / float(max(1, self._turn_tau_n))
+            self.turn_tau_acc.zero_()
+            self._turn_tau_n = 0
+            self.turn_lock_torque_max = torch.maximum(self.turn_lock_torque_max, self.turn_lock_torque)
+            pushing = self.turn_lock_torque >= float(pih_cfg.turn_tight_torque)
+            self.turn_tight_count = torch.where(pushing, self.turn_tight_count + 1, torch.zeros_like(self.turn_tight_count))
+            self.turn_tight |= self.turn_tight_count >= int(pih_cfg.turn_tight_steps)
+            self.turn_tight &= self.turn_angle >= self.unlock_angle - math.radians(1.0)
+            near = torch.where(at_last, near & self.turn_tight, near)
+            self._turn_update_lock_inertia()
+            self.extras["turn_tight_frac"] = self.turn_tight.float().mean()
+            self.extras["turn_lock_torque_mean"] = self.turn_lock_torque.mean()
+            self.extras["turn_u_mm_mean"] = self.turn_u.mean() * 1e3
         self._near_goal = near
         self._near_goal_steps = update_near_goal_steps(
             near_goal=near, near_goal_steps=self._turn_prev_near_steps,
@@ -815,12 +1016,15 @@ class PreciseAssemblyEnv(PlayEnv):
                                         + f * (strip_steps - int(pih_cfg.turn_strip_steps_ramp_start))))
             self.extras["turn_strip_over_deg_cur"] = over_deg
             self.extras["turn_strip_steps_cur"] = float(strip_steps)
-        if strip_steps > 0 or over_deg > 0.0:
+        strip_tau = float(pih_cfg.turn_strip_torque) if getattr(self, "turn_thread", False) else 0.0
+        if strip_steps > 0 or over_deg > 0.0 or strip_tau > 0.0:
             new = torch.zeros_like(at_stop)
             if strip_steps > 0:
                 new |= self.turn_strip_count > strip_steps
             if over_deg > 0.0:
                 new |= self.turn_angle > self.unlock_angle + math.radians(over_deg)
+            if getattr(self, "turn_thread", False) and float(pih_cfg.turn_strip_torque) > 0.0:
+                new |= self.turn_lock_torque > float(pih_cfg.turn_strip_torque)   # our over-torque rule (not official)
             new &= ~self.turn_stripped
             self._turn_just_stripped = new
             self.turn_stripped |= new
@@ -833,6 +1037,14 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
+        if getattr(self, "turn_thread", False):
+            # cap on the thread: engaged length above the seat, less the drop U(0, play) before the thread bites
+            pc = self.cfg.precise_assembly
+            drop = torch.rand(env_ids.numel(), device=self.device) * self.turn_play[env_ids]
+            self.turn_u_start[env_ids] = float(pc.turn_thread_engaged_mm) * 1e-3 - drop
+            axis_w, _ = self._turn_axis_w()
+            w = w.clone()
+            w[:, 0:3] -= axis_w[env_ids] * self.turn_u_start[env_ids].unsqueeze(-1)   # axis points into the bottle
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"

@@ -5,6 +5,6 @@
   <link name="object">
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="bottlecap3.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_00.obj" scale="1 1 1"/></geometry></collision>
-    <inertial><mass value="0.010480"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="3.669685e-06" ixy="4.614059e-12" ixz="-2.633103e-10" iyy="3.668314e-06" iyz="6.844814e-09" izz="7.037401e-06"/></inertial>
+    <inertial><mass value="0.014430"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="5.052820e-06" ixy="6.353137e-12" ixz="-3.625542e-10" iyy="5.050932e-06" iyz="9.424682e-09" izz="9.689857e-06"/></inertial>
   </link>
 </robot>
