@@ -465,6 +465,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             ar = torch.arange(palm.shape[0], device=palm.device)
             old_p = self._key_palm_buf[ar, slot].clone()            # palm W-1 steps ago (written W steps back)
             self._key_palm_buf[ar, slot] = palm
+            self._key_net_mm = torch.where(released & (self._key_rel_run >= W), (palm - old_p).norm(dim=-1) * 1e3,
+                                           torch.full_like(palm[:, 0], 1e3))
             net_ok = (palm - old_p).norm(dim=-1) <= dmm * 1e-3
             # still counter: released steps so far, capped; passes when a full window of released steps has a small net drift
             self._key_still = torch.where(released, torch.minimum(self._key_rel_run, torch.full_like(self._key_rel_run, W - 1)),
