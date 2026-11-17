@@ -181,6 +181,8 @@ class PreciseAssemblyCfg:
     # (all checks for card_final_steps steps), the goals only shape the reward and never end the episode.
     card_task: str = "off"
     card_hold_steps: int = 36            # 0.6 s hold (official T_HOLD)
+    card_settle_steps: int = 0           # policy steps after reset with actions held at the reset targets, before the checks
+                                         #   start (a restored pinch settles; see card_task.py)
     card_hold_slip: float = 0.0005       # held_in_hand_at_start: < 0.5 mm in the link7 frame
     card_transport_slip: float = 0.001   # held_through_transport: < 1 mm
     card_loaded_frac: float = 0.98       # pinch loaded on >= 98 % of transport steps

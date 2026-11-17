@@ -127,6 +127,8 @@ class CardTask:
         for t in self.fail.values():
             t[env_ids] = False
         env = self.env
+        self.settle_tgt = env._cur_targets.clone() if not hasattr(self, "settle_tgt") else self.settle_tgt
+        self.settle_tgt[env_ids] = env._cur_targets[env_ids]
         if self.deck_ref_p is None:
             K = len(env.distractors)
             self.deck_ref_p = torch.zeros(K, env.num_envs, 3, device=env.device)
@@ -213,10 +215,13 @@ class CardTask:
         p7 = quat_apply_inverse(bq, op - b)
         q7 = quat_mul(quat_conjugate(bq), oq)
         cur = self._pts(p7, q7, self.corners)
-        st = self.step
+        # card_settle_steps: after a start-state reset the restored pinch settles (PhysX starts its contacts cold:
+        # ~1.5 mm / 2.5 deg over 0.6 s) while the env holds the bank's joint targets; the official checks start
+        # after it (official t = 0 is after its scripted grasp, i.e. a settled pinch)
+        st = self.step - int(getattr(c, "card_settle_steps", 0))
         first = st == 0
         self.ref_p[first], self.ref_q[first] = p7[first], q7[first]
-        in_hold = st < c.card_hold_steps
+        in_hold = (st >= 0) & (st < c.card_hold_steps)
         slip0 = (cur - self._pts(self.ref_p, self.ref_q, self.corners)).norm(dim=-1).max(-1).values
         self.slip_hold = torch.where(in_hold, torch.maximum(self.slip_hold, slip0), self.slip_hold)
         self.hold_ok &= ~in_hold | (pinch & (self.f_env < c.card_clear_force))

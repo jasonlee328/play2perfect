@@ -667,6 +667,13 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
+        card = getattr(self, "_card", None)
+        S = int(getattr(self.cfg.precise_assembly, "card_settle_steps", 0))
+        if card is not None and S > 0 and hasattr(card, "settle_tgt"):
+            m = card.step < S
+            if m.any():
+                self._cur_targets[m] = card.settle_tgt[m]
+                self._prev_targets[m] = card.settle_tgt[m]
         self._apply_joint_detents()
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
