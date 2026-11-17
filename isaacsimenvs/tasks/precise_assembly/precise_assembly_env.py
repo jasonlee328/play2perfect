@@ -988,10 +988,23 @@ class PreciseAssemblyEnv(PlayEnv):
         loads). The lip seat (u >= 0) is also the cylindrical joint's PhysX limit."""
         n = self.num_envs
         dt = float(self.physics_dt)
+        pc = self.cfg.precise_assembly
+        tl_out = getattr(self, "_tl_out", None)
+        if bool(getattr(pc, "turn_coast_stop", False)) and tl_out is not None and bool(tl_out.any()):
+            # A9: the official screw (armature 2e-7 kg m^2) stops at once when undriven; ours has 2e-4 for explicit-torque
+            # stability and coasts ~5-10 deg after the tool leaves (eval: 85% of episodes failed the 2 deg toolless rule
+            # by coasting). With no tool tip in the recess (last policy step), remove the screw's spin along its axis at
+            # the start of every substep: contacts (fingers) can still turn it within a substep, nothing carries over.
+            v0 = body.data.root_vel_w.clone()
+            w0 = (v0[:, 3:6] * axis_w).sum(-1)
+            v0[:, 3:6] -= (w0 * tl_out.float()).unsqueeze(-1) * axis_w
+            ids = torch.nonzero(tl_out).squeeze(-1)
+            body.write_root_velocity_to_sim(v0[ids], env_ids=ids)
+            if getattr(self, "_turn_bristle_z", None) is not None:
+                self._turn_bristle_z = torch.where(tl_out, torch.zeros_like(self._turn_bristle_z), self._turn_bristle_z)
         pos = body.data.root_pos_w.clone()
         quat = body.data.root_quat_w.clone()
         vel = body.data.root_vel_w.clone()
-        pc = self.cfg.precise_assembly
         K_lock = float(getattr(pc, "turn_lock_stiffness", 0.0))
         tau_c0 = float(getattr(pc, "turn_thread_friction", 0.0))
         tau_fric = torch.zeros(n, device=self.device)

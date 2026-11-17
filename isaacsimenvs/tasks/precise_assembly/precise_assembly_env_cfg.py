@@ -340,6 +340,9 @@ class PreciseAssemblyCfg:
     turn_tip_near_fingers: tuple[str, ...] = ("thumb", "index")
     turn_tip_near_off_m: float = 0.02
     turn_tip_near_sigma_m: float = 0.015
+    # A9: no tool tip in the recess -> the screw's axial spin is removed every substep (official: undriven screw stops at
+    # once, armature 2e-7; ours coasts on its 2e-4 inertia). Off = A7 behaviour.
+    turn_coast_stop: bool = False
     turn_preload_free_deg: float = 10.0
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9
