@@ -1483,6 +1483,19 @@ class PreciseAssemblyEnv(PlayEnv):
         if float(c.latch_cbf_door_still_deg_s) > 0.0:
             self._cbf_door_still = rate <= float(c.latch_cbf_door_still_deg_s)
             ok = ok & self._cbf_door_still
+        hold = float(getattr(c, "latch_cbf_hold_range_deg", 0.0))
+        if hold > 0.0:
+            # A8: door range over the current consecutive run <= hold (official: < 1 deg over the last 1 s)
+            if not hasattr(self, "_cbf_run_lo"):
+                self._cbf_run_lo, self._cbf_run_hi = door.clone(), door.clone()
+            run = open_ & ok
+            lo = torch.where(run, torch.minimum(self._cbf_run_lo, door), door)
+            hi = torch.where(run, torch.maximum(self._cbf_run_hi, door), door)
+            swing = (hi - lo) > math.radians(hold)
+            ok = ok & ~swing
+            self._cbf_run_lo = torch.where(swing, door, lo)
+            self._cbf_run_hi = torch.where(swing, door, hi)
+            self.extras["latch_cbf_hold_swing_frac"] = (open_ & swing).float().mean()
         self.extras["latch_cbf_door_open_frac"] = open_.float().mean()
         self.extras["latch_cbf_open_grasped_frac"] = (open_ & self._cbf_grasp_ok).float().mean()
         return open_ & ok

@@ -312,6 +312,10 @@ class PreciseAssemblyCfg:
     latch_cbf_grasp_fingers: int = 2
     latch_cbf_grasp_dist: float = 0.05
     latch_cbf_door_still_deg_s: float = 0.0
+    # A8 (official motion_stopped_door_held_open): > 0 = the consecutive success run also needs the door's range
+    # (max - min angle over the run) to stay <= this (deg); a larger swing restarts the run. Use with
+    # termination.success_steps = 60 (1 s at 60 Hz) for the official 'door range < 1 deg over the last 1 s'.
+    latch_cbf_hold_range_deg: float = 0.0
     # Distractor indices baked kinematic (no gravity; posed only by resets / the env), e.g. the latch keeper.
     kinematic_distractors: tuple[int, ...] = ()
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
