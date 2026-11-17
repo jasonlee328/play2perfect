@@ -204,6 +204,10 @@ class PreciseAssemblyCfg:
     # Fragile variant: card <-> deck + holder contact force sum (N) > card_break_force for card_break_steps steps = "broken".
     card_break_force: float = 0.0
     card_break_steps: int = 3
+    card_deck_fail_move_start: float = 0.003   # deck_disturbed termination tolerance at the curriculum start (m)
+    card_deck_fail_rot_start: float = 3.0
+    card_deck_fail_curriculum_steps: int = 0
+    card_deck_fail_curriculum_offset: int = 0
     card_deck_lean_range_deg: tuple[float, ...] = ()   # fragile: hidden per-episode deck lean [lo, hi] deg
 
 

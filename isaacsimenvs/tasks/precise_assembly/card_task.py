@@ -265,7 +265,15 @@ class CardTask:
         self.fail["dropped_at_start"] = hold_done & ~(self.hold_ok & (self.slip_hold < c.card_hold_slip)) if c.card_fail_hold else torch.zeros_like(deck_ok)
         self.fail["slipped"] = transport & (self.slip_tr >= c.card_transport_slip) if c.card_fail_slip else torch.zeros_like(deck_ok)
         self.fail["released_outside"] = self.released & ~self.rel_inside
-        self.fail["deck_disturbed"] = (deck_moved >= c.card_deck_move_tol) | (deck_rot >= c.card_deck_rot_tol)
+        # early-termination tolerance: curriculum from (card_deck_fail_move_start, _rot_start) to the official values
+        # over card_deck_fail_curriculum_steps env steps; the success check always uses the official 3 mm / 3 deg
+        a = 1.0
+        if c.card_deck_fail_curriculum_steps > 0:
+            a = min(1.0, float(env.common_step_counter + c.card_deck_fail_curriculum_offset) / float(c.card_deck_fail_curriculum_steps))
+        mv_tol = c.card_deck_fail_move_start + a * (c.card_deck_move_tol - c.card_deck_fail_move_start)
+        rt_tol = c.card_deck_fail_rot_start + a * (c.card_deck_rot_tol - c.card_deck_fail_rot_start)
+        self.fail["deck_disturbed"] = (deck_moved >= mv_tol) | (deck_rot >= rt_tol)
+        env.extras["card/deck_fail_move_tol_mm"] = mv_tol * 1e3
         if c.card_break_force > 0.0:
             over = self.f_env > c.card_break_force
             self.break_count = torch.where(over, self.break_count + 1, torch.zeros_like(self.break_count))
