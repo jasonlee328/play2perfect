@@ -70,6 +70,9 @@ class KeyLockCfg:
     release_dist: float = 0.08           # fingertips from the key (official: hand moved >= 8 cm)
     still_steps: int = 42                # 0.7 s at 60 Hz
     drift_mm: float = 2.0
+    drift_net: bool = True               # official (turn_key_unlock_door_flat.py:264-267): NET palm displacement between the
+                                         # first and last step of the still window < drift_mm; False = every step within
+                                         # drift_mm of the window start (stricter, pre-11-17 behaviour)
     drift_start_mm: float = 0.0          # > 0: the stillness tolerance ramps drift_start_mm -> drift_mm over drift_ramp_steps
     drift_ramp_steps: int = 0
     drift_offset_steps: int = 0
@@ -446,11 +449,29 @@ class KeyLockEnv(PreciseAssemblyEnv):
             f = min(1.0, float(self.common_step_counter + int(kl.drift_offset_steps)) / float(kl.drift_ramp_steps))
             dmm = float(kl.drift_start_mm) + f * (dmm - float(kl.drift_start_mm))
         self.extras["key/drift_mm_cur"] = torch.tensor(dmm, device=self.device)
-        near_anchor = (palm - self._key_palm_anchor).norm(dim=-1) <= dmm * 1e-3
-        still_ok = released & near_anchor & (self._key_still > 0)
-        self._key_still = torch.where(still_ok, self._key_still + 1,
-                                      torch.where(released, torch.ones_like(self._key_still),
-                                                  torch.zeros_like(self._key_still)))
+        if bool(kl.drift_net):
+            W = int(kl.still_steps)
+            if not hasattr(self, "_key_palm_buf"):
+                self._key_palm_buf = palm.unsqueeze(1).repeat(1, W, 1).clone()
+                self._key_rel_run = torch.zeros_like(self._key_still)
+            self._key_rel_run = torch.where(released, self._key_rel_run + 1, torch.zeros_like(self._key_rel_run))
+            slot = self._key_t % W
+            ar = torch.arange(palm.shape[0], device=palm.device)
+            old_p = self._key_palm_buf[ar, slot].clone()            # palm W-1 steps ago (written W steps back)
+            self._key_palm_buf[ar, slot] = palm
+            net_ok = (palm - old_p).norm(dim=-1) <= dmm * 1e-3
+            # still counter: released steps so far, capped; passes when a full window of released steps has a small net drift
+            self._key_still = torch.where(released, torch.minimum(self._key_rel_run, torch.full_like(self._key_rel_run, W - 1)),
+                                          torch.zeros_like(self._key_still))
+            self._key_still = torch.where(released & (self._key_rel_run >= W) & net_ok,
+                                          torch.full_like(self._key_still, W), self._key_still)
+            still_ok = released
+        else:
+            near_anchor = (palm - self._key_palm_anchor).norm(dim=-1) <= dmm * 1e-3
+            still_ok = released & near_anchor & (self._key_still > 0)
+            self._key_still = torch.where(still_ok, self._key_still + 1,
+                                          torch.where(released, torch.ones_like(self._key_still),
+                                                      torch.zeros_like(self._key_still)))
         restart = released & ~still_ok
         self._key_released_now = released
         self._key_palm_anchor = torch.where(restart.unsqueeze(-1), palm, self._key_palm_anchor)
