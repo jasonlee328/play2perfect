@@ -933,7 +933,13 @@ class PreciseAssemblyEnv(PlayEnv):
                     hm.copy_(torch.where(free, torch.zeros_like(hm), hm))
                     # only inside the lock zone, where the raised lock inertia keeps the stiff tanh stable (the
                     # official releases it after backing off turn_preload_free_deg; here leaving the 0.5 deg zone does)
-                    tau_c = tau_c + frac * hm * self.turn_lock_flag.float()
+                    if float(getattr(pc, "turn_thread_bristle_k", 0.0)) > 0.0:
+                        # A9: the bristle is stable at the bare inertia, so use the official release (preload on until
+                        # backed off turn_preload_free_deg), evaluated every substep (the lock flag only updates per policy
+                        # step: a loosen episode starting seated got 2 unpreloaded substeps and ran off)
+                        tau_c = tau_c + frac * hm * (~free).float()
+                    else:
+                        tau_c = tau_c + frac * hm * self.turn_lock_flag.float()
             w_f = (vel[:, 3:6] * axis_w).sum(-1)
             kb = float(getattr(pc, "turn_thread_bristle_k", 0.0))
             if kb > 0.0:   # A9: elasto-plastic stiction (official STICTION_K), holds below breakaway without creep
