@@ -749,6 +749,7 @@ class PreciseAssemblyEnv(PlayEnv):
         d = torch.atan2(torch.sin(a - self._turn_prev_wrapped), torch.cos(a - self._turn_prev_wrapped))
         self.turn_angle += d
         self._turn_prev_wrapped = a
+        self._turn_last_d = d
         lower = math.radians(float(self.cfg.precise_assembly.turn_lower_deg))
         over = self.turn_angle - self.unlock_angle
         pc = self.cfg.precise_assembly
@@ -911,11 +912,27 @@ class PreciseAssemblyEnv(PlayEnv):
         touched = corr != 0
         if elastic is not None:
             touched = touched | elastic
+        # thread drag (A1 11-17): Coulomb friction torque D about the axis while the cap turns on the thread (not at
+        # the lock / lower bound), implicit at pose level like the elastic lock (PhysX has already moved the cap this
+        # substep): v_phys = this substep's angle change / dt, v = sign(v_phys) max(|v_phys| - D dt / I, 0); the cap is
+        # rotated back by (v - v_phys) dt and its spin set to v. Below D the cap holds still. Needs turn_cap_izz.
+        D_thr = float(getattr(pc, "turn_thread_drag_torque", 0.0))
+        c_drag = torch.zeros_like(corr)
+        drag_m = torch.zeros_like(touched)
+        if D_thr > 0.0 and getattr(self, "_turn_last_d", None) is not None:
+            drag_m = ~touched
+            I_d = self._turn_axis_inertia(body, axis_w)
+            v_phys = self._turn_last_d / dt
+            v_drag = torch.sign(v_phys) * torch.clamp(v_phys.abs() - D_thr * dt / I_d, min=0.0)
+            c_drag = torch.where(drag_m, (v_drag - v_phys) * dt, torch.zeros_like(corr))
+            self.turn_drag_now = torch.where(drag_m, (v_phys - v_drag).abs() * I_d / dt, torch.zeros_like(corr))
+            self._turn_drag_v = v_drag
         # (1) angle: stop / lower bound
         c = corr
-        rot = quat_from_angle_axis(c, axis_w)
-        pos = torch.where(touched.unsqueeze(-1), anchor_w + quat_apply(rot, pos - anchor_w), pos)
-        quat = torch.where(touched.unsqueeze(-1), quat_mul(rot, quat), quat)
+        rot = quat_from_angle_axis(c + c_drag, axis_w)
+        moved_a = touched | (drag_m & (c_drag != 0))
+        pos = torch.where(moved_a.unsqueeze(-1), anchor_w + quat_apply(rot, pos - anchor_w), pos)
+        quat = torch.where(moved_a.unsqueeze(-1), quat_mul(rot, quat), quat)
         w_ax = (vel[:, 3:6] * axis_w).sum(-1)
         bad = touched & (((c < 0) & (w_ax > 0)) | ((c > 0) & (w_ax < 0)))
         at_lock = bad & (c < 0)
@@ -941,24 +958,12 @@ class PreciseAssemblyEnv(PlayEnv):
         if elastic is not None:
             w_now = (vel[:, 3:6] * axis_w).sum(-1)
             vel[:, 3:6] += (torch.where(elastic, self._turn_el_v - w_now, torch.zeros_like(w_now))).unsqueeze(-1) * axis_w
-        dragged = torch.zeros_like(touched)
-        D_thr = float(getattr(pc, "turn_thread_drag_torque", 0.0))
-        if D_thr > 0.0:
-            # thread drag (A1 11-17): Coulomb friction torque D_thr about the axis while the cap turns on the thread
-            # (not in the lock), applied implicitly as an impulse: |w| -> max(|w| - D_thr dt / I, 0). Uses the cap's
-            # real inertia (set turn_cap_izz; at the printed 2.7e-6 one substep's impulse stops any spin).
-            free = ~bad
-            if elastic is not None:
-                free = free & ~elastic
+        if D_thr > 0.0 and getattr(self, "_turn_drag_v", None) is not None:
             w_now = (vel[:, 3:6] * axis_w).sum(-1)
-            dw = D_thr * dt / I_cur
-            w_new = torch.sign(w_now) * torch.clamp(w_now.abs() - dw, min=0.0)
-            dragged = free & (w_now != 0)
-            vel[:, 3:6] += (torch.where(dragged, w_new - w_now, torch.zeros_like(w_now))).unsqueeze(-1) * axis_w
-            self.turn_drag_acc = getattr(self, "turn_drag_acc", torch.zeros(n, device=self.device)) + torch.where(
-                dragged, (w_now - w_new).abs() * I_cur / dt, torch.zeros_like(w_now))
+            vel[:, 3:6] += (torch.where(drag_m, self._turn_drag_v - w_now, torch.zeros_like(w_now))).unsqueeze(-1) * axis_w
+        c = c + c_drag
         self.turn_angle += c
-        self._turn_prev_wrapped = torch.where(touched, torch.atan2(torch.sin(a + c), torch.cos(a + c)),
+        self._turn_prev_wrapped = torch.where(moved_a, torch.atan2(torch.sin(a + c), torch.cos(a + c)),
                                               self._turn_prev_wrapped)
         # (2) height: helix band
         if not hasattr(self, "_turn_seat_pos_w"):
@@ -978,7 +983,7 @@ class PreciseAssemblyEnv(PlayEnv):
         into = moved & (((du > 0) & (v_ax < 0)) | ((du < 0) & (v_ax > 0)))
         vel[:, 0:3] -= (v_ax * into.float()).unsqueeze(-1) * up
         self.turn_u = u + du
-        ids = (touched | moved | dragged).nonzero(as_tuple=False).squeeze(-1)
+        ids = (moved_a | drag_m | moved).nonzero(as_tuple=False).squeeze(-1)
         if ids.numel() == 0:
             return
         body.write_root_pose_to_sim(torch.cat([pos[ids], quat[ids]], -1), env_ids=ids)
