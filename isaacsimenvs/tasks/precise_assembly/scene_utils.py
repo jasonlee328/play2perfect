@@ -252,14 +252,17 @@ def setup_scene(env) -> None:
     else:
         env.hole = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0]))
         _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0])
-        if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)):
+        _card = getattr(env.cfg.precise_assembly, "card_task", "off") != "off"
+        if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)) or _card:
             _ocfg.spawn.activate_contact_sensors = True   # PhysxContactReportAPI: hand-on-object force (A1)
         env.object = RigidObject(_ocfg)
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
-    env.distractors = tuple(
-        RigidObject(_pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd))
-        for k, usd in enumerate(distractor_usd_paths)
-    )
+    def _dcfg(k, usd):
+        dc = _pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd)
+        if getattr(env.cfg.precise_assembly, "card_task", "off") != "off":
+            dc.spawn.activate_contact_sensors = True   # A10: robot <-> deck card contact
+        return RigidObject(dc)
+    env.distractors = tuple(_dcfg(k, usd) for k, usd in enumerate(distractor_usd_paths))
     _log_scene_step(setup_t0, f"spawned robot/table/hole/object/goalviz + {len(env.distractors)} distractors")
 
     spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())

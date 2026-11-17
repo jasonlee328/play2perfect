@@ -365,8 +365,24 @@ class PreciseAssemblyEnv(PlayEnv):
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
+        card = getattr(self, "_card", None)
+        if card is not None and card.checks:
+            # keep the finished episode's verdict for evals (read before the auto-reset clears it)
+            if not hasattr(self, "card_last"):
+                self.card_last = {k: torch.zeros(self.num_envs, device=self.device)
+                                  for k in list(card.checks) + list(card.meas) + ["success"] + [f"fail_{f}" for f in card.fail]}
+            for k, v in list(card.checks.items()) + list(card.meas.items()):
+                self.card_last[k][env_ids] = v[env_ids].float()
+            self.card_last["success"][env_ids] = card.success[env_ids].float()
+            for f, v in card.fail.items():
+                self.card_last[f"fail_{f}"][env_ids] = v[env_ids].float()
         super()._reset_idx(env_ids)
         self._reset_peg_episode(env_ids)
+        if self.cfg.precise_assembly.card_task != "off":
+            if card is None:
+                from .card_task import CardTask
+                self._card = card = CardTask(self)
+            card.reset(env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
@@ -1096,10 +1112,21 @@ class PreciseAssemblyEnv(PlayEnv):
         else:
             disturbed = torch.zeros_like(fall)
         self._hand_force_update()
+        card_fail = {}
+        if pih_cfg.card_task != "off" and getattr(self, "_card", None) is not None:
+            self._card.update()
+            if pih_cfg.card_task == "gate":
+                max_successes = self._card.success.clone()
+                if pih_cfg.card_terminate_on_fail:
+                    card_fail = {k: v & ~max_successes for k, v in self._card.fail.items()}
+            elif pih_cfg.card_break_force > 0.0:
+                card_fail = {"broken": self._card.fail["broken"] & ~max_successes}
         crushed = torch.zeros_like(fall)
         if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and hasattr(self, "_crush_count"):
             crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
         terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed
+        for v in card_fail.values():
+            terminated = terminated | v
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1109,6 +1136,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "dropped": dropped,
             "disturbed": disturbed,
             "crushed": crushed,
+            **{f"card_{k}": v for k, v in card_fail.items()},
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1203,6 +1231,21 @@ class PreciseAssemblyEnv(PlayEnv):
             c_pen = float(pih_cfg.crush_penalty) * self._termination_reasons["crushed"].float()
             reward = reward - c_pen
             self._reward_terms["crush_penalty"] = -c_pen
+            self._reward_terms["total_reward"] = reward
+
+        card = getattr(self, "_card", None)
+        if pih_cfg.card_task == "gate" and card is not None:
+            tr = self._termination_reasons
+            c_rew = pih_cfg.card_success_bonus * tr["max_successes"].float() \
+                + pih_cfg.card_release_bonus * card.just_rel_inside.float()
+            if pih_cfg.card_clear_rew_scale > 0.0:
+                c_rew = c_rew + pih_cfg.card_clear_rew_scale * card.checks["card_in_holder"].float() \
+                    * card.meas["palm_from_release"].clamp(max=pih_cfg.card_clear_dist) * card.released.float()
+            fails = [v for k, v in tr.items() if k.startswith("card_")]
+            if fails:
+                c_rew = c_rew - pih_cfg.card_fail_penalty * torch.stack(fails).any(0).float()
+            reward = reward + c_rew
+            self._reward_terms["card_rew"] = c_rew
             self._reward_terms["total_reward"] = reward
 
         log_step_metrics(self)

@@ -173,6 +173,37 @@ class PreciseAssemblyCfg:
     strict_neat_step_tol: float = 0.0015
     strict_ref_local: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
+    # A10 ContactBench "place card into holder" official checks (card_task.py). "off" = unused; "report" = computed
+    # and logged (extras card/*), success unchanged; "gate" = task success (max_successes) = the official verdict
+    # (all checks for card_final_steps steps), the goals only shape the reward and never end the episode.
+    card_task: str = "off"
+    card_hold_steps: int = 36            # 0.6 s hold (official T_HOLD)
+    card_hold_slip: float = 0.0005       # held_in_hand_at_start: < 0.5 mm in the link7 frame
+    card_transport_slip: float = 0.001   # held_through_transport: < 1 mm
+    card_loaded_frac: float = 0.98       # pinch loaded on >= 98 % of transport steps
+    card_pad_force: float = 0.1          # N: a fingertip link counts as loaded
+    card_clear_force: float = 0.05       # N: released_and_clear / "nothing else touches it"
+    card_release_steps: int = 3          # contact-free steps that mark the release
+    card_clear_dist: float = 0.05        # link7 moved >= 50 mm from the release
+    card_floor_tol: float = 0.0005       # lowest point within 0.5 mm of the floor
+    card_lean_tol: float = 3.0           # deg vs the front card
+    card_gap_tol: float = 0.0006         # face gap < 0.6 mm
+    card_rest_speed: float = 0.002       # m/s
+    card_stop_speed: float = 0.005       # arm links m/s
+    card_deck_move_tol: float = 0.003    # existing_cards_remain: < 3 mm
+    card_deck_rot_tol: float = 3.0       # and < 3 deg
+    card_final_steps: int = 72           # final window 1.2 s (official T_STILL)
+    card_terminate_on_fail: bool = True  # end on released_outside / deck_disturbed / broken (+ the two below if on)
+    card_fail_hold: bool = False         # also end when held_in_hand_at_start fails
+    card_fail_slip: bool = False         # also end when held_through_transport slip fails
+    card_fail_penalty: float = 200.0
+    card_success_bonus: float = 1000.0
+    card_release_bonus: float = 200.0    # once, released inside the slot
+    card_clear_rew_scale: float = 0.0    # per step: scale x min(link7 dist from release, clear_dist) while card_in_holder
+    # Fragile variant: card <-> deck + holder contact force sum (N) > card_break_force for card_break_steps steps = "broken".
+    card_break_force: float = 0.0
+    card_break_steps: int = 3
+
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
     """Return a render-overlay-compatible sim cfg for teacher and student tasks."""
