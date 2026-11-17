@@ -60,6 +60,8 @@ class KeyLockCfg:
     contact_n: float = 0.05              # common.CONTACT_FREE_N
     pinch_pad_n: float = 1.0
     pinch_frac: float = 0.85
+    pinch_frac_ramp_steps: int = 0       # > 0: the required pinch share ramps 0 -> pinch_frac over this many env steps
+    pinch_frac_offset_steps: int = 0     # (a resume restarts common_step_counter: set this to continue the ramp)
     pinch_max_n: float = 50.0
     pinch_max_frac: float = 0.01
     pinch_min_turn_steps: int = 3
@@ -332,8 +334,12 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_probe_t = torch.where(self._key_probe_on, self._key_probe_t + 1, self._key_probe_t)
         opened = self._key_probe_on & (door >= math.radians(float(kl.open_deg)))
         ts = self._key_turn_steps.clamp(min=1.0)
+        pf = float(kl.pinch_frac)
+        if int(kl.pinch_frac_ramp_steps) > 0:
+            pf *= min(1.0, float(self.common_step_counter + int(kl.pinch_frac_offset_steps)) / float(kl.pinch_frac_ramp_steps))
+        self.extras["key/pinch_frac_required"] = torch.tensor(pf, device=self.device)
         pinch_ok = ((self._key_turn_steps >= float(kl.pinch_min_turn_steps))
-                    & (self._key_pinch_ok / ts >= float(kl.pinch_frac))
+                    & (self._key_pinch_ok / ts >= pf)
                     & (self._key_pinch_over / ts <= float(kl.pinch_max_frac)))
         self._key_pinch_ok_ep = pinch_ok
         if not bool(kl.require_pinch):
