@@ -291,6 +291,9 @@ class PreciseAssemblyCfg:
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9
     turn_strip_torque: float = 0.0
+    # A7 'break' variant (generic; also A9's fragile screwdriver): > 0 = fail `stripped` (-turn_strip_penalty) once the
+    # SUSTAINED torque into the lock (min over turn_tight_steps policy steps) exceeds this (N m). 0 = off (official).
+    turn_break_torque: float = 0.0
     # Lock stiffness: the software stop zeroes the cap's spin every substep, which acts as a viscous brake of I_axis / dt
     # (~1.6e-4 N m s/rad for a 3.6 g cap: the hand would hardly feel the lock). While the cap is within
     # turn_lock_zone_deg of the lock its moment of inertia about the axis is raised to this value (kg m^2; 0 = off), so

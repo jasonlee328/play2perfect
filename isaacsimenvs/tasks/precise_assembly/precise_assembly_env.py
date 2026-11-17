@@ -1119,6 +1119,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["turn_strip_over_deg_cur"] = over_deg
             self.extras["turn_strip_steps_cur"] = float(strip_steps)
         strip_tau = float(pih_cfg.turn_strip_torque) if getattr(self, "turn_thread", False) else 0.0
+        if getattr(self, "turn_thread", False):
+            strip_tau = max(strip_tau, float(getattr(pih_cfg, "turn_break_torque", 0.0)))
         if strip_steps > 0 or over_deg > 0.0 or strip_tau > 0.0:
             new = torch.zeros_like(at_stop)
             if strip_steps > 0:
@@ -1127,6 +1129,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 new |= self.turn_angle > self.unlock_angle + math.radians(over_deg)
             if getattr(self, "turn_thread", False) and float(pih_cfg.turn_strip_torque) > 0.0:
                 new |= self.turn_lock_torque > float(pih_cfg.turn_strip_torque)   # our over-torque rule (not official)
+            brk = float(getattr(pih_cfg, "turn_break_torque", 0.0))
+            if getattr(self, "turn_thread", False) and brk > 0.0 and getattr(self, "_turn_hold_now", None) is not None:
+                # A7 'break' variant: the SUSTAINED seat torque (min over turn_tight_steps) above turn_break_torque
+                # breaks the part (stripped); a slam spike does not count
+                new |= self._turn_hold_now > brk
             new &= ~self.turn_stripped
             self._turn_just_stripped = new
             self.turn_stripped |= new
@@ -1168,6 +1175,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self._turn_tau_hist[self._turn_tau_hist_i % N] = self.turn_lock_torque
         self._turn_tau_hist_i += 1
         hold = self._turn_tau_hist.min(dim=0).values
+        self._turn_hold_now = hold
         self.turn_lock_torque_hold_max = torch.maximum(self.turn_lock_torque_hold_max, hold)
         pushing = self.turn_lock_torque >= float(pc.turn_tight_torque)
         self.turn_tight_count = torch.where(pushing, self.turn_tight_count + 1, torch.zeros_like(self.turn_tight_count))
