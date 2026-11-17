@@ -355,6 +355,13 @@ class PreciseAssemblyCfg:
     # A7 no-hand probe only: D6 joint GoalViz -> Object with an implicit yaw drive (N m/rad, N m s/rad); 0 = off.
     # A7: pin the object at its start pose for the first N policy steps of each episode (a tool in a holder; 0 = off).
     object_start_hold_steps: int = 0
+    # A9 curriculum: virtual upright torque on the tool near the screw (N m/rad, N m s/rad), fading to 0 over
+    # tool_upright_assist_ramp_steps env steps (+ offset for resumes). 0 = off (evals).
+    tool_upright_assist_k: float = 0.0
+    tool_upright_assist_d: float = 0.0
+    tool_upright_assist_radius_m: float = 0.03
+    tool_upright_assist_ramp_steps: float = 0.0
+    tool_upright_assist_offset_steps: float = 0.0
     probe_key_driver_k: float = 0.0
     probe_key_driver_d: float = 0.0
     distractor_velocity_iterations: int = 0

@@ -774,8 +774,51 @@ class PreciseAssemblyEnv(PlayEnv):
     def _apply_action(self) -> None:
         super()._apply_action()
         self._object_start_hold()
+        self._tool_upright_assist()
         if getattr(self, "turn_mode", False):
             self._turn_substep()
+
+    def _tool_upright_assist(self) -> None:
+        """A9 curriculum: while a tool tip (turn_tool_tips_m[0]) is within tool_upright_assist_radius_m of the screw head,
+        a virtual spring-damper torque turns the tool's tip axis (object-frame +x) toward the screw axis:
+        k (a x axis) - d w_perp, k / d fading from 1 to 0 over tool_upright_assist_ramp_steps env steps (offset for resumes).
+        Training aid only (the 13 g tool tips over when a stroke loosens the grip); evals run with it off."""
+        pc = self.cfg.precise_assembly
+        k0 = float(getattr(pc, "tool_upright_assist_k", 0.0))
+        if k0 <= 0.0 or not getattr(self, "turn_mode", False):
+            return
+        ramp = float(getattr(pc, "tool_upright_assist_ramp_steps", 0.0))
+        step = float(self.common_step_counter) + float(getattr(pc, "tool_upright_assist_offset_steps", 0.0))
+        f = max(0.0, 1.0 - step / ramp) if ramp > 0.0 else 1.0
+        self.extras["tool_upright_assist_frac"] = torch.tensor(f, device=self.device)
+        if f <= 0.0:
+            return
+        tips = getattr(pc, "turn_tool_tips_m", ())
+        if not tips:
+            return
+        axis_w, anchor_w = self._turn_axis_w()
+        pos, quat = self.object.data.root_pos_w, self.object.data.root_quat_w
+        tl = torch.tensor([float(v) for v in tips[0]], device=self.device).expand(self.num_envs, 3)
+        tip_w = pos + quat_apply(quat, tl)
+        head = anchor_w + (getattr(self, "turn_u", torch.zeros(self.num_envs, device=self.device))
+                           + float(pc.turn_tool_head_top_m)).unsqueeze(-1) * (-axis_w)
+        near = (tip_w - head).norm(dim=-1) < float(getattr(pc, "tool_upright_assist_radius_m", 0.03))
+        a = torch.nn.functional.normalize(quat_apply(quat, torch.tensor([1.0, 0.0, 0.0], device=self.device)
+                                                     .expand(self.num_envs, 3)), dim=-1)
+        w = self.object.data.root_ang_vel_w
+        w_perp = w - (w * a).sum(-1, keepdim=True) * a
+        tau = f * (k0 * torch.cross(a, axis_w, dim=-1)
+                   - float(getattr(pc, "tool_upright_assist_d", 0.0)) * w_perp) * near.float().unsqueeze(-1)
+        self.extras["tool_upright_assist_near"] = near.float().mean()
+        fw = getattr(self, "_object_forces", None)
+        tw = getattr(self, "_object_torques", None)
+        zero = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        f_w = zero if fw is None else fw
+        t_w = (zero if tw is None else tw) + tau.unsqueeze(1)
+        q_b = quat.unsqueeze(1)
+        self.object.set_external_force_and_torque(quat_apply_inverse(q_b.expand(-1, f_w.shape[1], 4), f_w),
+                                                  quat_apply_inverse(q_b.expand(-1, t_w.shape[1], 4), t_w),
+                                                  is_global=False)
 
     def _object_start_hold(self) -> None:
         """A7: object_start_hold_steps N > 0 = for the first N policy steps of every episode the object is pinned at its
