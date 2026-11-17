@@ -270,8 +270,6 @@ class PreciseAssemblyCfg:
     # _screwdriver_table.py:221): bristle z integrates the spin, |k z| capped at the friction cap (running drag + seat
     # preload); torque k z + d w while sticking. The tanh model creeps below breakaway (probe v4: 1 mN m -> 15 deg in 12 s,
     # a preloaded seat backs off under 10 mN m), the bristle holds. Stable while k dt^2 / I < 4 and d dt / I < 2.
-    turn_thread_bristle_k: float = 0.0
-    turn_thread_bristle_d: float = 0.02
     turn_loosen: bool = False
     turn_loosen_deg: float = 180.0
     turn_loosen_preload: float = 0.020
