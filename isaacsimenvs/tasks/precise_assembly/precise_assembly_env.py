@@ -1056,6 +1056,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.hs_touched[env_ids] = False
             if hasattr(self, "_hs_phi_prev"):
                 self._hs_phi_prev[env_ids] = 0.0
+            if hasattr(self, "_hs_palm_prev") and hasattr(self, "hs_palm_dist"):
+                self._hs_palm_prev[env_ids] = (1.0 - (self.hs_palm_dist[env_ids] / 0.15).clamp(0.0, 1.0))
             if hasattr(self, "_cbf_run"):
                 self._cbf_run[env_ids] = 0.0
                 self._cbf_run_prev[env_ids] = 0.0
@@ -1726,6 +1728,16 @@ class PreciseAssemblyEnv(PlayEnv):
             palm = on[:, self._hs_palm_idx] if self._hs_palm_idx >= 0 else torch.zeros_like(on[:, 0])
             self.hs_links = on.sum(-1)
             self.hs_palm = palm
+            if not hasattr(self, "_hs_pp_idx"):
+                paths_all = list(self.robot.root_physx_view.link_paths[0])
+                self._hs_pp_idx = [i for i, p in enumerate(paths_all)
+                                   if any(p.endswith(n) for n in ("left_index_PP", "left_middle_PP", "left_ring_PP"))]
+                print(f"[a8] human_style: palm proxy links {self._hs_pp_idx}", flush=True)
+            if self._hs_pp_idx:
+                pp = self.robot.data.body_pos_w[:, self._hs_pp_idx].mean(1)
+                tgt = self.object.data.root_pos_w.clone(); tgt[:, 2] += float(getattr(c, "hs_palm_above_m", 0.03))
+                self.hs_palm_dist = (pp - tgt).norm(dim=-1)
+                self.extras["hs_palm_dist_mean"] = self.hs_palm_dist.mean()
             self.hs_power = palm & (self.hs_links >= int(c.hs_grasp_links_min))
             self.hs_touched |= on.any(-1)
             Fd = self._hs_door_view.get_contact_force_matrix(float(self.physics_dt)).to(self.device)
@@ -2138,7 +2150,15 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._hs_phi_prev = phi.clone()
             dr = float(pih_cfg.hs_door_rew_scale) * (phi - self._hs_phi_prev)
             self._hs_phi_prev = phi.clone()
-            reward = reward + gr + pp + dr
+            pr = torch.zeros_like(reward)
+            if float(getattr(pih_cfg, "hs_palm_rew_scale", 0.0)) > 0.0 and hasattr(self, "hs_palm_dist"):
+                phip = 1.0 - (self.hs_palm_dist / 0.15).clamp(0.0, 1.0)
+                if not hasattr(self, "_hs_palm_prev"):
+                    self._hs_palm_prev = phip.clone()
+                pr = float(pih_cfg.hs_palm_rew_scale) * (phip - self._hs_palm_prev)
+                self._hs_palm_prev = phip.clone()
+                self._reward_terms["hs_palm_rew"] = pr
+            reward = reward + gr + pp + dr + pr
             self._reward_terms["hs_grasp_rew"] = gr
             self._reward_terms["hs_panel_pen"] = pp
             self._reward_terms["hs_door_rew"] = dr

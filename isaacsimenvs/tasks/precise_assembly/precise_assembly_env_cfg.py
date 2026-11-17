@@ -350,6 +350,10 @@ class PreciseAssemblyCfg:
     # dense grasp reward: scale x (0.5 x min(links on the knob, hs_grasp_links_min) / hs_grasp_links_min + 0.5 x palm on)
     hs_grasp_dense: bool = False
     hs_panel_cap: float = 10.0            # N, cap of the hand-on-panel force in the penalty
+    # palm-over-knob shaping: potential S x delta(1 - clamp(d / 0.15 m, 0, 1)), d = distance from the palm proxy (mean of
+    # the index / middle / ring PP links) to the point hs_palm_above_m above the knob centre
+    hs_palm_rew_scale: float = 0.0
+    hs_palm_above_m: float = 0.03
     object_compliant_damping: float = 0.0
     hand_force_gain: float = 0.5
     crush_force: float = 0.0
