@@ -73,12 +73,17 @@ class KeyLockCfg:
     start_locked_max_deg: float = 1.0
     end_probe_steps: int = 72            # 1.2 s (T_PROBE)
     open_deg: float = 5.0
+    # goal 0 = the key turned first_goal_deg (by its joint angle: the key's keypoints sit near the turning axis, so a
+    # keypoint test passed at rest = a free reach_goal_bonus every episode, cb_keyA). Keypoint distance proxy for the
+    # dense keypoint reward: remaining angle x progress_m_per_rad.
+    first_goal_deg: float = 20.0
+    progress_m_per_rad: float = 0.02
     # rewards
     release_rew_scale: float = 300.0     # potential on min(tip dist, release_dist) / release_dist after the clear goal
     still_rew_scale: float = 200.0       # potential on still_count / still_steps
     turnback_penalty: float = 2.0        # per step with the key back below its clear angle after the clear goal
-    pinch_rew: float = 0.5               # per turning step with a valid pinch
-    approach_unpinched_scale: float = 0.25   # latch_approach_rew gain on turning progress made without a 2-pad pinch
+    pinch_rew: float = 1.0               # per turning step with a valid pinch
+    approach_unpinched_scale: float = 0.5   # latch_approach_rew gain on turning progress made without a 2-pad pinch
     fail_penalty: float = 100.0          # probe / pinch fail, broken
     # phase 2
     break_ratio: float = 0.0             # 0 = off; F_break = break_ratio x F_min(env)
@@ -249,6 +254,29 @@ class KeyLockEnv(PreciseAssemblyEnv):
         k = int(self.cfg.precise_assembly.unlock_joint)
         return self.cb_joint_angle[k] >= self.key_clear
 
+    def _apply_unlock_goal(self, prev_near_steps: torch.Tensor) -> None:
+        """Goal 0 (the first waypoint) by the key angle, not by keypoints; the last goal stays the base unlock logic."""
+        from isaacsimenvs.tasks.play.utils.reward_utils import update_near_goal_steps
+        kl = self.cfg.key_lock
+        self._update_joint_angles()
+        ang = self.cb_joint_angle[int(self.cfg.precise_assembly.unlock_joint)]
+        first = (self._successes < self.env_max_goals - 1) & ~self.is_random_goal_env
+        rem = (math.radians(float(kl.first_goal_deg)) - ang).clamp(min=0.0)
+        kp = rem * float(kl.progress_m_per_rad)
+        self._keypoints_max_dist = torch.where(first, kp, self._keypoints_max_dist)
+        if not hasattr(self, "_key_kp_fresh"):
+            self._key_kp_fresh = torch.ones(self.num_envs, dtype=torch.bool, device=self.device)
+        # first step after a reset: the base just seeded the tracker with the (tiny) real keypoint distance
+        fresh = self._key_kp_fresh | (self._closest_keypoint_max_dist < 0)
+        self._closest_keypoint_max_dist = torch.where(first & fresh, kp, self._closest_keypoint_max_dist)
+        self._key_kp_fresh[:] = False
+        near = rem <= 0.0
+        steps = update_near_goal_steps(near_goal=near, near_goal_steps=prev_near_steps,
+                                       force_consecutive=self.cfg.termination.force_consecutive_near_goal_steps)
+        self._near_goal = torch.where(first, near, self._near_goal)
+        self._near_goal_steps = torch.where(first, steps, self._near_goal_steps)
+        super()._apply_unlock_goal(prev_near_steps)
+
     def _retract_seated_by_depth(self, pih_cfg):
         return self._key_ok
 
@@ -401,5 +429,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
             t[env_ids] = 0.0
         for t in (self._key_still, self._key_probe_t, self._key_break_count, self._key_t):
             t[env_ids] = 0
+        if hasattr(self, "_key_kp_fresh"):
+            self._key_kp_fresh[env_ids] = True
         for t in (self._key_probe_on, self._key_ok, self._key_cleared_ep, self._key_released_ep):
             t[env_ids] = False
