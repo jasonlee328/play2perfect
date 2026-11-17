@@ -11712,7 +11712,7 @@
       -1.0
      ],
      "stiffness": 0.0,
-     "damping": 0.0
+     "damping": 0.004
     }
    ],
    "waypoints": [
@@ -11805,7 +11805,7 @@
       -1.0
      ],
      "stiffness": 0.0,
-     "damping": 0.0
+     "damping": 0.004
     }
    ],
    "waypoints": [
@@ -11898,28 +11898,10 @@
       -1.0
      ],
      "stiffness": 0.0,
-     "damping": 0.0
+     "damping": 0.004
     }
    ],
    "waypoints": [
-    [
-     0.020764307395866006,
-     4.549989996444177e-05,
-     0.0888461437901703,
-     -0.0,
-     0.7071067811865475,
-     -0.0,
-     0.7071067811865475
-    ],
-    [
-     0.020764307395866006,
-     4.549989996444177e-05,
-     0.06884614379017032,
-     -0.0,
-     0.7071067811865475,
-     -0.0,
-     0.7071067811865475
-    ],
     [
      0.02133024184432384,
      0.0021575962154336634,
@@ -11943,12 +11925,12 @@
     "lead_mm": 2.34,
     "unengaged_mm": 4.0,
     "turn_to_seat_deg": 615.4,
-    "prelude_goals": 2,
+    "prelude_goals": 0,
     "turn_goals_deg": [
      30.0,
      120.0
     ],
-    "note": "official task 13; overrides in FoundationTouch teacher/allenkey/overrides.sh"
+    "note": "official task 13; overrides in FoundationTouch teacher/allenkey/overrides.sh (turn_prelude_goals=0)"
    },
    "object_start_pose": [
     0.020764307395866006,

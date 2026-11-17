@@ -364,6 +364,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "screw_flats" in OBS_FIELD_SIZES and getattr(env, "turn_mode", False):
+        a4 = 4.0 * env.turn_angle
+        obs_clean["screw_flats"] = torch.stack([torch.sin(a4), torch.cos(a4)], dim=-1)
+
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel

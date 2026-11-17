@@ -82,6 +82,9 @@ class PreciseAssemblyCfg:
     # peg's keypoint centroid AND no tactile pad has touched anything for retract_clear_steps steps.
     retract_min_fingertip_dist: float = 0.0
     retract_clear_steps: int = 10
+    # A7: > 0 = retract success also needs the held object's root more than this far (m, horizontally) from the turn
+    # joint's axis (official Allen-key key_off_screw: the key may not be left in the screw).
+    retract_object_off_joint_m: float = 0.0
     # Release curriculum (end_on_retract): ramp the release rule from (retract_ramp_start_dist, retract_ramp_start_clear)
     # to (retract_min_fingertip_dist, retract_clear_steps) over retract_ramp_steps env steps (0 = off); a resume restarts
     # common_step_counter, so set retract_ramp_offset_steps to continue.
@@ -141,6 +144,8 @@ class PreciseAssemblyCfg:
     # field "distractor_obs", added to obs_list and state_list). A checkpoint trained without it warm-starts with
     # the new inputs zero-initialized when P2P_NEW_OBS_FIELD=distractor_obs (train.py).
     obs_distractors: bool = False
+    # A7: actor + critic field screw_flats = [sin 4a, cos 4a] of the turn joint's angle (recess orientation mod 90 deg)
+    obs_screw_flats: bool = False
     # > 0: feed only the obs_distractors_k distractors whose reset pose is nearest the object's start (kept in
     # problem order), so a policy trained with k neighbours can run on a layout with more. 0 = all of them.
     obs_distractors_k: int = 0
@@ -258,13 +263,23 @@ class PreciseAssemblyCfg:
     # _allen_key ThreadModel): Coulomb running friction (N m; official TAU_RUN0 0.0015) + viscous (N m s / rad; official
     # SCREW_KD 0.004). Never reverses the spin, so an undriven light screw stops (stiction). 0 = off (bottle default).
     turn_thread_friction: float = 0.0
-    turn_thread_viscous: float = 0.0
+    turn_thread_viscous: float = 0.0   # unused (11-17: viscous drag = JointSpec.damping on the PhysX drive)
+    turn_thread_stiction_w: float = 0.03   # rad/s: tanh width of the Coulomb friction torque
     # Turn mode: the first N goals are ordinary object-pose goals (tool above the screw, tool engaged), the last two
     # the turn goals (turn_first_goal_deg, then the stop / tight). 0 = all goals are turn goals (bottle).
     turn_prelude_goals: int = 0
     # Seat preload (official _allen_key): the friction cap rises by this fraction of turn_lock_torque_max (the torque
     # pushed into the seat, per policy step) while within turn_preload_free_deg of the seat; 0 = off.
     turn_seat_preload_frac: float = 0.0
+    # A7 tool rule (official turned_by_the_tool_in_hand): tool tips in the held object's frame (m); the jointed body may
+    # turn at most turn_toolless_max_deg (0 = off) in total over policy steps where no tip is in the recess (radial
+    # < turn_tool_radial_m from the axis, height < turn_tool_out_m above the head top = seat + turn_tool_head_top_m + u).
+    turn_tool_tips_m: tuple[tuple[float, float, float], ...] = ()
+    turn_tool_head_top_m: float = 0.007
+    turn_tool_radial_m: float = 0.0015
+    turn_tool_out_m: float = 0.0005
+    turn_toolless_max_deg: float = 0.0
+    turn_toolless_penalty: float = 0.0
     turn_preload_free_deg: float = 10.0
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9

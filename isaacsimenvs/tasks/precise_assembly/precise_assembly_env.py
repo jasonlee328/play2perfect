@@ -219,6 +219,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_prev_ep_max = torch.zeros(n, device=self.device)
             self.turn_strip_count = torch.zeros(n, dtype=torch.long, device=self.device)
             self.turn_stripped = torch.zeros(n, dtype=torch.bool, device=self.device)
+            # A7: screw rotation while no tool tip is in the recess (deg) and its failure flag
+            self.turn_toolless_deg = torch.zeros(n, device=self.device)
+            self.turn_toolless = torch.zeros(n, dtype=torch.bool, device=self.device)
+            self._turn_just_toolless = torch.zeros(n, dtype=torch.bool, device=self.device)
+            self._turn_prev_step_angle = torch.zeros(n, device=self.device)
             self._turn_just_stripped = torch.zeros(n, dtype=torch.bool, device=self.device)
             self.turn_released_early = torch.zeros(n, dtype=torch.bool, device=self.device)
             self._turn_just_released_early = torch.zeros(n, dtype=torch.bool, device=self.device)
@@ -386,6 +391,13 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if cfg.precise_assembly.obs_screw_flats:
+            # A7: [sin 4a, cos 4a] of the jointed body's turn angle = the square recess's orientation mod 90 deg
+            # (what the official expert reads to re-insert the key); carries no progress / seat information
+            OBS_FIELD_SIZES["screw_flats"] = 2
+            for lst in ("obs_list", "state_list"):
+                if "screw_flats" not in getattr(cfg.obs, lst):
+                    setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "screw_flats"))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
@@ -619,6 +631,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_max_angle[env_ids] = self.turn_offset[env_ids]
             self.turn_strip_count[env_ids] = 0
             self.turn_stripped[env_ids] = False
+            self.turn_toolless_deg[env_ids] = 0.0
+            self.turn_toolless[env_ids] = False
+            self._turn_prev_step_angle[env_ids] = self.turn_angle[env_ids]
             self.turn_released_early[env_ids] = False
             self._turn_early_clear[env_ids] = 0
             self.turn_at_stop_steps[env_ids] = 0
@@ -862,6 +877,25 @@ class PreciseAssemblyEnv(PlayEnv):
         vel = body.data.root_vel_w.clone()
         pc = self.cfg.precise_assembly
         K_lock = float(getattr(pc, "turn_lock_stiffness", 0.0))
+        tau_c0 = float(getattr(pc, "turn_thread_friction", 0.0))
+        tau_fric = torch.zeros(n, device=self.device)
+        if tau_c0 > 0.0:
+            # A7 thread friction (official _allen_key: running friction TAU_RUN0 + seat preload = frac x the torque
+            # measured into the seat, released after backing off turn_preload_free_deg), as a smooth Coulomb torque
+            # -tau_c tanh(w / w0) applied during the step (a velocity-level correction after the step cannot stop a
+            # light screw moving within it). Explicitly stable while tau_c dt / (w0 I) < 2: give the screw enough axial
+            # inertia. Viscous drag goes on the joint's (implicit) PhysX drive: JointSpec.damping.
+            tau_c = torch.full((n,), tau_c0, device=self.device)
+            frac = float(getattr(pc, "turn_seat_preload_frac", 0.0))
+            if frac > 0.0:
+                free = self.turn_angle < self.unlock_angle - math.radians(float(pc.turn_preload_free_deg))
+                self.turn_lock_torque_max = torch.where(free, torch.zeros_like(self.turn_lock_torque_max),
+                                                        self.turn_lock_torque_max)
+                # only inside the lock zone, where the raised lock inertia keeps the stiff tanh stable (the official
+                # releases it after backing off turn_preload_free_deg; here leaving the 0.5 deg zone does)
+                tau_c = tau_c + frac * self.turn_lock_torque_max * self.turn_lock_flag.float()
+            w_f = (vel[:, 3:6] * axis_w).sum(-1)
+            tau_fric = tau_c * torch.tanh(w_f / float(pc.turn_thread_stiction_w))
         elastic = None
         if K_lock > 0.0:
             # elastic lock where the raised inertia is on: no pose correction up to the backstop, spring + damper instead
@@ -874,17 +908,19 @@ class PreciseAssemblyEnv(PlayEnv):
             tau_l = torch.where(elastic, K_lock * over_e + float(pc.turn_lock_damping) * w_now.clamp_min(0.0),
                                 torch.zeros_like(over_l))
             self._turn_dbg_el = (elastic.clone(), tau_l.clone(), over_l.clone(), w_now.clone())
+        if K_lock > 0.0 or tau_c0 > 0.0:
+            tau_tot = (tau_l if K_lock > 0.0 else torch.zeros(n, device=self.device)) + tau_fric   # both oppose +spin
             zero = torch.zeros(n, 1, 3, device=self.device)
             if body is self.object:
                 f = getattr(self, "_object_forces", None); t = getattr(self, "_object_torques", None)
                 self.object.set_external_force_and_torque(zero if f is None else f,
-                                                          (zero if t is None else t) - (tau_l.unsqueeze(-1) * axis_w).unsqueeze(1),
+                                                          (zero if t is None else t) - (tau_tot.unsqueeze(-1) * axis_w).unsqueeze(1),
                                                           is_global=True)
             else:
                 # _turn_ext_force / _turn_ext_torque: an extra wrench on the jointed body (no-hand probes), kept
                 f_x = getattr(self, "_turn_ext_force", None); t_x = getattr(self, "_turn_ext_torque", None)
                 body.set_external_force_and_torque(zero if f_x is None else f_x,
-                                                   (zero if t_x is None else t_x) - (tau_l.unsqueeze(-1) * axis_w).unsqueeze(1),
+                                                   (zero if t_x is None else t_x) - (tau_tot.unsqueeze(-1) * axis_w).unsqueeze(1),
                                                    is_global=True)
         touched = corr != 0
         # (1) angle: stop / lower bound
@@ -914,26 +950,6 @@ class PreciseAssemblyEnv(PlayEnv):
         self.turn_tau_acc += tau
         self._turn_tau_n += 1
         vel[:, 3:6] -= (w_ax * bad.float()).unsqueeze(-1) * axis_w
-        tau_f = float(getattr(pc, "turn_thread_friction", 0.0))
-        visc = float(getattr(pc, "turn_thread_viscous", 0.0))
-        fric = torch.zeros_like(touched)
-        if tau_f > 0.0 or visc > 0.0:
-            # thread drag (official _allen_key ThreadModel: running friction TAU_RUN0 + viscous SCREW_KD): remove up to
-            # (tau_f + visc |w|) dt / I of the spin each substep, never reversing it (an undriven screw stops = stiction)
-            w2 = (vel[:, 3:6] * axis_w).sum(-1)
-            tau_c = torch.full_like(w2, tau_f)
-            frac = float(getattr(pc, "turn_seat_preload_frac", 0.0))
-            if frac > 0.0:
-                # seat preload (official): once seated the stiction cap rises by frac x the torque measured into the
-                # seat (no floor); backing off more than turn_preload_free_deg releases it
-                free = self.turn_angle < self.unlock_angle - math.radians(float(pc.turn_preload_free_deg))
-                self.turn_lock_torque_max = torch.where(free, torch.zeros_like(self.turn_lock_torque_max),
-                                                        self.turn_lock_torque_max)
-                tau_c = tau_c + frac * self.turn_lock_torque_max
-            dw = torch.clamp((tau_c + visc * w2.abs()) * dt / I_cur, max=1.0e9)
-            dw = torch.minimum(dw, w2.abs())
-            vel[:, 3:6] -= (torch.sign(w2) * dw).unsqueeze(-1) * axis_w
-            fric = dw > 0
         self.turn_angle += c
         self._turn_prev_wrapped = torch.where(touched, torch.atan2(torch.sin(a + c), torch.cos(a + c)),
                                               self._turn_prev_wrapped)
@@ -956,7 +972,7 @@ class PreciseAssemblyEnv(PlayEnv):
         into = moved & (((du > 0) & (v_ax < 0)) | ((du < 0) & (v_ax > 0)))
         vel[:, 0:3] -= (v_ax * into.float()).unsqueeze(-1) * up
         self.turn_u = u + du
-        ids = (touched | moved | fric).nonzero(as_tuple=False).squeeze(-1)
+        ids = (touched | moved).nonzero(as_tuple=False).squeeze(-1)
         if ids.numel() == 0:
             return
         body.write_root_pose_to_sim(torch.cat([pos[ids], quat[ids]], -1), env_ids=ids)
@@ -1051,6 +1067,7 @@ class PreciseAssemblyEnv(PlayEnv):
             contact = torch.zeros_like(at_stop) if tac is None else tac.reshape(tac.shape[0], -1).sum(-1) > 0
         self.turn_strip_count += (at_stop & contact).long()
         self._turn_just_stripped = torch.zeros_like(at_stop)
+        self._turn_toolless_check()
         over_deg = float(pih_cfg.turn_strip_over_deg)
         strip_steps = int(pih_cfg.turn_strip_steps)
         if int(pih_cfg.turn_strip_over_ramp_steps) > 0:
@@ -1094,6 +1111,38 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _turn_thread_body_is_object(self) -> bool:
         return self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)].body == "object"
+
+    def _turn_toolless_check(self) -> None:
+        """A7 (official turned_by_the_tool_in_hand): accumulate the jointed body's rotation over policy steps in which no
+        tool tip (turn_tool_tips_m, object frame) is in its recess (within turn_tool_radial_m of the axis and below the
+        head top + turn_tool_out_m); more than turn_toolless_max_deg = fail `toolless` (-turn_toolless_penalty)."""
+        pc = self.cfg.precise_assembly
+        tips = getattr(pc, "turn_tool_tips_m", ())
+        d = (self.turn_angle - self._turn_prev_step_angle).abs()
+        self._turn_prev_step_angle = self.turn_angle.clone()
+        self._turn_just_toolless = torch.zeros_like(self.turn_toolless)
+        if not tips:
+            return
+        axis_w, anchor_w = self._turn_axis_w()
+        up = -axis_w
+        u = getattr(self, "turn_u", torch.zeros_like(self.turn_angle))
+        head_top = anchor_w + (u + float(pc.turn_tool_head_top_m)).unsqueeze(-1) * up
+        pos, quat = self.object.data.root_pos_w, self.object.data.root_quat_w
+        inside = torch.zeros_like(self.turn_toolless)
+        for t in tips:
+            tl = torch.tensor([float(v) for v in t], device=self.device).expand(self.num_envs, 3)
+            tw = pos + quat_apply(quat, tl)
+            rel = tw - head_top
+            h = (rel * up).sum(-1)
+            radial = (rel - h.unsqueeze(-1) * up).norm(dim=-1)
+            inside |= (radial < float(pc.turn_tool_radial_m)) & (h < float(pc.turn_tool_out_m))
+        self.turn_toolless_deg += torch.where(inside, torch.zeros_like(d), torch.rad2deg(d))
+        self.extras["turn_tool_in_recess_frac"] = inside.float().mean()
+        lim = float(pc.turn_toolless_max_deg)
+        if lim > 0.0:
+            new = (self.turn_toolless_deg > lim) & ~self.turn_toolless
+            self._turn_just_toolless = new
+            self.turn_toolless |= new
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
@@ -1466,6 +1515,14 @@ class PreciseAssemblyEnv(PlayEnv):
             )
             if getattr(pih_cfg, "retract_seated_mode", "keypoint") == "depth":
                 object_at_goal = self._retract_seated_by_depth(pih_cfg)
+            off_d = float(getattr(pih_cfg, "retract_object_off_joint_m", 0.0))
+            if off_d > 0.0 and getattr(self, "turn_mode", False):
+                # A7 (official key_off_screw): the held tool must end away from the turn joint's axis (horizontal
+                # distance of its root from the axis > off_d), e.g. not left standing in the screw's recess
+                axis_w, anchor_w = self._turn_axis_w()
+                rel = self.object.data.root_pos_w - anchor_w
+                radial = rel - (rel * axis_w).sum(-1, keepdim=True) * axis_w
+                object_at_goal = object_at_goal & (radial.norm(dim=-1) > off_d)
             mean_fingertip_dist = self._curr_fingertip_distances.mean(dim=-1)
             if pih_cfg.end_on_retract:
                 # Strict: off the peg (distance to its middle, not its root) and no tactile contact for a while.
@@ -1568,11 +1625,14 @@ class PreciseAssemblyEnv(PlayEnv):
         stripped = self.turn_stripped.clone() if getattr(self, "turn_mode", False) else torch.zeros_like(fall)
         released_early = (self.turn_released_early.clone() if getattr(self, "turn_mode", False)
                           else torch.zeros_like(fall))
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | stripped | released_early
+        toolless = (self.turn_toolless.clone() if getattr(self, "turn_mode", False) else torch.zeros_like(fall))
+        terminated = (fall | max_successes | hand_far | dropped | retract_fail | disturbed | stripped | released_early
+                      | toolless)
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "stripped": stripped,
             "released_early": released_early,
+            "toolless": toolless,
             "fall": fall,
             "max_successes": max_successes,
             "retract_fail": retract_fail,
@@ -1622,6 +1682,10 @@ class PreciseAssemblyEnv(PlayEnv):
             strip_pen = -float(pih_cfg.turn_strip_penalty) * self._turn_just_stripped.float()
             reward = reward + strip_pen
             self._reward_terms["turn_strip_penalty"] = strip_pen
+        if getattr(self, "turn_mode", False) and float(getattr(pih_cfg, "turn_toolless_penalty", 0.0)) != 0.0:
+            tl_pen = -float(pih_cfg.turn_toolless_penalty) * self._turn_just_toolless.float()
+            reward = reward + tl_pen
+            self._reward_terms["turn_toolless_penalty"] = tl_pen
         if getattr(self, "turn_mode", False) and float(pih_cfg.turn_over_penalty) != 0.0:
             over_pen = -float(pih_cfg.turn_over_penalty) * self._turn_over_inc
             reward = reward + over_pen
