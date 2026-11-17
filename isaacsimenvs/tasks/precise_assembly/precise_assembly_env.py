@@ -971,7 +971,7 @@ class PreciseAssemblyEnv(PlayEnv):
         if elastic is not None:
             w_now = (vel[:, 3:6] * axis_w).sum(-1)
             vel[:, 3:6] += (torch.where(elastic, self._turn_el_v - w_now, torch.zeros_like(w_now))).unsqueeze(-1) * axis_w
-        if D_thr > 0.0 and getattr(self, "_turn_drag_v", None) is not None:
+        if ((D_thr > 0.0) if isinstance(D_thr, float) else True) and getattr(self, "_turn_drag_v", None) is not None:
             w_now = (vel[:, 3:6] * axis_w).sum(-1)
             vel[:, 3:6] += (torch.where(drag_m, self._turn_drag_v - w_now, torch.zeros_like(w_now))).unsqueeze(-1) * axis_w
         c = c + c_drag
