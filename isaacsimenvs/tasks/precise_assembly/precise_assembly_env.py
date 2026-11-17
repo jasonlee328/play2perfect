@@ -1027,7 +1027,12 @@ class PreciseAssemblyEnv(PlayEnv):
         if not (getattr(self, "turn_mode", False) and self.cfg.precise_assembly.turn_hide_from_actor):
             return None
         axis_w, _ = self._turn_axis_w()
-        return quat_from_angle_axis(-(self.turn_angle - self.turn_offset), axis_w), axis_w
+        q = quat_from_angle_axis(-(self.turn_angle - self.turn_offset), axis_w)
+        if getattr(self, "turn_thread", False) and getattr(self.cfg.precise_assembly, "turn_hide_height", False):
+            # A1 11-17: the faithful thread lowers the cap L per turn and it bottoms out at the same height at the lock
+            # for every turn count = a visual stop cue. The actor sees the cap at the seat height all episode.
+            return q, axis_w, -axis_w * self.turn_u.unsqueeze(-1)
+        return q, axis_w
 
     def _turn_goal_values(self) -> None:
         """Turn mode, after compute_intermediate_values: goals / keypoint distance from the unwrapped angle."""

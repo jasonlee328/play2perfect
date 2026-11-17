@@ -279,10 +279,14 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     turn_hide = getattr(env, "_actor_turn_hide", None)
     turn_hidden = turn_hide() if callable(turn_hide) else None
     if turn_hidden is not None:
-        unturn_q, axis_w = turn_hidden
+        unturn_q, axis_w = turn_hidden[0], turn_hidden[1]
         noisy_obj_rot = quat_mul(unturn_q, noisy_obj_rot)
         w = noisy_obj_vel[:, 3:6]
-        noisy_obj_vel = torch.cat([noisy_obj_vel[:, 0:3], w - (w * axis_w).sum(-1, keepdim=True) * axis_w], dim=-1)
+        lv = noisy_obj_vel[:, 0:3]
+        if len(turn_hidden) > 2:  # thread height hidden too: drop the height offset and the axial speed
+            noisy_obj_pos = noisy_obj_pos - turn_hidden[2]
+            lv = lv - (lv * axis_w).sum(-1, keepdim=True) * axis_w
+        noisy_obj_vel = torch.cat([lv, w - (w * axis_w).sum(-1, keepdim=True) * axis_w], dim=-1)
 
     kp_offsets = env._keypoint_offsets * env._object_scale_multiplier.unsqueeze(1)
     obj_kp = _keypoints_world(obj_pos, obj_rot, kp_offsets)

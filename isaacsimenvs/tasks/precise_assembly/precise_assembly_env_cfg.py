@@ -286,6 +286,8 @@ class PreciseAssemblyCfg:
     # resampled at every reset, replacing turn_thread_drag_torque / turn_lock_stiffness for that env. Blurs the joint
     # cue at the lock (a slow turn = stiff thread or the stop; the stall differs per episode).
     turn_thread_drag_range: tuple[float, ...] = ()
+    # A1 11-17: hide the cap's height along the thread from the actor (seen at the seat height all episode).
+    turn_hide_height: bool = False
     turn_lock_stiffness_range: tuple[float, ...] = ()
     # A1 slip rule (11-17, 0 = off): stripped once the fingers have slipped more than this many degrees (about the
     # bottle axis, relative to the cap) over the locked cap, counted while a pad touches it (see _turn_update_slip).
