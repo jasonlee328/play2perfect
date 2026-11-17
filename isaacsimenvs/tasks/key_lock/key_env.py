@@ -202,6 +202,22 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._ja_unwrap = u
         self.cb_joint_angle[k] = u
 
+    # ---- phase 2: hide the key's turn from the actor (obs_utils hook) ------------------------------------------
+    def _actor_turn_hide(self):
+        if not bool(self.cfg.key_lock.hide_key_angle) or not hasattr(self, "_ja_reinit"):
+            return None
+        c = self.cfg.precise_assembly
+        j = self._pih_joints[int(c.unlock_joint)]
+        door = self.distractors[int(j.parent[10:])]
+        from isaaclab.utils.math import quat_conjugate, quat_from_angle_axis, quat_mul
+        kp = int(j.parent[10:])
+        qp0 = torch.tensor([self._pih_distractor_pose_rel[kp][6], *self._pih_distractor_pose_rel[kp][3:6]],
+                           device=self.device, dtype=torch.float32).expand(self.num_envs, 4)
+        q_par = quat_mul(door.data.root_quat_w, quat_conjugate(qp0))
+        axis_w = quat_apply(q_par, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(self.num_envs, 3))
+        ang = self.cb_joint_angle[int(c.unlock_joint)]
+        return quat_from_angle_axis(-ang, axis_w), axis_w
+
     # ---- physics substep: hinge probes (replaces the knob spring correction of latch_cbf) ----------------------
     def _cbf_spring_correction(self, knob: torch.Tensor) -> None:
         if not hasattr(self, "_key_probe_on"):
