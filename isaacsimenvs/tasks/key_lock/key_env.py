@@ -181,6 +181,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_break_count = z(torch.long)
         self._key_rel_phi = z(); self._key_still_phi = z()
         self._key_min_tip = z()
+        self._key_amax, self._key_dmax = z(), z()
+        self._key_cleared_ep, self._key_released_ep = z(torch.bool), z(torch.bool)
         print(f"[key_lock] contact views: key / door vs {self._key_nl} hand links; clear "
               f"{torch.rad2deg(self.key_clear[:4]).tolist()} deg; break_ratio {kl.break_ratio}", flush=True)
 
@@ -279,6 +281,10 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_pinch_ok_ep = pinch_ok
         if not bool(kl.require_pinch):
             pinch_ok = torch.ones_like(pinch_ok)
+        self._key_amax = torch.maximum(self._key_amax, ang)
+        self._key_dmax = torch.maximum(self._key_dmax, door)
+        self._key_cleared_ep |= cleared
+        self._key_released_ep |= released
         self._key_ok = opened & pinch_ok
         self._key_fail_pinch = opened & ~pinch_ok
         self._key_fail_probe = self._key_probe_on & (self._key_probe_t > int(kl.end_probe_steps)) & ~opened
@@ -310,6 +316,16 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._termination_reasons = {"key_broken": broken, "probe_fail": probe_fail, "pinch_fail": pinch_fail,
                                      "start_unlocked": start_unl, **tr}
         self._key_term = broken | probe_fail | pinch_fail | start_unl
+        # end-of-episode snapshots for evals (the auto reset after _get_dones clears the live counters)
+        self._key_last_turn = self._key_turn_steps.clone()
+        self._key_last_pinch = self._key_pinch_ok.clone()
+        self._key_last_over = self._key_pinch_over.clone()
+        self._key_last_amax = self._key_amax.clone()
+        self._key_last_dmax = self._key_dmax.clone()
+        self._key_last_cleared = self._key_cleared_ep.clone()
+        self._key_last_released = self._key_released_ep.clone()
+        self._key_last_probe = self._key_probe_on.clone()
+        self._key_last_handf = self.key_hand_f.clone()
         return terminated | self._key_term, truncated
 
     def _get_rewards(self):
@@ -344,9 +360,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
             return
         self._ja_reinit[env_ids] = True
         for t in (self._key_turn_steps, self._key_pinch_ok, self._key_pinch_over, self._key_prev_ang,
-                  self._key_start_max, self._key_rel_phi, self._key_still_phi):
+                  self._key_start_max, self._key_rel_phi, self._key_still_phi, self._key_amax, self._key_dmax):
             t[env_ids] = 0.0
         for t in (self._key_still, self._key_probe_t, self._key_break_count):
             t[env_ids] = 0
-        for t in (self._key_probe_on, self._key_ok):
+        for t in (self._key_probe_on, self._key_ok, self._key_cleared_ep, self._key_released_ep):
             t[env_ids] = False
