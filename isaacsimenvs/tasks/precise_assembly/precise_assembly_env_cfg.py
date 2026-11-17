@@ -147,6 +147,7 @@ class PreciseAssemblyCfg:
     # substep. Logged as extras hand_force_{mean,max}; per-episode max in self.hand_force_ep_max (evals). Upper-bound
     # rule: hand_force > crush_force (N, 0 = off) for crush_steps steps in a row = termination "crushed" (- crush_penalty).
     hand_force_sense: bool = False
+    hand_force_scale: float = 0.5   # calibration of the PhysX force matrix (reads 2x on a flat contact)
     crush_force: float = 0.0
     crush_steps: int = 3
     crush_penalty: float = 200.0

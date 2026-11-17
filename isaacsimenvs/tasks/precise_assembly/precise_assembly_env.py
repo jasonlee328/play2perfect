@@ -971,7 +971,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self.hand_force_ep_max = torch.zeros(self.num_envs, device=self.device)
             self._crush_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         F = self._hf_view.get_contact_force_matrix(float(self.physics_dt)).to(self.device)   # (N, links, 3)
-        self.hand_force = F.norm(dim=-1).sum(-1)
+        # x hand_force_scale: on a flat contact (cup on the table, a1_force_probe --on_table) the force matrix reads
+        # 2.000x the true support force (m g + push, 0-10 N, within 0.3%) -> default 0.5
+        self.hand_force = F.norm(dim=-1).sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
         over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
