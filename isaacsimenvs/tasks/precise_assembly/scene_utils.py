@@ -138,19 +138,27 @@ def _create_fixture_joints(env) -> None:
             if j.lower_deg is not None:
                 jp.CreateLowerLimitAttr(float(j.lower_deg))
             unlock = getattr(env, "_unlock_deg_np", None)
-            if unlock is not None and k == int(env.cfg.precise_assembly.unlock_joint):
+            cbf = getattr(env, "_cbf", None)
+            stiff, target = float(j.stiffness), 0.0
+            if cbf is not None and k == int(env.cfg.precise_assembly.unlock_joint):
+                # faithful door: end stop = this env's pinion stop; spring tau = tau0 + K theta toward the rest stop
+                # (the lower limit) = a drive with stiffness K and its target tau0 / K beyond the rest stop
+                jp.CreateUpperLimitAttr(float(cbf["stop_deg"][i]))
+                stiff = float(cbf["K"][i])
+                target = -math.degrees(float(cbf["tau0"][i]) / stiff) + (float(j.lower_deg or 0.0))
+            elif unlock is not None and k == int(env.cfg.precise_assembly.unlock_joint):
                 # hidden unlock angle: this env's end stop = its theta + margin
                 fixed = float(getattr(env.cfg.precise_assembly, "unlock_fixed_stop_deg", 0.0))
                 jp.CreateUpperLimitAttr(fixed if fixed > 0.0 else
                                         float(unlock[i]) + float(env.cfg.precise_assembly.unlock_stop_margin_deg))
             elif j.upper_deg is not None:
                 jp.CreateUpperLimitAttr(float(j.upper_deg))
-            if j.damping or j.stiffness:
+            if j.damping or stiff:
                 drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "angular")
                 drive.CreateTypeAttr("force")
-                drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
+                drive.CreateTargetPositionAttr(float(target)); drive.CreateTargetVelocityAttr(0.0)
                 drive.CreateDampingAttr(float(j.damping) * math.pi / 180.0)
-                drive.CreateStiffnessAttr(float(j.stiffness) * math.pi / 180.0)
+                drive.CreateStiffnessAttr(stiff * math.pi / 180.0)
     print(f"[precise_assembly] created {len(joints)} fixture joint(s) x {env.num_envs} envs", flush=True)
 
 

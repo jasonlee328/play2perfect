@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- ContactBench door leaf, official print-model mass incl. modules (door_latch_tasks.py) -->
+<robot name="cb_doorlatch_door_cbf">
+  <material name="c"><color rgba="0.95 0.95 0.93 1.0"/></material>
+  <link name="door">
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="doorlatch_door_cbf.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
+    <collision><origin xyz="0.038850 -0.064750 0.024750" rpy="0 0 0"/><geometry><box size="0.228000 0.224000 0.014500"/></geometry></collision>
+    <inertial><mass value="0.386766"/><origin xyz="0.042450 -0.045186 0.022541" rpy="0 0 0"/><inertia ixx="1.510099e-03" ixy="-6.805629e-05" ixz="-1.055270e-05" iyy="1.594234e-03" iyz="3.774876e-05" izz="3.060589e-03"/></inertial>
+  </link>
+</robot>

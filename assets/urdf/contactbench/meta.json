@@ -621,6 +621,80 @@
     1.45
    ],
    "collision": "coacd 12"
+  },
+  "doorknob_1_60mm_cbf": {
+   "src": "for_visualization/doorknob_module/doorknob_1_60mm.stl",
+   "extents_mm": [
+    59.99,
+    60.0,
+    58.0
+   ],
+   "mass_g": 39.59,
+   "com_src_mm": [
+    0.0,
+    0.0,
+    59.131
+   ],
+   "object_scale": [
+    1.4998,
+    1.5,
+    1.45
+   ],
+   "collision": "coacd 12",
+   "mass_src": "print model 1240 kg/m^3, 0.8 mm wall, 20% infill: grip 36.84 g + 60 deg pinion 2.75 g",
+   "com_offset_mm": [
+    -0.0,
+    -0.001,
+    -2.753
+   ],
+   "inertia_print_kgm2": [
+    1.7743e-05,
+    1.7711e-05,
+    1.4273e-05
+   ],
+   "inertia_kgm2": [
+    1.7743e-05,
+    1.7711e-05,
+    0.001014273
+   ],
+   "spindle_armature_kgm2": 0.001
+  },
+  "doorknob_1_55mm_cbf": {
+   "src": "for_visualization/doorknob_module/doorknob_1_55mm.stl",
+   "extents_mm": [
+    54.99,
+    54.98,
+    58.0
+   ],
+   "mass_g": 35.0,
+   "com_src_mm": [
+    0.0,
+    0.0,
+    58.542
+   ],
+   "object_scale": [
+    1.3748,
+    1.3746,
+    1.45
+   ],
+   "collision": "coacd 12",
+   "mass_src": "print model 1240 kg/m^3, 0.8 mm wall, 20% infill: grip 32.25 g + 60 deg pinion 2.75 g",
+   "com_offset_mm": [
+    -0.0,
+    -0.001,
+    -3.068
+   ],
+   "inertia_print_kgm2": [
+    1.5193e-05,
+    1.5161e-05,
+    1.0576e-05
+   ],
+   "inertia_kgm2": [
+    1.5193e-05,
+    1.5161e-05,
+    0.001010576
+   ],
+   "spindle_armature_kgm2": 0.001
   }
  },
  "fixtures": {
@@ -11515,12 +11589,258 @@
     ],
     "note": "door on a hinge (joint 0), knob on the door (joint 1); invisible kinematic keeper (distractor 1) holds the door until the knob reaches theta. Needs precise_assembly.latch_door_joint=0 unlock_joint=1 latch_keeper=1 kinematic_distractors=[1] + unlock_angle_*."
    }
+  },
+  "cb_doorlatch_cbf": {
+   "object": "doorknob_1_60mm_cbf",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -3.916421884032863e-08,
+    -1.06249410499597e-09,
+    0.06163054706666386,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -3.716572182917466e-08,
+     1.2396533870913812e-08,
+     0.06163054706666386,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     1.8661962533866586e-08,
+     -0.009409392129613487,
+     0.09085969085965685,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/doorlatch_door_cbf/doorlatch_door_cbf.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 59.0,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 39.59,
+    "door_mass_g": 386.8,
+    "note": "faithful ContactBench door (contactbench-sim f51f6aa): no keeper; the env's software latch (precise_assembly.latch_cbf=true) holds the hinge until the knob passes the clear angle of the env's pinion; knob stop / spring per env. Needs precise_assembly.latch_door_joint=0 unlock_joint=1 latch_keeper=-1 latch_cbf=true kinematic_distractors=[] unlock_angle_values_deg=[40,48,60,72,80] (subset)."
+   }
+  },
+  "cb_doorlatch_cbf_k55": {
+   "object": "doorknob_1_55mm_cbf",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -3.101334369002478e-08,
+    -2.654729300855541e-08,
+    0.06104156367043653,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -3.822271917110815e-08,
+     -1.4339107088110359e-08,
+     0.06104156367043653,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     -7.483958302105617e-09,
+     -0.009307110638993683,
+     0.09027965643159214,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/doorlatch_door_cbf/doorlatch_door_cbf.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 59.0,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 35.0,
+    "door_mass_g": 386.8,
+    "note": "faithful ContactBench door (contactbench-sim f51f6aa): no keeper; the env's software latch (precise_assembly.latch_cbf=true) holds the hinge until the knob passes the clear angle of the env's pinion; knob stop / spring per env. Needs precise_assembly.latch_door_joint=0 unlock_joint=1 latch_keeper=-1 latch_cbf=true kinematic_distractors=[] unlock_angle_values_deg=[40,48,60,72,80] (subset)."
+   }
   }
  },
  "parts": {
   "doorlatch_door": {
    "src": "door_unz/door/door.stl + doorknob_module_base",
    "mass_g": 190.0,
+   "panel_box_mm": {
+    "lo": [
+     -75.15,
+     -176.75,
+     17.5
+    ],
+    "hi": [
+     152.85,
+     47.25,
+     32.0
+    ]
+   }
+  },
+  "doorlatch_door_cbf": {
+   "src": "door_unz/door/door.stl + doorknob_module_base + spring 5mm + latch 60 + lock module (official kit)",
+   "mass_g": 386.8,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_5mm": 7.51,
+    "doorknob_module_latch_60_deg": 9.86,
+    "lock_module(housings+friction spring+plug+deadbolt)": 90.29
+   },
+   "com_m": [
+    0.04245,
+    -0.04519,
+    0.02254
+   ],
+   "inertia_com_kgm2": [
+    [
+     0.0015101,
+     -6.8056e-05,
+     -1.0553e-05
+    ],
+    [
+     -6.8056e-05,
+     0.0015942,
+     3.7749e-05
+    ],
+    [
+     -1.0553e-05,
+     3.7749e-05,
+     0.0030606
+    ]
+   ],
+   "weight_moment_closed_Nm": 0.4802,
+   "com_to_hinge_m": 0.1266,
    "panel_box_mm": {
     "lo": [
      -75.15,

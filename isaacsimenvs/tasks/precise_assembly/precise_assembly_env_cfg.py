@@ -292,6 +292,26 @@ class PreciseAssemblyCfg:
     latch_critic_obs: bool = False
     # > 0: the knob's end stop is this angle for every env (instead of theta + unlock_stop_margin_deg).
     unlock_fixed_stop_deg: float = 0.0
+    # Faithful ContactBench door (problems cb_doorlatch_cbf*; official contactbench-sim doorknob_module.py / door.py).
+    # latch_cbf=true replaces the keeper / window / dwell / cue design: unlock_angle_values_deg must be official pinions
+    # (40 / 48 / 60 / 72 / 80; env i gets values[i % K]); the knob's upper limit is that pinion's hard stop (15.44 mm
+    # of rack / r_p: 39.3 / 47.2 / 59.0 / 70.8 / 78.6 deg) and the latch clears at 15.24 mm / r_p (38.8 / 46.6 / 58.2 /
+    # 69.9 / 77.6 deg; env.unlock_angle = this clear angle). Spring per env (latch_cbf_spring_mm[(i // K) % S]):
+    # tau = tau0 + K theta (5 mm 0.48 / 0.15, 7.5 mm 0.67 / 0.25, 10 mm 0.78 / 0.31 N m, N m/rad) as a joint drive
+    # with its target tau0 / K beyond the rest stop (the lower limit, 0). Software latch, every physics substep: while
+    # the knob is below the clear angle and the door has been shut (<= latch_cbf_gap_deg) since, the hinge is held at
+    # <= latch_cbf_gap_deg (door + knob rotated back about the hinge, opening spin removed); it re-engages when the door
+    # comes back down with the knob released. Success (last waypoint) = door >= door_open_deg for success_steps
+    # CONSECUTIVE policy steps, after the latch cleared this episode, with >= latch_cbf_grasp_fingers fingertips on
+    # the knob (tactile pads deformed by it; without tactile: within latch_cbf_grasp_dist of its centre) and, if
+    # latch_cbf_door_still_deg_s > 0, the door moving slower than that.
+    # Off: no keeper, no hidden window / dwell / touch-only cues / knob speed cap / soft stop (their flags are ignored).
+    latch_cbf: bool = False
+    latch_cbf_spring_mm: tuple[float, ...] = (5.0,)
+    latch_cbf_gap_deg: float = 0.1
+    latch_cbf_grasp_fingers: int = 2
+    latch_cbf_grasp_dist: float = 0.05
+    latch_cbf_door_still_deg_s: float = 0.0
     # Distractor indices baked kinematic (no gravity; posed only by resets / the env), e.g. the latch keeper.
     kinematic_distractors: tuple[int, ...] = ()
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).

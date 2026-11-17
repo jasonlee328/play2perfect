@@ -34,6 +34,30 @@ from .scene_utils import REPO_ROOT, setup_scene
 
 TABLE_HALF_HEIGHT = 0.15
 
+# Faithful ContactBench door (precise_assembly.latch_cbf), contactbench-sim f51f6aa kit/mechanisms/doorknob_module.py:
+# nominal unlock angle (deg) -> pinion pitch radius (mm); the printed cavity stops the rack after 15.44 mm (the knob's
+# hard stop) and the bolt clears the strike jamb after 15.24 mm.
+CBF_PINION_RP_MM = {40.0: 22.50, 48.0: 18.75, 60.0: 15.00, 72.0: 12.50, 80.0: 11.25}
+CBF_LATCH_TRAVEL_MM, CBF_JAMB_CLEAR_MM = 15.44, 15.24
+CBF_SPRINGS = {5.0: (0.48, 0.15), 7.5: (0.67, 0.25), 10.0: (0.78, 0.31)}   # spring mm -> (K N m/rad, tau0 N m)
+
+
+def cbf_door_params(unlock_deg, spring_mm) -> dict:
+    """Per-env official knob parameters: stop / clear angle (deg), spring K (N m/rad) and preload tau0 (N m)."""
+    import numpy as np
+    unlock_deg = np.asarray(unlock_deg, dtype=np.float64)
+    bad = sorted({float(v) for v in unlock_deg} - set(CBF_PINION_RP_MM))
+    if bad:
+        raise ValueError(f"latch_cbf: unlock angles {bad} are not official pinions {sorted(CBF_PINION_RP_MM)}")
+    springs = [float(v) for v in spring_mm]
+    if not springs or any(v not in CBF_SPRINGS for v in springs):
+        raise ValueError(f"latch_cbf_spring_mm {spring_mm}: choose from {sorted(CBF_SPRINGS)}")
+    rp = np.array([CBF_PINION_RP_MM[float(v)] for v in unlock_deg])
+    k_vals = len({float(v) for v in unlock_deg})
+    sp = np.array([springs[(i // max(1, k_vals)) % len(springs)] for i in range(len(unlock_deg))])
+    return dict(stop_deg=np.degrees(CBF_LATCH_TRAVEL_MM / rp), clear_deg=np.degrees(CBF_JAMB_CLEAR_MM / rp),
+                spring_mm=sp, K=np.array([CBF_SPRINGS[v][0] for v in sp]), tau0=np.array([CBF_SPRINGS[v][1] for v in sp]))
+
 
 def _xyzw_to_wxyz(quat: torch.Tensor) -> torch.Tensor:
     return torch.cat([quat[:, 3:4], quat[:, 0:3]], dim=-1)
@@ -199,7 +223,9 @@ class PreciseAssemblyEnv(PlayEnv):
         # hidden unlock angle (rad, per env) + the furthest the knob got this episode (for evals)
         self.unlock_angle = None
         if self._unlock_deg_np is not None:
-            self.unlock_angle = torch.as_tensor(self._unlock_deg_np, device=self.device, dtype=torch.float32).deg2rad()
+            # latch_cbf: theta = the clear angle of the env's pinion (the label / eval angle stays _unlock_deg_np)
+            src = self._cbf["clear_deg"] if getattr(self, "_cbf", None) is not None else self._unlock_deg_np
+            self.unlock_angle = torch.as_tensor(src, device=self.device, dtype=torch.float32).deg2rad()
             self.unlock_max_angle = torch.zeros(self.num_envs, device=self.device)
             self.unlock_reached = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
             self.unlock_prev_ep_max = torch.zeros(self.num_envs, device=self.device)
@@ -385,6 +411,13 @@ class PreciseAssemblyEnv(PlayEnv):
             else:
                 lo, hi = (float(v) for v in pih_cfg.unlock_angle_range_deg)
                 self._unlock_deg_np = np.random.default_rng(int(pih_cfg.unlock_seed)).uniform(lo, hi, n_env)
+        self._cbf = None
+        if bool(getattr(pih_cfg, "latch_cbf", False)):
+            if self._unlock_deg_np is None or int(pih_cfg.latch_door_joint) < 0:
+                raise ValueError("latch_cbf needs latch_door_joint >= 0 and unlock_angle_values_deg")
+            if int(pih_cfg.latch_keeper) >= 0:
+                raise ValueError("latch_cbf has no keeper: set latch_keeper=-1 (and kinematic_distractors=[])")
+            self._cbf = cbf_door_params(self._unlock_deg_np, pih_cfg.latch_cbf_spring_mm)
 
         cfg.assets.object_name = problem.insertion_object_name if len(problem_names) == 1 else "multi"
         cfg.assets.object_urdf = self._pih_object_urdf_abs
@@ -666,6 +699,9 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _apply_action(self) -> None:
         super()._apply_action()
+        if self._latch_cbf_on():
+            self._latch_cbf_substep()
+            return
         if float(self.cfg.precise_assembly.latch_soft_stop_deg) > 0.0 and self._latch_on() and hasattr(self, "latch_open"):
             self._latch_soft_stop()
         if float(getattr(self.cfg.precise_assembly, "latch_knob_max_deg_s", 0.0)) > 0.0 and self._latch_on() \
@@ -717,7 +753,8 @@ class PreciseAssemblyEnv(PlayEnv):
         touch-only cue: knob raised latch_tactile_pop_mm (world z) while in the unlock window and still latched."""
         mm = float(getattr(self.cfg.precise_assembly, "latch_tactile_pop_mm", 0.0))
         om = float(getattr(self.cfg.precise_assembly, "latch_tactile_open_mm", 0.0))
-        if (mm <= 0.0 and om == 0.0) or not self._latch_on() or not hasattr(self, "latch_in_window"):
+        if (mm <= 0.0 and om == 0.0) or not self._latch_on() or not hasattr(self, "latch_in_window") \
+                or self._latch_cbf_on():
             return None
         cue = getattr(self, "latch_cue_frac", self.latch_in_window.float()) * (~self.latch_open).float()
         dz = cue * (mm * 1e-3)
@@ -740,6 +777,13 @@ class PreciseAssemblyEnv(PlayEnv):
         if not hasattr(self, "_soft_stop_hits"):
             self._soft_stop_hits = torch.zeros(self.num_envs, device=self.device)
         self._soft_stop_hits = torch.where(bad, self._soft_stop_hits + 1, self._soft_stop_hits)
+        self._hinge_rotate_back(bad, over)
+
+    def _hinge_rotate_back(self, bad: torch.Tensor, over: torch.Tensor) -> None:
+        """Rotate door (latch_door_joint's body) + knob (object) back by over (rad) about the hinge axis where bad, and
+        remove their opening spin about it (pose level: a velocity / torque stop is out-pushed by the hand)."""
+        c = self.cfg.precise_assembly
+        k = int(c.latch_door_joint)
         ids = bad.nonzero(as_tuple=False).squeeze(-1)
         if ids.numel() == 0:
             return
@@ -777,7 +821,98 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _latch_on(self) -> bool:
         c = self.cfg.precise_assembly
-        return int(c.latch_door_joint) >= 0 and int(c.latch_keeper) >= 0 and getattr(self, "unlock_angle", None) is not None
+        return int(c.latch_door_joint) >= 0 and (int(c.latch_keeper) >= 0 or getattr(self, "_cbf", None) is not None) \
+            and getattr(self, "unlock_angle", None) is not None
+
+    def _latch_cbf_on(self) -> bool:
+        return getattr(self, "_cbf", None) is not None and getattr(self, "unlock_angle", None) is not None
+
+    def _latch_cbf_substep(self) -> None:
+        """latch_cbf, every physics substep (from _apply_action): the bolt is out of the strike once the knob (angle
+        relative to the door) reaches this env's clear angle; it is back in while the knob is below it AND the door
+        has been shut (<= latch_cbf_gap_deg + 0.05) since, i.e. it re-engages when the door comes down with the knob
+        released (no 30 deg entry ramp in the official model either: there a released bolt rests on the pocket roof).
+        While engaged the hinge is held at <= latch_cbf_gap_deg by rotating door + knob back (exact at any env count,
+        unlike the kinematic keeper, findings 36). latch_open_ep = cleared at least once this episode."""
+        c = self.cfg.precise_assembly
+        self._update_joint_angles()
+        if not hasattr(self, "_cbf_engaged"):
+            self._init_latch_cbf_state()
+        knob = self.cb_joint_angle[int(c.unlock_joint)]
+        door = self.cb_joint_angle[int(c.latch_door_joint)]
+        gap = math.radians(float(c.latch_cbf_gap_deg))
+        cleared = knob >= self.unlock_angle
+        self._cbf_engaged = ~cleared & (self._cbf_engaged | (door <= gap + math.radians(0.05)))
+        self.latch_open = ~self._cbf_engaged
+        self.latch_open_ep |= self.latch_open
+        over = door - gap
+        bad = self._cbf_engaged & (over > 0)
+        self._soft_stop_hits = torch.where(bad, self._soft_stop_hits + 1, self._soft_stop_hits)
+        self._cbf_over_max = torch.maximum(self._cbf_over_max, torch.where(self._cbf_engaged, over, torch.zeros_like(over)))
+        self._hinge_rotate_back(bad, over)
+        self._cbf_spring_correction(knob)
+
+    def _cbf_spring_correction(self, knob: torch.Tensor) -> None:
+        """The spring is a PhysX joint drive (implicit, stable) with stiffness K and target tgt = -tau0 / K (beyond the
+        rest stop), but a D6 twist drive pulls with K * 2 sin(e / 2), e = angle - tgt, not K * e: up to 12 % soft at
+        the 80 deg stop (probe). The difference -K (e - 2 sin(e / 2)) is added as an explicit torque pair on knob /
+        door about the spindle (its stiffness <= K (1 - cos(e / 2)), ~0.3 K, is explicit-stable with the knob's
+        spindle armature), so tau = tau0 + K theta exactly. Kept with any object wrench DR (added to it)."""
+        c = self.cfg.precise_assembly
+        if not hasattr(self, "_cbf_K"):
+            self._cbf_K = torch.as_tensor(self._cbf["K"], device=self.device, dtype=torch.float32)
+            self._cbf_tgt = -torch.as_tensor(self._cbf["tau0"], device=self.device, dtype=torch.float32) / self._cbf_K
+        e = knob - self._cbf_tgt
+        tau = -self._cbf_K * (e - 2.0 * torch.sin(0.5 * e))
+        j = self._pih_joints[int(c.unlock_joint)]
+        kp = int(j.parent[10:])
+        door_body = self.distractors[kp]
+        qp0 = _xyzw_to_wxyz(torch.tensor([self._pih_distractor_pose_rel[kp][3:7]], device=self.device,
+                                         dtype=torch.float32)).expand(self.num_envs, 4)
+        q_par = quat_mul(door_body.data.root_quat_w, quat_conjugate(qp0))
+        ax = quat_apply(q_par, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(self.num_envs, 3))
+        self._cbf_corr_w = tau.unsqueeze(-1) * ax                      # (N, 3) world torque on the knob
+        f = getattr(self, "_object_forces", None)
+        t = getattr(self, "_object_torques", None)
+        zero = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        self.object.set_external_force_and_torque(zero if f is None else f,
+                                                  (zero if t is None else t) + self._cbf_corr_w.unsqueeze(1),
+                                                  is_global=True)
+        door_body.set_external_force_and_torque(zero, -self._cbf_corr_w.unsqueeze(1), is_global=True)
+
+    def _init_latch_cbf_state(self) -> None:
+        z = lambda dt=torch.bool: torch.zeros(self.num_envs, dtype=dt, device=self.device)
+        self._cbf_engaged = ~z()
+        self.latch_open, self.latch_open_ep = z(), z()
+        self.latch_in_window, self.latch_dwell = z(), z(torch.long)     # obs fields of the old design: always 0
+        self._soft_stop_hits = z(torch.float32)
+        self._cbf_over_max = z(torch.float32)          # max door angle above the gap while engaged, before correction
+        self._cbf_prev_door = z(torch.float32)
+        self._cbf_grasp_ok = z()
+        self._cbf_door_still = ~z()
+
+    def _update_latch_cbf(self, env_ids: torch.Tensor | None) -> None:
+        """latch_cbf, per policy step / reset: reset the latch state; the latch itself is _latch_cbf_substep."""
+        c = self.cfg.precise_assembly
+        if not hasattr(self, "_cbf_engaged"):
+            self._init_latch_cbf_state()
+        if env_ids is not None:
+            self._cbf_engaged[env_ids] = True
+            self.latch_open[env_ids] = False
+            self.latch_open_ep[env_ids] = False
+            self._soft_stop_hits[env_ids] = 0.0
+            self._cbf_over_max[env_ids] = 0.0
+            self._cbf_prev_door[env_ids] = 0.0
+            if c.latch_hint_obs:
+                self._latch_hint_resample(env_ids)
+            for name in ("_latch_bonus_paid",):
+                if hasattr(self, name):
+                    getattr(self, name)[env_ids] = False
+            if hasattr(self, "_latch_phi_prev"):
+                self._latch_phi_prev[env_ids] = 0.0
+            return
+        self.extras["latch_open_frac"] = self.latch_open.float().mean()
+        self.extras["latch_cbf_over_max_deg"] = torch.rad2deg(self._cbf_over_max).max()
 
     def _apply_latch_pop(self, pop: torch.Tensor, door: torch.Tensor) -> None:
         """Felt cue: lift the door to latch_pop_deg (bang-bang torque about the hinge) where pop is set."""
@@ -816,6 +951,9 @@ class PreciseAssemblyEnv(PlayEnv):
         moved by latch_retract_m; it re-engages only once the door is closed (< latch_reengage_deg) and the knob is
         below theta again. Resets (env_ids) force it engaged. Only envs whose state changes are written."""
         if not self._latch_on():
+            return
+        if self._latch_cbf_on():
+            self._update_latch_cbf(env_ids)
             return
         c = self.cfg.precise_assembly
         if not hasattr(self, "latch_open"):
@@ -1314,14 +1452,48 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.extras["latch_soft_stop_ep_frac"] = (self._soft_stop_hits > 0).float().mean()
             self.extras["door_open_no_latch_frac"] = ((door >= math.radians(float(pih_cfg.door_open_deg)))
                                                       & ~self.latch_open_ep).float().mean()
+        consecutive = self.cfg.termination.force_consecutive_near_goal_steps
+        if self._latch_cbf_on():
+            unlocked = self._latch_cbf_success_now(door)
+            consecutive = True
         at_last = (self._successes == self.env_max_goals - 1) & ~self.is_random_goal_env
         steps = update_near_goal_steps(near_goal=unlocked, near_goal_steps=prev_near_steps,
-                                       force_consecutive=self.cfg.termination.force_consecutive_near_goal_steps)
+                                       force_consecutive=consecutive)
         self._near_goal = torch.where(at_last, unlocked, self._near_goal)
         self._near_goal_steps = torch.where(at_last, steps, self._near_goal_steps)
         self._is_success = self._near_goal_steps >= self.cfg.termination.success_steps
         self.extras["unlock_angle_deg_mean"] = torch.rad2deg(ang).mean()
         self.extras["unlock_reached_frac"] = self.unlock_reached.float().mean()
+
+    def _latch_cbf_success_now(self, door: torch.Tensor) -> torch.Tensor:
+        """latch_cbf success condition this policy step (counted over success_steps CONSECUTIVE steps): door open
+        >= door_open_deg after the latch cleared via the knob this episode (latch_open_ep; the software latch keeps the
+        door <= latch_cbf_gap_deg before), knob still held (>= latch_cbf_grasp_fingers fingertips within
+        latch_cbf_grasp_dist of its centre) and, with latch_cbf_door_still_deg_s > 0, the door nearly still. The episode
+        ends on success, so it ends with the door open and held (official: unlocked_by_knob_then_opened,
+        finger_grip_sustained, motion_stopped_door_held_open)."""
+        c = self.cfg.precise_assembly
+        open_ = (door >= math.radians(float(c.door_open_deg))) & self.latch_open_ep
+        ok = torch.ones_like(open_)
+        if int(c.latch_cbf_grasp_fingers) > 0:
+            self._cbf_grasp_ok = self._cbf_fingers_on_knob() >= int(c.latch_cbf_grasp_fingers)
+            ok = ok & self._cbf_grasp_ok
+        rate = torch.rad2deg((door - self._cbf_prev_door).abs()) / float(self.step_dt)
+        self._cbf_prev_door = door.clone()
+        if float(c.latch_cbf_door_still_deg_s) > 0.0:
+            self._cbf_door_still = rate <= float(c.latch_cbf_door_still_deg_s)
+            ok = ok & self._cbf_door_still
+        self.extras["latch_cbf_door_open_frac"] = open_.float().mean()
+        self.extras["latch_cbf_open_grasped_frac"] = (open_ & self._cbf_grasp_ok).float().mean()
+        return open_ & ok
+
+    def _cbf_fingers_on_knob(self) -> torch.Tensor:
+        """Fingertips touching the knob: with tactile on, pads with any taxel deformed by the knob mesh in the last
+        (clean, pre-override) tactile reading; otherwise fingertips within latch_cbf_grasp_dist of the knob's centre."""
+        tac = getattr(self, "_last_tactile", None)
+        if tac is not None and tac.shape[0] == self.num_envs:
+            return (tac.view(self.num_envs, 5, -1).amax(dim=-1) > 0).sum(dim=-1)
+        return (self._curr_fingertip_distances < float(self.cfg.precise_assembly.latch_cbf_grasp_dist)).sum(dim=-1)
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
