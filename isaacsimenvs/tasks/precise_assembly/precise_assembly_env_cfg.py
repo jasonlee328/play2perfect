@@ -311,6 +311,7 @@ class PreciseAssemblyCfg:
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0
+    distractor_position_iterations: int = 0   # A7: PhysX position iterations of the distractor bodies (0 = 4)
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:

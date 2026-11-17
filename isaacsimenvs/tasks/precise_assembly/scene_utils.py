@@ -241,7 +241,7 @@ def setup_scene(env) -> None:
                 kinematic_enabled=False,
                 disable_gravity=False,
                 max_depenetration_velocity=1000.0,
-                rb_solver_position_iterations=4,
+                rb_solver_position_iterations=int(getattr(env.cfg.precise_assembly, "distractor_position_iterations", 0)) or 4,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
             ),
