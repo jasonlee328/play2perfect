@@ -133,6 +133,42 @@ class CardTask:
         for k, pose in enumerate(env._pih_distractor_pose_rel):
             self.deck_ref_p[k, env_ids] = torch.tensor(pose[:3], device=env.device)
             self.deck_ref_q[k, env_ids] = torch.tensor([pose[6], pose[3], pose[4], pose[5]], device=env.device)
+        rng = tuple(self.c.card_deck_lean_range_deg)
+        if rng:
+            self._relayout_deck(env_ids, rng)
+
+    def _relayout_deck(self, env_ids, rng):
+        """Fragile variant: hidden per-episode deck lean (deg, uniform in rng), the official closed-form layout
+        (_card_place.py deck_layout) re-solved per env; goals stay at the problem's nominal lean (not observed)."""
+        from isaaclab.utils.math import quat_from_matrix
+        env, d = self.env, self.env.device
+        n, K = env_ids.numel(), len(env.distractors)
+        th = torch.deg2rad(torch.empty(n, device=d).uniform_(float(rng[0]), float(rng[1])))
+        self.deck_lean = getattr(self, "deck_lean", torch.zeros(env.num_envs, device=d))
+        self.deck_lean[env_ids] = torch.rad2deg(th)
+        T, H, POST, FLOOR = 0.0012, 0.055, 0.037, 0.002
+        z = FLOOR + 2e-5 + 0.5 * T * torch.sin(th) + 0.5 * H * torch.cos(th)
+        x0 = -0.007 + (POST - z) * torch.tan(th) + (0.5 * T + 2e-5) / torch.cos(th)
+        pitch = (T + 1e-5) / torch.cos(th)
+        P = torch.tensor([[0.0, 0.0, 1.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], device=d)
+        c, s_ = torch.cos(-th), torch.sin(-th)
+        R = torch.zeros(n, 3, 3, device=d)
+        R[:, 0, 0], R[:, 0, 2], R[:, 1, 1], R[:, 2, 0], R[:, 2, 2] = c, s_, 1.0, -s_, c
+        q = quat_from_matrix(R @ P)
+        hp = env.hole_pos[env_ids] + env.scene.env_origins[env_ids]
+        hq = env.hole_quat_wxyz[env_ids]
+        ref = torch.tensor(self.c.strict_ref_local, device=d).expand(n, 3)
+        for k, body in enumerate(env.distractors):
+            p_rel = torch.stack([x0 + k * pitch, torch.zeros_like(z), z], -1)
+            pw = hp + quat_apply(hq, p_rel)
+            qw = quat_mul(hq, q)
+            body.write_root_pose_to_sim(torch.cat([pw, qw], -1), env_ids=env_ids)
+            body.write_root_velocity_to_sim(torch.zeros(n, 6, device=d), env_ids=env_ids)
+            self.deck_ref_p[k, env_ids] = p_rel
+            self.deck_ref_q[k, env_ids] = q
+            if hasattr(env, "_distractor_reset_pos"):
+                env._distractor_reset_pos[k, env_ids] = pw
+                env._distractor_reset_ref[k, env_ids] = pw + quat_apply(qw, ref)
 
     # ------------------------------------------------------------------ step
     def update(self):

@@ -1429,8 +1429,12 @@ def _bake_usd(
     apply_physx_articulation: bool = False,
     collision_enabled: bool | None = None,
     rest_offset: float | None = None,
+    torsional_patch_radius: float = 0.0,
 ) -> str:
     """Copy raw USD into bake_root/baked_subdir and pre-author physics props.
+
+    ``torsional_patch_radius`` (m, > 0): PhysX torsional friction patch radius on this asset's collision shapes
+    (A10: a two-pad pinch otherwise has ~no torsional friction and the card spins about the pinch axis).
 
     ``rest_offset`` (m) replaces _REST_OFFSET on this asset's collision shapes (None = _REST_OFFSET).
 
@@ -1494,6 +1498,9 @@ def _bake_usd(
             px = PhysxSchema.PhysxCollisionAPI(prim) or PhysxSchema.PhysxCollisionAPI.Apply(prim)
             px.CreateContactOffsetAttr().Set(_CONTACT_OFFSET)
             px.CreateRestOffsetAttr().Set(_REST_OFFSET if rest_offset is None else float(rest_offset))
+            if torsional_patch_radius > 0.0:
+                px.CreateTorsionalPatchRadiusAttr().Set(float(torsional_patch_radius))
+                px.CreateMinTorsionalPatchRadiusAttr().Set(float(torsional_patch_radius))
             if collision_enabled is not None:
                 ce = UsdPhysics.CollisionAPI(prim)
                 (ce.GetCollisionEnabledAttr() or ce.CreateCollisionEnabledAttr()).Set(

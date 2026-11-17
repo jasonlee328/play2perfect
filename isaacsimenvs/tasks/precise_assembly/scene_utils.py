@@ -153,6 +153,8 @@ def setup_scene(env) -> None:
                 articulation_enabled=False,
             ),
             rest_offset=rest,
+        
+            torsional_patch_radius=float(getattr(env.cfg.precise_assembly, "object_torsional_patch_radius", 0.0)),
         ))
         goalviz_usd_paths.append(_bake_usd(
             object_raw_usd,
@@ -196,6 +198,8 @@ def setup_scene(env) -> None:
                 articulation_enabled=False,
             ),
             rest_offset=rest,
+        
+            torsional_patch_radius=float(getattr(env.cfg.precise_assembly, "object_torsional_patch_radius", 0.0)),
         ))
 
     robot_usd_path = _bake_usd(
