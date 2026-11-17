@@ -631,6 +631,8 @@ class PreciseAssemblyEnv(PlayEnv):
                     self.turn_lock_torque_hold_max[env_ids] = 0.0
                 self.turn_tau_acc[env_ids] = 0.0
                 self.turn_u[env_ids] = self.turn_u_start[env_ids]
+                if getattr(self, "_turn_bristle_z", None) is not None:
+                    self._turn_bristle_z[env_ids] = 0.0
                 self._turn_pending_unlock = getattr(self, '_turn_pending_unlock', torch.zeros_like(self.turn_tight))
                 self._turn_pending_unlock[env_ids] |= self.turn_lock_flag[env_ids]
             self._turn_prev_wrapped[env_ids] = 0.0
@@ -923,7 +925,17 @@ class PreciseAssemblyEnv(PlayEnv):
                     # official releases it after backing off turn_preload_free_deg; here leaving the 0.5 deg zone does)
                     tau_c = tau_c + frac * hm * self.turn_lock_flag.float()
             w_f = (vel[:, 3:6] * axis_w).sum(-1)
-            tau_fric = tau_c * torch.tanh(w_f / float(pc.turn_thread_stiction_w))
+            kb = float(getattr(pc, "turn_thread_bristle_k", 0.0))
+            if kb > 0.0:   # A9 (f652587): elasto-plastic stiction (official STICTION_K), holds below breakaway, no creep
+                if getattr(self, "_turn_bristle_z", None) is None:
+                    self._turn_bristle_z = torch.zeros(n, device=self.device)
+                zmax = tau_c / kb
+                z = torch.maximum(torch.minimum(self._turn_bristle_z + w_f * dt, zmax), -zmax)
+                stick = z.abs() < zmax
+                self._turn_bristle_z = z
+                tau_fric = kb * z + torch.where(stick, float(pc.turn_thread_bristle_d) * w_f, torch.zeros_like(w_f))
+            else:
+                tau_fric = tau_c * torch.tanh(w_f / float(pc.turn_thread_stiction_w))
         k_ax = float(getattr(pc, "turn_thread_axial_k", 0.0))
         f_ax = torch.zeros(n, device=self.device)
         g_comp = bool(getattr(pc, "turn_thread_gravity_comp", False))
