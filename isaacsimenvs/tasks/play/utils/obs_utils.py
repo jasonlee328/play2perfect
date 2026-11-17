@@ -389,6 +389,18 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
+    # A8: joint-position obs noise for the policy (critic keeps clean state): per-step Gaussian + per-episode per-joint
+    # uniform bias (resampled on each env's first step), so the PD error (target - measured q) is a noisy force readout.
+    jp_std = float(getattr(dr, "joint_position_obs_noise_std", 0.0))
+    jp_bias = float(getattr(dr, "joint_position_obs_bias", 0.0))
+    if jp_std > 0 or jp_bias > 0:
+        jp = obs_clean["joint_pos"]
+        if getattr(env, "_jp_bias", None) is None or env._jp_bias.shape != jp.shape:
+            env._jp_bias = (torch.rand_like(jp) * 2.0 - 1.0) * jp_bias
+        new_ep = env.episode_length_buf <= 1
+        if bool(new_ep.any()):
+            env._jp_bias[new_ep] = (torch.rand_like(env._jp_bias[new_ep]) * 2.0 - 1.0) * jp_bias
+        obs_noisy["joint_pos"] = jp + env._jp_bias + torch.randn_like(jp) * jp_std
 
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)
