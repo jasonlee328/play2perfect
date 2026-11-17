@@ -1865,6 +1865,7 @@ class PreciseAssemblyEnv(PlayEnv):
             false_stop = self.latch_false_stop & ~max_successes & ~overturned
             self.extras["latch_false_stop_frac"] = self.latch_false_stop.float().mean()
         broken = torch.zeros_like(fall)
+        self.broken_strip = torch.zeros_like(fall); self.broken_latch = torch.zeros_like(fall)
         if hasattr(self, "door_stop_torque"):
             # A1 upper bound (door_break_*): readings = max over this policy step's substeps
             lim_t, lim_f = float(pih_cfg.door_break_torque), float(pih_cfg.door_break_pull)
@@ -1911,6 +1912,10 @@ class PreciseAssemblyEnv(PlayEnv):
             "forced": forced,
             "overturned": overturned,
             "false_stop": false_stop,
+            # A8: break-reason split (strip = torque into the knob stop, latch = pull while latched); listed before
+            # "broken" so evals that take the first true reason report the kind
+            "broken_strip": getattr(self, "broken_strip", torch.zeros_like(broken)) & broken,
+            "broken_latch": getattr(self, "broken_latch", torch.zeros_like(broken)) & broken,
             "broken": broken,
             "crushed": crushed,
             "timeout": truncated,
