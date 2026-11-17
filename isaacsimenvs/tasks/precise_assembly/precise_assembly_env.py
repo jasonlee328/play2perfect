@@ -1009,6 +1009,11 @@ class PreciseAssemblyEnv(PlayEnv):
         lo = torch.clamp(helix, min=0.0)
         hi = torch.clamp(helix + self.turn_play, min=0.0)
         du = torch.where(u < lo, lo - u, torch.where(u > hi, hi - u, torch.zeros_like(u)))
+        tol = float(getattr(pc, "turn_thread_band_tol_m", 0.0))
+        if tol > 0.0:
+            # A7: write the pose only when the body is more than tol off its helix band (per-substep pose writes of a
+            # body in contact with a light tool may disturb that contact); the full error is corrected then
+            du = torch.where(du.abs() > tol, du, torch.zeros_like(du))
         if float(getattr(pc, "turn_thread_axial_k", 0.0)) > 0.0:
             bs = float(pc.turn_thread_axial_backstop_m)
             du = torch.where(du.abs() > bs, du - torch.sign(du) * bs, torch.zeros_like(du))
