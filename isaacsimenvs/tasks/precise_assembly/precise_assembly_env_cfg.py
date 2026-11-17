@@ -200,6 +200,7 @@ class PreciseAssemblyCfg:
     card_fail_penalty: float = 200.0
     card_success_bonus: float = 1000.0
     card_release_bonus: float = 200.0    # once, released inside the slot
+    card_hold_rew: float = 0.0          # per step, pinch loaded and not released (shaping)
     card_clear_rew_scale: float = 0.0    # per step: scale x min(link7 dist from release, clear_dist) while card_in_holder
     # Fragile variant: card <-> deck + holder contact force sum (N) > card_break_force for card_break_steps steps = "broken".
     card_break_force: float = 0.0
