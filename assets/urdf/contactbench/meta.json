@@ -707,6 +707,42 @@
    "collision": "convex hull",
    "tactile_extra_mesh": "objects/bottlecap2t/ribs_tactile.obj",
    "mass_model": "print 1240 kg/m3, 0.8 mm walls + 20% infill (inertia scaled)"
+  },
+  "ak_screw": {
+   "src": "official bodies_kit/screw_block/screw_6_5.stl",
+   "extents_mm": [
+    15.0,
+    15.0,
+    23.5
+   ],
+   "mass_g": 2.51,
+   "object_scale": [
+    0.375,
+    0.375,
+    0.5875
+   ],
+   "collision": "head: floor disc + 4 recess-ring sectors (exact convex), +0.3 mm",
+   "frame": "origin on the axis at the head underside"
+  },
+  "ak_key": {
+   "src": "official bodies_kit/allen_key/allen_key.stl",
+   "extents_mm": [
+    67.5,
+    5.0,
+    30.0
+   ],
+   "mass_g": 2.733,
+   "com_src_mm": [
+    23.654,
+    -0.0,
+    26.276
+   ],
+   "object_scale": [
+    1.6875,
+    0.125,
+    0.75
+   ],
+   "collision": "convex hulls: long leg (x >= 2.5 mm) + short leg / bend"
   }
  },
  "fixtures": {
@@ -1274,6 +1310,15 @@
    ],
    "neck_top_mm": 117.06,
    "collision": "coacd 8"
+  },
+  "ak_block": {
+   "src": "official bodies_kit/screw_block/{block_top,block_bottom,captive_nut}.stl",
+   "extents_mm": [
+    80.0,
+    30.0,
+    20.0
+   ],
+   "collision": "box 80 x 30 x 20 mm"
   }
  },
  "problems": {
@@ -11635,6 +11680,192 @@
     "cap_diam_mm": 46.2,
     "note": "hidden turns: env.precise_assembly.unlock_angle_values_deg=[720,1080,1440] (turns x 360) sets each env's stop; precise_assembly.turn_* options credit the goal from the joint angle."
    }
+  },
+  "cb_allenkey_table": {
+   "object": "ak_key",
+   "fixture": "ak_block",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/ak_screw/ak_screw.urdf",
+     [
+      0.0249885,
+      4.55e-05,
+      0.02,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0249885,
+      4.55e-05,
+      0.02
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "stiffness": 0.0,
+     "damping": 0.0
+    }
+   ],
+   "waypoints": [
+    [
+     0.020764307395866006,
+     4.549989996444177e-05,
+     0.0888461437901703,
+     -0.0,
+     0.7071067811865475,
+     -0.0,
+     0.7071067811865475
+    ],
+    [
+     0.020764307395866006,
+     4.549989996444177e-05,
+     0.06884614379017032,
+     -0.0,
+     0.7071067811865475,
+     -0.0,
+     0.7071067811865475
+    ],
+    [
+     0.02133024184432384,
+     0.0021575962154336634,
+     0.06884614379017032,
+     0.18301270189221935,
+     0.6830127018922194,
+     -0.18301270189221933,
+     0.6830127018922195
+    ],
+    [
+     0.027100596215433665,
+     0.003703758155676161,
+     0.06884614379017032,
+     0.6123724356957945,
+     0.35355339059327384,
+     -0.6123724356957945,
+     0.35355339059327384
+    ]
+   ],
+   "layout": {
+    "lead_mm": 2.34,
+    "unengaged_mm": 4.0,
+    "turn_to_seat_deg": 615.4,
+    "prelude_goals": 2,
+    "turn_goals_deg": [
+     30.0,
+     120.0
+    ],
+    "note": "official task 13; overrides in FoundationTouch teacher/allenkey/overrides.sh"
+   },
+   "object_start_pose": [
+    -0.00634614379017032,
+    -0.086275807395866,
+    0.0026999998999644435,
+    0.7071067811865475,
+    0.0,
+    0.0,
+    0.7071067811865475
+   ]
+  },
+  "cb_allenkey_inhand": {
+   "object": "ak_key",
+   "fixture": "ak_block",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/ak_screw/ak_screw.urdf",
+     [
+      0.0249885,
+      4.55e-05,
+      0.02,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0249885,
+      4.55e-05,
+      0.02
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "stiffness": 0.0,
+     "damping": 0.0
+    }
+   ],
+   "waypoints": [
+    [
+     0.020764307395866006,
+     4.549989996444177e-05,
+     0.0888461437901703,
+     -0.0,
+     0.7071067811865475,
+     -0.0,
+     0.7071067811865475
+    ],
+    [
+     0.020764307395866006,
+     4.549989996444177e-05,
+     0.06884614379017032,
+     -0.0,
+     0.7071067811865475,
+     -0.0,
+     0.7071067811865475
+    ],
+    [
+     0.02133024184432384,
+     0.0021575962154336634,
+     0.06884614379017032,
+     0.18301270189221935,
+     0.6830127018922194,
+     -0.18301270189221933,
+     0.6830127018922195
+    ],
+    [
+     0.027100596215433665,
+     0.003703758155676161,
+     0.06884614379017032,
+     0.6123724356957945,
+     0.35355339059327384,
+     -0.6123724356957945,
+     0.35355339059327384
+    ]
+   ],
+   "layout": {
+    "lead_mm": 2.34,
+    "unengaged_mm": 4.0,
+    "turn_to_seat_deg": 615.4,
+    "prelude_goals": 2,
+    "turn_goals_deg": [
+     30.0,
+     120.0
+    ],
+    "note": "official task 13; overrides in FoundationTouch teacher/allenkey/overrides.sh"
+   },
+   "object_start_pose": [
+    0.020764307395866006,
+    4.549989996444177e-05,
+    0.0888461437901703,
+    -0.0,
+    0.7071067811865475,
+    -0.0,
+    0.7071067811865475
+   ]
   }
  }
 }
