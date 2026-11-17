@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- A8 ContactBench door leaf (doorknob_tasks.py), print-model mass incl. modules -->
+<robot name="cb_a8_door_p80_s5_0">
+  <material name="c"><color rgba="0.95 0.95 0.93 1.0"/></material>
+  <link name="door">
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="a8_door_p80_s5_0.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
+    <collision><origin xyz="0.038850 -0.064750 0.024750" rpy="0 0 0"/><geometry><box size="0.228000 0.224000 0.014500"/></geometry></collision>
+    <inertial><mass value="0.387842"/><origin xyz="0.042331 -0.045055 0.022539" rpy="0 0 0"/><inertia ixx="1.512585e-03" ixy="-6.587944e-05" ixz="-1.058511e-05" iyy="1.596424e-03" iyz="3.776795e-05" izz="3.065266e-03"/></inertial>
+  </link>
+</robot>

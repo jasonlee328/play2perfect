@@ -695,6 +695,258 @@
     0.001010576
    ],
    "spindle_armature_kgm2": 0.001
+  },
+  "a8k_doorknob_1_55mm_p60": {
+   "src": "for_visualization/doorknob_module/doorknob_1_55mm.stl + doorknob_module_60_deg_variant/doorknob_module_gear_60_deg.stl",
+   "extents_mm": [
+    54.99,
+    54.98,
+    58.0
+   ],
+   "com_src_mm": [
+    0.0,
+    0.0,
+    58.542
+   ],
+   "object_scale": [
+    1.3748,
+    1.3746,
+    1.45
+   ],
+   "mass_g": 34.996,
+   "grip_g": 32.247,
+   "pinion_g": 2.75,
+   "com_offset_mm": [
+    -0.0,
+    -0.001,
+    -3.068
+   ],
+   "inertia_print_kgm2": [
+    1.5193e-05,
+    1.5161e-05,
+    1.0576e-05
+   ],
+   "inertia_kgm2": [
+    1.5193e-05,
+    1.5161e-05,
+    0.0010106
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "collision": "1 convex hull of vertices z >= 35 mm (doorknob_module.py GRIPS)",
+   "hull_zmin_mm": 35.0,
+   "hull_zmax_mm": 80.0,
+   "hull_rmax_mm": 27.5,
+   "hull_vertices": 1730
+  },
+  "a8k_doorknob_1_55mm_p40": {
+   "src": "for_visualization/doorknob_module/doorknob_1_55mm.stl + doorknob_module_40_deg_variant/doorknob_module_gear_40_deg.stl",
+   "extents_mm": [
+    54.99,
+    54.98,
+    58.0
+   ],
+   "com_src_mm": [
+    0.0,
+    0.0,
+    58.542
+   ],
+   "object_scale": [
+    1.3748,
+    1.3746,
+    1.45
+   ],
+   "mass_g": 34.77,
+   "grip_g": 32.247,
+   "pinion_g": 2.524,
+   "com_offset_mm": [
+    -0.384,
+    -0.14,
+    -2.834
+   ],
+   "inertia_print_kgm2": [
+    1.4859e-05,
+    1.4985e-05,
+    1.0655e-05
+   ],
+   "inertia_kgm2": [
+    1.4859e-05,
+    1.4985e-05,
+    0.0010107
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "collision": "1 convex hull of vertices z >= 35 mm (doorknob_module.py GRIPS)",
+   "hull_zmin_mm": 35.0,
+   "hull_zmax_mm": 80.0,
+   "hull_rmax_mm": 27.5,
+   "hull_vertices": 1730
+  },
+  "a8k_doorknob_1_55mm_p80": {
+   "src": "for_visualization/doorknob_module/doorknob_1_55mm.stl + doorknob_module_80_deg_variant/doorknob_module_gear_80_deg.stl",
+   "extents_mm": [
+    54.99,
+    54.98,
+    58.0
+   ],
+   "com_src_mm": [
+    0.0,
+    0.0,
+    58.542
+   ],
+   "object_scale": [
+    1.3748,
+    1.3746,
+    1.45
+   ],
+   "mass_g": 33.906,
+   "grip_g": 32.247,
+   "pinion_g": 1.659,
+   "com_offset_mm": [
+    -0.0,
+    -0.001,
+    -1.911
+   ],
+   "inertia_print_kgm2": [
+    1.3627e-05,
+    1.3594e-05,
+    1.0361e-05
+   ],
+   "inertia_kgm2": [
+    1.3627e-05,
+    1.3594e-05,
+    0.0010104
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "collision": "1 convex hull of vertices z >= 35 mm (doorknob_module.py GRIPS)",
+   "hull_zmin_mm": 35.0,
+   "hull_zmax_mm": 80.0,
+   "hull_rmax_mm": 27.5,
+   "hull_vertices": 1730
+  },
+  "a8k_doorknob_2_55mm_p60": {
+   "src": "for_visualization/doorknob_module/doorknob_2_55mm.stl + doorknob_module_60_deg_variant/doorknob_module_gear_60_deg.stl",
+   "extents_mm": [
+    54.99,
+    55.0,
+    58.0
+   ],
+   "com_src_mm": [
+    0.0,
+    0.0,
+    57.178
+   ],
+   "object_scale": [
+    1.3747,
+    1.3749,
+    1.45
+   ],
+   "mass_g": 28.909,
+   "grip_g": 26.16,
+   "pinion_g": 2.75,
+   "com_offset_mm": [
+    -0.0,
+    -0.002,
+    -3.584
+   ],
+   "inertia_print_kgm2": [
+    1.1361e-05,
+    1.1344e-05,
+    7.6781e-06
+   ],
+   "inertia_kgm2": [
+    1.1361e-05,
+    1.1344e-05,
+    0.0010077
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "collision": "1 convex hull of vertices z >= 41 mm (doorknob_module.py GRIPS)",
+   "hull_zmin_mm": 41.34,
+   "hull_zmax_mm": 80.0,
+   "hull_rmax_mm": 27.5,
+   "hull_vertices": 7891
+  },
+  "a8k_doorknob_1_50mm_p60": {
+   "src": "for_visualization/doorknob_module/doorknob_1_50mm.stl + doorknob_module_60_deg_variant/doorknob_module_gear_60_deg.stl",
+   "extents_mm": [
+    49.99,
+    50.0,
+    58.0
+   ],
+   "com_src_mm": [
+    0.0,
+    0.0,
+    59.216
+   ],
+   "object_scale": [
+    1.2498,
+    1.25,
+    1.45
+   ],
+   "mass_g": 28.939,
+   "grip_g": 26.189,
+   "pinion_g": 2.75,
+   "com_offset_mm": [
+    -0.0,
+    -0.002,
+    -3.774
+   ],
+   "inertia_print_kgm2": [
+    1.2252e-05,
+    1.2238e-05,
+    7.1763e-06
+   ],
+   "inertia_kgm2": [
+    1.2252e-05,
+    1.2238e-05,
+    0.0010072
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "collision": "1 convex hull of vertices z >= 35 mm (doorknob_module.py GRIPS)",
+   "hull_zmin_mm": 35.0,
+   "hull_zmax_mm": 80.0,
+   "hull_rmax_mm": 25.0,
+   "hull_vertices": 1736
+  },
+  "a8k_doorknob_1_60mm_p60": {
+   "src": "for_visualization/doorknob_module/doorknob_1_60mm.stl + doorknob_module_60_deg_variant/doorknob_module_gear_60_deg.stl",
+   "extents_mm": [
+    59.99,
+    60.0,
+    58.0
+   ],
+   "com_src_mm": [
+    0.0,
+    0.0,
+    59.131
+   ],
+   "object_scale": [
+    1.4998,
+    1.5,
+    1.45
+   ],
+   "mass_g": 39.592,
+   "grip_g": 36.842,
+   "pinion_g": 2.75,
+   "com_offset_mm": [
+    -0.0,
+    -0.001,
+    -2.753
+   ],
+   "inertia_print_kgm2": [
+    1.7743e-05,
+    1.7711e-05,
+    1.4273e-05
+   ],
+   "inertia_kgm2": [
+    1.7743e-05,
+    1.7711e-05,
+    0.0010143
+   ],
+   "spindle_armature_kgm2": 0.001,
+   "collision": "1 convex hull of vertices z >= 35 mm (doorknob_module.py GRIPS)",
+   "hull_zmin_mm": 35.0,
+   "hull_zmax_mm": 80.0,
+   "hull_rmax_mm": 30.0,
+   "hull_vertices": 1899
   }
  },
  "fixtures": {
@@ -11787,6 +12039,838 @@
     "door_mass_g": 386.8,
     "note": "faithful ContactBench door (contactbench-sim f51f6aa): no keeper; the env's software latch (precise_assembly.latch_cbf=true) holds the hinge until the knob passes the clear angle of the env's pinion; knob stop / spring per env. Needs precise_assembly.latch_door_joint=0 unlock_joint=1 latch_keeper=-1 latch_cbf=true kinematic_distractors=[] unlock_angle_values_deg=[40,48,60,72,80] (subset)."
    }
+  },
+  "cb_doorknob": {
+   "object": "a8k_doorknob_1_55mm_p60",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -3.101334369002478e-08,
+    -2.654729300855541e-08,
+    0.06104156367043653,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -3.822271917110815e-08,
+     -1.4339107088110359e-08,
+     0.06104156367043653,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     -7.483958302105617e-09,
+     -0.009307110638993683,
+     0.09027965643159214,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/a8_door_p60_s5_0/a8_door_p60_s5_0.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 58.98,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "official": "turn_doorknob_open_door_flat",
+    "grip": "doorknob_1_55mm",
+    "pinion_deg": 60,
+    "spring_mm": 5.0,
+    "overrides": "precise_assembly.problem=cb_doorknob precise_assembly.unlock_angle_values_deg=[60.0] precise_assembly.latch_cbf_spring_mm=[5.0]",
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 34.996,
+    "door_mass_g": 386.77,
+    "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
+   }
+  },
+  "cb_doorknob_unlock40": {
+   "object": "a8k_doorknob_1_55mm_p40",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -3.101334369002478e-08,
+    -2.654729300855541e-08,
+    0.06104156367043653,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -3.822271917110815e-08,
+     -1.4339107088110359e-08,
+     0.06104156367043653,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     -7.483958302105617e-09,
+     -0.009307110638993683,
+     0.09027965643159214,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/a8_door_p40_s5_0/a8_door_p40_s5_0.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 39.32,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "official": "turn_doorknob_open_door_flat_unlock40",
+    "grip": "doorknob_1_55mm",
+    "pinion_deg": 40,
+    "spring_mm": 5.0,
+    "overrides": "precise_assembly.problem=cb_doorknob_unlock40 precise_assembly.unlock_angle_values_deg=[40.0] precise_assembly.latch_cbf_spring_mm=[5.0]",
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 34.77,
+    "door_mass_g": 386.12,
+    "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
+   }
+  },
+  "cb_doorknob_unlock80": {
+   "object": "a8k_doorknob_1_55mm_p80",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -3.101334369002478e-08,
+    -2.654729300855541e-08,
+    0.06104156367043653,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -3.822271917110815e-08,
+     -1.4339107088110359e-08,
+     0.06104156367043653,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     -7.483958302105617e-09,
+     -0.009307110638993683,
+     0.09027965643159214,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/a8_door_p80_s5_0/a8_door_p80_s5_0.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 78.64,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "official": "turn_doorknob_open_door_flat_unlock80",
+    "grip": "doorknob_1_55mm",
+    "pinion_deg": 80,
+    "spring_mm": 5.0,
+    "overrides": "precise_assembly.problem=cb_doorknob_unlock80 precise_assembly.unlock_angle_values_deg=[80.0] precise_assembly.latch_cbf_spring_mm=[5.0]",
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 33.906,
+    "door_mass_g": 387.84,
+    "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
+   }
+  },
+  "cb_doorknob_spring7_5mm": {
+   "object": "a8k_doorknob_1_55mm_p60",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -3.101334369002478e-08,
+    -2.654729300855541e-08,
+    0.06104156367043653,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -3.822271917110815e-08,
+     -1.4339107088110359e-08,
+     0.06104156367043653,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     -7.483958302105617e-09,
+     -0.009307110638993683,
+     0.09027965643159214,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/a8_door_p60_s7_5/a8_door_p60_s7_5.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 58.98,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "official": "turn_doorknob_open_door_flat_spring7_5mm",
+    "grip": "doorknob_1_55mm",
+    "pinion_deg": 60,
+    "spring_mm": 7.5,
+    "overrides": "precise_assembly.problem=cb_doorknob_spring7_5mm precise_assembly.unlock_angle_values_deg=[60.0] precise_assembly.latch_cbf_spring_mm=[7.5]",
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 34.996,
+    "door_mass_g": 387.71,
+    "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
+   }
+  },
+  "cb_doorknob_spring10mm": {
+   "object": "a8k_doorknob_1_55mm_p60",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -3.101334369002478e-08,
+    -2.654729300855541e-08,
+    0.06104156367043653,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -3.822271917110815e-08,
+     -1.4339107088110359e-08,
+     0.06104156367043653,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     -7.483958302105617e-09,
+     -0.009307110638993683,
+     0.09027965643159214,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/a8_door_p60_s10_0/a8_door_p60_s10_0.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 58.98,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "official": "turn_doorknob_open_door_flat_spring10mm",
+    "grip": "doorknob_1_55mm",
+    "pinion_deg": 60,
+    "spring_mm": 10.0,
+    "overrides": "precise_assembly.problem=cb_doorknob_spring10mm precise_assembly.unlock_angle_values_deg=[60.0] precise_assembly.latch_cbf_spring_mm=[10.0]",
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 34.996,
+    "door_mass_g": 388.65,
+    "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
+   }
+  },
+  "cb_doorknob_knob2": {
+   "object": "a8k_doorknob_2_55mm_p60",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -1.662212423394149e-07,
+    -1.2882482573178638e-07,
+    0.059677943598840065,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -2.0025756020490427e-07,
+     -6.420472498549289e-08,
+     0.059677943598840065,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     -2.8454950552122826e-08,
+     -0.009070154822115286,
+     0.08893678202614301,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/a8_door_p60_s5_0/a8_door_p60_s5_0.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 58.98,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "official": "turn_doorknob_open_door_flat_knob2",
+    "grip": "doorknob_2_55mm",
+    "pinion_deg": 60,
+    "spring_mm": 5.0,
+    "overrides": "precise_assembly.problem=cb_doorknob_knob2 precise_assembly.unlock_angle_values_deg=[60.0] precise_assembly.latch_cbf_spring_mm=[5.0]",
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 28.909,
+    "door_mass_g": 386.77,
+    "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
+   }
+  },
+  "cb_doorknob_knob1_50mm": {
+   "object": "a8k_doorknob_1_50mm_p60",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -6.853361379563354e-11,
+    -3.072085247881013e-11,
+    0.061715612496740006,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -7.490768152743755e-11,
+     -5.428281965581749e-12,
+     0.061715612496740006,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     7.661768225253043e-12,
+     -0.009424197438057478,
+     0.09094345798577129,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/a8_door_p60_s5_0/a8_door_p60_s5_0.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 58.98,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "official": "turn_doorknob_open_door_flat_knob1_50mm",
+    "grip": "doorknob_1_50mm",
+    "pinion_deg": 60,
+    "spring_mm": 5.0,
+    "overrides": "precise_assembly.problem=cb_doorknob_knob1_50mm precise_assembly.unlock_angle_values_deg=[60.0] precise_assembly.latch_cbf_spring_mm=[5.0]",
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 28.939,
+    "door_mass_g": 386.77,
+    "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
+   }
+  },
+  "cb_doorknob_knob1_60mm": {
+   "object": "a8k_doorknob_1_60mm_p60",
+   "fixture": "doorlatch_frame",
+   "object_start_pose": [
+    -3.916421884032863e-08,
+    -1.06249410499597e-09,
+    0.06163054706666386,
+    0.0,
+    0.0,
+    1.0,
+    6.123233995736766e-17
+   ],
+   "waypoints": [
+    [
+     -3.716572182917466e-08,
+     1.2396533870913812e-08,
+     0.06163054706666386,
+     0.0,
+     0.0,
+     0.9848077530122081,
+     0.17364817766693041
+    ],
+    [
+     1.8661962533866586e-08,
+     -0.009409392129613487,
+     0.09085969085965685,
+     0.07547908730517328,
+     -0.04357787137382929,
+     0.4980973490458729,
+     0.862729915662821
+    ]
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/a8_door_p60_s5_0/a8_door_p60_s5_0.urdf",
+     [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      -0.17175,
+      0.02247
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 100.0,
+     "stiffness": 0.0,
+     "damping": 0.15
+    },
+    {
+     "body": "object",
+     "parent": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.03
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 58.98,
+     "stiffness": 0.48,
+     "damping": 0.008
+    }
+   ],
+   "layout": {
+    "official": "turn_doorknob_open_door_flat_knob1_60mm",
+    "grip": "doorknob_1_60mm",
+    "pinion_deg": 60,
+    "spring_mm": 5.0,
+    "overrides": "precise_assembly.problem=cb_doorknob_knob1_60mm precise_assembly.unlock_angle_values_deg=[60.0] precise_assembly.latch_cbf_spring_mm=[5.0]",
+    "turn_goals_deg": [
+     20.0,
+     120.0
+    ],
+    "door_goal_deg": 10.0,
+    "hinge_anchor_m": [
+     0.0,
+     -0.17175,
+     0.02247
+    ],
+    "knob_mass_g": 39.592,
+    "door_mass_g": 386.77,
+    "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
+   }
   }
  },
  "parts": {
@@ -11853,6 +12937,86 @@
      32.0
     ]
    }
+  },
+  "a8_door_p60_s5_0": {
+   "mass_g": 386.77,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_5mm": 7.51,
+    "doorknob_module_latch_60_deg": 9.86,
+    "lock_module": 90.29
+   },
+   "com_m": [
+    0.04245,
+    -0.04519,
+    0.02254
+   ]
+  },
+  "a8_door_p40_s5_0": {
+   "mass_g": 386.12,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_5mm": 7.51,
+    "doorknob_module_latch_40_deg": 9.21,
+    "lock_module": 90.29
+   },
+   "com_m": [
+    0.04243,
+    -0.04526,
+    0.02254
+   ]
+  },
+  "a8_door_p80_s5_0": {
+   "mass_g": 387.84,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_5mm": 7.51,
+    "doorknob_module_latch_80_deg": 10.94,
+    "lock_module": 90.29
+   },
+   "com_m": [
+    0.04233,
+    -0.04505,
+    0.02254
+   ]
+  },
+  "a8_door_p60_s7_5": {
+   "mass_g": 387.71,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_7.5mm": 8.45,
+    "doorknob_module_latch_60_deg": 9.86,
+    "lock_module": 90.29
+   },
+   "com_m": [
+    0.04234,
+    -0.04509,
+    0.02252
+   ]
+  },
+  "a8_door_p60_s10_0": {
+   "mass_g": 388.65,
+   "parts_g": {
+    "door": 216.47,
+    "doorknob_module_bottom": 40.81,
+    "doorknob_module_top": 21.83,
+    "doorknob_module_spring_10mm": 9.39,
+    "doorknob_module_latch_60_deg": 9.86,
+    "lock_module": 90.29
+   },
+   "com_m": [
+    0.04223,
+    -0.04499,
+    0.02251
+   ]
   }
  }
 }
