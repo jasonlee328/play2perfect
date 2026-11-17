@@ -282,6 +282,12 @@ class PreciseAssemblyCfg:
     # previous behaviour). A1 11-17 slip test: set near the grip's slip torque so hitting the lock is not a torque jump
     # for the hand (it goes from turning the cap to slipping on it at about the same torque). Needs turn_cap_izz.
     turn_thread_drag_torque: float = 0.0
+    # A1 slip rule (11-17, 0 = off): stripped once the fingers have slipped more than this many degrees (about the
+    # bottle axis, relative to the cap) over the locked cap, counted while a pad touches it (see _turn_update_slip).
+    # The physical version of the 11/4 over-turn window: the cap stops, the hand over-spins on it.
+    turn_slip_strip_deg: float = 0.0
+    turn_slip_near_m: float = 0.02
+    turn_slip_cap_radius_m: float = 0.0231
     # held object's PhysX max depenetration velocity (m/s); 1000 = previous hard-coded value. Low values stop the hard
     # stop's pose snap-back from flinging the cap out of the fingers (fake lock torque under hand contact).
     object_max_depenetration_velocity: float = 1000.0

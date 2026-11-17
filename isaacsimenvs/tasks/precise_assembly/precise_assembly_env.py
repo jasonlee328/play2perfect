@@ -620,6 +620,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_max_angle[env_ids] = self.turn_offset[env_ids]
             self.turn_strip_count[env_ids] = 0
             self.turn_stripped[env_ids] = False
+            if hasattr(self, "turn_slip_acc"):
+                self.turn_slip_last_ep[env_ids] = self.turn_slip_acc[env_ids]
+                self.turn_slip_acc[env_ids] = 0.0
             self.turn_released_early[env_ids] = False
             self._turn_early_clear[env_ids] = 0
             self.turn_at_stop_steps[env_ids] = 0
@@ -1077,7 +1080,10 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["turn_strip_over_deg_cur"] = over_deg
             self.extras["turn_strip_steps_cur"] = float(strip_steps)
         strip_tau = float(pih_cfg.turn_strip_torque) if getattr(self, "turn_thread", False) else 0.0
-        if strip_steps > 0 or over_deg > 0.0 or strip_tau > 0.0:
+        slip_deg = float(getattr(pih_cfg, "turn_slip_strip_deg", 0.0))
+        if getattr(self, "turn_thread", False):
+            self._turn_update_slip(contact)
+        if strip_steps > 0 or over_deg > 0.0 or strip_tau > 0.0 or slip_deg > 0.0:
             new = torch.zeros_like(at_stop)
             if strip_steps > 0:
                 new |= self.turn_strip_count > strip_steps
@@ -1085,6 +1091,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 new |= self.turn_angle > self.unlock_angle + math.radians(over_deg)
             if getattr(self, "turn_thread", False) and float(pih_cfg.turn_strip_torque) > 0.0:
                 new |= self.turn_lock_torque > float(pih_cfg.turn_strip_torque)   # our over-torque rule (not official)
+            if slip_deg > 0.0 and getattr(self, "turn_thread", False):
+                new |= self.turn_slip_acc > math.radians(slip_deg)   # A1 slip rule: the hand over-spins the locked cap
             new &= ~self.turn_stripped
             self._turn_just_stripped = new
             self.turn_stripped |= new
@@ -1094,6 +1102,45 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["turn_clutch_brake_cur"] = self._turn_clutch_brake()
         self.extras["turn_over_deg_mean"] = torch.rad2deg(torch.clamp(self.turn_angle - self.unlock_angle, min=0.0)).mean()
         self.extras["turn_contact_frac"] = contact.float().mean()
+
+    def _turn_update_slip(self, contact) -> None:
+        """turn_thread (A1 11-17): finger slip on the locked cap, once per policy step. Per fingertip within
+        turn_slip_near_m of the cap surface: change of its angle about the bottle axis minus the cap's own change
+        (tightening sense); the mean over those fingertips is added to turn_slip_acc (rad) while the cap sits within 1 deg
+        of the lock and a pad touches it (an over-spinning hand slides over a cap that can no longer turn)."""
+        n = self.num_envs
+        axis_w, anchor_w = self._turn_axis_w()
+        ft = self.robot.data.body_state_w[:, self._fingertip_body_ids, 0:3]          # (N, F, 3)
+        v = ft - anchor_w.unsqueeze(1)
+        ax = axis_w.unsqueeze(1)
+        v_perp = v - (v * ax).sum(-1, keepdim=True) * ax
+        if not hasattr(self, "_slip_e1") or self._slip_e1.shape[0] != n:
+            ref = torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(n, 3)
+            alt = torch.tensor([0.0, 1.0, 0.0], device=self.device).expand(n, 3)
+            ref = torch.where(((ref * axis_w).sum(-1).abs() > 0.9).unsqueeze(-1), alt, ref)
+            e1 = ref - (ref * axis_w).sum(-1, keepdim=True) * axis_w
+            self._slip_e1 = e1 / e1.norm(dim=-1, keepdim=True)
+            self._slip_e2 = torch.cross(axis_w, self._slip_e1, dim=-1)
+            self.turn_slip_acc = torch.zeros(n, device=self.device)
+            self.turn_slip_last_ep = torch.zeros(n, device=self.device)
+            self._slip_phi = None
+        phi = torch.atan2((v_perp * self._slip_e2.unsqueeze(1)).sum(-1), (v_perp * self._slip_e1.unsqueeze(1)).sum(-1))
+        cap_a = self.turn_angle.clone()
+        r = v_perp.norm(dim=-1)
+        r_cap = float(getattr(self.cfg.precise_assembly, "turn_slip_cap_radius_m", 0.0231))
+        near = (r - r_cap).abs() < float(getattr(self.cfg.precise_assembly, "turn_slip_near_m", 0.02))
+        if self._slip_phi is not None:
+            dphi = torch.atan2(torch.sin(phi - self._slip_phi), torch.cos(phi - self._slip_phi))
+            dcap = (cap_a - self._slip_cap_a).unsqueeze(-1)
+            fresh = (self.episode_length_buf <= 1).unsqueeze(-1)
+            sl = torch.where(near & ~fresh, dphi - dcap, torch.zeros_like(dphi))
+            k = near.float().sum(-1).clamp(min=1.0)
+            slip = sl.sum(-1) / k
+            at_lock = self.turn_angle >= self.unlock_angle - math.radians(1.0)
+            self.turn_slip_acc += torch.where(at_lock & contact, torch.clamp(slip, min=0.0), torch.zeros_like(slip))
+            self.extras["turn_slip_deg_mean"] = torch.rad2deg(self.turn_slip_acc).mean()
+        self._slip_phi = phi
+        self._slip_cap_a = cap_a
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
