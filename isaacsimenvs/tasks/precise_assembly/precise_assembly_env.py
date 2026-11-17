@@ -1496,6 +1496,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self._cbf_run_lo = torch.where(swing, door, lo)
             self._cbf_run_hi = torch.where(swing, door, hi)
             self.extras["latch_cbf_hold_swing_frac"] = (open_ & swing).float().mean()
+        self._cbf_hold_now = open_ & ok          # A8: this step counts toward the consecutive success run
+        self._cbf_open_now = open_
+        self._cbf_door_rate = rate
         self.extras["latch_cbf_door_open_frac"] = open_.float().mean()
         self.extras["latch_cbf_open_grasped_frac"] = (open_ & self._cbf_grasp_ok).float().mean()
         return open_ & ok
@@ -1833,6 +1836,21 @@ class PreciseAssemblyEnv(PlayEnv):
             wr = float(pih_cfg.latch_window_rew_scale) * (on & ~self.latch_open).float()
             reward = reward + wr
             self._reward_terms["latch_window_rew"] = wr
+            self._reward_terms["total_reward"] = reward
+
+        # A8 hold shaping (latch_cbf): + latch_cbf_hold_rew_scale per step that counts toward the held-open success run,
+        # - latch_cbf_door_vel_pen_scale x door speed (deg/s / 100, capped at 3) while the door is open after the latch.
+        if getattr(self, "_cbf", None) is not None and hasattr(self, "_cbf_hold_now"):
+            hs = float(getattr(pih_cfg, "latch_cbf_hold_rew_scale", 0.0))
+            vs = float(getattr(pih_cfg, "latch_cbf_door_vel_pen_scale", 0.0))
+            if hs > 0.0:
+                hr = hs * self._cbf_hold_now.float()
+                reward = reward + hr
+                self._reward_terms["latch_cbf_hold_rew"] = hr
+            if vs > 0.0:
+                vp = -vs * (self._cbf_door_rate / 100.0).clamp(max=3.0) * self._cbf_open_now.float()
+                reward = reward + vp
+                self._reward_terms["latch_cbf_door_vel_pen"] = vp
             self._reward_terms["total_reward"] = reward
 
         log_step_metrics(self)
