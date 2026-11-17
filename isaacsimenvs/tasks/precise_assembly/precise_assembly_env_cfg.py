@@ -309,6 +309,26 @@ class PreciseAssemblyCfg:
     latch_cbf: bool = False
     latch_cbf_spring_mm: tuple[float, ...] = (5.0,)
     latch_cbf_gap_deg: float = 0.1
+    # A1 physical door forces (Phase 3): latch_cbf_elastic replaces the knob's PhysX end stop and the pose-level latch
+    # hold by implicit elastic stops (pose level, stable at any inertia; at rest x = tau / K), so the torque the hand pushes
+    # into the pinion stop (door_stop_torque, N m) and the hinge torque into the engaged latch (door_pull_torque, N m;
+    # door_pull_force = / lever arm hinge -> knob, N) are physical readings (validated by a1_door_probe --elastic).
+    latch_cbf_elastic: bool = False
+    latch_cbf_stop_K: float = 100.0      # N m/rad (1 N m -> 0.57 deg past the stop)
+    latch_cbf_stop_D: float = 0.5
+    latch_cbf_stop_back_deg: float = 3.0
+    latch_cbf_stop_cal_gain: float = 0.96    # stop reading calibration (see _cbf_elastic_substep)
+    latch_cbf_stop_cal_spring: float = 0.40
+    latch_cbf_hinge_K: float = 600.0     # N m/rad (2.5 N m -> ~0.3 deg: keeps the official locked < 0.6 deg)
+    latch_cbf_hinge_D: float = 2.0
+    latch_cbf_hinge_back_deg: float = 2.0
+    latch_cbf_hinge_cal_gain: float = 0.75   # latch reading calibration (two-level probe slope)
+    # upper-bound rule (0 = off): knob torque into the stop > door_break_torque, or pull force while latched >
+    # door_break_pull, for door_break_steps policy steps in a row = termination "broken" (- door_break_penalty)
+    door_break_torque: float = 0.0
+    door_break_pull: float = 0.0
+    door_break_steps: int = 3
+    door_break_penalty: float = 200.0
     latch_cbf_grasp_fingers: int = 2
     latch_cbf_grasp_dist: float = 0.05
     latch_cbf_door_still_deg_s: float = 0.0
