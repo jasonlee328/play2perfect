@@ -505,6 +505,10 @@ class DomainRandomizationCfg:
 
     # Per-step Gaussian noise on joint-velocity obs (legacy env.py:3251).
     joint_velocity_obs_noise_std: float = 0.1
+    # Joint-position obs noise for the actor (rad; A1 11-17): per-step Gaussian std + a per-episode bias U(+-b) per joint
+    # (resampled on the episode's first step). Critic keeps the clean value. 0 = off.
+    joint_pos_obs_noise_std: float = 0.0
+    joint_pos_obs_bias: float = 0.0
 
     # Random force/torque impulses on the object body.
     force_scale: float = 20.0

@@ -376,6 +376,17 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
+    jp_std = float(getattr(dr, "joint_pos_obs_noise_std", 0.0))
+    jp_b = float(getattr(dr, "joint_pos_obs_bias", 0.0))
+    if jp_std > 0 or jp_b > 0:
+        scale = 2.0 / (env._joint_upper_canon - env._joint_lower_canon)   # rad -> normalised joint_pos units
+        bias = getattr(env, "_joint_pos_obs_bias", None)
+        if bias is None or bias.shape != joint_pos.shape:
+            bias = (torch.rand_like(joint_pos) * 2.0 - 1.0) * jp_b
+        new_ep = (env.episode_length_buf == 0).unsqueeze(-1)
+        bias = torch.where(new_ep, (torch.rand_like(joint_pos) * 2.0 - 1.0) * jp_b, bias)
+        env._joint_pos_obs_bias = bias
+        obs_noisy["joint_pos"] = joint_pos + (bias + torch.randn_like(joint_pos) * jp_std) * scale
 
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)

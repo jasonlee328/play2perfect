@@ -278,6 +278,10 @@ class PreciseAssemblyCfg:
     # (printed cap ~2.7e-6). Needed for a physical elastic-lock torque reading (see _turn_apply_cap_izz); 1e-4 adds
     # ~0.03 N m of flywheel torque when the hand spins the cap up to ~14 rad/s in 0.05 s.
     turn_cap_izz: float = 0.0
+    # turn_thread: Coulomb drag torque of the thread (N m) while the cap turns before the lock (0 = free spin, the
+    # previous behaviour). A1 11-17 slip test: set near the grip's slip torque so hitting the lock is not a torque jump
+    # for the hand (it goes from turning the cap to slipping on it at about the same torque). Needs turn_cap_izz.
+    turn_thread_drag_torque: float = 0.0
     # held object's PhysX max depenetration velocity (m/s); 1000 = previous hard-coded value. Low values stop the hard
     # stop's pose snap-back from flinging the cap out of the fingers (fake lock torque under hand contact).
     object_max_depenetration_velocity: float = 1000.0

@@ -941,6 +941,22 @@ class PreciseAssemblyEnv(PlayEnv):
         if elastic is not None:
             w_now = (vel[:, 3:6] * axis_w).sum(-1)
             vel[:, 3:6] += (torch.where(elastic, self._turn_el_v - w_now, torch.zeros_like(w_now))).unsqueeze(-1) * axis_w
+        dragged = torch.zeros_like(touched)
+        D_thr = float(getattr(pc, "turn_thread_drag_torque", 0.0))
+        if D_thr > 0.0:
+            # thread drag (A1 11-17): Coulomb friction torque D_thr about the axis while the cap turns on the thread
+            # (not in the lock), applied implicitly as an impulse: |w| -> max(|w| - D_thr dt / I, 0). Uses the cap's
+            # real inertia (set turn_cap_izz; at the printed 2.7e-6 one substep's impulse stops any spin).
+            free = ~bad
+            if elastic is not None:
+                free = free & ~elastic
+            w_now = (vel[:, 3:6] * axis_w).sum(-1)
+            dw = D_thr * dt / I_cur
+            w_new = torch.sign(w_now) * torch.clamp(w_now.abs() - dw, min=0.0)
+            dragged = free & (w_now != 0)
+            vel[:, 3:6] += (torch.where(dragged, w_new - w_now, torch.zeros_like(w_now))).unsqueeze(-1) * axis_w
+            self.turn_drag_acc = getattr(self, "turn_drag_acc", torch.zeros(n, device=self.device)) + torch.where(
+                dragged, (w_now - w_new).abs() * I_cur / dt, torch.zeros_like(w_now))
         self.turn_angle += c
         self._turn_prev_wrapped = torch.where(touched, torch.atan2(torch.sin(a + c), torch.cos(a + c)),
                                               self._turn_prev_wrapped)
@@ -962,7 +978,7 @@ class PreciseAssemblyEnv(PlayEnv):
         into = moved & (((du > 0) & (v_ax < 0)) | ((du < 0) & (v_ax > 0)))
         vel[:, 0:3] -= (v_ax * into.float()).unsqueeze(-1) * up
         self.turn_u = u + du
-        ids = (touched | moved).nonzero(as_tuple=False).squeeze(-1)
+        ids = (touched | moved | dragged).nonzero(as_tuple=False).squeeze(-1)
         if ids.numel() == 0:
             return
         body.write_root_pose_to_sim(torch.cat([pos[ids], quat[ids]], -1), env_ids=ids)
