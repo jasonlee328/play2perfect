@@ -89,6 +89,8 @@ class KeyLockCfg:
     # rewards
     release_rew_scale: float = 300.0     # potential on min(tip dist, release_dist) / release_dist after the clear goal
     still_rew_scale: float = 200.0       # potential on still_count / still_steps
+    still_action_penalty: float = 0.0    # per step once released: x mean |arm action| (arm actions are joint velocities, so
+                                         # holding still = zero arm action)
     still_speed_penalty: float = 0.0     # per step once released: x palm speed (m/s) / 0.01 + joint-target change (rad), released only
     turnback_penalty: float = 2.0        # per step with the key back below its clear angle after the clear goal
     pinch_rew: float = 1.0               # per turning step with a valid pinch
@@ -289,6 +291,10 @@ class KeyLockEnv(PreciseAssemblyEnv):
         axis_w = quat_apply(q_par, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(self.num_envs, 3))
         ang = self.cb_joint_angle[int(c.unlock_joint)]
         return quat_from_angle_axis(-ang, axis_w), axis_w
+
+    def _pre_physics_step(self, actions: torch.Tensor) -> None:
+        self._key_arm_act = actions[:, :7].abs().mean(-1).to(self.device)
+        super()._pre_physics_step(actions)
 
     def _tactile_object_pose(self):
         """Phase 2 v2: the tactile ray-cast sees the key rotated back about the lock axis by the slip lag (physics and
@@ -622,6 +628,10 @@ class KeyLockEnv(PreciseAssemblyEnv):
             pv = self.robot.data.body_lin_vel_w[:, self._palm_id, :].norm(dim=-1)
             spen = float(kl.still_speed_penalty) * (pv / 0.01).clamp(max=10.0) * self._key_released_now.float()
             self.extras["key/released_palm_speed"] = (pv * self._key_released_now.float()).sum() / self._key_released_now.float().sum().clamp(min=1.0)
+        if float(kl.still_action_penalty) > 0.0 and hasattr(self, "_key_released_now") and hasattr(self, "_key_arm_act"):
+            rl = self._key_released_now.float()
+            spen = spen + float(kl.still_action_penalty) * self._key_arm_act * rl
+            self.extras["key/released_arm_action"] = (self._key_arm_act * rl).sum() / rl.sum().clamp(min=1.0)
         extra = rel - back + pinch - fail - unp - slip_pen - spen
         r = r + extra
         for name, v in (("key_release_rew", rel), ("key_turnback_pen", -back), ("key_pinch_rew", pinch), ("key_unpinched_cut", -unp),
