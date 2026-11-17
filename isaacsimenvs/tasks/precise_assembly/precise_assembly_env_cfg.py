@@ -273,6 +273,7 @@ class PreciseAssemblyCfg:
     turn_loosen: bool = False
     turn_loosen_deg: float = 180.0
     turn_loosen_preload: float = 0.020
+    object_start_follow_thread: bool = False   # A7: held tool start pose follows the drawn start height
     # A7 (Allen key screw): thread drag on the jointed body, applied every substep at the velocity level (official
     # _allen_key ThreadModel): Coulomb running friction (N m; official TAU_RUN0 0.0015) + viscous (N m s / rad; official
     # SCREW_KD 0.004). Never reverses the spin, so an undriven light screw stops (stiction). 0 = off (bottle default).
@@ -311,6 +312,9 @@ class PreciseAssemblyCfg:
     # over a 40 s episode of sub-millidegree sim jitter otherwise reaches 2 deg and ends 70% of episodes as `toolless` with
     # the screw untouched (sd_tbl3, mean angle 0.014 deg). 0 = off (A7 behaviour).
     turn_toolless_deadband_deg: float = 0.0
+    # A7: the turn-progress reward / turn goals count only while a tool tip is in the recess (no reward for turning the
+    # head with the fingers).
+    turn_progress_requires_tool: bool = False
     turn_preload_free_deg: float = 10.0
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9

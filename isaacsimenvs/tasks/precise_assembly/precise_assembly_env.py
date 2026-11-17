@@ -1127,15 +1127,28 @@ class PreciseAssemblyEnv(PlayEnv):
                                torch.full_like(self.turn_angle, math.radians(float(pih_cfg.turn_first_goal_deg))))
             rem = torch.clamp(self.turn_angle - (self.turn_seat_angle - back), min=0.0)
         else:
-            target = torch.where(at_last, self.unlock_angle,
-                                 self.turn_offset + math.radians(float(pih_cfg.turn_first_goal_deg)))
+            first = torch.minimum(self.turn_offset + math.radians(float(pih_cfg.turn_first_goal_deg)),
+                                  self.unlock_angle - math.radians(float(pih_cfg.unlock_tol_deg)))   # A7: near the seat
+            target = torch.where(at_last, self.unlock_angle, first)
             rem = torch.clamp(target - self.turn_angle, min=0.0)
         self._keypoints_max_dist = rem * float(pih_cfg.turn_progress_m_per_rad)
+        tool_out = None
+        if bool(getattr(pih_cfg, "turn_progress_requires_tool", False)) and getattr(self, "_tl_out", None) is not None:
+            # A7: turning progress only pays while a tool tip is in the recess (last step's toolless check): degrees turned
+            # by the fingers on the head earn nothing (the keypoint reward pays improvements of the closest distance, so
+            # holding the distance at its best-so-far value freezes it), and the first turn goal can't be credited
+            tool_out = self._tl_out
+            best = torch.where(self._closest_keypoint_max_dist >= 0.0, self._closest_keypoint_max_dist,
+                               self._keypoints_max_dist)
+            self._keypoints_max_dist = torch.where(tool_out, torch.maximum(self._keypoints_max_dist, best),
+                                                   self._keypoints_max_dist)
         # goal trackers cleared this step (-1 sentinel, replaced by the real keypoint distance in
         # compute_intermediate_values): start them from the turn distance instead
         fresh = self._turn_fresh_closest
         self._closest_keypoint_max_dist = torch.where(fresh, self._keypoints_max_dist, self._closest_keypoint_max_dist)
         near = rem <= math.radians(float(pih_cfg.unlock_tol_deg))
+        if tool_out is not None:
+            near = near & ~tool_out
         if getattr(self, "turn_thread", False):
             # tight = the hand has pushed >= turn_tight_torque into the lock for turn_tight_steps consecutive steps;
             # turning the cap back > 1 deg off the lock loosens it (the preload is gone)
@@ -1211,11 +1224,14 @@ class PreciseAssemblyEnv(PlayEnv):
         before the thread bites. w = its seated world pose (n, 7); returns the lifted pose."""
         pc = self.cfg.precise_assembly
         drop = torch.rand(env_ids.numel(), device=self.device) * self.turn_play[env_ids]
-        self.turn_u_start[env_ids] = float(pc.turn_thread_engaged_mm) * 1e-3 - drop
-        rng = tuple(getattr(pc, "turn_thread_engaged_range_mm", ()))
-        if rng:   # A9: hidden start height U(lo, hi)
-            lo, hi = float(rng[0]) * 1e-3, float(rng[1]) * 1e-3
+        rng = getattr(pc, "turn_thread_engaged_range_mm", ())
+        if rng:
+            # A7 (OmniReset-style near-goal resets): each episode starts at a random point along the thread, from
+            # rng[1] mm above the seat (rng[1] / lead turns to go) down to rng[0] mm
+            lo, hi = (float(v) * 1e-3 for v in rng)
             self.turn_u_start[env_ids] = lo + (hi - lo) * torch.rand(env_ids.numel(), device=self.device)
+        else:
+            self.turn_u_start[env_ids] = float(pc.turn_thread_engaged_mm) * 1e-3 - drop
         axis_w, _ = self._turn_axis_w()
         w = w.clone()
         w[:, 0:3] -= axis_w[env_ids] * self.turn_u_start[env_ids].unsqueeze(-1)   # axis points into the bottle
@@ -1296,6 +1312,13 @@ class PreciseAssemblyEnv(PlayEnv):
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
         if getattr(self, "turn_thread", False) and self._turn_thread_body_is_object():
             w = self._turn_thread_lift(env_ids, w)
+        elif getattr(self, "turn_thread", False) and bool(getattr(self.cfg.precise_assembly, "object_start_follow_thread", False)):
+            # A7: the held tool starts at a pose built for the nominal start height (turn_thread_engaged_mm): move it
+            # along the axis with the screw's actual start height (tool standing in the recess at any thread progress)
+            axis_w, _ = self._turn_axis_w()
+            dz = self.turn_u_start[env_ids] - float(self.cfg.precise_assembly.turn_thread_engaged_mm) * 1e-3
+            w = w.clone()
+            w[:, 0:3] -= axis_w[env_ids] * dz.unsqueeze(-1)
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         if int(getattr(self.cfg.precise_assembly, "object_start_hold_steps", 0)) > 0:
             if getattr(self, "_object_start_pose_w", None) is None:
