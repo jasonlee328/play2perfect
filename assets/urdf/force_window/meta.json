@@ -1,0 +1,417 @@
+{
+ "objects": {
+  "fw_can_m080": {
+   "mass_kg": 0.08,
+   "object_scale": [
+    0.066,
+    0.066,
+    0.1
+   ]
+  },
+  "fw_can_m110": {
+   "mass_kg": 0.11,
+   "object_scale": [
+    0.066,
+    0.066,
+    0.1
+   ]
+  },
+  "fw_can_m150": {
+   "mass_kg": 0.15,
+   "object_scale": [
+    0.066,
+    0.066,
+    0.1
+   ]
+  },
+  "fw_can_m200": {
+   "mass_kg": 0.2,
+   "object_scale": [
+    0.066,
+    0.066,
+    0.1
+   ]
+  },
+  "fw_key_lever": {
+   "mass_kg": 0.012,
+   "object_scale": [
+    0.08,
+    0.02,
+    0.006
+   ],
+   "com_from_pivot": [
+    0.04179427043775513,
+    -3.750417042159818e-19,
+    0.0012417191389025796
+   ],
+   "pad_from_pivot": [
+    0.064,
+    0.0,
+    0.009000000000000001
+   ]
+  }
+ },
+ "fixtures": {
+  "fw_coaster": {
+   "size": [
+    0.15,
+    0.15,
+    0.004
+   ]
+  },
+  "fw_key_base": {
+   "size": [
+    0.06,
+    0.04,
+    0.03
+   ]
+  }
+ },
+ "problems": {
+  "fw_fragile_m080": {
+   "object": "fw_can_m080",
+   "fixture": "fw_coaster",
+   "hole_z_offset": 0.0,
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05450000000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.15450000000000003,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "mass_kg": 0.08
+  },
+  "fw_fragile_m110": {
+   "object": "fw_can_m110",
+   "fixture": "fw_coaster",
+   "hole_z_offset": 0.0,
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05450000000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.15450000000000003,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "mass_kg": 0.11
+  },
+  "fw_fragile_m150": {
+   "object": "fw_can_m150",
+   "fixture": "fw_coaster",
+   "hole_z_offset": 0.0,
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05450000000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.15450000000000003,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "mass_kg": 0.15
+  },
+  "fw_fragile_m200": {
+   "object": "fw_can_m200",
+   "fixture": "fw_coaster",
+   "hole_z_offset": 0.0,
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05450000000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.15450000000000003,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "mass_kg": 0.2
+  },
+  "fw_press_k1830": {
+   "object": "fw_key_lever",
+   "fixture": "fw_key_base",
+   "hole_z_offset": 0.0,
+   "object_start_pose": [
+    0.016794270437755134,
+    -3.750417042159818e-19,
+    0.03624171913890258,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.016794270437755134,
+     -3.750417042159818e-19,
+     0.03624171913890258,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "joints": [
+    {
+     "body": "object",
+     "anchor": [
+      -0.024999999999999998,
+      0.0,
+      0.035
+     ],
+     "axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 20.0,
+     "damping": 0.002,
+     "stiffness": 1.83
+    }
+   ],
+   "spring_k": 1.83,
+   "pad_r": 0.064,
+   "f_star": 4.0,
+   "theta_star_deg": 8.015147298004958
+  },
+  "fw_press_k2590": {
+   "object": "fw_key_lever",
+   "fixture": "fw_key_base",
+   "hole_z_offset": 0.0,
+   "object_start_pose": [
+    0.016794270437755134,
+    -3.750417042159818e-19,
+    0.03624171913890258,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.016794270437755134,
+     -3.750417042159818e-19,
+     0.03624171913890258,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "joints": [
+    {
+     "body": "object",
+     "anchor": [
+      -0.024999999999999998,
+      0.0,
+      0.035
+     ],
+     "axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 20.0,
+     "damping": 0.002,
+     "stiffness": 2.59
+    }
+   ],
+   "spring_k": 2.59,
+   "pad_r": 0.064,
+   "f_star": 4.0,
+   "theta_star_deg": 5.663212183532462
+  },
+  "fw_press_k3660": {
+   "object": "fw_key_lever",
+   "fixture": "fw_key_base",
+   "hole_z_offset": 0.0,
+   "object_start_pose": [
+    0.016794270437755134,
+    -3.750417042159818e-19,
+    0.03624171913890258,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.016794270437755134,
+     -3.750417042159818e-19,
+     0.03624171913890258,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "joints": [
+    {
+     "body": "object",
+     "anchor": [
+      -0.024999999999999998,
+      0.0,
+      0.035
+     ],
+     "axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 20.0,
+     "damping": 0.002,
+     "stiffness": 3.66
+    }
+   ],
+   "spring_k": 3.66,
+   "pad_r": 0.064,
+   "f_star": 4.0,
+   "theta_star_deg": 4.007573649002479
+  },
+  "fw_press_k5170": {
+   "object": "fw_key_lever",
+   "fixture": "fw_key_base",
+   "hole_z_offset": 0.0,
+   "object_start_pose": [
+    0.016794270437755134,
+    -3.750417042159818e-19,
+    0.03624171913890258,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.016794270437755134,
+     -3.750417042159818e-19,
+     0.03624171913890258,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "joints": [
+    {
+     "body": "object",
+     "anchor": [
+      -0.024999999999999998,
+      0.0,
+      0.035
+     ],
+     "axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 20.0,
+     "damping": 0.002,
+     "stiffness": 5.17
+    }
+   ],
+   "spring_k": 5.17,
+   "pad_r": 0.064,
+   "f_star": 4.0,
+   "theta_star_deg": 2.8370830861410203
+  },
+  "fw_press_k7320": {
+   "object": "fw_key_lever",
+   "fixture": "fw_key_base",
+   "hole_z_offset": 0.0,
+   "object_start_pose": [
+    0.016794270437755134,
+    -3.750417042159818e-19,
+    0.03624171913890258,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.016794270437755134,
+     -3.750417042159818e-19,
+     0.03624171913890258,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "joints": [
+    {
+     "body": "object",
+     "anchor": [
+      -0.024999999999999998,
+      0.0,
+      0.035
+     ],
+     "axis": [
+      0.0,
+      1.0,
+      0.0
+     ],
+     "lower_deg": 0.0,
+     "upper_deg": 20.0,
+     "damping": 0.002,
+     "stiffness": 7.32
+    }
+   ],
+   "spring_k": 7.32,
+   "pad_r": 0.064,
+   "f_star": 4.0,
+   "theta_star_deg": 2.0037868245012396
+  }
+ },
+ "notes": "A3 force-window task assets -> <p2p_root>/assets/urdf/force_window/{objects,fixtures}/ + meta.json (own meta, not\nContactBench's). Run with any python that has numpy + trimesh:  python make_fw_assets.py <p2p_root>\n\nFragile grasp (\"fw_fragile_m<g>\"): a 66 mm x 100 mm cylinder (\"thin-walled can\"; one convex collision mesh) standing on\na 150 x 150 x 4 mm coaster fixture. Mass variants (hidden per env via precise_assembly.multi_problems): 80 / 110 / 150 /\n200 g, same shape, so the slip force (minimum grip) differs per env and can't be seen. Goal: lift 10 cm.\n\nPress to force (\"fw_press_k<k>\"): a rocker key. Fixture = base block 60 x 40 x 30 mm. Object = lever 80 x 20 x 6 mm,\npivot (revolute JointSpec, axis +y) at its back end, a 12 mm dome pad on top at r = 64 mm from the pivot. Return spring\nk (N m / rad) differs per variant (hidden per env); the target force F* = 4 N then sits at angle F* r / k.\nLower stop 0 deg (rest), upper stop 20 deg (past the widest break angle).\n"
+}
