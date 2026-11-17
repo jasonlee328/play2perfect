@@ -726,6 +726,7 @@
    "frame": "origin on the axis at the head underside"
   },
   "ak_key": {
+   "mass_scale": 1.0,
    "src": "official bodies_kit/allen_key/allen_key.stl",
    "extents_mm": [
     67.5,
@@ -733,6 +734,27 @@
     30.0
    ],
    "mass_g": 2.733,
+   "com_src_mm": [
+    23.654,
+    -0.0,
+    26.276
+   ],
+   "object_scale": [
+    1.6875,
+    0.125,
+    0.75
+   ],
+   "collision": "convex hulls: long leg (x >= 2.5 mm) + short leg / bend"
+  },
+  "ak_key_k30": {
+   "mass_scale": 10.97694840834248,
+   "src": "official bodies_kit/allen_key/allen_key.stl",
+   "extents_mm": [
+    67.5,
+    5.0,
+    30.0
+   ],
+   "mass_g": 30.005,
    "com_src_mm": [
     23.654,
     -0.0,
@@ -11870,6 +11892,81 @@
   },
   "cb_allenkey_engaged": {
    "object": "ak_key",
+   "fixture": "ak_block",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/ak_screw/ak_screw.urdf",
+     [
+      0.0249885,
+      4.55e-05,
+      0.02,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0249885,
+      4.55e-05,
+      0.02
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "stiffness": 0.0,
+     "damping": 0.004
+    }
+   ],
+   "waypoints": [
+    [
+     0.02133024184432384,
+     0.0021575962154336634,
+     0.06884614379017032,
+     0.18301270189221935,
+     0.6830127018922194,
+     -0.18301270189221933,
+     0.6830127018922195
+    ],
+    [
+     0.027100596215433665,
+     0.003703758155676161,
+     0.06884614379017032,
+     0.6123724356957945,
+     0.35355339059327384,
+     -0.6123724356957945,
+     0.35355339059327384
+    ]
+   ],
+   "layout": {
+    "lead_mm": 2.34,
+    "unengaged_mm": 4.0,
+    "turn_to_seat_deg": 615.4,
+    "prelude_goals": 0,
+    "turn_goals_deg": [
+     30.0,
+     120.0
+    ],
+    "note": "official task 13; overrides in FoundationTouch teacher/allenkey/overrides.sh (turn_prelude_goals=0)"
+   },
+   "object_start_pose": [
+    0.020764307395866006,
+    4.549989996444177e-05,
+    0.06904614379017032,
+    -0.0,
+    0.7071067811865475,
+    -0.0,
+    0.7071067811865475
+   ]
+  },
+  "cb_allenkey_engaged_k30": {
+   "object": "ak_key_k30",
    "fixture": "ak_block",
    "distractors": [
     [
