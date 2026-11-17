@@ -65,6 +65,7 @@ class CardTask:
         self.tr_p = self.ref_p.clone(); self.tr_q = self.ref_q.clone()
         self.success = z(torch.bool)
         self.just_rel_inside = z(torch.bool)
+        self.vel_ema = torch.zeros(N, 3, device=d)
         self.fail = {k: z(torch.bool) for k in ("dropped_at_start", "slipped", "released_outside", "deck_disturbed", "broken")}
         self.checks = {}
         bi, _ = env.robot.find_bodies("iiwa14_link_7")
@@ -119,6 +120,7 @@ class CardTask:
         for t in (self.step, self.slip_hold, self.slip_tr, self.tr_steps, self.tr_loaded, self.nocontact,
                   self.final_count, self.break_count, self.f_env_ep_max):
             t[env_ids] = 0
+        self.vel_ema[env_ids] = 0.0
         for t in (self.released, self.rel_inside, self.success):
             t[env_ids] = False
         self.hold_ok[env_ids] = True
@@ -242,7 +244,10 @@ class CardTask:
         n_front = quat_apply(front_q, torch.tensor([0.0, 0.0, 1.0], device=env.device).expand(env.num_envs, 3))
         gap = ((pc - front_p) * n_front).sum(-1) - 2 * HALF[2]
         lean_d = (self._lean_deg(qc) - self._lean_deg(front_q)).abs()
-        speed = env.object.data.root_lin_vel_w.norm(dim=-1)
+        # "at rest over the final window": EMA (~12 steps) of the velocity vector, so PhysX contact jitter
+        # (instantaneous 1-5 mm/s on a resting card, zero mean) does not count as motion
+        self.vel_ema = 0.92 * self.vel_ema + 0.08 * env.object.data.root_lin_vel_w
+        speed = self.vel_ema.norm(dim=-1)
         in_holder = self._in_slot(bot) & ((zlow - FLOOR_Z).abs() <= c.card_floor_tol) & (lean_d < c.card_lean_tol) \
             & (gap < c.card_gap_tol) & (gap > -c.card_gap_tol) & (speed < c.card_rest_speed)
         clear = self.released & (f_rob_scene < c.card_clear_force) & ((b - self.rel_palm).norm(dim=-1) >= c.card_clear_dist)
