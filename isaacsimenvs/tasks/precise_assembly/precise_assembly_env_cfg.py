@@ -274,6 +274,10 @@ class PreciseAssemblyCfg:
     turn_lock_stiffness: float = 0.0
     turn_lock_damping: float = 1.0
     turn_lock_backstop_deg: float = 5.0
+    # turn_thread: cap moment of inertia about the bottle axis (kg m^2), set once at the first reset; 0 = the asset's
+    # (printed cap ~2.7e-6). Needed for a physical elastic-lock torque reading (see _turn_apply_cap_izz); 1e-4 adds
+    # ~0.03 N m of flywheel torque when the hand spins the cap up to ~14 rad/s in 0.05 s.
+    turn_cap_izz: float = 0.0
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0

@@ -449,6 +449,7 @@ class PreciseAssemblyEnv(PlayEnv):
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self.device)
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        self._turn_apply_cap_izz()
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
@@ -805,11 +806,27 @@ class PreciseAssemblyEnv(PlayEnv):
             self._turn_I_axis = torch.einsum("ni,nij,nj->n", a_b, I, a_b).clamp_min(1e-9)
         return self._turn_I_axis
 
+    def _turn_apply_cap_izz(self) -> None:
+        """turn_cap_izz > 0: once, at the first reset, set the cap's moment of inertia about the bottle axis (body z) to
+        this value for the env's life. At the printed cap's real ~2.7e-6 kg m^2 PhysX caps the spin and its pose rate
+        disagrees with the velocity readback (probe 11-16 a1_inertia_test: 2.26x), so no physical lock torque can be
+        read; at 1e-4 pose rate = readback and the implicit elastic lock reads tau / K (turn_lock_stiffness)."""
+        izz = float(getattr(self.cfg.precise_assembly, "turn_cap_izz", 0.0))
+        if izz <= 0.0 or getattr(self, "_turn_cap_izz_done", False) or not getattr(self, "turn_thread", False):
+            return
+        body = self._joint_bodies()[int(self.cfg.precise_assembly.unlock_joint)]
+        view = body.root_physx_view
+        inert = view.get_inertias().clone()
+        inert[:, 8] = izz
+        view.set_inertias(inert, torch.arange(self.num_envs, dtype=torch.int32))
+        self._turn_I_axis = None   # re-read in _turn_axis_inertia
+        self._turn_cap_izz_done = True
+
     def _turn_update_lock_inertia(self) -> None:
         """turn_lock_inertia: cap inside the lock zone -> raised moment of inertia about its axis (see the cfg)."""
         I_lock = float(self.cfg.precise_assembly.turn_lock_inertia)
-        if I_lock <= 0.0:
-            return
+        if I_lock <= 0.0 or float(getattr(self.cfg.precise_assembly, "turn_lock_stiffness", 0.0)) > 0.0:
+            return   # the elastic lock is implicit at the real inertia (no switch)
         zone = self.turn_angle >= self.unlock_angle - math.radians(float(self.cfg.precise_assembly.turn_lock_zone_deg))
         pend = getattr(self, "_turn_pending_unlock", None)
         changed = zone != self.turn_lock_flag
@@ -833,15 +850,13 @@ class PreciseAssemblyEnv(PlayEnv):
         if lock_ids.numel() > 0 and float(getattr(self.cfg.precise_assembly, "turn_lock_stiffness", 0.0)) > 0.0:
             # conserve the axial angular momentum across the switch (I_orig w -> I_lock w'): keeping w would multiply
             # the cap's spin energy by I_lock / I_orig (~2e4) and slam an elastic lock into its backstop
-            body = self._joint_bodies()[int(self.cfg.precise_assembly.unlock_joint)]
+            # deferred to the next substep (_turn_apply_pending_spin): a velocity write in the same call as
+            # set_inertias does not take (PhysX keeps the old spin at the new inertia; probe 11-16 btl_trace_k30)
             li = lock_ids.to(self.device)
-            axis_w, _ = self._turn_axis_w()
-            ax = axis_w[li]
-            vel = body.data.root_vel_w[li].clone()
-            w = (vel[:, 3:6] * ax).sum(-1)
             ratio = self._turn_I_orig[lock_ids, 8].to(self.device) / I_lock
-            vel[:, 3:6] -= ((1.0 - ratio) * w).unsqueeze(-1) * ax
-            body.write_root_velocity_to_sim(vel, env_ids=li)
+            if getattr(self, "_turn_spin_ratio", None) is None:
+                self._turn_spin_ratio = torch.ones(self.num_envs, device=self.device)
+            self._turn_spin_ratio[li] = ratio
         self.turn_lock_flag = zone
 
     def _turn_thread_substep(self, body, axis_w, anchor_w, corr, a) -> None:
@@ -852,6 +867,16 @@ class PreciseAssemblyEnv(PlayEnv):
         loads). The lip seat (u >= 0) is also the cylindrical joint's PhysX limit."""
         n = self.num_envs
         dt = float(self.physics_dt)
+        sr = getattr(self, "_turn_spin_ratio", None)
+        if sr is not None and bool((sr != 1.0).any()):
+            # pending axial-momentum conservation from the lock-zone inertia switch (see _turn_update_lock_inertia)
+            ids_s = (sr != 1.0).nonzero(as_tuple=False).squeeze(-1)
+            v_s = body.data.root_vel_w[ids_s].clone()
+            ax_s = axis_w[ids_s]
+            w_s = (v_s[:, 3:6] * ax_s).sum(-1)
+            v_s[:, 3:6] -= ((1.0 - sr[ids_s]) * w_s).unsqueeze(-1) * ax_s
+            body.write_root_velocity_to_sim(v_s, env_ids=ids_s)
+            sr[ids_s] = 1.0
         pos = body.data.root_pos_w.clone()
         quat = body.data.root_quat_w.clone()
         vel = body.data.root_vel_w.clone()
@@ -859,22 +884,33 @@ class PreciseAssemblyEnv(PlayEnv):
         K_lock = float(getattr(pc, "turn_lock_stiffness", 0.0))
         elastic = None
         if K_lock > 0.0:
-            # elastic lock where the raised inertia is on: no pose correction up to the backstop, spring + damper instead
+            # elastic lock, implicit (stable at the cap's real inertia, no inertia switch): past the lock the over-angle
+            # x obeys I x'' = tau_contacts - K x - D x'. PhysX has already integrated the contacts (x_phys, v_phys from
+            # the pose); the spring + damper are applied implicitly:
+            #   v = (v_phys - dt K x_prev / I) / (1 + dt D / I + dt^2 K / I),  x = x_prev + dt v.
+            # At rest x = tau / K, so the twist torque the hand pushes into the lock is read as K x + D v (physical).
             over_l = torch.clamp(-corr, min=0.0)                       # angle past the lock (corr < 0 there)
             back = math.radians(float(pc.turn_lock_backstop_deg))
-            elastic = self.turn_lock_flag & (over_l > 0)
-            corr = torch.where(elastic, -torch.clamp(over_l - back, min=0.0), corr)
-            w_now = (vel[:, 3:6] * axis_w).sum(-1)
-            over_e = torch.clamp(over_l, max=back)
-            tau_l = torch.where(elastic, K_lock * over_e + float(pc.turn_lock_damping) * w_now.clamp_min(0.0),
-                                torch.zeros_like(over_l))
-            self._turn_dbg_el = (elastic.clone(), tau_l.clone(), over_l.clone(), w_now.clone())
-            f = getattr(self, "_object_forces", None); t = getattr(self, "_object_torques", None)
-            zero = torch.zeros(n, 1, 3, device=self.device)
-            self.object.set_external_force_and_torque(zero if f is None else f,
-                                                      (zero if t is None else t) - (tau_l.unsqueeze(-1) * axis_w).unsqueeze(1),
-                                                      is_global=True)
+            x_prev = getattr(self, "_turn_el_x", None)
+            if x_prev is None or x_prev.shape[0] != n:
+                x_prev = torch.zeros(n, device=self.device)
+            elastic = over_l > 0
+            I_ax = self._turn_axis_inertia(body, axis_w)              # the cap's real inertia (no switch when elastic)
+            D_lock = float(pc.turn_lock_damping)
+            v_phys = (over_l - x_prev) / dt
+            v_new = (v_phys - dt * K_lock * x_prev / I_ax) / (1.0 + dt * D_lock / I_ax + dt * dt * K_lock / I_ax)
+            x_new = torch.clamp(x_prev + dt * v_new, min=0.0, max=back)
+            v_new = torch.where(x_new >= back, torch.clamp(v_new, max=0.0), v_new)
+            x_new = torch.where(elastic, x_new, torch.zeros_like(x_new))
+            v_new = torch.where(elastic, v_new, torch.zeros_like(v_new))
+            tau_l = torch.where(elastic, K_lock * x_new + D_lock * v_new, torch.zeros_like(x_new))
+            corr = torch.where(elastic, x_new - over_l, corr)          # rotate the cap back to the spring's angle
+            self._turn_el_x = x_new
+            self._turn_el_v = v_new
+            self._turn_dbg_el = (elastic.clone(), tau_l.clone(), over_l.clone(), v_phys.clone())
         touched = corr != 0
+        if elastic is not None:
+            touched = touched | elastic
         # (1) angle: stop / lower bound
         c = corr
         rot = quat_from_angle_axis(c, axis_w)
@@ -902,6 +938,9 @@ class PreciseAssemblyEnv(PlayEnv):
         self.turn_tau_acc += tau
         self._turn_tau_n += 1
         vel[:, 3:6] -= (w_ax * bad.float()).unsqueeze(-1) * axis_w
+        if elastic is not None:
+            w_now = (vel[:, 3:6] * axis_w).sum(-1)
+            vel[:, 3:6] += (torch.where(elastic, self._turn_el_v - w_now, torch.zeros_like(w_now))).unsqueeze(-1) * axis_w
         self.turn_angle += c
         self._turn_prev_wrapped = torch.where(touched, torch.atan2(torch.sin(a + c), torch.cos(a + c)),
                                               self._turn_prev_wrapped)
