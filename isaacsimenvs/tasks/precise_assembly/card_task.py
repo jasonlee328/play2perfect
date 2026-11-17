@@ -217,7 +217,12 @@ class CardTask:
         bot = self._pts(pc, qc, self.bottom)
         free = f_robot_card < c.card_clear_force
         self.nocontact = torch.where(free, self.nocontact + 1, torch.zeros_like(self.nocontact))
-        just_rel = (~self.released) & (st >= c.card_hold_steps) & (self.nocontact >= c.card_release_steps)
+        # release = pads off the card for card_release_steps AND the card moved > 2 mm in the hand frame (a real
+        # release: it slides / drops), or no contact at all for 15 steps; a few contact-free substep reads while the
+        # card stays put in the pinch (PhysX patch flicker) are not a release
+        moved_in_hand = slip1 > 0.002
+        just_rel = (~self.released) & (st >= c.card_hold_steps) & (
+            ((self.nocontact >= c.card_release_steps) & moved_in_hand) | (self.nocontact >= 15))
         if just_rel.any():
             # the release step = the first contact-free step; its corners ~ the current ones (a few ms later)
             self.rel_inside[just_rel] = (self._in_slot(bot) & (bot[..., 2] <= WALL_TOP_Z).all(-1))[just_rel]
