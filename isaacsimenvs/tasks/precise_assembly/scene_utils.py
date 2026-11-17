@@ -58,6 +58,58 @@ def _rigid_body_prim(stage, root: str):
     raise RuntimeError(f"no rigid body under {root}")
 
 
+def _create_probe_key_driver(env) -> None:
+    """A7 no-hand probes only (precise_assembly.probe_key_driver_k > 0): a D6 joint between the kinematic GoalViz
+    (driver, body0) and the Object (the held tool, body1), both frames at the object's origin with z = world up at
+    the object's start pose: transX / transY / rotX / rotY locked, transZ free, rotZ an implicit angular drive (K, D;
+    USD units per degree). The probe moves GoalViz to the object's pose rotated by tau / K about the vertical, so
+    the drive applies a known torque about the vertical (implicit: no explicit-force instability on a light tool).
+    GoalViz has no collisions."""
+    pc = env.cfg.precise_assembly
+    K = float(getattr(pc, "probe_key_driver_k", 0.0))
+    if K <= 0.0:
+        return
+    import math
+    import omni.usd
+    from pxr import Gf, UsdPhysics
+
+    stage = omni.usd.get_context().get_stage()
+    start = env._pih_object_start_rel
+    if not start:
+        raise ValueError("probe_key_driver_k needs a problem with object_start_pose")
+    q_obj = Gf.Quatd(start[6], Gf.Vec3d(*start[3:6]))           # object orientation in the fixture frame
+    # fixture frame = world up to a yaw (hole quat identity for joint problems): joint frame z = world up, i.e.
+    # expressed in the object frame: inverse(q_obj)
+    q_j = q_obj.GetInverse()
+    qf = Gf.Quatf(float(q_j.GetReal()), Gf.Vec3f(*[float(v) for v in q_j.GetImaginary()]))
+    hole_np = getattr(env, "_joint_hole_np", None)
+    for i in range(env.num_envs):
+        pos = [float(v) for v in start[:3]]
+        if hole_np is not None:
+            pos = [pos[k] + float(hole_np[i][k]) for k in range(3)]
+        for root in ("Object", "GoalViz"):
+            prim = stage.GetPrimAtPath(f"/World/envs/env_{i}/{root}")
+            t, o = prim.GetAttribute("xformOp:translate"), prim.GetAttribute("xformOp:orient")
+            t.Set(Gf.Vec3d(*pos))
+            o.Set(q_obj if "quatd" in str(o.GetTypeName()) else Gf.Quatf(float(q_obj.GetReal()), Gf.Vec3f(*[float(v) for v in q_obj.GetImaginary()])))
+        b0 = _rigid_body_prim(stage, f"/World/envs/env_{i}/GoalViz").GetPath()
+        b1 = _rigid_body_prim(stage, f"/World/envs/env_{i}/Object").GetPath()
+        jg = UsdPhysics.Joint.Define(stage, f"/World/envs/env_{i}/ProbeKeyDriver")
+        jg.CreateBody0Rel().SetTargets([b0]); jg.CreateBody1Rel().SetTargets([b1])
+        jg.CreateLocalPos0Attr(Gf.Vec3f(0.0, 0.0, 0.0)); jg.CreateLocalRot0Attr(qf)
+        jg.CreateLocalPos1Attr(Gf.Vec3f(0.0, 0.0, 0.0)); jg.CreateLocalRot1Attr(qf)
+        for dof in ("transX", "transY", "rotX", "rotY"):
+            lim = UsdPhysics.LimitAPI.Apply(jg.GetPrim(), dof)
+            lim.CreateLowAttr(1.0); lim.CreateHighAttr(-1.0)   # locked
+        drive = UsdPhysics.DriveAPI.Apply(jg.GetPrim(), "rotZ")
+        drive.CreateTypeAttr("force")
+        drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
+        drive.CreateStiffnessAttr(K * math.pi / 180.0)
+        drive.CreateDampingAttr(float(getattr(pc, "probe_key_driver_d", 0.0)) * math.pi / 180.0)
+    print(f"[precise_assembly] probe key driver: D6 GoalViz -> Object, rotZ drive K {K} N m/rad x {env.num_envs}",
+          flush=True)
+
+
 def _create_fixture_joints(env) -> None:
     """Problem.joints: one USD revolute joint per env between the fixture's body and the jointed body. The joint
     frame's z is the axis (frame 0 in the fixture, frame 1 = the same frame in the body at its reset pose, so the
@@ -345,6 +397,7 @@ def setup_scene(env) -> None:
     # replicate_physics=False this is a no-op for env_origins (already
     # set in __init__).
     _create_fixture_joints(env)
+    _create_probe_key_driver(env)
 
     if env.scene._default_env_origins is None:
         env.scene.clone_environments(copy_from_source=False)

@@ -315,6 +315,9 @@ class PreciseAssemblyCfg:
     # A7: PhysX velocity iterations of the object / distractor bodies (default 0). A light tool chattering in a
     # recess against a heavy jointed body needs velocity-level contact resolution.
     object_velocity_iterations: int = 0
+    # A7 no-hand probe only: D6 joint GoalViz -> Object with an implicit yaw drive (N m/rad, N m s/rad); 0 = off.
+    probe_key_driver_k: float = 0.0
+    probe_key_driver_d: float = 0.0
     distractor_velocity_iterations: int = 0
 
 
