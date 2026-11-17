@@ -740,6 +740,8 @@ class PreciseAssemblyEnv(PlayEnv):
         super()._apply_action()
         if self._latch_cbf_on():
             self._latch_cbf_substep()
+            if float(getattr(self.cfg.precise_assembly, "latch_knob_max_deg_s", 0.0)) > 0.0 and hasattr(self, "latch_open"):
+                self._latch_knob_speed_cap()   # A8: knob turns at most this fast while latched (visible twist, no flick)
             return
         if float(self.cfg.precise_assembly.latch_soft_stop_deg) > 0.0 and self._latch_on() and hasattr(self, "latch_open"):
             self._latch_soft_stop()
