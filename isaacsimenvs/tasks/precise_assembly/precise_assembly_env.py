@@ -903,6 +903,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self._soft_stop_hits[env_ids] = 0.0
             self._cbf_over_max[env_ids] = 0.0
             self._cbf_prev_door[env_ids] = 0.0
+            if hasattr(self, "_cbf_run"):
+                self._cbf_run[env_ids] = 0.0
+                self._cbf_run_prev[env_ids] = 0.0
             if c.latch_hint_obs:
                 self._latch_hint_resample(env_ids)
             for name in ("_latch_bonus_paid",):
@@ -1497,6 +1500,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self._cbf_run_hi = torch.where(swing, door, hi)
             self.extras["latch_cbf_hold_swing_frac"] = (open_ & swing).float().mean()
         self._cbf_hold_now = open_ & ok          # A8: this step counts toward the consecutive success run
+        if not hasattr(self, "_cbf_run"):
+            self._cbf_run = torch.zeros(self.num_envs, device=self.device)
+            self._cbf_run_prev = torch.zeros(self.num_envs, device=self.device)
+        self._cbf_run_prev = self._cbf_run.clone()
+        self._cbf_run = torch.where(self._cbf_hold_now, self._cbf_run + 1.0, torch.zeros_like(self._cbf_run))
         self._cbf_open_now = open_
         self._cbf_door_rate = rate
         self.extras["latch_cbf_door_open_frac"] = open_.float().mean()
@@ -1843,7 +1851,13 @@ class PreciseAssemblyEnv(PlayEnv):
         if getattr(self, "_cbf", None) is not None and hasattr(self, "_cbf_hold_now"):
             hs = float(getattr(pih_cfg, "latch_cbf_hold_rew_scale", 0.0))
             vs = float(getattr(pih_cfg, "latch_cbf_door_vel_pen_scale", 0.0))
-            if hs > 0.0:
+            if hs > 0.0 and bool(getattr(pih_cfg, "latch_cbf_hold_potential", False)):
+                # potential on the success-run length: total = hs at success, a broken run pays it back (no farming)
+                n = float(self.cfg.termination.success_steps)
+                hr = hs * (self._cbf_run.clamp(max=n) - self._cbf_run_prev.clamp(max=n)) / n
+                reward = reward + hr
+                self._reward_terms["latch_cbf_hold_rew"] = hr
+            elif hs > 0.0:
                 hr = hs * self._cbf_hold_now.float()
                 reward = reward + hr
                 self._reward_terms["latch_cbf_hold_rew"] = hr

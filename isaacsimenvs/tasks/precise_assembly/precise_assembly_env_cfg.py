@@ -320,6 +320,9 @@ class PreciseAssemblyCfg:
     # (x deg/s / 100, capped at 3) while the door is open after the latch cleared. 0 = off.
     latch_cbf_hold_rew_scale: float = 0.0
     latch_cbf_door_vel_pen_scale: float = 0.0
+    # true: the hold reward is potential-based on the run length (scale x delta(run / success_steps)), so it totals
+    # latch_cbf_hold_rew_scale at success and a broken run gives it back (the per-step version was farmed, 11-17).
+    latch_cbf_hold_potential: bool = False
     # Distractor indices baked kinematic (no gravity; posed only by resets / the env), e.g. the latch keeper.
     kinematic_distractors: tuple[int, ...] = ()
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
