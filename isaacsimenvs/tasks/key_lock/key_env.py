@@ -70,6 +70,9 @@ class KeyLockCfg:
     release_dist: float = 0.08           # fingertips from the key (official: hand moved >= 8 cm)
     still_steps: int = 42                # 0.7 s at 60 Hz
     drift_mm: float = 2.0
+    drift_start_mm: float = 0.0          # > 0: the stillness tolerance ramps drift_start_mm -> drift_mm over drift_ramp_steps
+    drift_ramp_steps: int = 0
+    drift_offset_steps: int = 0
     probe_torque: float = 1.5            # _door_kit.LOCK_PROBE_NM
     start_probe_steps: tuple[int, int] = (3, 27)   # 0.05 .. 0.45 s
     start_locked_max_deg: float = 1.0
@@ -311,7 +314,10 @@ class KeyLockEnv(PreciseAssemblyEnv):
         c = self.cfg.precise_assembly
         t = self._key_t
         s0, s1 = (int(v) for v in kl.start_probe_steps)
-        on = ((t >= s0) & (t <= s1)) | self._key_probe_on
+        # the start (lock) probe acts only while the bolt is engaged: a fast policy can clear the key inside the
+        # official 0.05-0.45 s window, and pushing an unlocked door then is not the locked-door check
+        eng = getattr(self, "_cbf_engaged", torch.ones_like(self._key_probe_on))
+        on = ((t >= s0) & (t <= s1) & eng) | self._key_probe_on
         jd = self._pih_joints[int(c.latch_door_joint)]
         body = self.distractors[int(jd.body[10:])]
         axis_w = quat_apply(self.hole_quat_wxyz, torch.tensor(jd.axis, device=self.device,
@@ -371,7 +377,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
         # start lock probe
         s0, s1 = (int(v) for v in kl.start_probe_steps)
         inwin = (t >= s0) & (t <= s1 + 6)
-        self._key_start_max = torch.where(inwin, torch.maximum(self._key_start_max, door), self._key_start_max)
+        eng = getattr(self, "_cbf_engaged", torch.ones_like(inwin))
+        self._key_start_max = torch.where(inwin & eng, torch.maximum(self._key_start_max, door), self._key_start_max)
         self._key_start_unlocked = (t == s1 + 6) & (self._key_start_max > math.radians(float(kl.start_locked_max_deg)))
         # pinch during the turn (before the clear goal)
         turning = ((ang - self._key_prev_ang) > math.radians(float(kl.turn_step_deg))) & ~self.retract_phase
@@ -391,7 +398,12 @@ class KeyLockEnv(PreciseAssemblyEnv):
         cleared = ang >= self.key_clear
         free = (self.key_hand_f < float(kl.contact_n)) & (self.door_hand_f < float(kl.contact_n))
         released = self.retract_phase & cleared & free & (self._key_min_tip > float(kl.release_dist))
-        near_anchor = (palm - self._key_palm_anchor).norm(dim=-1) <= float(kl.drift_mm) * 1e-3
+        dmm = float(kl.drift_mm)
+        if float(kl.drift_start_mm) > 0.0 and int(kl.drift_ramp_steps) > 0:
+            f = min(1.0, float(self.common_step_counter + int(kl.drift_offset_steps)) / float(kl.drift_ramp_steps))
+            dmm = float(kl.drift_start_mm) + f * (dmm - float(kl.drift_start_mm))
+        self.extras["key/drift_mm_cur"] = torch.tensor(dmm, device=self.device)
+        near_anchor = (palm - self._key_palm_anchor).norm(dim=-1) <= dmm * 1e-3
         still_ok = released & near_anchor & (self._key_still > 0)
         self._key_still = torch.where(still_ok, self._key_still + 1,
                                       torch.where(released, torch.ones_like(self._key_still),
