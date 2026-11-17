@@ -559,6 +559,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_last_handf = self.key_hand_f.clone()
         self._key_last_touch = self._key_turn_touch.clone()
         self._key_last_linkf = self._key_turn_linkf.clone()
+        self._key_last_fmin = self.key_fmin2.clone()
         return terminated | self._key_term, truncated
 
     def _get_rewards(self):
