@@ -623,6 +623,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.turn_tight_count[env_ids] = 0
                 self.turn_lock_torque[env_ids] = 0.0
                 self.turn_lock_torque_max[env_ids] = 0.0
+                if getattr(self, "_turn_tau_hist", None) is not None:
+                    self._turn_tau_hist[:, env_ids] = 0.0
+                    self.turn_lock_torque_hold_max[env_ids] = 0.0
                 self.turn_tau_acc[env_ids] = 0.0
                 self.turn_u[env_ids] = self.turn_u_start[env_ids]
                 self._turn_pending_unlock = getattr(self, '_turn_pending_unlock', torch.zeros_like(self.turn_tight))
@@ -889,11 +892,12 @@ class PreciseAssemblyEnv(PlayEnv):
             frac = float(getattr(pc, "turn_seat_preload_frac", 0.0))
             if frac > 0.0:
                 free = self.turn_angle < self.unlock_angle - math.radians(float(pc.turn_preload_free_deg))
-                self.turn_lock_torque_max = torch.where(free, torch.zeros_like(self.turn_lock_torque_max),
-                                                        self.turn_lock_torque_max)
-                # only inside the lock zone, where the raised lock inertia keeps the stiff tanh stable (the official
-                # releases it after backing off turn_preload_free_deg; here leaving the 0.5 deg zone does)
-                tau_c = tau_c + frac * self.turn_lock_torque_max * self.turn_lock_flag.float()
+                hm = getattr(self, "turn_lock_torque_hold_max", None)
+                if hm is not None:
+                    hm.copy_(torch.where(free, torch.zeros_like(hm), hm))
+                    # only inside the lock zone, where the raised lock inertia keeps the stiff tanh stable (the
+                    # official releases it after backing off turn_preload_free_deg; here leaving the 0.5 deg zone does)
+                    tau_c = tau_c + frac * hm * self.turn_lock_flag.float()
             w_f = (vel[:, 3:6] * axis_w).sum(-1)
             tau_fric = tau_c * torch.tanh(w_f / float(pc.turn_thread_stiction_w))
         elastic = None
@@ -1032,14 +1036,7 @@ class PreciseAssemblyEnv(PlayEnv):
         if getattr(self, "turn_thread", False):
             # tight = the hand has pushed >= turn_tight_torque into the lock for turn_tight_steps consecutive steps;
             # turning the cap back > 1 deg off the lock loosens it (the preload is gone)
-            self.turn_lock_torque = self.turn_tau_acc / float(max(1, self._turn_tau_n))
-            self.turn_tau_acc.zero_()
-            self._turn_tau_n = 0
-            self.turn_lock_torque_max = torch.maximum(self.turn_lock_torque_max, self.turn_lock_torque)
-            pushing = self.turn_lock_torque >= float(pih_cfg.turn_tight_torque)
-            self.turn_tight_count = torch.where(pushing, self.turn_tight_count + 1, torch.zeros_like(self.turn_tight_count))
-            self.turn_tight |= self.turn_tight_count >= int(pih_cfg.turn_tight_steps)
-            self.turn_tight &= self.turn_angle >= self.unlock_angle - math.radians(1.0)
+            self._turn_torque_step()
             near = torch.where(at_last, near & self.turn_tight, near)
             self._turn_update_lock_inertia()
             self.extras["turn_tight_frac"] = self.turn_tight.float().mean()
@@ -1111,6 +1108,29 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _turn_thread_body_is_object(self) -> bool:
         return self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)].body == "object"
+
+    def _turn_torque_step(self) -> None:
+        """turn_thread, once per policy step: the step's mean torque into the lock (turn_lock_torque), its running max,
+        the sustained torque = min over the last turn_tight_steps steps (turn_lock_torque_hold; A7: the preload uses its
+        max, so a slam into the seat does not count as torque held), and tight = sustained >= turn_tight_torque."""
+        pc = self.cfg.precise_assembly
+        self.turn_lock_torque = self.turn_tau_acc / float(max(1, self._turn_tau_n))
+        self.turn_tau_acc.zero_()
+        self._turn_tau_n = 0
+        self.turn_lock_torque_max = torch.maximum(self.turn_lock_torque_max, self.turn_lock_torque)
+        N = max(1, int(pc.turn_tight_steps))
+        if getattr(self, "_turn_tau_hist", None) is None or self._turn_tau_hist.shape[0] != N:
+            self._turn_tau_hist = torch.zeros(N, self.num_envs, device=self.device)
+            self._turn_tau_hist_i = 0
+            self.turn_lock_torque_hold_max = torch.zeros(self.num_envs, device=self.device)
+        self._turn_tau_hist[self._turn_tau_hist_i % N] = self.turn_lock_torque
+        self._turn_tau_hist_i += 1
+        hold = self._turn_tau_hist.min(dim=0).values
+        self.turn_lock_torque_hold_max = torch.maximum(self.turn_lock_torque_hold_max, hold)
+        pushing = self.turn_lock_torque >= float(pc.turn_tight_torque)
+        self.turn_tight_count = torch.where(pushing, self.turn_tight_count + 1, torch.zeros_like(self.turn_tight_count))
+        self.turn_tight |= self.turn_tight_count >= N
+        self.turn_tight &= self.turn_angle >= self.unlock_angle - math.radians(1.0)
 
     def _turn_toolless_check(self) -> None:
         """A7 (official turned_by_the_tool_in_hand): accumulate the jointed body's rotation over policy steps in which no
