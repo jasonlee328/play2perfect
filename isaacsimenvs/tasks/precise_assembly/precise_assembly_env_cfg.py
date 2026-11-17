@@ -259,6 +259,16 @@ class PreciseAssemblyCfg:
     turn_thread_lead_k_mm: float = 9.33
     turn_thread_ridge_mm: float = 1.75
     turn_thread_engaged_mm: float = 9.4
+    # A9: > () = start height above the seat drawn U(lo, hi) mm per episode (replaces engaged - drop; the official
+    # screwdriver's rest height is a sawtooth over the screw's phase, _screwdriver_kit.py:20-28). Hidden: fragile design A.
+    turn_thread_engaged_range_mm: tuple[float, ...] = ()
+    # A9 loosen mode (official task 16): start seated (set turn_thread_engaged_mm=0) with a seat preload of
+    # turn_loosen_preload N m; turn goals = backed off turn_first_goal_deg, then turn_loosen_deg from the seat (no tight
+    # check; the preload is released once off the lock zone, so the screw then turns under the 5 mN m probe). Needs
+    # turn_lower_deg < -turn_loosen_deg.
+    turn_loosen: bool = False
+    turn_loosen_deg: float = 180.0
+    turn_loosen_preload: float = 0.020
     # A7 (Allen key screw): thread drag on the jointed body, applied every substep at the velocity level (official
     # _allen_key ThreadModel): Coulomb running friction (N m; official TAU_RUN0 0.0015) + viscous (N m s / rad; official
     # SCREW_KD 0.004). Never reverses the spin, so an undriven light screw stops (stiction). 0 = off (bottle default).

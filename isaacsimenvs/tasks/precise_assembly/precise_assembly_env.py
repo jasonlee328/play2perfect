@@ -633,6 +633,16 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.turn_u[env_ids] = self.turn_u_start[env_ids]
                 self._turn_pending_unlock = getattr(self, '_turn_pending_unlock', torch.zeros_like(self.turn_tight))
                 self._turn_pending_unlock[env_ids] |= self.turn_lock_flag[env_ids]
+                if bool(getattr(self.cfg.precise_assembly, "turn_loosen", False)):
+                    # A9 loosen: seated start with the official LOOSE_PRELOAD0 (preload = frac x hold_max)
+                    pcl = self.cfg.precise_assembly
+                    N_l = max(1, int(pcl.turn_tight_steps))
+                    if getattr(self, "_turn_tau_hist", None) is None or self._turn_tau_hist.shape[0] != N_l:
+                        self._turn_tau_hist = torch.zeros(N_l, self.num_envs, device=self.device)
+                        self._turn_tau_hist_i = 0
+                        self.turn_lock_torque_hold_max = torch.zeros(self.num_envs, device=self.device)
+                    frac_l = max(1e-6, float(pcl.turn_seat_preload_frac))
+                    self.turn_lock_torque_hold_max[env_ids] = float(pcl.turn_loosen_preload) / frac_l
             self._turn_prev_wrapped[env_ids] = 0.0
             self.turn_max_angle[env_ids] = self.turn_offset[env_ids]
             self.turn_strip_count[env_ids] = 0
@@ -1060,9 +1070,15 @@ class PreciseAssemblyEnv(PlayEnv):
         self.turn_max_angle = torch.maximum(self.turn_max_angle, self.turn_angle)
         self._turn_over_inc = torch.clamp(self.turn_max_angle - self.unlock_angle, min=0.0) - over_prev
         at_last = self._successes >= self.env_max_goals - 1
-        target = torch.where(at_last, self.unlock_angle,
-                             self.turn_offset + math.radians(float(pih_cfg.turn_first_goal_deg)))
-        rem = torch.clamp(target - self.turn_angle, min=0.0)
+        loosen = bool(getattr(pih_cfg, "turn_loosen", False))
+        if loosen:   # A9: back off from the seat (turn_first_goal_deg, then turn_loosen_deg)
+            back = torch.where(at_last, torch.full_like(self.turn_angle, math.radians(float(pih_cfg.turn_loosen_deg))),
+                               torch.full_like(self.turn_angle, math.radians(float(pih_cfg.turn_first_goal_deg))))
+            rem = torch.clamp(self.turn_angle - (self.turn_seat_angle - back), min=0.0)
+        else:
+            target = torch.where(at_last, self.unlock_angle,
+                                 self.turn_offset + math.radians(float(pih_cfg.turn_first_goal_deg)))
+            rem = torch.clamp(target - self.turn_angle, min=0.0)
         self._keypoints_max_dist = rem * float(pih_cfg.turn_progress_m_per_rad)
         # goal trackers cleared this step (-1 sentinel, replaced by the real keypoint distance in
         # compute_intermediate_values): start them from the turn distance instead
@@ -1073,7 +1089,8 @@ class PreciseAssemblyEnv(PlayEnv):
             # tight = the hand has pushed >= turn_tight_torque into the lock for turn_tight_steps consecutive steps;
             # turning the cap back > 1 deg off the lock loosens it (the preload is gone)
             self._turn_torque_step()
-            near = torch.where(at_last, near & self.turn_tight, near)
+            if not loosen:
+                near = torch.where(at_last, near & self.turn_tight, near)
             self._turn_update_lock_inertia()
             self.extras["turn_tight_frac"] = self.turn_tight.float().mean()
             self.extras["turn_lock_torque_mean"] = self.turn_lock_torque.mean()
@@ -1137,6 +1154,10 @@ class PreciseAssemblyEnv(PlayEnv):
         pc = self.cfg.precise_assembly
         drop = torch.rand(env_ids.numel(), device=self.device) * self.turn_play[env_ids]
         self.turn_u_start[env_ids] = float(pc.turn_thread_engaged_mm) * 1e-3 - drop
+        rng = tuple(getattr(pc, "turn_thread_engaged_range_mm", ()))
+        if rng:   # A9: hidden start height U(lo, hi)
+            lo, hi = float(rng[0]) * 1e-3, float(rng[1]) * 1e-3
+            self.turn_u_start[env_ids] = lo + (hi - lo) * torch.rand(env_ids.numel(), device=self.device)
         axis_w, _ = self._turn_axis_w()
         w = w.clone()
         w[:, 0:3] -= axis_w[env_ids] * self.turn_u_start[env_ids].unsqueeze(-1)   # axis points into the bottle
