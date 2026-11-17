@@ -1001,6 +1001,38 @@
     0.0,
     -0.0
    ]
+  },
+  "card_holder_kit": {
+   "src": [
+    "official_sim/assets/bodies_kit/card_holder_kit/holder.stl"
+   ],
+   "collision": "boxes (A10 card_tasks.py)",
+   "extents_mm": [
+    50.0,
+    90.5,
+    37.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "card_holder_kit_platform": {
+   "src": [
+    "official_sim/assets/bodies_kit/card_holder_kit/holder.stl + board 254x254x3.18 @ 120 mm + 4 legs"
+   ],
+   "collision": "boxes (A10 card_tasks.py)",
+   "extents_mm": [
+    372.0,
+    279.25,
+    120.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ]
   }
  },
  "problems": {
@@ -8776,6 +8808,267 @@
      100.0
     ]
    ]
+  },
+  "cb_card": {
+   "fixture": "card_holder_kit",
+   "object_start_pose": [
+    0.075,
+    0.0,
+    0.11,
+    0.5,
+    0.5000000000000001,
+    0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object": "card",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      -0.004675007597933425,
+      0.0,
+      0.029043806034670314,
+      0.44499671605030977,
+      0.4449967160503101,
+      0.5495251793179634,
+      0.5495251793179634
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      -0.00343797547814674,
+      0.0,
+      0.029043806034670314,
+      0.44499671605030977,
+      0.4449967160503101,
+      0.5495251793179634,
+      0.5495251793179634
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      -0.0022009433583600546,
+      0.0,
+      0.029043806034670314,
+      0.44499671605030977,
+      0.4449967160503101,
+      0.5495251793179634,
+      0.5495251793179634
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     -0.012949538887272027,
+     0.0,
+     0.08783661792410753,
+     0.44499671605030977,
+     0.4449967160503101,
+     0.5495251793179634,
+     0.5495251793179634
+    ],
+    [
+     -0.0009639112385733694,
+     0.0,
+     0.029043806034670314,
+     0.44499671605030977,
+     0.4449967160503101,
+     0.5495251793179634,
+     0.5495251793179634
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim packages/force-bench/src/force_bench/appendix_tasks/{_card_place.py,place_card_into_holder*.py}",
+    "card_mm": [
+     1.2,
+     85.0,
+     55.0
+    ],
+    "card_mass_g": 6.94,
+    "deck_cards": 3,
+    "deck_lean_deg": 12.0,
+    "deck_x_mm": [
+     -4.675,
+     -3.438,
+     -2.2009
+    ],
+    "deck_z_mm": 29.0438,
+    "deck_pitch_mm": 1.237,
+    "seat_mm": [
+     -0.9639,
+     0.0,
+     29.0438
+    ],
+    "hover_mm": [
+     -12.9495,
+     0.0,
+     87.8366
+    ],
+    "slot_x_mm": [
+     -7.0,
+     7.0
+    ],
+    "slot_y_mm": [
+     -43.25,
+     43.25
+    ],
+    "floor_z_mm": 2.0,
+    "wall_top_z_mm": 17.0,
+    "post_top_z_mm": 37.0,
+    "start_card_mm": [
+     75.0,
+     0.0,
+     110.0
+    ],
+    "mu": {
+     "card": 0.25,
+     "holder": 0.3,
+     "pad": 1.4,
+     "board": 0.15,
+     "combine": "official: pair max (MuJoCo); ours: PhysX average"
+    }
+   }
+  },
+  "cb_card_platform": {
+   "fixture": "card_holder_kit_platform",
+   "object_start_pose": [
+    0.22,
+    -0.0475,
+    0.12065,
+    0.0,
+    1.0,
+    0.0,
+    0.0
+   ],
+   "object": "card",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      -0.004675007597933425,
+      0.0,
+      0.029043806034670314,
+      0.44499671605030977,
+      0.4449967160503101,
+      0.5495251793179634,
+      0.5495251793179634
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      -0.00343797547814674,
+      0.0,
+      0.029043806034670314,
+      0.44499671605030977,
+      0.4449967160503101,
+      0.5495251793179634,
+      0.5495251793179634
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      -0.0022009433583600546,
+      0.0,
+      0.029043806034670314,
+      0.44499671605030977,
+      0.4449967160503101,
+      0.5495251793179634,
+      0.5495251793179634
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     -0.012949538887272027,
+     0.0,
+     0.08783661792410753,
+     0.44499671605030977,
+     0.4449967160503101,
+     0.5495251793179634,
+     0.5495251793179634
+    ],
+    [
+     -0.0009639112385733694,
+     0.0,
+     0.029043806034670314,
+     0.44499671605030977,
+     0.4449967160503101,
+     0.5495251793179634,
+     0.5495251793179634
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim packages/force-bench/src/force_bench/appendix_tasks/{_card_place.py,place_card_into_holder*.py}",
+    "card_mm": [
+     1.2,
+     85.0,
+     55.0
+    ],
+    "card_mass_g": 6.94,
+    "deck_cards": 3,
+    "deck_lean_deg": 12.0,
+    "deck_x_mm": [
+     -4.675,
+     -3.438,
+     -2.2009
+    ],
+    "deck_z_mm": 29.0438,
+    "deck_pitch_mm": 1.237,
+    "seat_mm": [
+     -0.9639,
+     0.0,
+     29.0438
+    ],
+    "hover_mm": [
+     -12.9495,
+     0.0,
+     87.8366
+    ],
+    "slot_x_mm": [
+     -7.0,
+     7.0
+    ],
+    "slot_y_mm": [
+     -43.25,
+     43.25
+    ],
+    "floor_z_mm": 2.0,
+    "wall_top_z_mm": 17.0,
+    "post_top_z_mm": 37.0,
+    "start_card_mm": [
+     75.0,
+     0.0,
+     110.0
+    ],
+    "mu": {
+     "card": 0.25,
+     "holder": 0.3,
+     "pad": 1.4,
+     "board": 0.15,
+     "combine": "official: pair max (MuJoCo); ours: PhysX average"
+    },
+    "platform": {
+     "board_c_mm": [
+      220.0,
+      -107.0
+     ],
+     "board_mm": [
+      254.0,
+      254.0,
+      3.18
+     ],
+     "board_top_mm": 120.0,
+     "card_start_mm": [
+      220.0,
+      -47.5,
+      120.65
+     ]
+    }
+   }
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"
