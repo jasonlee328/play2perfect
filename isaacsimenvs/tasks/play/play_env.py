@@ -50,6 +50,14 @@ class PlayEnv(DirectRLEnv):
                     cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_hand")
                 if cfg.tactile.whole_hand_in_critic and "tactile_hand" not in cfg.obs.state_list:
                     cfg.obs.state_list = (*cfg.obs.state_list, "tactile_hand")
+            # A4 sensing fields (utils/sensing.py): registered so students / teachers can list them
+            if cfg.tactile.wrench:
+                OBS_FIELD_SIZES["tactile_wrench"] = 5 * 6
+                if cfg.tactile.whole_hand:
+                    OBS_FIELD_SIZES["tactile_hand_wrench"] = hand_skin_obs_dim(cfg.tactile) // int(
+                        cfg.tactile.whole_hand_grid) ** 2 * 6
+            if cfg.tactile.joint_ft:
+                OBS_FIELD_SIZES["wrist_ft"], OBS_FIELD_SIZES["tip_ft"] = 6, 5 * 6
         # Override obs/state space from configured field lists before
         # DirectRLEnv / rl_games observes the configclass.
         cfg.observation_space = compute_obs_dim(cfg.obs.obs_list)
@@ -60,6 +68,16 @@ class PlayEnv(DirectRLEnv):
         allocate_state_buffers(self)
         self._tactile = TactileSensor(self, cfg.tactile) if cfg.tactile.enabled else None
         self._hand_skin = HandSkinSensor(self, cfg.tactile) if cfg.tactile.enabled and cfg.tactile.whole_hand else None
+        if cfg.tactile.enabled:
+            from .utils.sensing import TIP_BODIES, WRIST_BODY
+
+            for name, v, full in (("student_res", cfg.tactile.student_res, cfg.tactile.resolution),
+                                  ("student_hand_grid", cfg.tactile.student_hand_grid, cfg.tactile.whole_hand_grid)):
+                if int(v) < 0 or (int(v) and int(full) % int(v)):
+                    raise ValueError(f"tactile.{name}={v} must be 0 or divide {full}")
+            if cfg.tactile.joint_ft:
+                self._a4_wrist_id = self.robot.find_bodies(WRIST_BODY)[0][0]
+                self._a4_tip_ids = [self.robot.find_bodies(b)[0][0] for b in TIP_BODIES]
         self._tactile_hr = self._tactile_encoder = None
         so = getattr(cfg, "student_obs", None)
         if so is not None and so.enabled and str(getattr(so, "tactile_encoder", "none")).lower() != "none":

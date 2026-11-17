@@ -126,6 +126,13 @@ class HandSkinSensor:
         self.body = torch.tensor(np.concatenate(body), dtype=torch.long, device=self.device)
         self.taxel = torch.tensor(np.concatenate(taxel), dtype=torch.long, device=self.device)
         self.n_tax = len(HAND_LINKS) * g * g
+        # A4 pooled wrench (tactile.wrench): per-link net force / torque from the same rays, in the link frame
+        self.want_wrench = bool(getattr(tactile_cfg, "wrench", False))
+        nl = len(HAND_LINKS)
+        self._rays_per_link = torch.bincount(self.body, minlength=nl).clamp_min(1).float()
+        centre = torch.zeros(nl, 3, device=self.device).index_add_(0, self.body, self.starts)
+        self._lever_cm = (self.starts - (centre / self._rays_per_link.unsqueeze(-1))[self.body]) * 100.0
+        self.last_wrench = None
         self.body_ids = [env.robot.find_bodies(_ALIASES.get(n, (n,))[0])[0][0] for n in HAND_LINKS]
         self.max_dist = skin + 3e-3  # a body can also sink a little into the collision surface
         self.targets = [env.object] + (list(getattr(env, "distractors", ())) if tactile_cfg.whole_hand_distractors
@@ -153,6 +160,8 @@ class HandSkinSensor:
         link = env.robot.data.body_state_w[:, self.body_ids, 0:7]  # (N, B, 7)
         R_wl = matrix_from_quat(link[..., 3:7])
         result = torch.zeros(env.num_envs, self.n_tax, device=self.device)
+        nl = len(HAND_LINKS)
+        wrench = torch.zeros(env.num_envs, nl, 6, device=self.device) if self.want_wrench else None
         for a in range(0, env.num_envs, self.envs_per_chunk):
             c = slice(a, a + self.envs_per_chunk)
             depth = None
@@ -172,6 +181,13 @@ class HandSkinSensor:
                 depth = dj if depth is None else torch.maximum(depth, dj)
             result[c] = torch.zeros(depth.shape[0], self.n_tax, device=self.device).scatter_reduce_(
                 1, self.taxel.expand(depth.shape[0], -1), depth, "amax")
+            if wrench is not None:  # f_i = depth_i [mm] x inward ray direction (link frame)
+                f = (depth * 1e3).unsqueeze(-1) * self.dirs
+                tq = torch.cross(self._lever_cm.expand_as(f), f, dim=-1)
+                w = torch.zeros(depth.shape[0], nl, 6, device=self.device)
+                w.index_add_(1, self.body, torch.cat([f, tq], -1))
+                wrench[c] = w / self._rays_per_link.view(1, -1, 1)
+        self.last_wrench = wrench
         return _deform_quantize(result) / 255.0
 
 

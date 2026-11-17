@@ -165,6 +165,15 @@ class TactileSensor:
         self.finger = torch.cat(finger)   # (R,) finger index of each ray
         self.taxel = torch.cat(taxel)     # (R,) flat taxel index of each ray
         self.counts = torch.bincount(self.taxel, minlength=len(FINGERS) * res * res).clamp_min(1).float()
+        self.ray_counts = torch.bincount(self.taxel, minlength=len(FINGERS) * res * res).float()  # 0 = off-pad
+        # A4 pooled wrench (tactile.wrench): per-pad net force / torque from the same rays, in the DP body frame
+        self.want_wrench = bool(getattr(tactile_cfg, "wrench", False))
+        self.finger_l = self.finger.long()
+        self._rays_per_pad = torch.bincount(self.finger_l, minlength=len(FINGERS)).clamp_min(1).float()
+        centre = torch.zeros(len(FINGERS), 3, device=self.device).index_add_(0, self.finger_l, self.starts)
+        centre = centre / self._rays_per_pad.unsqueeze(-1)
+        self._lever_cm = (self.starts - centre[self.finger_l]) * 100.0
+        self.last_wrench = None
         # Rays per raycast_mesh call, to bound temporaries at large num_envs.
         self.envs_per_chunk = max(1, int(tactile_cfg.max_rays_per_chunk) // len(self.starts))
         print(f"[tactile] {len(FINGERS)} pads x {res}x{res} taxels, {len(self.starts)} rays/env, "
@@ -185,6 +194,7 @@ class TactileSensor:
         t_od = (R_wo_T.unsqueeze(1) @ (body[..., 0:3] - obj_pos.unsqueeze(1)).unsqueeze(-1)).squeeze(-1)
 
         result = torch.zeros(env.num_envs, len(self.counts), device=self.device)
+        wrench = torch.zeros(env.num_envs, len(FINGERS), 6, device=self.device) if self.want_wrench else None
         for mesh, ids in zip(self.meshes, self.asset_env_ids):
             for a in range(0, len(ids), self.envs_per_chunk):
                 c = ids[a:a + self.envs_per_chunk]
@@ -197,6 +207,13 @@ class TactileSensor:
                 depth = torch.where(torch.isfinite(dist) & torch.isfinite(dist2), dist, torch.zeros_like(dist))
                 taxels = torch.zeros(len(depth), len(self.counts), device=self.device).index_add_(1, self.taxel, depth)
                 result[c] = taxels / self.counts
+                if wrench is not None:  # f_i = depth_i [mm] x inward ray direction (DP frame)
+                    f = (depth * 1e3).unsqueeze(-1) * self.dirs
+                    tq = torch.cross(self._lever_cm.expand_as(f), f, dim=-1)
+                    w = torch.zeros(len(depth), len(FINGERS), 6, device=self.device)
+                    w.index_add_(1, self.finger_l, torch.cat([f, tq], -1))
+                    wrench[c] = w / self._rays_per_pad.view(1, -1, 1)
+        self.last_wrench = wrench
         return _deform_quantize(result) / 255.0
 
 

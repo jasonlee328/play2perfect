@@ -347,8 +347,11 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         if getattr(env, "_hand_skin", None) is not None:
             obs_clean["tactile_hand"] = env._hand_skin.compute()
             env._last_tactile_hand = obs_clean["tactile_hand"]
+        from .sensing import add_sensing_obs
+
+        add_sensing_obs(env, obs_clean)  # A4: optional force fields + student-facing touch buffers
         override = str(getattr(env.cfg.tactile, "policy_override", "none")).lower()
-        for k in ("tactile", "tactile_hand"):
+        for k in ("tactile", "tactile_hand", "tactile_wrench", "tactile_hand_wrench", "wrist_ft", "tip_ft"):
             if k not in obs_clean:
                 continue
             if override == "zero":
@@ -399,10 +402,15 @@ def _student_proprio_dict(env) -> dict[str, torch.Tensor]:
     }
     if getattr(env, "_tactile", None) is not None:
         # Computed once per step in build_observations; zeros before the first step.
-        last = getattr(env, "_last_tactile", None)
+        last = getattr(env, "_student_tactile", None)  # = _last_tactile unless an A4 sensing option is on
+        last = last if last is not None else getattr(env, "_last_tactile", None)
         out["tactile"] = last if last is not None else torch.zeros(
             env.num_envs, OBS_FIELD_SIZES["tactile"], device=env.device
         )
+    for f in ("tactile_hand", "tactile_wrench", "tactile_hand_wrench", "wrist_ft", "tip_ft"):
+        v = getattr(env, f"_student_{f}", None)  # A4 sensing fields (present once the env has stepped)
+        if v is not None:
+            out[f] = v
     if getattr(env, "_tactile_encoder", None) is not None:
         last = getattr(env, "_last_tactile_feat", None)
         out["tactile_feat"] = last if last is not None else env._tactile_encoder._zero_feat_or_none(env.num_envs)

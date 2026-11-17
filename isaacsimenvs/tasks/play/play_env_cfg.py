@@ -577,6 +577,13 @@ class TactileCfg:
     whole_hand_skin_mm: float = 2.0        # virtual skin thickness outside the collision surface
     whole_hand_distractors: bool = True    # also sense the distractors (one channel with the object)
     whole_hand_in_critic: bool = False
+    # A4 sensing ablations (utils/sensing.py; all off by default). They change only the student-facing copies
+    # (env._student_tactile etc. and the student obs fields), never the teacher obs or env._last_tactile.
+    student_res: int = 0          # 0 = off; else divides resolution: pads block-averaged to student_res^2 taxels
+    student_hand_grid: int = 0    # 0 = off; else divides whole_hand_grid: skin block max per link
+    student_hold_steps: int = 1   # sensor rate: student touch / force refreshes every k policy steps (and at reset)
+    wrench: bool = False          # pooled touch: net force + torque per pad (tactile_wrench) / link (tactile_hand_wrench)
+    joint_ft: bool = False        # PhysX joint wrenches: wrist_ft (iiwa a7) and tip_ft (5 DIP joints)
 
 
 # ----------------------------------------------------------------------------
