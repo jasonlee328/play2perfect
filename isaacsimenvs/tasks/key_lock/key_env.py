@@ -85,7 +85,9 @@ class KeyLockCfg:
     still_rew_scale: float = 200.0       # potential on still_count / still_steps
     turnback_penalty: float = 2.0        # per step with the key back below its clear angle after the clear goal
     pinch_rew: float = 1.0               # per turning step with a valid pinch
-    approach_unpinched_scale: float = 0.5   # latch_approach_rew gain on turning progress made without a 2-pad pinch
+    approach_unpinched_scale: float = 0.5
+    pad_contact_rew: float = 0.0         # per step before the clear goal: x (# fingertip pads on the key > pad_contact_n, max 2) / 2
+    pad_contact_n: float = 0.5   # latch_approach_rew gain on turning progress made without a 2-pad pinch
     fail_penalty: float = 100.0          # probe / pinch fail, broken
     # phase 2
     break_ratio: float = 0.0             # 0 = off; F_break = break_ratio x F_min(env)
@@ -459,6 +461,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_rel_phi, self._key_still_phi = phi, sphi
         back = float(kl.turnback_penalty) * (self.retract_phase & (ang < self.key_clear)).float()
         pinch = float(kl.pinch_rew) * self._key_turning_ok.float()
+        if float(kl.pad_contact_rew) > 0.0:
+            npads = (self.key_pad_f > float(kl.pad_contact_n)).sum(-1).clamp(max=2).float()
+            pinch = pinch + float(kl.pad_contact_rew) * (npads / 2.0) * (~self.retract_phase).float()
         fail = float(kl.fail_penalty) * self._key_term.float()
         # the official check needs a 2-pad pinch: progress made by poking the bow (thumb only) pays less
         ar = self._reward_terms.get("latch_approach_rew")
