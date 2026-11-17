@@ -319,9 +319,10 @@ class PreciseAssemblyCfg:
     latch_cbf_stop_back_deg: float = 3.0
     latch_cbf_stop_cal_gain: float = 0.96    # stop reading calibration (see _cbf_elastic_substep)
     latch_cbf_stop_cal_spring: float = 0.40
-    latch_cbf_hinge_K: float = 300.0     # N m/rad (1.5 N m -> 0.29 deg: keeps the official locked < 0.6 deg)
+    latch_cbf_hinge_K: float = 600.0     # N m/rad (2.5 N m -> ~0.3 deg: keeps the official locked < 0.6 deg)
     latch_cbf_hinge_D: float = 2.0
     latch_cbf_hinge_back_deg: float = 2.0
+    latch_cbf_hinge_cal_gain: float = 0.75   # latch reading calibration (two-level probe slope)
     # upper-bound rule (0 = off): knob torque into the stop > door_break_torque, or pull force while latched >
     # door_break_pull, for door_break_steps policy steps in a row = termination "broken" (- door_break_penalty)
     door_break_torque: float = 0.0

@@ -947,6 +947,8 @@ class PreciseAssemblyEnv(PlayEnv):
                                         * self._cbf_stop_rad)
         a_cal, b_cal = float(getattr(c, "latch_cbf_stop_cal_gain", 0.96)), float(getattr(c, "latch_cbf_stop_cal_spring", 0.40))
         tau_k = torch.where(tau_k > 0, torch.clamp((tau_k - b_cal * self._cbf_spring_at_stop) / a_cal, min=0.0), tau_k)
+        # latch: the two-level probe (1.5 / 2.5 N m on the hinge) reads a slope of 0.75 -> pure gain (gravity matches)
+        tau_h = tau_h / float(getattr(c, "latch_cbf_hinge_cal_gain", 0.75))
         self.door_stop_torque_now, self.door_pull_torque_now = tau_k, tau_h     # last substep (probes)
         self.door_stop_torque = torch.maximum(self.door_stop_torque, tau_k)
         self.door_pull_torque = torch.maximum(self.door_pull_torque, tau_h)
