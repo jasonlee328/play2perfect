@@ -105,7 +105,7 @@ class KeyLockCfg:
     # phase 2
     break_ratio: float = 0.0             # 0 = off; F_break = break_ratio x F_min(env)
     fmin_per_Nm: float = 0.0             # F_min = fmin_per_Nm x tau_f (N per N m), calibrated
-    break_steps: int = 3
+    break_steps: int = 5
     hide_key_angle: bool = False
     # phase 2 v2 (touch-only slip cue, like the bottle clutch): per-episode hidden F_min ~ log-uniform p2_fmin_range (N);
     # hand force on the key below F_min while the key turns = SLIP: physics unchanged (joint state carries nothing),
@@ -123,6 +123,8 @@ class KeyLockCfg:
     p2_cue_cap_deg: float = 25.0
     p2_cue_decay: float = 0.2
     p2_slip_penalty: float = 2.0         # per slipping step
+    p2_force: str = "pads"               # force the window acts on: "pads" (sum of the 5 fingertip pads = the pinch) | "hand"
+    p2_force_ema: float = 0.2            # weight of the newest step in the smoothed force
 
 
 @configclass
@@ -500,8 +502,13 @@ class KeyLockEnv(PreciseAssemblyEnv):
         if bool(kl.p2_enabled):
             dth = (ang - self._key_prev_ang_p2) if hasattr(self, "_key_prev_ang_p2") else torch.zeros_like(ang)
             self._key_prev_ang_p2 = ang.clone()
-            turn2 = (dth > 0) & ~self.retract_phase & (self.key_hand_f > float(kl.contact_n))
-            slipping = turn2 & (self.key_hand_f < self.key_fmin2)
+            fnow = self.key_pad_f.sum(-1) if str(kl.p2_force) == "pads" else self.key_hand_f
+            if not hasattr(self, "_p2_f"):
+                self._p2_f = fnow.clone()
+            a_ = float(kl.p2_force_ema)
+            self._p2_f = a_ * fnow + (1.0 - a_) * self._p2_f
+            turn2 = (dth > 0) & ~self.retract_phase & (fnow > float(kl.contact_n))
+            slipping = turn2 & (self._p2_f < self.key_fmin2)
             self._p2_slipping = slipping
             self._p2_slip_acc = self._p2_slip_acc + torch.where(slipping, dth, torch.zeros_like(dth))
             cap = math.radians(float(kl.p2_cue_cap_deg))
@@ -515,10 +522,11 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 rho = float(kl.p2_rho_start) + f * (rho - float(kl.p2_rho_start))
             self.extras["key/p2_rho_cur"] = torch.tensor(rho, device=self.device)
             if rho > 0.0:
-                over = self.key_hand_f > rho * self.key_fmin2
+                over = self._p2_f > rho * self.key_fmin2
                 self._key_break_count = torch.where(over, self._key_break_count + 1, torch.zeros_like(self._key_break_count))
                 self._key_broken = self._key_break_count >= int(kl.break_steps)
             self.extras["key/p2_slipping_frac"] = slipping.float().mean()
+            self.extras["key/p2_force_mean"] = self._p2_f.mean()
             self.extras["key/p2_lag_deg_mean"] = torch.rad2deg(self._p2_lag).mean()
         # phase 2 (v1): breaking force
         if float(kl.break_ratio) > 0.0:
@@ -611,6 +619,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
         if hasattr(self, "key_fmin2"):
             self.key_fmin2[env_ids] = torch.exp(torch.empty(len(env_ids), device=self.device).uniform_(self._p2_lo, self._p2_hi))
             self._p2_slip_acc[env_ids] = 0.0; self._p2_lag[env_ids] = 0.0
+            if hasattr(self, "_p2_f"):
+                self._p2_f[env_ids] = 0.0
             self._key_slipped[env_ids] = False; self._p2_slipping[env_ids] = False
             self._key_broken[env_ids] = False
             if hasattr(self, "_key_prev_ang_p2"):
