@@ -187,13 +187,20 @@ class CardTask:
         f_robot_card = F_rc.sum(-1)
         # the force view reads one substep and flickers on a held card (A10 11-17: 0 N for 15+ steps while the card
         # stayed in the pinch), so pad contact also comes from the TacMap ray-cast (FINGERS: thumb, index, middle, ...)
+        # "both pads loaded" for a 5-finger hand: >= 2 robot contacts on the card (force on >= 2 links, or >= 2 TacMap
+        # pads, or 1 pad + measured force), debounced over 3 steps (single-substep force reads flicker)
+        n_links = (F_rc > c.card_pad_force).sum(-1)
         tac_on = None
         if getattr(env, "_tactile", None) is not None:
             T = env._tactile.compute().view(env.num_envs, 5, -1)
             tac_on = T.amax(-1) > 0.0
-            pinch = pinch_f | (tac_on[:, 0] & (tac_on[:, 1] | tac_on[:, 2]))
+            raw = pinch_f | (n_links >= 2) | (tac_on.sum(-1) >= 2) | ((tac_on.sum(-1) >= 1) & (f_robot_card > c.card_pad_force))
         else:
-            pinch = pinch_f
+            raw = pinch_f | (n_links >= 2)
+        if not hasattr(self, "pinch_hist"):
+            self.pinch_hist = torch.zeros(3, env.num_envs, dtype=torch.bool, device=env.device)
+        self.pinch_hist = torch.roll(self.pinch_hist, 1, 0); self.pinch_hist[0] = raw
+        pinch = self.pinch_hist.any(0)
         self.f_env = F_ce.sum(-1)
         self.f_env_ep_max = torch.maximum(self.f_env_ep_max, self.f_env)
         f_rob_scene = f_robot_card + F_rd.sum(-1)
