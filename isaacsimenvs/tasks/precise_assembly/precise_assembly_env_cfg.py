@@ -312,6 +312,10 @@ class PreciseAssemblyCfg:
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0
     distractor_position_iterations: int = 0   # A7: PhysX position iterations of the distractor bodies (0 = 4)
+    # A7: PhysX velocity iterations of the object / distractor bodies (default 0). A light tool chattering in a
+    # recess against a heavy jointed body needs velocity-level contact resolution.
+    object_velocity_iterations: int = 0
+    distractor_velocity_iterations: int = 0
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:

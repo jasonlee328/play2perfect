@@ -201,7 +201,7 @@ def setup_scene(env) -> None:
                 disable_gravity=False,
                 max_depenetration_velocity=1000.0,
                 rb_solver_position_iterations=int(env.cfg.precise_assembly.object_position_iterations) or 4,
-                rb_solver_velocity_iterations=0,
+                rb_solver_velocity_iterations=int(getattr(env.cfg.precise_assembly, "object_velocity_iterations", 0)),
                 articulation_enabled=False,
             ),
         ))
@@ -242,7 +242,7 @@ def setup_scene(env) -> None:
                 disable_gravity=False,
                 max_depenetration_velocity=1000.0,
                 rb_solver_position_iterations=int(getattr(env.cfg.precise_assembly, "distractor_position_iterations", 0)) or 4,
-                rb_solver_velocity_iterations=0,
+                rb_solver_velocity_iterations=int(getattr(env.cfg.precise_assembly, "distractor_velocity_iterations", 0)),
                 articulation_enabled=False,
             ),
         ))
