@@ -1959,6 +1959,12 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward - fall_pen
             self._reward_terms["fall_terminal_penalty"] = -fall_pen
             self._reward_terms["total_reward"] = reward
+        dp = float(getattr(pih_cfg, "dropped_terminal_penalty", 0.0))
+        if dp > 0.0 and "dropped" in self._termination_reasons:   # A9: tool knocked down onto the table
+            d_pen = dp * self._termination_reasons["dropped"].float()
+            reward = reward - d_pen
+            self._reward_terms["dropped_terminal_penalty"] = -d_pen
+            self._reward_terms["total_reward"] = reward
 
         log_step_metrics(self)
         self._log_peg_metrics()

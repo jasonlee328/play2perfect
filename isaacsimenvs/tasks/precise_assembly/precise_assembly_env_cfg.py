@@ -120,6 +120,7 @@ class PreciseAssemblyCfg:
     enable_dropped_on_table_term: bool = False
     dropped_on_table_z_margin: float = 0.05
     dropped_on_table_ft_distance: float = 0.15
+    dropped_terminal_penalty: float = 0.0   # A9: one-time penalty when the episode ends `dropped`
 
     # Start episodes mid-task from a bank of recorded teacher states (npz from
     # dagger/record_start_states.py): robot joint state + targets, peg pose in
