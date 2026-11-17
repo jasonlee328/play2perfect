@@ -165,6 +165,13 @@ def _create_fixture_joints(env) -> None:
     print(f"[precise_assembly] created {len(joints)} fixture joint(s) x {env.num_envs} envs", flush=True)
 
 
+def _a8_contact_cfg(env, c, k):
+    """A8 human_style: contact report on distractor 0 (the door leaf) for the hand-on-panel penalty."""
+    if k == 0 and bool(getattr(env.cfg.precise_assembly, "human_style", False)):
+        c.spawn.activate_contact_sensors = True
+    return c
+
+
 def setup_scene(env) -> None:
     """Build robot, narrow table, dynamic hole fixture, object, goal, and light."""
     assets_cfg = env.cfg.assets
@@ -304,7 +311,7 @@ def setup_scene(env) -> None:
         env.object = RigidObject(_ocfg)
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
     env.distractors = tuple(
-        RigidObject(_pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd))
+        RigidObject(_a8_contact_cfg(env, _pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd), k))
         for k, usd in enumerate(distractor_usd_paths)
     )
     _log_scene_step(setup_t0, f"spawned robot/table/hole/object/goalviz + {len(env.distractors)} distractors")

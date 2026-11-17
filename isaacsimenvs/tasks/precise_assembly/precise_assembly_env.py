@@ -1052,6 +1052,10 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._crush_count[env_ids] = 0
             if hasattr(self, "_brk_t"):
                 self._brk_t[env_ids] = 0; self._brk_f[env_ids] = 0
+            if hasattr(self, "hs_touched"):
+                self.hs_touched[env_ids] = False
+            if hasattr(self, "_hs_phi_prev"):
+                self._hs_phi_prev[env_ids] = 0.0
             if hasattr(self, "_cbf_run"):
                 self._cbf_run[env_ids] = 0.0
                 self._cbf_run_prev[env_ids] = 0.0
@@ -1667,6 +1671,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self._cbf_run_lo = torch.where(swing, door, lo)
             self._cbf_run_hi = torch.where(swing, door, hi)
             self.extras["latch_cbf_hold_swing_frac"] = (open_ & swing).float().mean()
+        if bool(getattr(c, "human_style", False)) and bool(getattr(c, "hs_success_requires_grasp", False)) \
+                and hasattr(self, "hs_power"):
+            ok = ok & self.hs_power
         self._cbf_hold_now = open_ & ok          # A8: this step counts toward the consecutive success run
         if not hasattr(self, "_cbf_run"):
             self._cbf_run = torch.zeros(self.num_envs, device=self.device)
@@ -1685,8 +1692,8 @@ class PreciseAssemblyEnv(PlayEnv):
         if not bool(getattr(self.cfg.precise_assembly, "hand_force_sense", False)):
             return
         import re as _re
+        glob = lambda p: _re.sub(r"env_\d+", "env_*", p)
         if getattr(self, "_hf_view", None) is None:
-            glob = lambda p: _re.sub(r"env_\d+", "env_*", p)
             links = [glob(p) for p in self.robot.root_physx_view.link_paths[0]]
             self._hf_view = self.object._physics_sim_view.create_rigid_contact_view(
                 glob(self.object.root_physx_view.prim_paths[0]), filter_patterns=links)
@@ -1705,6 +1712,26 @@ class PreciseAssemblyEnv(PlayEnv):
         self._crush_count = torch.where(over, self._crush_count + 1, torch.zeros_like(self._crush_count))
         self.extras["hand_force_mean"] = self.hand_force.mean()
         self.extras["hand_force_max"] = self.hand_force.max()
+        c = self.cfg.precise_assembly
+        if bool(getattr(c, "human_style", False)):
+            if not hasattr(self, "_hs_palm_idx"):
+                paths = list(self.robot.root_physx_view.link_paths[0])
+                self._hs_palm_idx = next((i for i, p in enumerate(paths) if p.endswith("iiwa14_link_7")), -1)
+                hand_links = [glob(p) for p in paths]
+                self._hs_door_view = self.distractors[0]._physics_sim_view.create_rigid_contact_view(
+                    glob(self.distractors[0].root_physx_view.prim_paths[0]), filter_patterns=hand_links)
+                self.hs_touched = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                print(f"[a8] human_style: palm link index {self._hs_palm_idx} of {len(paths)}", flush=True)
+            on = nrm > float(c.hs_link_force_min)
+            palm = on[:, self._hs_palm_idx] if self._hs_palm_idx >= 0 else torch.zeros_like(on[:, 0])
+            self.hs_links = on.sum(-1)
+            self.hs_power = palm & (self.hs_links >= int(c.hs_grasp_links_min))
+            self.hs_touched |= on.any(-1)
+            Fd = self._hs_door_view.get_contact_force_matrix(float(self.physics_dt)).to(self.device)
+            self.hs_panel_force = Fd.norm(dim=-1).sum(-1) * g
+            self.extras["hs_power_grasp_frac"] = self.hs_power.float().mean()
+            self.extras["hs_links_mean"] = self.hs_links.float().mean()
+            self.extras["hs_panel_force_mean"] = self.hs_panel_force.mean()
 
     def _cbf_fingers_on_knob(self) -> torch.Tensor:
         """Fingertips touching the knob: with tactile on, pads with any taxel deformed by the knob mesh in the last
@@ -2092,6 +2119,23 @@ class PreciseAssemblyEnv(PlayEnv):
             wr = float(pih_cfg.latch_window_rew_scale) * (on & ~self.latch_open).float()
             reward = reward + wr
             self._reward_terms["latch_window_rew"] = wr
+            self._reward_terms["total_reward"] = reward
+
+        # A8 human-style shaping (human_style): power grasp, no hand on the door panel, swing the door toward ~40 deg
+        if bool(getattr(pih_cfg, "human_style", False)) and hasattr(self, "hs_power"):
+            gr = float(pih_cfg.hs_grasp_rew_scale) * (self.hs_power & self.hs_touched).float()
+            pp = -float(pih_cfg.hs_panel_pen_scale) * self.hs_panel_force.clamp(max=10.0)
+            dj = int(pih_cfg.latch_door_joint)
+            phi = (self.cb_joint_angle[dj] / math.radians(float(pih_cfg.hs_door_target_deg))).clamp(0.0, 1.0)
+            phi = phi * getattr(self, "latch_open_ep", torch.ones_like(phi, dtype=torch.bool)).float()
+            if not hasattr(self, "_hs_phi_prev"):
+                self._hs_phi_prev = phi.clone()
+            dr = float(pih_cfg.hs_door_rew_scale) * (phi - self._hs_phi_prev)
+            self._hs_phi_prev = phi.clone()
+            reward = reward + gr + pp + dr
+            self._reward_terms["hs_grasp_rew"] = gr
+            self._reward_terms["hs_panel_pen"] = pp
+            self._reward_terms["hs_door_rew"] = dr
             self._reward_terms["total_reward"] = reward
 
         # A8 hold shaping (latch_cbf): + latch_cbf_hold_rew_scale per step that counts toward the held-open success run,

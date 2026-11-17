@@ -336,6 +336,17 @@ class PreciseAssemblyCfg:
     # A8 (A3's force_window recipe): > 0 = compliant-contact PhysX material on the object (N/m, damping N s/m), so
     # contact depth and the ray-cast taxels read force (A3: k 2000 ~ 0.09 mm/N on a grasped body). 0 = rigid.
     object_compliant_stiffness: float = 0.0
+    # A8 human-style door (ContactBench human demo of task 28: palm-on-top power grasp, no fingers on the panel, one
+    # turn-and-pull swinging the door to ~40 deg, held). Needs hand_force_sense. Power grasp = the palm (iiwa14_link_7,
+    # the palm is merged into it) + >= hs_grasp_links_min - 1 other hand links each pressing > hs_link_force_min N.
+    human_style: bool = False
+    hs_grasp_links_min: int = 4
+    hs_link_force_min: float = 0.3
+    hs_grasp_rew_scale: float = 0.0       # per step with the power grasp, once the knob is touched
+    hs_panel_pen_scale: float = 0.0       # per step x hand-on-door-leaf force (N, capped at 10)
+    hs_door_target_deg: float = 40.0
+    hs_door_rew_scale: float = 0.0        # potential S x delta clamp(door / target, 0, 1) after the latch cleared
+    hs_success_requires_grasp: bool = False   # the held-open success run also needs the power grasp
     object_compliant_damping: float = 0.0
     hand_force_gain: float = 0.5
     crush_force: float = 0.0
