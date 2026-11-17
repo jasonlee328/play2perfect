@@ -54,6 +54,7 @@ class KeyLockCfg:
     # friction spring (lock_module.FRICTION_N = 1.25 N on the deadbolt -> plug drag 1.25 N x r)
     fric_damping: float = 2.0            # N m s/rad of the saturating drag drive (drag = min(D w, tau_f))
     drag_scale_range: tuple[float, float] = (1.0, 1.0)   # per env, log-uniform (phase 2: (0.5, 8.0))
+    drag_scale_values: tuple[float, ...] = ()            # if set: env i gets values[i % K] (sweeps)
     drag_seed: int = 7
     # official checks
     contact_n: float = 0.05              # common.CONTACT_FREE_N
@@ -123,6 +124,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
         lo, hi = (float(v) for v in kl.drag_scale_range)
         rng = np.random.default_rng(int(kl.drag_seed))
         scale = np.exp(rng.uniform(math.log(lo), math.log(hi), n)) if hi > lo else np.full(n, lo)
+        if kl.drag_scale_values:
+            vals = [float(v) for v in kl.drag_scale_values]
+            scale = np.array([vals[i % len(vals)] for i in range(n)])
         self._key_drag_scale_np = scale
         self._key_tau_f_np = np.asarray(cbf["drag_Nm"], dtype=np.float64) * scale
         k = int(self.cfg.precise_assembly.unlock_joint)
