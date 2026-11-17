@@ -143,7 +143,10 @@ def _create_fixture_joints(env) -> None:
             if cbf is not None and k == int(env.cfg.precise_assembly.unlock_joint):
                 # faithful door: end stop = this env's pinion stop; spring tau = tau0 + K theta toward the rest stop
                 # (the lower limit) = a drive with stiffness K and its target tau0 / K beyond the rest stop
-                jp.CreateUpperLimitAttr(float(cbf["stop_deg"][i]))
+                el = bool(getattr(env.cfg.precise_assembly, "latch_cbf_elastic", False))
+                # latch_cbf_elastic: the end stop is the env's implicit elastic stop; PhysX limit moved out of the way
+                jp.CreateUpperLimitAttr(float(cbf["stop_deg"][i]) + (float(env.cfg.precise_assembly.latch_cbf_stop_back_deg)
+                                                                     + 5.0 if el else 0.0))
                 stiff = float(cbf["K"][i])
                 target = -math.degrees(float(cbf["tau0"][i]) / stiff) + (float(j.lower_deg or 0.0))
             elif unlock is not None and k == int(env.cfg.precise_assembly.unlock_joint):

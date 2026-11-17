@@ -849,8 +849,99 @@ class PreciseAssemblyEnv(PlayEnv):
         bad = self._cbf_engaged & (over > 0)
         self._soft_stop_hits = torch.where(bad, self._soft_stop_hits + 1, self._soft_stop_hits)
         self._cbf_over_max = torch.maximum(self._cbf_over_max, torch.where(self._cbf_engaged, over, torch.zeros_like(over)))
-        self._hinge_rotate_back(bad, over)
-        self._cbf_spring_correction(knob)
+        if bool(getattr(c, "latch_cbf_elastic", False)):
+            self._cbf_elastic_substep(knob, door, over)
+        else:
+            self._hinge_rotate_back(bad, over)
+        self._cbf_spring_correction(self.cb_joint_angle[int(c.unlock_joint)])
+
+    def _axis_inertia(self, body, ax: torch.Tensor, an: torch.Tensor) -> torch.Tensor:
+        """Moment of inertia (kg m^2, (N,)) of a rigid body about the world line (an, ax): COM inertia + m d^2."""
+        key = id(body)
+        cache = self.__dict__.setdefault("_ax_inertia_cache", {})
+        if key not in cache:
+            v = body.root_physx_view
+            cache[key] = (v.get_inertias().to(self.device).reshape(-1, 3, 3), v.get_masses().to(self.device).reshape(-1))
+        I_b, m = cache[key]
+        a_b = quat_apply_inverse(body.data.root_quat_w, ax)
+        r = body.data.root_com_pos_w - an if hasattr(body.data, "root_com_pos_w") else body.data.root_pos_w - an
+        d2 = (r * r).sum(-1) - (r * ax).sum(-1) ** 2
+        return torch.einsum("ni,nij,nj->n", a_b, I_b, a_b) + m * d2
+
+    def _elastic_rot(self, name: str, bodies, ax, an, over, active, K, D, back_deg, cap_deg=None):
+        """Implicit elastic stop about the world line (an, ax) for a rigid group (bodies rotate together): over = angle
+        past the stop (rad), active = envs where the stop acts. PhysX already integrated every other load into the pose
+        (v_phys = (over - x_prev) / dt); the spring + damper act implicitly:
+            v = (v_phys - dt K x_prev / I) / (1 + dt D / I + dt^2 K / I),  x = clamp(x_prev + dt v, 0, back).
+        The group is rotated to x, its spin about the line set to v. Returns the stop torque K x + D v (N m)."""
+        dt = float(self.physics_dt)
+        n = self.num_envs
+        st = self.__dict__.setdefault("_elastic_state", {})
+        x_prev = st.get(name, torch.zeros(n, device=self.device))
+        over_p = torch.clamp(over, min=0.0)
+        el = active & (over_p > 0)
+        I = sum(self._axis_inertia(b, ax, an) for b in bodies).clamp_min(1e-7)
+        v_phys = (over_p - x_prev) / dt
+        v = (v_phys - dt * K * x_prev / I) / (1.0 + dt * D / I + dt * dt * K / I)
+        back = math.radians(back_deg)
+        x = torch.clamp(x_prev + dt * v, min=0.0, max=back)
+        v = torch.where(x >= back, torch.clamp(v, max=0.0), v)
+        x = torch.where(el, x, torch.zeros_like(x)); v = torch.where(el, v, torch.zeros_like(v))
+        st[name] = x
+        corr = torch.where(el, x - over_p, torch.zeros_like(x))
+        ids = el.nonzero(as_tuple=False).squeeze(-1)
+        if ids.numel() > 0:
+            rot = quat_from_angle_axis(corr[ids], ax[ids])
+            for body in bodies:
+                pos, quat = body.data.root_pos_w[ids], body.data.root_quat_w[ids]
+                new_pos = an[ids] + quat_apply(rot, pos - an[ids])
+                body.write_root_pose_to_sim(torch.cat([new_pos, quat_mul(rot, quat)], -1), env_ids=ids)
+                vel = body.data.root_vel_w[ids].clone()
+                w_ax = (vel[:, 3:6] * ax[ids]).sum(-1)
+                dw = (v[ids] - w_ax).unsqueeze(-1) * ax[ids]
+                vel[:, 3:6] += dw
+                vel[:, 0:3] += torch.cross(dw, new_pos - an[ids], dim=-1)
+                body.write_root_velocity_to_sim(vel, env_ids=ids)
+        return torch.where(el, K * x + D * v, torch.zeros_like(x)), corr
+
+    def _cbf_elastic_substep(self, knob: torch.Tensor, door: torch.Tensor, over_h: torch.Tensor) -> None:
+        """latch_cbf_elastic (see the cfg): (1) engaged latch: elastic hinge stop at the gap for door + knob;
+        (2) pinion stop: elastic knob stop at this env's stop angle (knob relative to the door, about the spindle)."""
+        c = self.cfg.precise_assembly
+        n = self.num_envs
+        jh, jk = self._pih_joints[int(c.latch_door_joint)], self._pih_joints[int(c.unlock_joint)]
+        door_body = self.distractors[int(jh.body[10:])]
+        hq = self.hole_quat_wxyz
+        base = self.hole_pos + self.scene.env_origins
+        ax_h = quat_apply(hq, torch.tensor(jh.axis, device=self.device, dtype=torch.float32).expand(n, 3))
+        an_h = base + quat_apply(hq, torch.tensor(jh.anchor, device=self.device, dtype=torch.float32).expand(n, 3))
+        tau_h, corr_h = self._elastic_rot("hinge", (door_body, self.object), ax_h, an_h, over_h, self._cbf_engaged,
+                                          float(c.latch_cbf_hinge_K), float(c.latch_cbf_hinge_D),
+                                          float(c.latch_cbf_hinge_back_deg))
+        self.cb_joint_angle[int(c.latch_door_joint)] += corr_h
+        door_now = self.cb_joint_angle[int(c.latch_door_joint)]
+        R = quat_from_angle_axis(door_now, ax_h)
+        ax_k = quat_apply(R, quat_apply(hq, torch.tensor(jk.axis, device=self.device, dtype=torch.float32).expand(n, 3)))
+        an_k0 = base + quat_apply(hq, torch.tensor(jk.anchor, device=self.device, dtype=torch.float32).expand(n, 3))
+        an_k = an_h + quat_apply(R, an_k0 - an_h)
+        if not hasattr(self, "_cbf_stop_rad"):
+            self._cbf_stop_rad = torch.as_tensor([math.radians(float(v)) for v in self._cbf["stop_deg"]],
+                                                 device=self.device, dtype=torch.float32)
+        over_k = self.cb_joint_angle[int(c.unlock_joint)] - self._cbf_stop_rad
+        tau_k, corr_k = self._elastic_rot("knob", (self.object,), ax_k, an_k, over_k, torch.ones_like(self._cbf_engaged),
+                                          float(c.latch_cbf_stop_K), float(c.latch_cbf_stop_D),
+                                          float(c.latch_cbf_stop_back_deg))
+        self.cb_joint_angle[int(c.unlock_joint)] += corr_k
+        # readings: max over the policy step's substeps (reset in _update_latch_cbf)
+        if not hasattr(self, "door_stop_torque"):
+            z = lambda: torch.zeros(n, device=self.device)
+            self.door_stop_torque, self.door_pull_torque, self.door_pull_force = z(), z(), z()
+            self._door_break_count = torch.zeros(n, dtype=torch.long, device=self.device)
+        r_k = torch.linalg.norm(torch.cross(self.object.data.root_pos_w - an_h, ax_h, dim=-1), dim=-1).clamp_min(1e-3)
+        self.door_stop_torque_now, self.door_pull_torque_now = tau_k, tau_h     # last substep (probes)
+        self.door_stop_torque = torch.maximum(self.door_stop_torque, tau_k)
+        self.door_pull_torque = torch.maximum(self.door_pull_torque, tau_h)
+        self.door_pull_force = torch.maximum(self.door_pull_force, tau_h / r_k)
 
     def _cbf_spring_correction(self, knob: torch.Tensor) -> None:
         """The spring is a PhysX joint drive (implicit, stable) with stiffness K and target tgt = -tau0 / K (beyond the
@@ -903,6 +994,16 @@ class PreciseAssemblyEnv(PlayEnv):
             self._soft_stop_hits[env_ids] = 0.0
             self._cbf_over_max[env_ids] = 0.0
             self._cbf_prev_door[env_ids] = 0.0
+            if hasattr(self, "door_stop_torque_ep_max"):
+                self.door_stop_torque_last_ep_max[env_ids] = self.door_stop_torque_ep_max[env_ids]
+                self.door_pull_force_last_ep_max[env_ids] = self.door_pull_force_ep_max[env_ids]
+                self.door_stop_torque_ep_max[env_ids] = 0.0
+                self.door_pull_force_ep_max[env_ids] = 0.0
+                self._door_break_count[env_ids] = 0
+            for nm in ("hinge", "knob"):
+                st = self.__dict__.get("_elastic_state", {})
+                if nm in st:
+                    st[nm][env_ids] = 0.0
             if c.latch_hint_obs:
                 self._latch_hint_resample(env_ids)
             for name in ("_latch_bonus_paid",):
@@ -1645,7 +1746,29 @@ class PreciseAssemblyEnv(PlayEnv):
         if hasattr(self, "latch_false_stop"):
             false_stop = self.latch_false_stop & ~max_successes & ~overturned
             self.extras["latch_false_stop_frac"] = self.latch_false_stop.float().mean()
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop
+        broken = torch.zeros_like(fall)
+        if hasattr(self, "door_stop_torque"):
+            # A1 upper bound (door_break_*): readings = max over this policy step's substeps
+            lim_t, lim_f = float(pih_cfg.door_break_torque), float(pih_cfg.door_break_pull)
+            over = torch.zeros_like(fall)
+            if lim_t > 0.0:
+                over |= self.door_stop_torque > lim_t
+            if lim_f > 0.0:
+                over |= self.door_pull_force > lim_f
+            self._door_break_count = torch.where(over, self._door_break_count + 1, torch.zeros_like(self._door_break_count))
+            broken = (self._door_break_count >= int(pih_cfg.door_break_steps)) & ~max_successes
+            self.extras["door_stop_torque_mean"] = self.door_stop_torque.mean()
+            self.extras["door_pull_force_mean"] = self.door_pull_force.mean()
+            self.door_stop_torque_step, self.door_pull_force_step = self.door_stop_torque.clone(), self.door_pull_force.clone()
+            if not hasattr(self, "door_stop_torque_ep_max"):
+                self.door_stop_torque_ep_max = torch.zeros_like(self.door_stop_torque)
+                self.door_pull_force_ep_max = torch.zeros_like(self.door_pull_force)
+                self.door_stop_torque_last_ep_max = torch.zeros_like(self.door_stop_torque)
+                self.door_pull_force_last_ep_max = torch.zeros_like(self.door_pull_force)
+            self.door_stop_torque_ep_max = torch.maximum(self.door_stop_torque_ep_max, self.door_stop_torque)
+            self.door_pull_force_ep_max = torch.maximum(self.door_pull_force_ep_max, self.door_pull_force)
+            self.door_stop_torque.zero_(); self.door_pull_torque.zero_(); self.door_pull_force.zero_()
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop | broken
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1657,6 +1780,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "forced": forced,
             "overturned": overturned,
             "false_stop": false_stop,
+            "broken": broken,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1754,6 +1878,12 @@ class PreciseAssemblyEnv(PlayEnv):
             fall_pen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
             reward = reward - fall_pen
             self._reward_terms["fall_terminal_penalty"] = -fall_pen
+            self._reward_terms["total_reward"] = reward
+
+        if float(getattr(pih_cfg, "door_break_penalty", 0.0)) > 0.0 and "broken" in self._termination_reasons:
+            bpen = float(pih_cfg.door_break_penalty) * self._termination_reasons["broken"].float()
+            reward = reward - bpen
+            self._reward_terms["door_break_penalty"] = -bpen
             self._reward_terms["total_reward"] = reward
 
         if float(pih_cfg.latch_force_fail_penalty) > 0.0 and "forced" in self._termination_reasons:
