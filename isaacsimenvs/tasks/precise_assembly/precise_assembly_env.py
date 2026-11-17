@@ -356,6 +356,12 @@ class PreciseAssemblyEnv(PlayEnv):
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self.device)
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        if hasattr(self, "hand_force_ep_max"):
+            if not hasattr(self, "hand_force_last_ep_max"):
+                self.hand_force_last_ep_max = torch.zeros_like(self.hand_force_ep_max)
+            self.hand_force_last_ep_max[env_ids] = self.hand_force_ep_max[env_ids]
+            self.hand_force_ep_max[env_ids] = 0.0
+            self._crush_count[env_ids] = 0
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
@@ -951,6 +957,28 @@ class PreciseAssemblyEnv(PlayEnv):
             self._skip_cand[jump] = -1
             self._skip_steps[jump] = 0
 
+    def _hand_force_update(self) -> None:
+        """hand_force_sense: sum over robot links of |contact force on the object| (N), physical (PhysX contact report)."""
+        if not bool(getattr(self.cfg.precise_assembly, "hand_force_sense", False)):
+            return
+        import re as _re
+        if getattr(self, "_hf_view", None) is None:
+            glob = lambda p: _re.sub(r"env_\d+", "env_*", p)
+            links = [glob(p) for p in self.robot.root_physx_view.link_paths[0]]
+            self._hf_view = self.object._physics_sim_view.create_rigid_contact_view(
+                glob(self.object.root_physx_view.prim_paths[0]), filter_patterns=links)
+            self.hand_force = torch.zeros(self.num_envs, device=self.device)
+            self.hand_force_ep_max = torch.zeros(self.num_envs, device=self.device)
+            self._crush_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        F = self._hf_view.get_contact_force_matrix(float(self.physics_dt)).to(self.device)   # (N, links, 3)
+        self.hand_force = F.norm(dim=-1).sum(-1)
+        self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
+        thr = float(self.cfg.precise_assembly.crush_force)
+        over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
+        self._crush_count = torch.where(over, self._crush_count + 1, torch.zeros_like(self._crush_count))
+        self.extras["hand_force_mean"] = self.hand_force.mean()
+        self.extras["hand_force_max"] = self.hand_force.max()
+
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
         compute_intermediate_values(self)
@@ -1067,7 +1095,11 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
+        self._hand_force_update()
+        crushed = torch.zeros_like(fall)
+        if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and hasattr(self, "_crush_count"):
+            crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1076,6 +1108,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "hand_far": hand_far,
             "dropped": dropped,
             "disturbed": disturbed,
+            "crushed": crushed,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1166,6 +1199,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
+        if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and "crushed" in getattr(self, "_termination_reasons", {}):
+            c_pen = float(pih_cfg.crush_penalty) * self._termination_reasons["crushed"].float()
+            reward = reward - c_pen
+            self._reward_terms["crush_penalty"] = -c_pen
+            self._reward_terms["total_reward"] = reward
 
         log_step_metrics(self)
         self._log_peg_metrics()

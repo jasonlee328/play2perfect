@@ -142,6 +142,14 @@ class PreciseAssemblyCfg:
     distractor_curriculum_offset_steps: int = 0  # added to common_step_counter (set on resume)
     # One-time reward subtracted when an episode ends because a distractor left the box / moved too far.
     distractor_disturb_terminal_penalty: float = 0.0
+    # A1 hand force (physical, PhysX contact report on the object filtered to the robot's links): hand_force = sum over
+    # robot links of |contact force on the object| (N; a two-finger pinch at N each reads 2N), every policy step, last
+    # substep. Logged as extras hand_force_{mean,max}; per-episode max in self.hand_force_ep_max (evals). Upper-bound
+    # rule: hand_force > crush_force (N, 0 = off) for crush_steps steps in a row = termination "crushed" (- crush_penalty).
+    hand_force_sense: bool = False
+    crush_force: float = 0.0
+    crush_steps: int = 3
+    crush_penalty: float = 200.0
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False
