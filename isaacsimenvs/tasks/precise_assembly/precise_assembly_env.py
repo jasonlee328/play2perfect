@@ -1381,6 +1381,13 @@ class PreciseAssemblyEnv(PlayEnv):
             axis_w, _ = self._turn_axis_w()
             u = self._start_bank_u[k]
             self.turn_u_start[env_ids] = u
+            # A7: the seat / stop angles and the thread height were set in the reset above from the configured start
+            # height; redo them from the bank entry's own height (no change when they match)
+            two_pi = 2.0 * math.pi
+            self.turn_seat_angle[env_ids] = self.turn_offset[env_ids] + two_pi * u / self.turn_lead[env_ids]
+            self.unlock_angle[env_ids] = (self.turn_seat_angle[env_ids]
+                                          + two_pi * self.turn_play[env_ids] / self.turn_lead[env_ids])
+            self.turn_u[env_ids] = u
             w[:, 0:3] -= axis_w[env_ids] * u.unsqueeze(-1)
             self.distractors[kk].write_root_pose_to_sim(w, env_ids=env_ids)
             self.distractors[kk].write_root_velocity_to_sim(torch.zeros(n, 6, device=self.device), env_ids=env_ids)
