@@ -455,7 +455,97 @@ class PreciseAssemblyEnv(PlayEnv):
             cfg.termination.max_consecutive_successes = self._num_total_insertion_goals
 
     def _setup_scene(self) -> None:
-        setup_scene(self)
+        pc = self.cfg.precise_assembly
+        if not (bool(getattr(pc, "grip_measure", False)) or float(getattr(pc, "grip_crack_ratio", 0.0)) > 0.0):
+            setup_scene(self)
+            return
+        # A9 grip crack (A3 force_window recipe): contact reporting on the object for the hand-link contact view
+        from . import scene_utils as _su
+        orig = _su.build_rigid_object_cfg
+
+        def cfg_contacts(prim_path, usd_paths):
+            c = orig(prim_path, usd_paths)
+            if prim_path.endswith("/Object"):
+                c.spawn.activate_contact_sensors = True
+            return c
+        _su.build_rigid_object_cfg = cfg_contacts
+        try:
+            setup_scene(self)
+        finally:
+            _su.build_rigid_object_cfg = orig
+
+    # ---- A9 design B: the screwdriver handle cracks above a grip-force limit; hidden handle friction per env -------
+    _GRIP_LINKS = ("left_thumb_MC", "left_thumb_PP", "left_thumb_DP",
+                   "left_index_MCP_VL", "left_index_PP", "left_index_MP", "left_index_DP",
+                   "left_middle_MCP_VL", "left_middle_PP", "left_middle_MP", "left_middle_DP",
+                   "left_ring_MCP_VL", "left_ring_PP", "left_ring_MP", "left_ring_DP",
+                   "left_pinky_MC", "left_pinky_MCP_VL", "left_pinky_PP", "left_pinky_MP", "left_pinky_DP",
+                   "iiwa14_link_7")
+
+    def _grip_init(self) -> None:
+        import re
+        pc = self.cfg.precise_assembly
+        g = lambda p: re.sub(r"env_\d+", "env_*", p)
+        paths = self.robot.root_physx_view.link_paths
+        p0 = paths[0] if isinstance(paths[0], (list, tuple)) else paths
+        p0 = [p for p in p0 if p.split("/")[-1] in self._GRIP_LINKS]
+        self._grip_view = self.object._physics_sim_view.create_rigid_contact_view(
+            g(self.object.root_physx_view.prim_paths[0]), filter_patterns=[g(p) for p in p0])
+        self._grip_nl = len(p0)
+        # per-env handle friction (object material, possibly bucket-randomized by object_friction_scale_range) and the
+        # fingertip friction; PhysX default combine = average
+        om = self.object.root_physx_view.get_material_properties()      # (N, shapes, 3) cpu
+        mu_obj = om[:, 0, 0].clone().to(self.device)
+        mu_ft = float(self.cfg.assets.finger_tip_friction)
+        self.grip_mu = 0.5 * (mu_obj + mu_ft)
+        # F_min = grip (sum of normal forces) needed to pass the tightening torque through friction at the handle radius
+        self.grip_fmin = float(pc.grip_tau_req) / (self.grip_mu * float(pc.grip_handle_radius_m))
+        self.grip_force = torch.zeros(self.num_envs, device=self.device)
+        self.grip_peak = torch.zeros(self.num_envs, device=self.device)
+        self._grip_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self.grip_cracked = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        self.grip_ep_max = torch.zeros(self.num_envs, device=self.device)
+        print(f"[grip] contact view vs {self._grip_nl} links; mu_obj env0..3 {mu_obj[:4].tolist()} "
+              f"F_min env0..3 {self.grip_fmin[:4].tolist()}", flush=True)
+
+    def _grip_ratio_now(self) -> float:
+        pc = self.cfg.precise_assembly
+        r, r0, n = float(pc.grip_crack_ratio), float(pc.grip_crack_ratio_start), int(pc.grip_crack_ramp_steps)
+        if r <= 0.0 or r0 <= 0.0 or n <= 0:
+            return r
+        f = min(1.0, (float(self.common_step_counter) + float(pc.grip_crack_ramp_offset_steps)) / n)
+        return math.exp(math.log(r0) + f * (math.log(r) - math.log(r0)))
+
+    def _grip_step(self) -> torch.Tensor:
+        pc = self.cfg.precise_assembly
+        if getattr(self, "_grip_view", None) is None:
+            self._grip_init()
+        F = self._grip_view.get_contact_force_matrix(self.physics_dt).reshape(self.num_envs, self._grip_nl, 3)
+        mag = F.norm(dim=-1)
+        self.grip_force = mag.sum(-1)
+        self.grip_peak = mag.max(-1).values
+        self.grip_ep_max = torch.maximum(self.grip_ep_max, self.grip_force)
+        self.extras["grip_force_mean"] = self.grip_force.mean()
+        self.extras["grip_over_fmin_mean"] = (self.grip_force / self.grip_fmin).mean()
+        ratio = self._grip_ratio_now()
+        new = torch.zeros_like(self.grip_cracked)
+        if ratio > 0.0:
+            self.extras["grip_crack_ratio_now"] = torch.tensor(ratio, device=self.device)
+            over = self.grip_force > ratio * self.grip_fmin
+            self._grip_count = torch.where(over, self._grip_count + 1, torch.zeros_like(self._grip_count))
+            new = (self._grip_count >= int(pc.grip_crack_steps)) & ~self.grip_cracked
+            self.grip_cracked |= new
+        return self.grip_cracked.clone()
+
+    def _grip_reset(self, env_ids) -> None:
+        if getattr(self, "_grip_view", None) is None:
+            return
+        self._grip_count[env_ids] = 0
+        self.grip_cracked[env_ids] = False
+        if not hasattr(self, "grip_prev_ep_max"):
+            self.grip_prev_ep_max = torch.zeros_like(self.grip_ep_max)
+        self.grip_prev_ep_max[env_ids] = self.grip_ep_max[env_ids]
+        self.grip_ep_max[env_ids] = 0.0
 
     def _reset_idx(self, env_ids) -> None:
         if env_ids is None:
@@ -466,6 +556,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
         super()._reset_idx(env_ids)
         self._reset_peg_episode(env_ids)
+        self._grip_reset(env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
@@ -1869,10 +1960,16 @@ class PreciseAssemblyEnv(PlayEnv):
         released_early = (self.turn_released_early.clone() if getattr(self, "turn_mode", False)
                           else torch.zeros_like(fall))
         toolless = (self.turn_toolless.clone() if getattr(self, "turn_mode", False) else torch.zeros_like(fall))
+        pc_g = self.cfg.precise_assembly
+        if bool(getattr(pc_g, "grip_measure", False)) or float(getattr(pc_g, "grip_crack_ratio", 0.0)) > 0.0:
+            cracked = self._grip_step()
+        else:
+            cracked = torch.zeros_like(fall)
         terminated = (fall | max_successes | hand_far | dropped | retract_fail | disturbed | stripped | released_early
-                      | toolless)
+                      | toolless | cracked)
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
+            "cracked": cracked,
             "stripped": stripped,
             "released_early": released_early,
             "toolless": toolless,
@@ -2003,6 +2100,12 @@ class PreciseAssemblyEnv(PlayEnv):
             fall_pen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
             reward = reward - fall_pen
             self._reward_terms["fall_terminal_penalty"] = -fall_pen
+            self._reward_terms["total_reward"] = reward
+        cp = float(getattr(pih_cfg, "grip_crack_penalty", 0.0))
+        if cp > 0.0 and "cracked" in self._termination_reasons:   # A9 design B: handle cracked
+            c_pen = cp * self._termination_reasons["cracked"].float()
+            reward = reward - c_pen
+            self._reward_terms["crack_terminal_penalty"] = -c_pen
             self._reward_terms["total_reward"] = reward
         tsp = float(getattr(pih_cfg, "turn_toolless_step_penalty", 0.0))
         if tsp > 0.0 and getattr(self, "_tl_step_deg", None) is not None:

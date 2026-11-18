@@ -309,6 +309,20 @@ class PreciseAssemblyCfg:
     turn_tool_out_m: float = 0.0005
     turn_toolless_max_deg: float = 0.0
     turn_toolless_penalty: float = 0.0
+    # A9 design B (cb_screwdriver_fragile): grip force G = sum over 21 hand links of |contact force on the tool|
+    # (A3 force_window contact view). Cracked (termination, -grip_crack_penalty) when G > grip_crack_ratio x F_min(env)
+    # for grip_crack_steps policy steps in a row; F_min = grip_tau_req / (mu_env x grip_handle_radius_m), mu_env = average
+    # of the env's handle friction (hide it: domain_randomization.object_friction_scale_range) and the fingertip friction.
+    # grip_measure = log G without a limit. Ratio ramps log-linearly from grip_crack_ratio_start over grip_crack_ramp_steps.
+    grip_measure: bool = False
+    grip_crack_ratio: float = 0.0
+    grip_crack_steps: int = 3
+    grip_crack_penalty: float = 0.0
+    grip_tau_req: float = 0.024
+    grip_handle_radius_m: float = 0.006
+    grip_crack_ratio_start: float = 0.0
+    grip_crack_ramp_steps: int = 0
+    grip_crack_ramp_offset_steps: int = 0
     turn_toolless_step_penalty: float = 0.0   # A9: reward -= this x deg of screw turn with no tip in the recess (per step)
     # A9: per-policy-step screw rotation below this (deg) is not counted toward turn_toolless_max_deg: the sum of |d angle|
     # over a 40 s episode of sub-millidegree sim jitter otherwise reaches 2 deg and ends 70% of episodes as `toolless` with
