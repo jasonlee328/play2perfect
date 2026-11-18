@@ -431,7 +431,27 @@ class PreciseAssemblyEnv(PlayEnv):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
         super()._reset_idx(env_ids)
+        self._reset_hand_kp(env_ids)
         self._reset_peg_episode(env_ids)
+
+    def _reset_hand_kp(self, env_ids: torch.Tensor) -> None:
+        """A8 hand_kp_scale_range: hidden per-episode hand PD gain scale (stiffness x s, damping x sqrt(s))."""
+        lo, hi = (float(v) for v in getattr(self.cfg.precise_assembly, "hand_kp_scale_range", (1.0, 1.0)))
+        if lo == 1.0 and hi == 1.0:
+            return
+        if not hasattr(self, "_hand_kp_ids"):
+            ids, _ = self.robot.find_joints("left_.*")
+            self._hand_kp_ids = torch.as_tensor(ids, device=self.device, dtype=torch.long)
+            self._hand_kp0 = self.robot.data.default_joint_stiffness[:, self._hand_kp_ids].clone()
+            self._hand_kd0 = self.robot.data.default_joint_damping[:, self._hand_kp_ids].clone()
+            self.hand_kp_scale = torch.ones(self.num_envs, device=self.device)
+        n = env_ids.numel()
+        s = lo + (hi - lo) * torch.rand(n, device=self.device)
+        self.hand_kp_scale[env_ids] = s
+        kp = self._hand_kp0[env_ids] * s[:, None]
+        kd = self._hand_kd0[env_ids] * s.sqrt()[:, None]
+        self.robot.write_joint_stiffness_to_sim(kp, joint_ids=self._hand_kp_ids, env_ids=env_ids)
+        self.robot.write_joint_damping_to_sim(kd, joint_ids=self._hand_kp_ids, env_ids=env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
