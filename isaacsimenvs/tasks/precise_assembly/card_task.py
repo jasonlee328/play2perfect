@@ -127,6 +127,8 @@ class CardTask:
         for t in (self.released, self.rel_inside, self.success, self.picked, self.board_after):
             t[env_ids] = False
         self.hold_ok[env_ids] = True
+        if hasattr(self, 'path_phi'):
+            self.path_phi[env_ids] = float('nan')
         self.rest_ok[env_ids] = False
         self.lift_max[env_ids] = 0.0
         for t in self.fail.values():
@@ -309,6 +311,14 @@ class CardTask:
         # reports a few mm/s of contact-correction velocity on a resting card whose position does not change
         self.pos_hist = torch.roll(self.pos_hist, 1, 0)
         self.pos_hist[0] = pc
+        # potential for card_path_rew_scale (A10): 3 x lateral distance to the slot centre + bottom height above the floor
+        phi = -(3.0 * torch.sqrt((pc[:, 0] - getattr(c, "card_missed_slot_x", 0.0035)) ** 2 + pc[:, 1] ** 2) + (zlow - FLOOR_Z).clamp(min=0.0))
+        if not hasattr(self, "path_phi"):
+            self.path_phi = torch.full_like(phi, float('nan'))
+        held = (~self.released) & (self.step >= int(getattr(c, "card_settle_steps", 0)))
+        dphi = (phi - self.path_phi).nan_to_num(0.0) * held.float()
+        self.path_dphi = dphi
+        self.path_phi = torch.where(held, phi, self.path_phi)
         pdt = float(env.physics_dt) * int(env.cfg.decimation)
         speed = ((self.pos_hist[0] - self.pos_hist[-1]).norm(dim=-1) / (pdt * (self.pos_hist.shape[0] - 1))).nan_to_num(1.0)
         in_holder = self._in_slot(bot) & ((zlow - FLOOR_Z).abs() <= c.card_floor_tol) & (lean_d < c.card_lean_tol) \

@@ -1260,6 +1260,8 @@ class PreciseAssemblyEnv(PlayEnv):
             tr = self._termination_reasons
             c_rew = pih_cfg.card_success_bonus * tr["max_successes"].float() \
                 + pih_cfg.card_release_bonus * card.just_rel_inside.float()
+            if getattr(pih_cfg, "card_path_rew_scale", 0.0) > 0.0 and hasattr(card, "path_dphi"):
+                c_rew = c_rew + pih_cfg.card_path_rew_scale * card.path_dphi
             if pih_cfg.card_hold_rew > 0.0:
                 # per step while the pinch is loaded and the card not yet released (shaping, A10)
                 c_rew = c_rew + pih_cfg.card_hold_rew * card.meas["pinch"] * (~card.released).float()
