@@ -189,6 +189,9 @@ class PreciseAssemblyCfg:
     # starts from the same state.
     start_state_sequential: bool = False
     start_state_offset: int = 0
+    # A8 (11-18): hidden per-episode hand PD gain scale U(lo, hi) on the hand joints (stiffness x s, damping x sqrt(s)),
+    # sampled at reset, not in any obs. Breaks the joint-tracking-error -> contact-force mapping proprio reads. (1, 1) = off.
+    hand_kp_scale_range: tuple[float, float] = (1.0, 1.0)
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
