@@ -252,7 +252,13 @@ class CardTask:
             transport = (st >= c.card_hold_steps) & ~self.released
             hold_window = st >= c.card_hold_steps
         slip1 = (cur - self._pts(self.tr_p, self.tr_q, self.corners)).norm(dim=-1).max(-1).values
-        self.slip_tr = torch.where(transport, torch.maximum(self.slip_tr, slip1), self.slip_tr)
+        # official: slip up to the release = the first contact-free step. Our release flag lags (it needs
+        # card_release_steps contact-free steps + 2 mm of motion), and a dropped card falls tens of mm in that lag
+        # (sweep19: 16-23 mm "slip" that all happened after the pads let go), so slip only accumulates on steps
+        # with robot contact on the card
+        f_rc_now = F_rc.sum(-1)
+        touching = (f_rc_now >= c.card_clear_force) if tac_on is None else (f_rc_now >= c.card_clear_force) | tac_on.any(-1)
+        self.slip_tr = torch.where(transport & touching, torch.maximum(self.slip_tr, slip1), self.slip_tr)
         self.tr_steps += transport.float()
         self.tr_loaded += (transport & pinch).float()
 
