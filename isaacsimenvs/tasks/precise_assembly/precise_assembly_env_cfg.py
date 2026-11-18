@@ -317,6 +317,11 @@ class PreciseAssemblyCfg:
     # A7: the turn-progress reward / turn goals count only while a tool tip is in the recess (no reward for turning the
     # head with the fingers).
     turn_progress_requires_tool: bool = False
+    # A7: + turning progress only with >= N fingertip pads on the key (official both-pads-loaded turning); 0 = off
+    turn_progress_requires_pads: int = 0
+    # A7: per-step reward while >= turn_pad_grip_min fingertip pads touch the key (encourage a fingertip pinch)
+    turn_pad_grip_rew: float = 0.0
+    turn_pad_grip_min: int = 2
     turn_preload_free_deg: float = 10.0
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9

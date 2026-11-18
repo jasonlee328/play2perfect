@@ -1188,11 +1188,22 @@ class PreciseAssemblyEnv(PlayEnv):
         rem = torch.clamp(target - self.turn_angle, min=0.0)
         self._keypoints_max_dist = rem * float(pih_cfg.turn_progress_m_per_rad)
         tool_out = None
+        # A7 (official turned_by_the_tool_in_hand: both pads loaded while turning): > 0 = turning progress pays only in
+        # policy steps where >= this many fingertip pads touch the key (last step's real taxels, also under
+        # policy_override, so the zero twin gets the same rule); requires turn_progress_requires_tool
+        npads = int(getattr(pih_cfg, "turn_progress_requires_pads", 0))
+        self._ak_pads_on = None
+        if getattr(self, "_last_tactile", None) is not None:
+            self._ak_pads_on = (self._last_tactile.reshape(self.num_envs, 5, -1).sum(-1) > 0).sum(-1)
+            self.extras["ak_pads_on_mean"] = self._ak_pads_on.float().mean()
+            self.extras["ak_pads2_frac"] = (self._ak_pads_on >= 2).float().mean()
         if bool(getattr(pih_cfg, "turn_progress_requires_tool", False)) and getattr(self, "_tl_out", None) is not None:
             # A7: turning progress only pays while a tool tip is in the recess (last step's toolless check): degrees turned
             # by the fingers on the head earn nothing (the keypoint reward pays improvements of the closest distance, so
             # holding the distance at its best-so-far value freezes it), and the first turn goal can't be credited
             tool_out = self._tl_out
+            if npads > 0 and self._ak_pads_on is not None:
+                tool_out = tool_out | (self._ak_pads_on < npads)
             best = torch.where(self._closest_keypoint_max_dist >= 0.0, self._closest_keypoint_max_dist,
                                self._keypoints_max_dist)
             self._keypoints_max_dist = torch.where(tool_out, torch.maximum(self._keypoints_max_dist, best),
@@ -1962,6 +1973,15 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward + tilt_pen
             self._reward_terms["turn_tool_tilt_penalty"] = tilt_pen
             self.extras["turn_tool_tilt_deg_mean"] = torch.rad2deg(tilt).mean()
+        gp = float(getattr(pih_cfg, "turn_pad_grip_rew", 0.0))
+        if getattr(self, "turn_mode", False) and gp != 0.0 and getattr(self, "_ak_pads_on", None) is not None:
+            # A7: per-step reward while >= turn_pad_grip_min fingertip pads touch the key (fingertip pinch, not a
+            # whole-hand / finger-side hold), before the retract phase
+            held = (self._ak_pads_on >= int(getattr(pih_cfg, "turn_pad_grip_min", 2))).float()
+            if hasattr(self, "retract_phase"):
+                held = held * (~self.retract_phase).float()
+            reward = reward + gp * held
+            self._reward_terms["turn_pad_grip_rew"] = gp * held
         if getattr(self, "turn_mode", False) and float(pih_cfg.turn_over_penalty) != 0.0:
             over_pen = -float(pih_cfg.turn_over_penalty) * self._turn_over_inc
             reward = reward + over_pen
