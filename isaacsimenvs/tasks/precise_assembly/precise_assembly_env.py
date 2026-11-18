@@ -1892,6 +1892,15 @@ class PreciseAssemblyEnv(PlayEnv):
             tl_pen = -float(pih_cfg.turn_toolless_penalty) * self._turn_just_toolless.float()
             reward = reward + tl_pen
             self._reward_terms["turn_toolless_penalty"] = tl_pen
+        if getattr(self, "turn_mode", False) and float(getattr(pih_cfg, "turn_tool_tilt_penalty_scale", 0.0)) != 0.0:
+            ax = quat_apply(self.object.data.root_quat_w, torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(
+                self.num_envs, 3))
+            tilt = torch.acos(torch.clamp(ax[:, 2].abs(), max=1.0))
+            tilt_pen = -float(pih_cfg.turn_tool_tilt_penalty_scale) * torch.clamp(
+                tilt - math.radians(float(pih_cfg.turn_tool_tilt_free_deg)), min=0.0)
+            reward = reward + tilt_pen
+            self._reward_terms["turn_tool_tilt_penalty"] = tilt_pen
+            self.extras["turn_tool_tilt_deg_mean"] = torch.rad2deg(tilt).mean()
         if getattr(self, "turn_mode", False) and float(pih_cfg.turn_over_penalty) != 0.0:
             over_pen = -float(pih_cfg.turn_over_penalty) * self._turn_over_inc
             reward = reward + over_pen

@@ -298,6 +298,10 @@ class PreciseAssemblyCfg:
     turn_tool_out_m: float = 0.0005
     turn_toolless_max_deg: float = 0.0
     turn_toolless_penalty: float = 0.0
+    # A7 shaping (training only): per-step penalty scale x (tilt of the tool's long axis (object frame x) from the hole
+    # axis - turn_tool_tilt_free_deg, rad, >= 0), so the key stays upright in the recess through regrasps (0 = off)
+    turn_tool_tilt_penalty_scale: float = 0.0
+    turn_tool_tilt_free_deg: float = 10.0
     # A7: the turn-progress reward / turn goals count only while a tool tip is in the recess (no reward for turning the
     # head with the fingers).
     turn_progress_requires_tool: bool = False
