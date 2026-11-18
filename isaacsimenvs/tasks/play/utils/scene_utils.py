@@ -1577,6 +1577,14 @@ def apply_physx_material_properties(env) -> None:
         view = getattr(env, name).root_physx_view
         materials = view.get_material_properties()
         materials[:] = default
+        mu = None
+        if name == "object" and bool(getattr(assets_cfg, "object_friction_apply", False)):
+            mu = float(assets_cfg.object_friction)
+        if name == "hole" and float(getattr(assets_cfg, "hole_friction", -1.0)) >= 0.0:
+            mu = float(assets_cfg.hole_friction)
+        if mu is not None:
+            materials[:, :, 0] = mu
+            materials[:, :, 1] = mu
         if name == "object" and obj_active:
             obj_base = float(assets_cfg.robot_friction)
             bucket_vals = torch.linspace(obj_lo, obj_hi, n_buckets) * obj_base
@@ -1585,6 +1593,14 @@ def apply_physx_material_properties(env) -> None:
             materials[:, :, 0] = per_env_obj.unsqueeze(-1)
             materials[:, :, 1] = per_env_obj.unsqueeze(-1)
         view.set_material_properties(materials, env_ids)
+
+    d_mu = float(getattr(assets_cfg, "distractor_friction", -1.0))
+    if d_mu >= 0.0:
+        for body in getattr(env, "distractors", ()) or ():
+            view = body.root_physx_view
+            materials = view.get_material_properties()
+            materials[:] = torch.tensor([d_mu, d_mu, 0.0], dtype=torch.float32)
+            view.set_material_properties(materials, env_ids)
 
     _log_scene_step(t0, "applied PhysX material properties")
 

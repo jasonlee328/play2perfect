@@ -101,6 +101,12 @@ class AssetsCfg:
     finger_tip_friction: float = 1.5
     object_friction: float = 0.5
     table_friction: float = 0.5
+    # A10 (ContactBench card): opt-in per-body frictions. object_friction_apply: the object gets object_friction
+    # (else robot_friction, the old behaviour). hole_friction / distractor_friction >= 0: those bodies get it
+    # (< 0: unchanged; distractors otherwise keep their USD default material).
+    object_friction_apply: bool = False
+    hole_friction: float = -1.0
+    distractor_friction: float = -1.0
 
 # ----------------------------------------------------------------------------
 # obs
