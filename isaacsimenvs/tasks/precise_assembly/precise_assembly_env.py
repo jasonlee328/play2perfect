@@ -334,6 +334,23 @@ class PreciseAssemblyEnv(PlayEnv):
                 raise ValueError(f"JointSpec.body must be 'object' or 'distractor<k>', got {j.body!r}")
             if j.body == "object" and not self._pih_object_start_rel:
                 raise ValueError("a joint on the object needs Problem.object_start_pose_rel_receptive")
+        # Jointed problems: one fixture pose per env for its lifetime (a teleported kinematic fixture leaves its USD
+        # joint behind at the spawn pose; doorknob fix b7e08d3 + yaw). See scene_utils._create_fixture_joints.
+        self._joint_hole_np = None
+        self._joint_hole_yaw_np = None
+        if self._pih_joints:
+            import numpy as np
+            rng = np.random.default_rng(int(pih_cfg.joint_fixture_seed) + 1)
+            n_env = int(cfg.scene.num_envs)
+            hz = float(cfg.reset.table_reset_z) + TABLE_HALF_HEIGHT + float(problem.hole_z_offset)
+            self._joint_hole_np = np.stack([rng.uniform(*[float(v) for v in pih_cfg.hole_x_range], n_env),
+                                            rng.uniform(*[float(v) for v in pih_cfg.hole_y_range], n_env),
+                                            np.full(n_env, hz)], -1)
+            yr = float(pih_cfg.hole_yaw_range_deg)
+            self._joint_hole_yaw_np = np.deg2rad(float(pih_cfg.hole_yaw_center_deg) + rng.uniform(-yr, yr, n_env))
+            if float(cfg.reset.table_reset_z_range) != 0.0:
+                print("[PreciseAssemblyEnv] WARNING: jointed problem with table_reset_z_range != 0: the fixture keeps "
+                      "its spawn height (use env.reset.table_reset_z_range=0.0)", flush=True)
 
         cfg.assets.object_name = problem.insertion_object_name if len(problem_names) == 1 else "multi"
         cfg.assets.object_urdf = self._pih_object_urdf_abs
@@ -365,8 +382,24 @@ class PreciseAssemblyEnv(PlayEnv):
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
+        usb = getattr(self, "_usb", None)
+        if usb is not None and usb.checks:
+            # keep the finished episode's verdict for evals (read before the auto-reset clears it)
+            if not hasattr(self, "usb_last"):
+                self.usb_last = {k: torch.zeros(self.num_envs, device=self.device)
+                                 for k in list(usb.checks) + list(usb.meas) + ["success"] + [f"fail_{f}" for f in usb.fail]}
+            for k, v in list(usb.checks.items()) + list(usb.meas.items()):
+                self.usb_last[k][env_ids] = v[env_ids].float()
+            self.usb_last["success"][env_ids] = usb.success[env_ids].float()
+            for f, v in usb.fail.items():
+                self.usb_last[f"fail_{f}"][env_ids] = v[env_ids].float()
         super()._reset_idx(env_ids)
         self._reset_peg_episode(env_ids)
+        if self.cfg.precise_assembly.usb_task != "off":
+            if usb is None:
+                from .usb_task import UsbTask
+                self._usb = usb = UsbTask(self)
+            usb.reset(env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
@@ -404,13 +437,21 @@ class PreciseAssemblyEnv(PlayEnv):
             hole_y_min, hole_y_max
         )
         self.hole_pos[env_ids, 2] = table_top_z + self._pih_hole_z_offset
+        if self._joint_hole_np is not None:  # jointed problem: the env's fixed fixture pose
+            if not hasattr(self, "_joint_hole_t"):
+                self._joint_hole_t = torch.as_tensor(self._joint_hole_np, device=self.device, dtype=torch.float32)
+                self._joint_hole_yaw_t = torch.as_tensor(self._joint_hole_yaw_np, device=self.device, dtype=torch.float32)
+            self.hole_pos[env_ids] = self._joint_hole_t[env_ids]
         if is_random_goal.any():
             rg_ids = env_ids[is_random_goal]
             self.hole_pos[rg_ids, 0:2] = 0.0
             self.hole_pos[rg_ids, 2] = -1.0
 
         yaw_range_deg = float(pih_cfg.hole_yaw_range_deg)
-        if yaw_range_deg > 0.0:
+        if self._joint_hole_np is not None:
+            z_axis = torch.tensor([0.0, 0.0, 1.0], device=self.device, dtype=torch.float32).expand(n, -1)
+            hole_quat = quat_from_angle_axis(self._joint_hole_yaw_t[env_ids], z_axis)
+        elif yaw_range_deg > 0.0:
             yaw = (
                 torch.rand(n, device=self.device) * 2.0 - 1.0
             ) * yaw_range_deg * (math.pi / 180.0)
@@ -660,6 +701,8 @@ class PreciseAssemblyEnv(PlayEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
         self._apply_joint_detents()
+        if getattr(self, "_usb", None) is not None:
+            self._usb._set_push()   # after the wrench-DR write (it overwrites the object's external force)
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
@@ -1111,7 +1154,16 @@ class PreciseAssemblyEnv(PlayEnv):
         crushed = torch.zeros_like(fall)
         if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and hasattr(self, "_crush_count"):
             crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
+        usb_fail = {}
+        if pih_cfg.usb_task != "off" and getattr(self, "_usb", None) is not None:
+            self._usb.update()
+            if pih_cfg.usb_task == "gate":
+                max_successes = self._usb.success.clone()
+                if pih_cfg.usb_terminate_on_fail:
+                    usb_fail = {k: v & ~max_successes for k, v in self._usb.fail.items()}
         terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed
+        for v in usb_fail.values():
+            terminated = terminated | v
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1121,6 +1173,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "dropped": dropped,
             "disturbed": disturbed,
             "crushed": crushed,
+            **{f"usb_{k}": v for k, v in usb_fail.items()},
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1216,6 +1269,36 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward - c_pen
             self._reward_terms["crush_penalty"] = -c_pen
             self._reward_terms["total_reward"] = reward
+
+        usb = getattr(self, "_usb", None)
+        if pih_cfg.usb_task == "gate" and usb is not None:
+            tr = self._termination_reasons
+            u_rew = pih_cfg.usb_success_bonus * tr["max_successes"].float() \
+                + pih_cfg.usb_release_bonus * usb.just_rel_seated.float()
+            for k, v in tr.items():
+                if k.startswith("usb_"):
+                    u_rew = u_rew - pih_cfg.usb_fail_penalty * v.float()
+            if pih_cfg.usb_clear_rew_scale > 0.0:
+                u_rew = u_rew + pih_cfg.usb_clear_rew_scale * usb.inserted.float() * usb.released.float() \
+                    * usb.meas["palm_from_release"].clamp(max=pih_cfg.usb_clear_dist)
+            if pih_cfg.usb_hold_rew > 0.0:
+                u_rew = u_rew + pih_cfg.usb_hold_rew * usb.meas["pinch"] * (~usb.released).float()
+            if pih_cfg.usb_seat_rew_scale > 0.0:
+                phi = -usb.meas["seat_err_mm"] * 1e-3
+                if not hasattr(usb, "phi_prev"):
+                    usb.phi_prev = phi.clone()
+                fresh = usb.step <= 1
+                d_phi = torch.where(fresh | usb.released, torch.zeros_like(phi), phi - usb.phi_prev)
+                usb.phi_prev = phi.clone()
+                u_rew = u_rew + pih_cfg.usb_seat_rew_scale * d_phi
+            reward = reward + u_rew
+            self._reward_terms["usb_reward"] = u_rew
+            self._reward_terms["total_reward"] = reward
+            for k, v in usb.checks.items():
+                self.extras[f"usb/{k}"] = v.float().mean()
+            self.extras["usb/success"] = usb.success.float().mean()
+            self.extras["usb/pushing"] = usb.pushing.float().mean()
+            self.extras["usb/released"] = usb.released.float().mean()
 
         log_step_metrics(self)
         self._log_peg_metrics()

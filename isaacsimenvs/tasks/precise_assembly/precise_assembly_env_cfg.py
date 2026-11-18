@@ -48,6 +48,9 @@ class PreciseAssemblyCfg:
     # derived insertion goals. Range is symmetric: yaw ~ U(-range, +range).
     # Default 0.0 keeps legacy behavior (identity hole quat).
     hole_yaw_range_deg: float = 0.0
+    # Fixture yaw = hole_yaw_center_deg + U(+-hole_yaw_range_deg) (A12 USB: official slot yaw 90 +- 20)
+    hole_yaw_center_deg: float = 0.0
+    joint_fixture_seed: int = 0
 
     goal_xy_obs_noise: float = 0.002
     # Per-episode yaw obs noise about world +Z applied to the observed goal
@@ -115,6 +118,27 @@ class PreciseAssemblyCfg:
     start_state_file: str = ""
     # A12 USB (usb_task.py): "off" | "report" (contact views + verdict logged) | "gate" (verdict = task success)
     usb_task: str = "off"
+    usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
+    usb_hold_steps: int = 36           # held_in_hand_at_start window (0.6 s)
+    usb_pad_force: float = 0.2         # N, a link "carries" the stick
+    usb_clear_force: float = 0.05      # N, official released_and_clear contact threshold
+    usb_pinch_frac: float = 0.9        # finger_pinch_real: share of pre-release steps with the pinch loaded
+    usb_seat_tol: float = 0.0005       # fully_inserted (plug_in_usb.py:153)
+    usb_release_steps: int = 3
+    usb_clear_steps: int = 10
+    usb_clear_dist: float = 0.04       # hand moved >= 40 mm after the release
+    usb_push_force: float = 8.0        # N, env-applied push along -slot z (plug_in_usb.py:136-139)
+    usb_push_steps: int = 36           # 0.6 s
+    usb_push_gain_tol: float = 0.0003  # no_motion_when_pushed (l.154)
+    usb_stay_tol: float = 0.0003       # stays_seated_after_release (l.155)
+    usb_unseated_steps: int = 30       # released + untouched + not inserted for this long = fail
+    usb_terminate_on_fail: bool = True
+    usb_success_bonus: float = 1000.0
+    usb_release_bonus: float = 200.0   # released while fully inserted (once)
+    usb_fail_penalty: float = 200.0
+    usb_clear_rew_scale: float = 0.0   # per step, x min(palm distance from release, usb_clear_dist), released + inserted
+    usb_hold_rew: float = 0.0          # per step while pinched and not released
+    usb_seat_rew_scale: float = 0.0    # potential: x change of -seat_err (m), before the release
     # Clutter problems (Problem.distractors): per-step reward -= distractor_penalty_scale * the largest distractor
     # displacement from its reset pose (m); with terminate_on_disturb the episode ends once it exceeds
     # distractor_disturb_tol. Both off by default (and no effect on problems without distractors).

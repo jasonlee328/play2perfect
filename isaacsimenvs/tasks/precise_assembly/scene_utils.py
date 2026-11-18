@@ -84,6 +84,33 @@ def _create_fixture_joints(env) -> None:
         return Gf.Quatf(w / n, *(v / n).tolist())
 
     stage = omni.usd.get_context().get_stage()
+
+    def set_local_pose(path, pos, q_wxyz):
+        prim = stage.GetPrimAtPath(path)
+        t, o = prim.GetAttribute("xformOp:translate"), prim.GetAttribute("xformOp:orient")
+        if not (t and o):
+            raise RuntimeError(f"{path} has no xformOp:translate / xformOp:orient")
+        t.Set(Gf.Vec3d(*[float(v) for v in pos]))
+        w, x, y, z = (float(v) for v in q_wxyz)
+        o.Set(Gf.Quatd(w, Gf.Vec3d(x, y, z)) if "quatd" in str(o.GetTypeName()) else Gf.Quatf(w, Gf.Vec3f(x, y, z)))
+
+    # The joint's fixture end does not follow the kinematic fixture when a reset teleports it, so jointed problems
+    # keep every env's fixture at one pose for its lifetime (env._joint_hole_np / _joint_hole_yaw_np, rel. to the
+    # env origin) and the prims start there, jointed bodies at their reset poses, before PhysX parses the joints.
+    hole_np = getattr(env, "_joint_hole_np", None)
+    if hole_np is not None:
+        yaw_np = getattr(env, "_joint_hole_yaw_np", None)
+        for i in range(env.num_envs):
+            yw = float(yaw_np[i]) if yaw_np is not None else 0.0
+            qh = Gf.Quatd(math.cos(yw / 2), Gf.Vec3d(0.0, 0.0, math.sin(yw / 2)))
+            set_local_pose(f"/World/envs/env_{i}/Hole", hole_np[i], (qh.GetReal(), *qh.GetImaginary()))
+            rh = Gf.Rotation(qh)
+            for j in joints:
+                pose = env._joint_reset_pose_rel(j)
+                root = "Object" if j.body == "object" else f"Distractor{int(j.body[10:])}"
+                pw = np.asarray(rh.TransformDir(Gf.Vec3d(*pose[:3]))) + hole_np[i]
+                qb = qh * Gf.Quatd(pose[6], Gf.Vec3d(*pose[3:6]))
+                set_local_pose(f"/World/envs/env_{i}/{root}", pw, (qb.GetReal(), *qb.GetImaginary()))
     for k, j in enumerate(joints):
         pose = env._joint_reset_pose_rel(j)
         p_b = Gf.Vec3d(*pose[:3]); q_b = Gf.Quatd(pose[6], Gf.Vec3d(*pose[3:6]))
