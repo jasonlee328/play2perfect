@@ -324,7 +324,9 @@ class CardTask:
         self.pos_hist[0] = pc
         # potential for card_path_rew_scale (A10): 3 x lateral distance to the slot centre + bottom height above the floor
         lat = torch.sqrt((pc[:, 0] - getattr(c, "card_missed_slot_x", 0.0035)) ** 2 + pc[:, 1] ** 2)
-        phi = -(3.0 * lat + (zlow - FLOOR_Z).clamp(min=0.0))
+        # card_path_floor_z: the height term stops this far above the floor, so pushing the held card further down
+        # (fingers into the deck) earns nothing; the official expert releases with the tips just above the deck top
+        phi = -(3.0 * lat + (zlow - FLOOR_Z - float(getattr(c, "card_path_floor_z", 0.0))).clamp(min=0.0))
         self.deck_moved_now, self.deck_rot_now = deck_moved, deck_rot
         lw = float(getattr(c, "card_path_lean_w", 0.0))
         if lw > 0.0:
