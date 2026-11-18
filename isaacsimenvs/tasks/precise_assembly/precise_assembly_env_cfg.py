@@ -121,6 +121,8 @@ class PreciseAssemblyCfg:
     dropped_on_table_z_margin: float = 0.05
     dropped_on_table_ft_distance: float = 0.15
     dropped_terminal_penalty: float = 0.0   # A9: one-time penalty when the episode ends `dropped`
+    grip_pads_rew: float = 0.0   # A9: per-step reward while >= grip_pads_min fingertip pads touch the object (not in retract)
+    grip_pads_min: int = 2
 
     # Start episodes mid-task from a bank of recorded teacher states (npz from
     # dagger/record_start_states.py): robot joint state + targets, peg pose in
@@ -377,6 +379,12 @@ class PreciseAssemblyCfg:
     tool_upright_assist_radius_m: float = 0.03
     tool_upright_assist_ramp_steps: float = 0.0
     tool_upright_assist_offset_steps: float = 0.0
+    # A7: > 0 = after object_start_hold_steps keep holding until >= this many fingertip pads touch the object (a tool in
+    # a holder until the hand has it), at most object_start_hold_max_steps policy steps.
+    object_start_hold_until_grasp: int = 0
+    object_start_hold_max_steps: int = 360
+    # A7 grasp stage: goals are credited only after the holder released the object because the hand grasped it.
+    object_start_hold_gate_goals: bool = False
     probe_key_driver_k: float = 0.0
     probe_key_driver_d: float = 0.0
     distractor_velocity_iterations: int = 0

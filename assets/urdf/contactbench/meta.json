@@ -13137,6 +13137,138 @@
     ],
     "note": "official tasks 15/16; overrides in FoundationTouch teacher/screwdriver/overrides.sh"
    }
+  },
+  "cb_allenkey_place": {
+   "object": "ak_key",
+   "fixture": "ak_block",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/ak_screw/ak_screw.urdf",
+     [
+      0.0249885,
+      4.55e-05,
+      0.02,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0249885,
+      4.55e-05,
+      0.02
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "stiffness": 0.0,
+     "damping": 0.004
+    }
+   ],
+   "waypoints": [
+    [
+     0.020764307395866006,
+     4.549989996444177e-05,
+     0.0888461437901703,
+     -0.0,
+     0.7071067811865475,
+     -0.0,
+     0.7071067811865475
+    ]
+   ],
+   "layout": {
+    "lead_mm": 2.34,
+    "unengaged_mm": 4.0,
+    "turn_to_seat_deg": 615.4,
+    "prelude_goals": 1,
+    "turn_goals_deg": [
+     30.0,
+     120.0
+    ],
+    "note": "key from the table to aligned above the head (in-hand bank)"
+   },
+   "object_start_pose": [
+    -0.00634614379017032,
+    -0.086275807395866,
+    0.0026999998999644435,
+    0.7071067811865475,
+    0.0,
+    0.0,
+    0.7071067811865475
+   ]
+  },
+  "cb_allenkey_grasp": {
+   "object": "ak_key",
+   "fixture": "ak_block",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/ak_screw/ak_screw.urdf",
+     [
+      0.0249885,
+      4.55e-05,
+      0.02,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0249885,
+      4.55e-05,
+      0.02
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "stiffness": 0.0,
+     "damping": 0.004
+    }
+   ],
+   "waypoints": [
+    [
+     0.020764307395866006,
+     4.549989996444177e-05,
+     0.0888461437901703,
+     -0.0,
+     0.7071067811865475,
+     -0.0,
+     0.7071067811865475
+    ]
+   ],
+   "layout": {
+    "lead_mm": 2.34,
+    "unengaged_mm": 4.0,
+    "turn_to_seat_deg": 615.4,
+    "prelude_goals": 1,
+    "turn_goals_deg": [
+     30.0,
+     120.0
+    ],
+    "note": "grasp the key held aligned above the head (in-hand bank)"
+   },
+   "object_start_pose": [
+    0.020764307395866006,
+    4.549989996444177e-05,
+    0.0888461437901703,
+    -0.0,
+    0.7071067811865475,
+    -0.0,
+    0.7071067811865475
+   ]
   }
  }
 }

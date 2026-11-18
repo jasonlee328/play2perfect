@@ -936,7 +936,23 @@ class PreciseAssemblyEnv(PlayEnv):
             return
         if not hasattr(self, "_hold_substeps"):
             self._hold_substeps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
-        held = self._hold_substeps < N * int(self.cfg.decimation)
+        dec = int(self.cfg.decimation)
+        held = self._hold_substeps < N * dec
+        pads_req = int(getattr(self.cfg.precise_assembly, "object_start_hold_until_grasp", 0))
+        if pads_req > 0:
+            # hold until the hand has the tool: >= pads_req fingertip pads touching it (last policy step's taxels),
+            # at most object_start_hold_max_steps; the release is latched per episode
+            if not hasattr(self, "_hold_grasped"):
+                self._hold_grasped = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                self._hold_released_by_grasp = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            tac = getattr(self, "_last_tactile", None)
+            if tac is not None:
+                pads = (tac.reshape(self.num_envs, 5, -1).sum(-1) > 0).sum(-1)
+                newly = (pads >= pads_req) & ~self._hold_grasped & (self._hold_substeps >= N * dec)
+                self._hold_released_by_grasp |= newly
+                self._hold_grasped |= newly
+            nmax = int(getattr(self.cfg.precise_assembly, "object_start_hold_max_steps", N))
+            held = held | (~self._hold_grasped & (self._hold_substeps < nmax * dec))
         self._hold_substeps += 1
         ids = held.nonzero(as_tuple=False).squeeze(-1)
         if ids.numel() == 0:
@@ -1499,6 +1515,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._hold_substeps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
             self._object_start_pose_w[env_ids] = w
             self._hold_substeps[env_ids] = 0
+            if hasattr(self, "_hold_grasped"):
+                self._hold_grasped[env_ids] = False
+                self._hold_released_by_grasp[env_ids] = False
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
         # (z - init_z > 0.10, which gates the keypoint reward) would need ~20 cm above the bin. Measure from here.
@@ -1519,6 +1538,10 @@ class PreciseAssemblyEnv(PlayEnv):
             # Robot joints are absolute, so the bank only fits the hole layout it was recorded on.
             self._start_bank_hole_pos = (torch.as_tensor(d["hole_pos"], device=self.device).float()
                                          if "hole_pos" in d.files else None)
+            # A7: in-hand banks also carry the screw's start height on its thread (recorded at the end of the start
+            # hold, when the screw has not moved from its reset pose)
+            self._start_bank_u = (torch.as_tensor(d["turn_u_start"], device=self.device).float()
+                                  if "turn_u_start" in d.files else None)
             if self._start_bank_hole_pos is None:
                 print("[PreciseAssemblyEnv] start-state bank has no hole_pos; can't check the hole "
                       "layout matches (use the layout it was recorded on)", flush=True)
@@ -1546,6 +1569,31 @@ class PreciseAssemblyEnv(PlayEnv):
         self.object.write_root_pose_to_sim(torch.cat([pos + self.scene.env_origins[env_ids], quat], -1), env_ids=env_ids)
         self.object.write_root_velocity_to_sim(vel, env_ids=env_ids)
 
+        if getattr(self, "_start_bank_u", None) is not None and getattr(self, "turn_thread", False) \
+                and not self._turn_thread_body_is_object():
+            # screw back on its thread at the bank entry's start height (same orientation as its reset pose)
+            kk = int(self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)].body[10:])
+            w = self._pose_rel_hole_to_world(env_ids, self._pih_distractor_pose_rel[kk]).clone()
+            axis_w, _ = self._turn_axis_w()
+            u = self._start_bank_u[k]
+            self.turn_u_start[env_ids] = u
+            # A7: the seat / stop angles and the thread height were set in the reset above from the configured start
+            # height; redo them from the bank entry's own height (no change when they match)
+            two_pi = 2.0 * math.pi
+            self.turn_seat_angle[env_ids] = self.turn_offset[env_ids] + two_pi * u / self.turn_lead[env_ids]
+            self.unlock_angle[env_ids] = (self.turn_seat_angle[env_ids]
+                                          + two_pi * self.turn_play[env_ids] / self.turn_lead[env_ids])
+            self.turn_u[env_ids] = u
+            w[:, 0:3] -= axis_w[env_ids] * u.unsqueeze(-1)
+            self.distractors[kk].write_root_pose_to_sim(w, env_ids=env_ids)
+            self.distractors[kk].write_root_velocity_to_sim(torch.zeros(n, 6, device=self.device), env_ids=env_ids)
+        if int(getattr(self.cfg.precise_assembly, "object_start_hold_steps", 0)) > 0 \
+                and getattr(self, "_object_start_pose_w", None) is not None:
+            self._object_start_pose_w[env_ids] = torch.cat([pos + self.scene.env_origins[env_ids], quat], -1)
+            self._hold_substeps[env_ids] = 0
+            if hasattr(self, "_hold_grasped"):
+                self._hold_grasped[env_ids] = False
+                self._hold_released_by_grasp[env_ids] = False
         self._successes[env_ids] = b["successes"][k].long()
         self._start_successes[env_ids] = b["successes"][k].long()
         self._lifted_object[env_ids] = b["lifted"][k].bool()
@@ -1838,6 +1886,10 @@ class PreciseAssemblyEnv(PlayEnv):
         if pih_cfg.allow_goal_skip:
             self._apply_goal_skip()
         is_success = self._is_success.clone()
+        if bool(getattr(pih_cfg, "object_start_hold_gate_goals", False)) and hasattr(self, "_hold_grasped"):
+            # A7 grasp stage: goals only count once the hand has the object and the holder has let go
+            held_now = self._hold_substeps < int(pih_cfg.object_start_hold_steps) * int(self.cfg.decimation)
+            is_success &= self._hold_grasped & ~held_now
         if pih_cfg.enable_retract:
             is_success &= ~self.retract_phase
         self._is_success = is_success
@@ -2129,6 +2181,18 @@ class PreciseAssemblyEnv(PlayEnv):
             t_pen = tsp * self._tl_step_deg
             reward = reward - t_pen
             self._reward_terms["toolless_step_penalty"] = -t_pen
+            self._reward_terms["total_reward"] = reward
+        gp = float(getattr(pih_cfg, "grip_pads_rew", 0.0))
+        tac = getattr(self, "_last_tactile", None)
+        if gp > 0.0 and tac is not None:
+            # A9: reward each step >= grip_pads_min fingertip pads touch the tool before the retract phase (the 13 g
+            # screwdriver tips over on regrasp strokes when the pinch opens; eng9 det: 15-25% dropped)
+            pads = (tac.reshape(self.num_envs, 5, -1).sum(-1) > 0).sum(-1)
+            held = (pads >= int(getattr(pih_cfg, "grip_pads_min", 2))).float()
+            if getattr(self, "retract_phase", None) is not None:
+                held = held * (~self.retract_phase).float()
+            reward = reward + gp * held
+            self._reward_terms["grip_pads_rew"] = gp * held
             self._reward_terms["total_reward"] = reward
         dp = float(getattr(pih_cfg, "dropped_terminal_penalty", 0.0))
         if dp > 0.0 and "dropped" in self._termination_reasons:   # A9: tool knocked down onto the table
