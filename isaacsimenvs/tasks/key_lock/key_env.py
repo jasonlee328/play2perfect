@@ -147,6 +147,7 @@ class KeyLockCfg:
     p2_slip_penalty: float = 2.0         # per slipping step
     p2_force: str = "pads"               # force the window acts on: "pads" (sum of the 5 fingertip pads = the pinch) | "hand"
     p2_force_ema: float = 0.2            # weight of the newest step in the smoothed force
+    p2_slip_ema: float = -1.0            # > 0: slip uses its own (faster) EMA of the pad force; break keeps p2_force_ema
     p2_ema_seed_onset: bool = False      # seed the smoothed force with the raw force at each contact onset (else it ramps
                                          # up from 0 and every fresh grasp reads as a slip whatever F_min is)
 
@@ -596,7 +597,16 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 self._p2_f = torch.where(onset, fnow, self._p2_f)
             self._p2_f = a_ * fnow + (1.0 - a_) * self._p2_f
             turn2 = (dth > 0) & ~self.retract_phase & (fnow > float(kl.contact_n))
-            slipping = turn2 & (self._p2_f < self.key_fmin2)
+            fslip = self._p2_f
+            if float(kl.p2_slip_ema) > 0.0:
+                if not hasattr(self, "_p2_fs"):
+                    self._p2_fs = fnow.clone()
+                b_ = float(kl.p2_slip_ema)
+                if bool(kl.p2_ema_seed_onset):
+                    self._p2_fs = torch.where(onset, fnow, self._p2_fs)
+                self._p2_fs = b_ * fnow + (1.0 - b_) * self._p2_fs
+                fslip = self._p2_fs
+            slipping = turn2 & (fslip < self.key_fmin2)
             self._p2_slipping = slipping
             self._p2_slip_acc = self._p2_slip_acc + torch.where(slipping, dth, torch.zeros_like(dth))
             cap = math.radians(float(kl.p2_cue_cap_deg))
@@ -732,6 +742,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self._p2_slip_acc[env_ids] = 0.0; self._p2_lag[env_ids] = 0.0
             if hasattr(self, "_p2_f"):
                 self._p2_f[env_ids] = 0.0
+            if hasattr(self, "_p2_fs"):
+                self._p2_fs[env_ids] = 0.0
             if hasattr(self, "_p2_inc_prev"):
                 self._p2_inc_prev[env_ids] = False
             self._key_slipped[env_ids] = False; self._p2_slipping[env_ids] = False
