@@ -188,6 +188,8 @@ class PreciseAssemblyCfg:
     card_missed_slot_z: float = 0.0      # > 0: fail "missed_slot" when the held card's bottom is below this (m) while its centre is off the slot
     card_path_rew_scale: float = 0.0     # potential-based shaping toward the slot (per m of 3 x lateral + bottom-height progress)
     card_path_lean_w: float = 0.0        # path potential: + w (m/deg) x lean difference to the front deck card while over the slot
+    card_success_outcome: bool = False   # success = seated + deck intact + hand clear only (no process checks)
+    card_fail_released_outside: bool = True
     card_rob_deck_pen: float = 0.0       # per-step penalty x robot <-> deck contact force (N), capped (A10)
     card_rob_deck_pen_cap: float = 5.0
     # A10 residual RL on the scripted expert (card_expert.py): joint target = expert target + scale x policy action

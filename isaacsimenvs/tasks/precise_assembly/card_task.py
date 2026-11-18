@@ -344,7 +344,13 @@ class CardTask:
         else:
             start_ok = self.hold_ok & (self.slip_hold < c.card_hold_slip)
         held = start_ok & tr_ok
-        end_ok = in_holder & deck_ok & clear & stopped & self.rel_inside & held
+        if getattr(c, "card_success_outcome", False):
+            # outcome success (A10, user 11-18): the card ends seated in the holder leaning on the deck, the deck
+            # undisturbed, the hand released and clear; HOW it got there (slip in the pinch, release height,
+            # arm speed) is not judged -- those official checks are QA for the scripted gripper demo
+            end_ok = in_holder & deck_ok & clear
+        else:
+            end_ok = in_holder & deck_ok & clear & stopped & self.rel_inside & held
         self.final_count = torch.where(end_ok, self.final_count + 1, torch.zeros_like(self.final_count))
         self.success = self.final_count >= c.card_final_steps
 
@@ -357,7 +363,7 @@ class CardTask:
             slip_tol = c.card_slip_fail_start + a_s * (c.card_transport_slip - c.card_slip_fail_start)
         self.slip_fail_tol = slip_tol
         self.fail["slipped"] = transport & (self.slip_tr >= slip_tol) if c.card_fail_slip else torch.zeros_like(deck_ok)
-        self.fail["released_outside"] = self.released & ~self.rel_inside
+        self.fail["released_outside"] = (self.released & ~self.rel_inside) if getattr(c, "card_fail_released_outside", True) else torch.zeros_like(deck_ok)
         mz = float(getattr(c, "card_missed_slot_z", 0.0))
         if mz > 0.0:   # card pushed low while not over the slot (lands beside the holder / on the walls)
             off = ((pc[:, 0] - c.card_missed_slot_x).abs() > c.card_missed_slot_xy_tol) | (pc[:, 1].abs() > c.card_missed_slot_xy_tol)
