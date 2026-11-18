@@ -149,6 +149,8 @@ class KeyLockCfg:
     p2_force_ema: float = 0.2            # weight of the newest step in the smoothed force
     p2_track_rew: float = 0.0            # per turning step: scale x (1 - |log(F_break_ema / (sqrt(rho) F_min))| / log(rho)),
                                          # clipped to [-1, 1] (privileged shaping toward the middle of the allowed band)
+    hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
+                                         # x sqrt): domain randomization so the policy learns to turn with a light grip too
     p2_slip_ema: float = -1.0            # > 0: slip uses its own (faster) EMA of the pad force; break keeps p2_force_ema
     p2_ema_seed_onset: bool = False      # seed the smoothed force with the raw force at each contact onset (else it ramps
                                          # up from 0 and every fresh grasp reads as a slip whatever F_min is)
@@ -737,6 +739,18 @@ class KeyLockEnv(PreciseAssemblyEnv):
         if hasattr(self, "_ja_reinit"):
             self._ja_reinit[env_ids] = True
         super()._reset_idx(env_ids)
+        lo, hi = (float(v) for v in self.cfg.key_lock.hand_stiff_range)
+        if lo != 1.0 or hi != 1.0:
+            rob = self.robot
+            if not hasattr(self, "_hs_ids"):
+                self._hs_ids = [i for i, nm in enumerate(rob.joint_names) if not nm.startswith("iiwa")]
+                self._hs_K0 = rob.data.joint_stiffness[:, self._hs_ids].clone()
+                self._hs_D0 = rob.data.joint_damping[:, self._hs_ids].clone()
+                self.key_hand_stiff = torch.ones(self.num_envs, device=self.device)
+            sc = torch.exp(torch.empty(len(env_ids), device=self.device).uniform_(math.log(lo), math.log(hi)))
+            self.key_hand_stiff[env_ids] = sc
+            rob.write_joint_stiffness_to_sim(self._hs_K0[env_ids] * sc.unsqueeze(-1), joint_ids=self._hs_ids, env_ids=env_ids)
+            rob.write_joint_damping_to_sim(self._hs_D0[env_ids] * sc.sqrt().unsqueeze(-1), joint_ids=self._hs_ids, env_ids=env_ids)
         if not hasattr(self, "_key_still"):
             return
         self._ja_reinit[env_ids] = True
