@@ -1264,6 +1264,33 @@ class PreciseAssemblyEnv(PlayEnv):
         body.write_root_pose_to_sim(torch.cat([pos[ids], quat[ids]], -1), env_ids=ids)
         body.write_root_velocity_to_sim(vel[ids], env_ids=ids)
 
+    def _retract_keep_step(self, pc) -> torch.Tensor:
+        """A9 official in-hand release check (one policy step); returns the per-env 'clear' flag (see cfg)."""
+        n = self.num_envs
+        tcp = self.robot.data.body_state_w[:, self._fingertip_body_ids, 0:3].mean(dim=1)
+        rel = self.object.data.root_pos_w - tcp
+        if getattr(self, "_retract_keep_tcp0", None) is None:
+            self._retract_keep_tcp0 = tcp.clone()
+            self._retract_keep_rel0 = rel.clone()
+            self._retract_keep_prev = tcp.clone()
+            self._retract_keep_lost = torch.zeros(n, dtype=torch.bool, device=self.device)
+        ent = self._just_entered_retract | ~self.retract_phase
+        self._retract_keep_tcp0 = torch.where(ent.unsqueeze(-1), tcp, self._retract_keep_tcp0)
+        self._retract_keep_rel0 = torch.where(ent.unsqueeze(-1), rel, self._retract_keep_rel0)
+        disp = (tcp - self._retract_keep_tcp0).norm(dim=-1)
+        drift = (rel - self._retract_keep_rel0).norm(dim=-1)
+        speed = (tcp - self._retract_keep_prev).norm(dim=-1) / max(1e-6, float(self.step_dt))
+        self._retract_keep_prev = tcp.clone()
+        self._retract_keep_disp = disp
+        self._retract_keep_lost = (drift > float(pc.retract_keep_drop_m)) & self.retract_phase
+        tl = getattr(self, "_tl_out", None)
+        tip_out = torch.ones(n, dtype=torch.bool, device=self.device) if tl is None else tl
+        clear = ((disp >= float(pc.retract_keep_move_m)) & (speed < float(pc.retract_keep_still_mps))
+                 & (drift < float(pc.retract_keep_drift_m)) & tip_out)
+        self.extras["retract_keep_disp_mean"] = (disp * self.retract_phase.float()).sum() / self.retract_phase.float().sum().clamp(min=1)
+        self.extras["retract_keep_lost_frac"] = self._retract_keep_lost.float().mean()
+        return clear
+
     def _turn_vseat_sample(self, env_ids) -> None:
         """A9 design C: hidden virtual seat = physical lock angle - U(lo, hi) deg (after the lock angle is set)."""
         if getattr(self, "turn_vseat", None) is None:
@@ -1965,9 +1992,12 @@ class PreciseAssemblyEnv(PlayEnv):
                     self.extras["retract_ramp_dist"] = r_dist
                     self.extras["retract_ramp_clear"] = float(r_clear)
                 self._retract_cur_dist = r_dist
-                far = self._curr_fingertip_dist_center.min(dim=-1).values > r_dist
-                tac = getattr(self, "_last_tactile", None)
-                clear = far if tac is None else far & (tac.reshape(tac.shape[0], -1).sum(-1) == 0)
+                if bool(getattr(pih_cfg, "retract_keep_object", False)):
+                    clear = self._retract_keep_step(pih_cfg)
+                else:
+                    far = self._curr_fingertip_dist_center.min(dim=-1).values > r_dist
+                    tac = getattr(self, "_last_tactile", None)
+                    clear = far if tac is None else far & (tac.reshape(tac.shape[0], -1).sum(-1) == 0)
                 if not hasattr(self, "_retract_clear_count"):
                     self._retract_clear_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
                 self._retract_clear_count = torch.where(clear & self.retract_phase, self._retract_clear_count + 1,
@@ -1993,6 +2023,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.retract_succeeded |= just_retracted
             if pih_cfg.end_on_retract:
                 self.retract_failed |= hand_away & self.retract_phase & ~self.retract_succeeded
+                if bool(getattr(pih_cfg, "retract_keep_object", False)):
+                    self.retract_failed |= self._retract_keep_lost & self.retract_phase & ~self.retract_succeeded
                 # Seat measurements at the moment the hand clears (kept across the auto-reset so evals can read them).
                 if not hasattr(self, "_retract_measured"):
                     self._retract_measured = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
@@ -2139,7 +2171,15 @@ class PreciseAssemblyEnv(PlayEnv):
                 <= pih_cfg.retract_success_tolerance * self.cfg.reward.keypoint_scale
             ).float()
             mean_fingertip_dist = self._curr_fingertip_distances.mean(dim=-1)
-            if getattr(pih_cfg, "retract_reward_delta", False):
+            if bool(getattr(pih_cfg, "retract_keep_object", False)) and getattr(self, "_retract_keep_disp", None) is not None:
+                d = self._retract_keep_disp.clamp(max=float(pih_cfg.retract_keep_move_m) + 0.01)
+                d = torch.where(self._retract_keep_lost, torch.zeros_like(d), d)
+                if not hasattr(self, "_retract_prev_d"):
+                    self._retract_prev_d = d.clone()
+                prev = torch.where(self._just_entered_retract, d, self._retract_prev_d)
+                self._retract_prev_d = d.clone()
+                mean_fingertip_dist = d - prev
+            elif getattr(pih_cfg, "retract_reward_delta", False):
                 cap = float(getattr(self, "_retract_cur_dist", 0.0) or pih_cfg.retract_min_fingertip_dist or 0.1) + 0.05
                 d = mean_fingertip_dist.clamp(max=cap)
                 if not hasattr(self, "_retract_prev_d"):

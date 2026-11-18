@@ -236,6 +236,17 @@ class PreciseAssemblyCfg:
     turn_clutch_brake_end: float = 0.0
     turn_clutch_brake_ramp_steps: int = 0
     turn_clutch_brake_offset_steps: int = 0
+    # A9 official in-hand release (tighten_screw_with_screwdriver: tool kept in hand + released_and_clear + stopped):
+    # with end_on_retract, the retract succeeds when, for retract_clear_steps steps in a row, the TCP (fingertip mean)
+    # has moved >= retract_keep_move_m from where it was when the retract phase began, moves < retract_keep_still_mps,
+    # no tool tip is in the recess, and the tool drifted < retract_keep_drift_m relative to the TCP (kept in hand).
+    # Tool drift > retract_keep_drop_m during the retract = retract failed (lost the tool). The retract reward then
+    # pays TCP displacement (capped at retract_keep_move_m + 1 cm) instead of fingertip distance from the tool.
+    retract_keep_object: bool = False
+    retract_keep_move_m: float = 0.05
+    retract_keep_still_mps: float = 0.03
+    retract_keep_drift_m: float = 0.008
+    retract_keep_drop_m: float = 0.03
     # A9 design C (virtual-seat clutch, turn_thread only): non-empty [lo, hi] = per-episode hidden virtual seat
     # vseat = physical lock angle - U(lo, hi) deg. The physics is unchanged (the screw keeps threading past vseat, so the
     # joint state shows no stall); the fingertip / skin tactile ray-casts the tool rotated back by the over-turn past
