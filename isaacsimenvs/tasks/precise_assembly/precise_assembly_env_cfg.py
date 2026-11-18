@@ -236,6 +236,14 @@ class PreciseAssemblyCfg:
     turn_clutch_brake_end: float = 0.0
     turn_clutch_brake_ramp_steps: int = 0
     turn_clutch_brake_offset_steps: int = 0
+    # A9 design C (virtual-seat clutch, turn_thread only): non-empty [lo, hi] = per-episode hidden virtual seat
+    # vseat = physical lock angle - U(lo, hi) deg. The physics is unchanged (the screw keeps threading past vseat, so the
+    # joint state shows no stall); the fingertip / skin tactile ray-casts the tool rotated back by the over-turn past
+    # vseat about the screw axis (the handle feels as if it stopped under the fingers = slip). The last goal is credited
+    # at vseat (no tight / torque requirement); turning more than turn_vseat_over_deg past vseat strips the screw.
+    turn_vseat_offset_range_deg: tuple[float, ...] = ()
+    turn_vseat_over_deg: float = 45.0
+    turn_vseat_tactile: bool = True
     # > 0: fail `stripped` (-turn_strip_penalty) once the cap is turned more than this past its stop (any mode).
     turn_strip_over_deg: float = 0.0
     # Over-turn curriculum: > 0 = ramp the strip window from turn_strip_over_ramp_start_deg down to turn_strip_over_deg

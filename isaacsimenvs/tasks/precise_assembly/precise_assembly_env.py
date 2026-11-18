@@ -243,6 +243,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.turn_play = torch.clamp(self.turn_lead - float(pih_cfg.turn_thread_ridge_mm) * 1e-3, min=0.0)
                 self.turn_u_start = torch.zeros(n, device=self.device)        # start height above the seat (m)
                 self.turn_seat_angle = torch.zeros(n, device=self.device)     # unwrapped angle at which it lands
+                self.turn_vseat = None
+                if len(list(getattr(pih_cfg, "turn_vseat_offset_range_deg", []) or [])) == 2:
+                    self.turn_vseat = torch.zeros(n, device=self.device)      # A9 design C: hidden virtual seat
                 self.turn_tau_acc = torch.zeros(n, device=self.device)        # torque pushed into the lock (sum)
                 self._turn_tau_n = 0
                 self.turn_lock_torque = torch.zeros(n, device=self.device)    # per-step mean (N m)
@@ -726,6 +729,7 @@ class PreciseAssemblyEnv(PlayEnv):
                                                  + two_pi * self.turn_u_start[env_ids] / self.turn_lead[env_ids])
                 self.unlock_angle[env_ids] = (self.turn_seat_angle[env_ids]
                                               + two_pi * self.turn_play[env_ids] / self.turn_lead[env_ids])
+                self._turn_vseat_sample(env_ids)
                 self.turn_prev_ep_tight[env_ids] = self.turn_tight[env_ids]
                 self.turn_prev_ep_lock_torque_max[env_ids] = self.turn_lock_torque_max[env_ids]
                 self.turn_tight[env_ids] = False
@@ -1260,6 +1264,14 @@ class PreciseAssemblyEnv(PlayEnv):
         body.write_root_pose_to_sim(torch.cat([pos[ids], quat[ids]], -1), env_ids=ids)
         body.write_root_velocity_to_sim(vel[ids], env_ids=ids)
 
+    def _turn_vseat_sample(self, env_ids) -> None:
+        """A9 design C: hidden virtual seat = physical lock angle - U(lo, hi) deg (after the lock angle is set)."""
+        if getattr(self, "turn_vseat", None) is None:
+            return
+        vlo, vhi = (math.radians(float(v)) for v in self.cfg.precise_assembly.turn_vseat_offset_range_deg)
+        self.turn_vseat[env_ids] = self.unlock_angle[env_ids] - (
+            vlo + (vhi - vlo) * torch.rand(len(env_ids), device=self.device))
+
     def _turn_clutch_brake(self) -> float:
         pc = self.cfg.precise_assembly
         b0 = float(pc.turn_clutch_brake)
@@ -1272,6 +1284,13 @@ class PreciseAssemblyEnv(PlayEnv):
     def _tactile_object_pose(self):
         """Object (pos, quat) the fingertip tactile ray-casts against, or None (= the real pose). Turn clutch: the cap
         rotated back by its over-turn past the stop, i.e. the felt surface stays at the stop angle."""
+        if getattr(self, "turn_vseat", None) is not None and bool(self.cfg.precise_assembly.turn_vseat_tactile):
+            # A9 design C: the tool felt as stopped at the virtual seat (rotated back about the screw axis)
+            over = torch.clamp(self.turn_angle - self.turn_vseat, min=0.0)
+            axis_w, anchor_w = self._turn_axis_w()
+            rot = quat_from_angle_axis(-over, axis_w)
+            pos = self.object.data.root_pos_w
+            return anchor_w + quat_apply(rot, pos - anchor_w), quat_mul(rot, self.object.data.root_quat_w)
         if not (getattr(self, "turn_mode", False) and self.cfg.precise_assembly.turn_clutch):
             return None
         over = torch.clamp(self.turn_angle - self.unlock_angle, min=0.0)
@@ -1310,7 +1329,10 @@ class PreciseAssemblyEnv(PlayEnv):
         else:
             first = torch.minimum(self.turn_offset + math.radians(float(pih_cfg.turn_first_goal_deg)),
                                   self.unlock_angle - math.radians(float(pih_cfg.unlock_tol_deg)))   # A7: near the seat
-            target = torch.where(at_last, self.unlock_angle, first)
+            vseat = getattr(self, "turn_vseat", None)
+            stop_t = self.unlock_angle if vseat is None else vseat
+            first = torch.minimum(first, stop_t - math.radians(float(pih_cfg.unlock_tol_deg)))
+            target = torch.where(at_last, stop_t, first)
             rem = torch.clamp(target - self.turn_angle, min=0.0)
         self._keypoints_max_dist = rem * float(pih_cfg.turn_progress_m_per_rad)
         tool_out = None
@@ -1334,7 +1356,7 @@ class PreciseAssemblyEnv(PlayEnv):
             # tight = the hand has pushed >= turn_tight_torque into the lock for turn_tight_steps consecutive steps;
             # turning the cap back > 1 deg off the lock loosens it (the preload is gone)
             self._turn_torque_step()
-            if not loosen:
+            if not loosen and getattr(self, "turn_vseat", None) is None:
                 near = torch.where(at_last, near & self.turn_tight, near)
             self._turn_update_lock_inertia()
             self.extras["turn_tight_frac"] = self.turn_tight.float().mean()
@@ -1377,12 +1399,14 @@ class PreciseAssemblyEnv(PlayEnv):
         strip_tau = float(pih_cfg.turn_strip_torque) if getattr(self, "turn_thread", False) else 0.0
         if getattr(self, "turn_thread", False):
             strip_tau = max(strip_tau, float(getattr(pih_cfg, "turn_break_torque", 0.0)))
-        if strip_steps > 0 or over_deg > 0.0 or strip_tau > 0.0:
+        if strip_steps > 0 or over_deg > 0.0 or strip_tau > 0.0 or getattr(self, "turn_vseat", None) is not None:
             new = torch.zeros_like(at_stop)
             if strip_steps > 0:
                 new |= self.turn_strip_count > strip_steps
             if over_deg > 0.0:
                 new |= self.turn_angle > self.unlock_angle + math.radians(over_deg)
+            if getattr(self, "turn_vseat", None) is not None:
+                new |= self.turn_angle > self.turn_vseat + math.radians(float(pih_cfg.turn_vseat_over_deg))
             if getattr(self, "turn_thread", False) and float(pih_cfg.turn_strip_torque) > 0.0:
                 new |= self.turn_lock_torque > float(pih_cfg.turn_strip_torque)   # our over-torque rule (not official)
             brk = float(getattr(pih_cfg, "turn_break_torque", 0.0))
@@ -1586,6 +1610,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.unlock_angle[env_ids] = (self.turn_seat_angle[env_ids]
                                           + two_pi * self.turn_play[env_ids] / self.turn_lead[env_ids])
             self.turn_u[env_ids] = u
+            self._turn_vseat_sample(env_ids)
             w[:, 0:3] -= axis_w[env_ids] * u.unsqueeze(-1)
             self.distractors[kk].write_root_pose_to_sim(w, env_ids=env_ids)
             self.distractors[kk].write_root_velocity_to_sim(torch.zeros(n, 6, device=self.device), env_ids=env_ids)
