@@ -208,6 +208,10 @@ class CardTask:
             raw = pinch_f | (n_links >= 2) | (tac_on.sum(-1) >= 2) | ((tac_on.sum(-1) >= 1) & (f_robot_card > c.card_pad_force))
         else:
             raw = pinch_f | (n_links >= 2)
+        # fingertip-vs-rest contact (A10, user 11-18: hold the card with the sensing fingertips, not the palm)
+        nontip = [i for i in range(F_rc.shape[1]) if i not in self.tip_ids]
+        self.f_nontip = F_rc[:, nontip].sum(-1) if nontip else torch.zeros_like(f_robot_card)
+        self.n_pads = tac_on.sum(-1).float() if tac_on is not None else tips.sum(-1).float()
         if not hasattr(self, "pinch_hist"):
             self.pinch_hist = torch.zeros(3, env.num_envs, dtype=torch.bool, device=env.device)
         self.pinch_hist = torch.roll(self.pinch_hist, 1, 0); self.pinch_hist[0] = raw

@@ -1293,6 +1293,14 @@ class PreciseAssemblyEnv(PlayEnv):
                 + pih_cfg.card_release_bonus * card.just_rel_inside.float()
             if getattr(pih_cfg, "card_path_rew_scale", 0.0) > 0.0 and hasattr(card, "path_dphi"):
                 c_rew = c_rew + pih_cfg.card_path_rew_scale * card.path_dphi
+            if float(getattr(pih_cfg, "card_tip_rew", 0.0)) > 0.0 and hasattr(card, "n_pads"):
+                # per step while held: fingertip pads touching the card (TacMap), saturating at 3 pads
+                c_rew = c_rew + pih_cfg.card_tip_rew * (card.n_pads.clamp(max=3.0) / 3.0) * (~card.released).float()
+                self._reward_terms["card_n_pads"] = card.n_pads
+            if float(getattr(pih_cfg, "card_nontip_pen", 0.0)) > 0.0 and hasattr(card, "f_nontip"):
+                # per step: contact force (N, capped) between the card and any hand/arm link other than the 5 DP tips
+                c_rew = c_rew - pih_cfg.card_nontip_pen * card.f_nontip.clamp(max=pih_cfg.card_nontip_pen_cap)
+                self._reward_terms["card_f_nontip"] = card.f_nontip
             if float(getattr(pih_cfg, "card_rob_deck_pen", 0.0)) > 0.0 and hasattr(card, "f_rob_deck"):
                 # robot <-> deck cards contact force (N, capped): keeps the fingers off the deck while seating (A10)
                 c_rew = c_rew - pih_cfg.card_rob_deck_pen * card.f_rob_deck.clamp(max=pih_cfg.card_rob_deck_pen_cap)

@@ -190,6 +190,9 @@ class PreciseAssemblyCfg:
     card_path_lean_w: float = 0.0        # path potential: + w (m/deg) x lean difference to the front deck card while over the slot
     card_success_outcome: bool = False   # success = seated + deck intact + hand clear only (no process checks)
     card_fail_released_outside: bool = True
+    card_tip_rew: float = 0.0           # per step x (fingertip pads on the card, capped 3) / 3 while held
+    card_nontip_pen: float = 0.0        # per step x card contact force on non-fingertip links (N, capped)
+    card_nontip_pen_cap: float = 5.0
     card_rob_deck_pen: float = 0.0       # per-step penalty x robot <-> deck contact force (N), capped (A10)
     card_rob_deck_pen_cap: float = 5.0
     # A10 residual RL on the scripted expert (card_expert.py): joint target = expert target + scale x policy action
