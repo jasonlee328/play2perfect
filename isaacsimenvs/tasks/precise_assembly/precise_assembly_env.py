@@ -1387,11 +1387,20 @@ class PreciseAssemblyEnv(PlayEnv):
             rem = torch.clamp(target - self.turn_angle, min=0.0)
         self._keypoints_max_dist = rem * float(pih_cfg.turn_progress_m_per_rad)
         tool_out = None
+        npads = int(getattr(pih_cfg, "turn_progress_requires_pads", 0))
+        if npads > 0 and getattr(self, "_last_tactile", None) is not None:
+            pads_on = (self._last_tactile.reshape(self.num_envs, 5, -1).sum(-1) > 0).sum(-1)
+            self._turn_pads_short = pads_on < npads
+            self.extras["turn_pads_ok_frac"] = (~self._turn_pads_short).float().mean()
+        else:
+            self._turn_pads_short = None
         if bool(getattr(pih_cfg, "turn_progress_requires_tool", False)) and getattr(self, "_tl_out", None) is not None:
             # A7: turning progress only pays while a tool tip is in the recess (last step's toolless check): degrees turned
             # by the fingers on the head earn nothing (the keypoint reward pays improvements of the closest distance, so
             # holding the distance at its best-so-far value freezes it), and the first turn goal can't be credited
             tool_out = self._tl_out
+            if getattr(self, "_turn_pads_short", None) is not None:
+                tool_out = tool_out | self._turn_pads_short
             best = torch.where(self._closest_keypoint_max_dist >= 0.0, self._closest_keypoint_max_dist,
                                self._keypoints_max_dist)
             self._keypoints_max_dist = torch.where(tool_out, torch.maximum(self._keypoints_max_dist, best),

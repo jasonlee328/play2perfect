@@ -242,6 +242,9 @@ class PreciseAssemblyCfg:
     # no tool tip is in the recess, and the tool drifted < retract_keep_drift_m relative to the TCP (kept in hand).
     # Tool drift > retract_keep_drop_m during the retract = retract failed (lost the tool). The retract reward then
     # pays TCP displacement (capped at retract_keep_move_m + 1 cm) instead of fingertip distance from the tool.
+    # A9 (official turned_by_the_tool_in_hand: both pads loaded > 98% of the turning): > 0 = turning progress pays only
+    # in policy steps where >= this many fingertip pads touch the tool (last step's taxels; like turn_progress_requires_tool)
+    turn_progress_requires_pads: int = 0
     retract_keep_object: bool = False
     retract_keep_move_m: float = 0.05
     retract_keep_still_mps: float = 0.03
