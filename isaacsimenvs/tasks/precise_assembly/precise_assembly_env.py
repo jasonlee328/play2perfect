@@ -500,8 +500,20 @@ class PreciseAssemblyEnv(PlayEnv):
         # fingertip friction; PhysX default combine = average
         om = self.object.root_physx_view.get_material_properties()      # (N, shapes, 3) cpu
         mu_obj = om[:, 0, 0].clone().to(self.device)
-        mu_ft = float(self.cfg.assets.finger_tip_friction)
-        self.grip_mu = 0.5 * (mu_obj + mu_ft)
+        # per-env fingertip friction (domain_randomization.fingertip_friction_scale_range buckets): read it back from the
+        # robot's fingertip shapes (same shape walk as scene_utils.apply_physx_material_properties)
+        from isaacsimenvs.tasks.play.utils.scene_utils import FINGERTIP_LINK_NAMES
+        rv = self.robot.root_physx_view
+        rm = rv.get_material_properties()
+        idx, start = [], 0
+        for name, path in zip(rv.shared_metatype.link_names, rv.link_paths[0]):
+            n = self.robot._physics_sim_view.create_rigid_body_view(path).max_shapes
+            if name in FINGERTIP_LINK_NAMES:
+                idx += list(range(start, start + n))
+            start += n
+        mu_ft = (rm[:, idx, 0].mean(-1) if idx else torch.full((self.num_envs,), float(self.cfg.assets.finger_tip_friction)))
+        self.grip_mu_ft = mu_ft.to(self.device)
+        self.grip_mu = 0.5 * (mu_obj + self.grip_mu_ft)
         # F_min = grip (sum of normal forces) needed to pass the tightening torque through friction at the handle radius
         self.grip_fmin = float(pc.grip_tau_req) / (self.grip_mu * float(pc.grip_handle_radius_m))
         self.grip_force = torch.zeros(self.num_envs, device=self.device)
@@ -509,7 +521,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self._grip_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         self.grip_cracked = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         self.grip_ep_max = torch.zeros(self.num_envs, device=self.device)
-        print(f"[grip] contact view vs {self._grip_nl} links; mu_obj env0..3 {mu_obj[:4].tolist()} "
+        print(f"[grip] contact view vs {self._grip_nl} links; mu_obj env0..3 {mu_obj[:4].tolist()} mu_ft {self.grip_mu_ft[:4].tolist()} "
               f"F_min env0..3 {self.grip_fmin[:4].tolist()}", flush=True)
 
     def _grip_ratio_now(self) -> float:
