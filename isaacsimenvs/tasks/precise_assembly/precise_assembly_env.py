@@ -1275,7 +1275,10 @@ class PreciseAssemblyEnv(PlayEnv):
         """A9 official in-hand release check (one policy step); returns the per-env 'clear' flag (see cfg)."""
         n = self.num_envs
         tcp = self.robot.data.body_state_w[:, self._fingertip_body_ids, 0:3].mean(dim=1)
-        rel = self.object.data.root_pos_w - tcp
+        # official 'tool drift in hand': the tool position in the PALM frame (a world-frame offset counted hand
+        # rotation during the lift as drift: a rigidly held tool read ~16 mm)
+        palm = self.robot.data.body_state_w[:, self._palm_body_id, :]
+        rel = quat_apply_inverse(palm[:, 3:7], self.object.data.root_pos_w - palm[:, 0:3])
         # tool tip (turn_tool_tips_m[0], object frame; root if unset): its displacement drives the retract reward, so
         # tilting the tool about a tip left in the recess earns nothing
         tips = getattr(pc, "turn_tool_tips_m", ())
