@@ -215,6 +215,7 @@ class CardTask:
         self.f_env = F_ce.sum(-1)
         self.f_env_ep_max = torch.maximum(self.f_env_ep_max, self.f_env)
         f_rob_scene = f_robot_card + F_rd.sum(-1)
+        self.f_rob_deck = F_rd.sum(-1)
         self.f_rob = f_rob_scene
 
         # card in the link7 frame
