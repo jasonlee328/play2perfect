@@ -1364,7 +1364,9 @@ class PreciseAssemblyEnv(PlayEnv):
             cur_end = cur
         self._tl_committed = self._tl_committed + torch.where(ends, cur_end, torch.zeros_like(cur))
         self._tl_out = ~inside
+        prev_tl = self.turn_toolless_deg.clone()
         self.turn_toolless_deg = self._tl_committed + torch.where(self._tl_out, cur, torch.zeros_like(cur))
+        self._tl_step_deg = torch.clamp(self.turn_toolless_deg - prev_tl, min=0.0)   # A9: dense penalty input
         self.extras["turn_tool_in_recess_frac"] = inside.float().mean()
         lim = float(pc.turn_toolless_max_deg)
         if lim > 0.0:
@@ -2001,6 +2003,13 @@ class PreciseAssemblyEnv(PlayEnv):
             fall_pen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
             reward = reward - fall_pen
             self._reward_terms["fall_terminal_penalty"] = -fall_pen
+            self._reward_terms["total_reward"] = reward
+        tsp = float(getattr(pih_cfg, "turn_toolless_step_penalty", 0.0))
+        if tsp > 0.0 and getattr(self, "_tl_step_deg", None) is not None:
+            # A9: per degree of screw rotation while no tool tip is in the recess (official: turned by the tool in hand)
+            t_pen = tsp * self._tl_step_deg
+            reward = reward - t_pen
+            self._reward_terms["toolless_step_penalty"] = -t_pen
             self._reward_terms["total_reward"] = reward
         dp = float(getattr(pih_cfg, "dropped_terminal_penalty", 0.0))
         if dp > 0.0 and "dropped" in self._termination_reasons:   # A9: tool knocked down onto the table

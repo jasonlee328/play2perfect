@@ -309,6 +309,7 @@ class PreciseAssemblyCfg:
     turn_tool_out_m: float = 0.0005
     turn_toolless_max_deg: float = 0.0
     turn_toolless_penalty: float = 0.0
+    turn_toolless_step_penalty: float = 0.0   # A9: reward -= this x deg of screw turn with no tip in the recess (per step)
     # A9: per-policy-step screw rotation below this (deg) is not counted toward turn_toolless_max_deg: the sum of |d angle|
     # over a 40 s episode of sub-millidegree sim jitter otherwise reaches 2 deg and ends 70% of episodes as `toolless` with
     # the screw untouched (sd_tbl3, mean angle 0.014 deg). 0 = off (A7 behaviour).
