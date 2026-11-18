@@ -75,6 +75,8 @@ class KeyLockCfg:
                                          # palm within drift_mm/2 of an anchor (=> net drift <= drift_mm), not just released time
     arm_deadband: float = 0.0            # |arm velocity action| below this -> 0 (arm actions are velocities: a tiny bias
                                          # otherwise creeps the palm; applies to every policy and every phase)
+    release_arm_scale: float = 1.0       # < 1: once released (hand >= release_dist away, no contact), arm velocity actions
+                                         # are scaled by this (fine mode for the stillness check; every policy, train + eval)
                                          # first and last step of the still window < drift_mm; False = every step within
                                          # drift_mm of the window start (stricter, pre-11-17 behaviour)
     drift_start_mm: float = 0.0          # > 0: the stillness tolerance ramps drift_start_mm -> drift_mm over drift_ramp_steps
@@ -302,6 +304,12 @@ class KeyLockEnv(PreciseAssemblyEnv):
             actions = actions.clone()
             a = actions[:, :7]
             actions[:, :7] = torch.where(a.abs() < db, torch.zeros_like(a), a)
+        ras = float(self.cfg.key_lock.release_arm_scale)
+        if ras < 1.0 and hasattr(self, "_key_released_now"):
+            actions = actions.clone()
+            sc = torch.where(self._key_released_now, torch.full_like(self._key_released_now, ras, dtype=actions.dtype),
+                             torch.ones_like(self._key_released_now, dtype=actions.dtype)).to(actions.device)
+            actions[:, :7] = actions[:, :7] * sc.unsqueeze(-1)
         self._key_arm_act = actions[:, :7].abs().mean(-1).to(self.device)
         super()._pre_physics_step(actions)
 
