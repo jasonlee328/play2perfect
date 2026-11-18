@@ -350,6 +350,8 @@ class ActionCfg:
     arm_moving_average: float = 0.1
     hand_moving_average: float = 0.1
     dof_speed_scale: float = 1.5
+    # A12: > 0 = hand actions are velocity deltas (target += scale * dt * a), not absolute [-1, 1] positions
+    hand_delta_scale: float = 0.0
 
 
 # ----------------------------------------------------------------------------
