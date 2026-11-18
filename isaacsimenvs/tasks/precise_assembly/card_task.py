@@ -127,6 +127,8 @@ class CardTask:
         for t in (self.released, self.rel_inside, self.success, self.picked, self.board_after):
             t[env_ids] = False
         self.hold_ok[env_ids] = True
+        if hasattr(self, 'deck_over'):
+            self.deck_over[env_ids] = 0
         if hasattr(self, 'path_phi'):
             self.path_phi[env_ids] = float('nan')
         self.rest_ok[env_ids] = False
@@ -368,7 +370,16 @@ class CardTask:
             a = min(1.0, float(env.common_step_counter + c.card_deck_fail_curriculum_offset) / float(c.card_deck_fail_curriculum_steps))
         mv_tol = c.card_deck_fail_move_start + a * (c.card_deck_move_tol - c.card_deck_fail_move_start)
         rt_tol = c.card_deck_fail_rot_start + a * (c.card_deck_rot_tol - c.card_deck_fail_rot_start)
-        self.fail["deck_disturbed"] = (deck_moved >= mv_tol) | (deck_rot >= rt_tol)
+        over = (deck_moved >= mv_tol) | (deck_rot >= rt_tol)
+        nh = int(getattr(c, "card_deck_fail_hold_steps", 0))
+        if nh > 0:
+            # the official existing_cards_remain is an END check; a deck card rocked while the card slides in and that
+            # falls back onto its posts is not a failure, so terminate only when it stays displaced for nh steps
+            if not hasattr(self, "deck_over"):
+                self.deck_over = torch.zeros(env.num_envs, dtype=torch.long, device=env.device)
+            self.deck_over = torch.where(over, self.deck_over + 1, torch.zeros_like(self.deck_over))
+            over = self.deck_over >= nh
+        self.fail["deck_disturbed"] = over
         env.extras["card/deck_fail_move_tol_mm"] = mv_tol * 1e3
         if c.card_break_force > 0.0:
             over = self.f_env > c.card_break_force

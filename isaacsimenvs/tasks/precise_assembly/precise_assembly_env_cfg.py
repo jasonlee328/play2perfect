@@ -188,6 +188,7 @@ class PreciseAssemblyCfg:
     card_missed_slot_z: float = 0.0      # > 0: fail "missed_slot" when the held card's bottom is below this (m) while its centre is off the slot
     card_path_rew_scale: float = 0.0     # potential-based shaping toward the slot (per m of 3 x lateral + bottom-height progress)
     card_path_lean_w: float = 0.0        # path potential: + w (m/deg) x lean difference to the front deck card while over the slot
+    card_deck_fail_hold_steps: int = 0   # deck_disturbed terminates only after N consecutive steps over the tolerance (0 = at once)
     card_missed_slot_x: float = 0.0035   # slot centre x of the seated card (holder frame)
     card_missed_slot_xy_tol: float = 0.006
                                          #   start (a restored pinch settles; see card_task.py)
