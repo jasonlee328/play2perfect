@@ -669,6 +669,8 @@ class PreciseAssemblyEnv(PlayEnv):
         super()._pre_physics_step(actions)
         card = getattr(self, "_card", None)
         S = int(getattr(self.cfg.precise_assembly, "card_settle_steps", 0))
+        if getattr(self.cfg.precise_assembly, "card_freeze_hold", False):
+            S += int(self.cfg.precise_assembly.card_hold_steps)   # also hold still through the official 0.6 s start hold
         if card is not None and S > 0 and hasattr(card, "settle_tgt"):
             m = card.step < S
             if m.any():
