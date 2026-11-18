@@ -441,6 +441,10 @@ class PreciseAssemblyCfg:
     # (x deg/s / 100, capped at 3) while the door is open after the latch cleared. 0 = off.
     latch_cbf_hold_rew_scale: float = 0.0
     latch_cbf_door_vel_pen_scale: float = 0.0
+    # A8 (11-18): hidden per-episode hand PD gain scale U(lo, hi) on the hand joints (stiffness x s, damping x sqrt(s)),
+    # sampled at reset and not in any obs. Breaks the joint-tracking-error -> grip-force mapping that lets proprio read
+    # the fragile-door forces; the tactile reading stays calibrated. (1, 1) = off.
+    hand_kp_scale_range: tuple[float, float] = (1.0, 1.0)
     # true: the hold reward is potential-based on the run length (scale x delta(run / success_steps)), so it totals
     # latch_cbf_hold_rew_scale at success and a broken run gives it back (the per-step version was farmed, 11-17).
     latch_cbf_hold_potential: bool = False
