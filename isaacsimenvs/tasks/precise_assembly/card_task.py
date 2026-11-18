@@ -289,7 +289,12 @@ class CardTask:
         # early-fail conditions (used for termination when card_terminate_on_fail)
         hold_done = st >= c.card_hold_steps
         self.fail["dropped_at_start"] = hold_done & ~(self.hold_ok & (self.slip_hold < c.card_hold_slip)) if c.card_fail_hold else torch.zeros_like(deck_ok)
-        self.fail["slipped"] = transport & (self.slip_tr >= c.card_transport_slip) if c.card_fail_slip else torch.zeros_like(deck_ok)
+        slip_tol = c.card_transport_slip
+        if c.card_fail_slip and getattr(c, "card_slip_fail_curriculum_steps", 0) > 0:
+            a_s = min(1.0, float(env.common_step_counter + c.card_slip_fail_curriculum_offset) / float(c.card_slip_fail_curriculum_steps))
+            slip_tol = c.card_slip_fail_start + a_s * (c.card_transport_slip - c.card_slip_fail_start)
+        self.slip_fail_tol = slip_tol
+        self.fail["slipped"] = transport & (self.slip_tr >= slip_tol) if c.card_fail_slip else torch.zeros_like(deck_ok)
         self.fail["released_outside"] = self.released & ~self.rel_inside
         # early-termination tolerance: curriculum from (card_deck_fail_move_start, _rot_start) to the official values
         # over card_deck_fail_curriculum_steps env steps; the success check always uses the official 3 mm / 3 deg

@@ -202,6 +202,9 @@ class PreciseAssemblyCfg:
     card_terminate_on_fail: bool = True  # end on released_outside / deck_disturbed / broken (+ the two below if on)
     card_fail_hold: bool = False         # also end when held_in_hand_at_start fails
     card_fail_slip: bool = False         # also end when held_through_transport slip fails
+    card_slip_fail_start: float = 0.02   # slipped-termination tolerance at the curriculum start (m); success always uses card_transport_slip
+    card_slip_fail_curriculum_steps: int = 0
+    card_slip_fail_curriculum_offset: int = 0
     card_fail_penalty: float = 200.0
     card_success_bonus: float = 1000.0
     card_release_bonus: float = 200.0    # once, released inside the slot
