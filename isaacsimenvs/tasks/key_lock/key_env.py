@@ -147,6 +147,8 @@ class KeyLockCfg:
     p2_slip_penalty: float = 2.0         # per slipping step
     p2_force: str = "pads"               # force the window acts on: "pads" (sum of the 5 fingertip pads = the pinch) | "hand"
     p2_force_ema: float = 0.2            # weight of the newest step in the smoothed force
+    p2_ema_seed_onset: bool = False      # seed the smoothed force with the raw force at each contact onset (else it ramps
+                                         # up from 0 and every fresh grasp reads as a slip whatever F_min is)
 
 
 @configclass
@@ -587,6 +589,11 @@ class KeyLockEnv(PreciseAssemblyEnv):
             if not hasattr(self, "_p2_f"):
                 self._p2_f = fnow.clone()
             a_ = float(kl.p2_force_ema)
+            if bool(kl.p2_ema_seed_onset):
+                inc = fnow > float(kl.contact_n)
+                onset = inc & ~getattr(self, "_p2_inc_prev", torch.zeros_like(inc))
+                self._p2_inc_prev = inc
+                self._p2_f = torch.where(onset, fnow, self._p2_f)
             self._p2_f = a_ * fnow + (1.0 - a_) * self._p2_f
             turn2 = (dth > 0) & ~self.retract_phase & (fnow > float(kl.contact_n))
             slipping = turn2 & (self._p2_f < self.key_fmin2)
@@ -725,6 +732,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self._p2_slip_acc[env_ids] = 0.0; self._p2_lag[env_ids] = 0.0
             if hasattr(self, "_p2_f"):
                 self._p2_f[env_ids] = 0.0
+            if hasattr(self, "_p2_inc_prev"):
+                self._p2_inc_prev[env_ids] = False
             self._key_slipped[env_ids] = False; self._p2_slipping[env_ids] = False
             self._key_broken[env_ids] = False
             if hasattr(self, "_key_prev_ang_p2"):
