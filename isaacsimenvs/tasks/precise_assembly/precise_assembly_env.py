@@ -1269,22 +1269,29 @@ class PreciseAssemblyEnv(PlayEnv):
         n = self.num_envs
         tcp = self.robot.data.body_state_w[:, self._fingertip_body_ids, 0:3].mean(dim=1)
         rel = self.object.data.root_pos_w - tcp
+        # tool tip (turn_tool_tips_m[0], object frame; root if unset): its displacement drives the retract reward, so
+        # tilting the tool about a tip left in the recess earns nothing
+        tips = getattr(pc, "turn_tool_tips_m", ())
+        tip = self.object.data.root_pos_w
+        if tips:
+            tl = torch.tensor([float(v) for v in tips[0]], device=self.device).expand(n, 3)
+            tip = tip + quat_apply(self.object.data.root_quat_w, tl)
         if getattr(self, "_retract_keep_tcp0", None) is None:
             self._retract_keep_tcp0 = tcp.clone()
             self._retract_keep_rel0 = rel.clone()
             self._retract_keep_prev = tcp.clone()
             self._retract_keep_lost = torch.zeros(n, dtype=torch.bool, device=self.device)
-            self._retract_keep_obj0 = self.object.data.root_pos_w.clone()
+            self._retract_keep_obj0 = tip.clone()
         ent = self._just_entered_retract | ~self.retract_phase
         self._retract_keep_tcp0 = torch.where(ent.unsqueeze(-1), tcp, self._retract_keep_tcp0)
         self._retract_keep_rel0 = torch.where(ent.unsqueeze(-1), rel, self._retract_keep_rel0)
-        self._retract_keep_obj0 = torch.where(ent.unsqueeze(-1), self.object.data.root_pos_w, self._retract_keep_obj0)
+        self._retract_keep_obj0 = torch.where(ent.unsqueeze(-1), tip, self._retract_keep_obj0)
         disp = (tcp - self._retract_keep_tcp0).norm(dim=-1)
         drift = (rel - self._retract_keep_rel0).norm(dim=-1)
         speed = (tcp - self._retract_keep_prev).norm(dim=-1) / max(1e-6, float(self.step_dt))
         self._retract_keep_prev = tcp.clone()
         # reward signal: the TOOL's displacement (carried), not the hand's (sliding off the tool earned it before)
-        obj_disp = (self.object.data.root_pos_w - self._retract_keep_obj0).norm(dim=-1)
+        obj_disp = (tip - self._retract_keep_obj0).norm(dim=-1)
         self._retract_keep_disp = torch.minimum(obj_disp, disp)
         self._retract_keep_lost = (drift > float(pc.retract_keep_drop_m)) & self.retract_phase
         tl = getattr(self, "_tl_out", None)
