@@ -374,6 +374,24 @@ class PreciseAssemblyCfg:
     # sampled at reset and not in any obs. Breaks the joint-tracking-error -> grip-force mapping that lets proprio read
     # the fragile-door forces; the tactile reading stays calibrated. (1, 1) = off.
     hand_kp_scale_range: tuple[float, float] = (1.0, 1.0)
+    # A8 force window (11-18, user: "only unlock with the right amount of force, grasp with the fingertips only").
+    # Needs hand_force_sense + latch_cbf. tip force = sum of |contact force| (x hand_force_gain) on the 5 DP links
+    # (where the TacMap pads are); other = every other robot link (palm, PP, MP...).
+    # fw_window_N = (lo, hi) > 0: the bolt clears only once the knob is at its clear angle AND tip force has stayed in
+    # [lo, hi] for fw_steps consecutive policy steps (sticky until the knob drops below the clear angle again).
+    # Window ramps from fw_window_start_N to fw_window_N over fw_ramp_steps env steps (+ fw_ramp_offset_steps).
+    fw_window_N: tuple[float, float] = (0.0, 0.0)
+    fw_window_start_N: tuple[float, float] = (0.0, 0.0)
+    fw_ramp_steps: int = 0
+    fw_ramp_offset_steps: int = 0
+    fw_steps: int = 5
+    fw_in_window_rew_scale: float = 0.0   # per step at the clear angle with tip force in the window (shaping)
+    # fingertips-only: other-link force on the object > fw_other_max_N for fw_other_steps in a row = "palm_grasp" fail
+    fw_other_max_N: float = 0.0
+    fw_other_steps: int = 3
+    fw_other_penalty: float = 200.0
+    fw_other_pen_scale: float = 0.0       # per step x min(other force, 10) N (dense, before the hard rule)
+    crush_on_tips: bool = False           # crush_force compares the tip force instead of the all-link sum
     # true: the hold reward is potential-based on the run length (scale x delta(run / success_steps)), so it totals
     # latch_cbf_hold_rew_scale at success and a broken run gives it back (the per-step version was farmed, 11-17).
     latch_cbf_hold_potential: bool = False

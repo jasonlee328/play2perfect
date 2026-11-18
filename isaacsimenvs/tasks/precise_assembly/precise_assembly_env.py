@@ -903,6 +903,10 @@ class PreciseAssemblyEnv(PlayEnv):
         door = self.cb_joint_angle[int(c.latch_door_joint)]
         gap = math.radians(float(c.latch_cbf_gap_deg))
         cleared = knob >= self.unlock_angle
+        if self._fw_window()[1] > 0.0:
+            # force window: the clear angle alone is not enough; the per-step tip-force check must have passed
+            fwu = getattr(self, "_fw_unlocked", None)
+            cleared = cleared & (fwu if fwu is not None else torch.zeros_like(cleared))
         self._cbf_engaged = ~cleared & (self._cbf_engaged | (door <= gap + math.radians(0.05)))
         self.latch_open = ~self._cbf_engaged
         self.latch_open_ep |= self.latch_open
@@ -1072,6 +1076,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.hand_force_last_ep_max[env_ids] = self.hand_force_ep_max[env_ids]
                 self.hand_force_ep_max[env_ids] = 0.0
                 self._crush_count[env_ids] = 0
+            if hasattr(self, "_fw_count"):
+                self._fw_count[env_ids] = 0; self._fw_unlocked[env_ids] = False; self._fw_other_count[env_ids] = 0
             if hasattr(self, "_brk_t"):
                 self._brk_t[env_ids] = 0; self._brk_f[env_ids] = 0
             if hasattr(self, "hs_touched"):
@@ -1730,9 +1736,37 @@ class PreciseAssemblyEnv(PlayEnv):
         nrm = F.norm(dim=-1) * g
         self.hand_force = nrm.sum(-1)
         self.hand_force_link_max = nrm.amax(-1)
+        if getattr(self, "_hf_tip_idx", None) is None:
+            paths = list(self.robot.root_physx_view.link_paths[0])
+            self._hf_tip_idx = [i for i, p in enumerate(paths) if p.endswith("_DP")]
+            print(f"[a8] fingertip DP links {self._hf_tip_idx} of {len(paths)}", flush=True)
+            assert len(self._hf_tip_idx) == 5, self._hf_tip_idx
+            self._fw_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+            self._fw_unlocked = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            self._fw_other_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self.tip_force = nrm[:, self._hf_tip_idx].sum(-1)
+        self.other_force = self.hand_force - self.tip_force
+        self.extras["tip_force_mean"] = self.tip_force.mean()
+        self.extras["other_force_mean"] = self.other_force.mean()
+        c0 = self.cfg.precise_assembly
+        lo, hi = self._fw_window()
+        if hi > 0.0 and self._latch_cbf_on():
+            at = self.cb_joint_angle[int(c0.unlock_joint)] >= self.unlock_angle
+            inw = at & (self.tip_force >= lo) & (self.tip_force <= hi)
+            self.fw_in_window = inw
+            self._fw_count = torch.where(inw, self._fw_count + 1, torch.zeros_like(self._fw_count))
+            self._fw_unlocked = at & (self._fw_unlocked | (self._fw_count >= int(c0.fw_steps)))
+            self.extras["fw_lo"] = torch.tensor(lo, device=self.device)
+            self.extras["fw_hi"] = torch.tensor(hi, device=self.device)
+            self.extras["fw_in_window_frac"] = inw.float().mean()
+            self.extras["fw_at_stop_frac"] = at.float().mean()
+        if float(c0.fw_other_max_N) > 0.0:
+            o = self.other_force > float(c0.fw_other_max_N)
+            self._fw_other_count = torch.where(o, self._fw_other_count + 1, torch.zeros_like(self._fw_other_count))
+        thr_metric = self.tip_force if bool(getattr(c0, "crush_on_tips", False)) else self.hand_force
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
-        over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
+        over = thr_metric > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
         self._crush_count = torch.where(over, self._crush_count + 1, torch.zeros_like(self._crush_count))
         self.extras["hand_force_mean"] = self.hand_force.mean()
         self.extras["hand_force_max"] = self.hand_force.max()
@@ -1767,6 +1801,17 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["hs_power_grasp_frac"] = self.hs_power.float().mean()
             self.extras["hs_links_mean"] = self.hs_links.float().mean()
             self.extras["hs_panel_force_mean"] = self.hs_panel_force.mean()
+
+    def _fw_window(self) -> tuple[float, float]:
+        c = self.cfg.precise_assembly
+        lo, hi = (float(v) for v in c.fw_window_N)
+        if hi <= 0.0:
+            return 0.0, 0.0
+        if int(c.fw_ramp_steps) > 0 and float(c.fw_window_start_N[1]) > 0.0:
+            a = min(1.0, float(self.common_step_counter + int(c.fw_ramp_offset_steps)) / float(c.fw_ramp_steps))
+            l0, h0 = (float(v) for v in c.fw_window_start_N)
+            lo, hi = l0 + a * (lo - l0), h0 + a * (hi - h0)
+        return lo, hi
 
     def _cbf_fingers_on_knob(self) -> torch.Tensor:
         """Fingertips touching the knob: with tactile on, pads with any taxel deformed by the knob mesh in the last
@@ -1962,7 +2007,10 @@ class PreciseAssemblyEnv(PlayEnv):
         crushed = torch.zeros_like(fall)
         if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and hasattr(self, "_crush_count"):
             crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop | broken | crushed
+        palm_grasp = torch.zeros_like(fall)
+        if float(getattr(pih_cfg, "fw_other_max_N", 0.0)) > 0.0 and hasattr(self, "_fw_other_count"):
+            palm_grasp = (self._fw_other_count >= int(pih_cfg.fw_other_steps)) & ~max_successes
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop | broken | crushed | palm_grasp
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1980,6 +2028,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "broken_latch": getattr(self, "broken_latch", torch.zeros_like(broken)) & broken,
             "broken": broken,
             "crushed": crushed,
+            "palm_grasp": palm_grasp,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -2083,6 +2132,21 @@ class PreciseAssemblyEnv(PlayEnv):
             c_pen = float(pih_cfg.crush_penalty) * self._termination_reasons["crushed"].float()
             reward = reward - c_pen
             self._reward_terms["crush_penalty"] = -c_pen
+            self._reward_terms["total_reward"] = reward
+        if float(getattr(pih_cfg, "fw_other_max_N", 0.0)) > 0.0 and "palm_grasp" in self._termination_reasons:
+            ppen = float(pih_cfg.fw_other_penalty) * self._termination_reasons["palm_grasp"].float()
+            reward = reward - ppen
+            self._reward_terms["palm_grasp_penalty"] = -ppen
+            self._reward_terms["total_reward"] = reward
+        if float(getattr(pih_cfg, "fw_other_pen_scale", 0.0)) > 0.0 and hasattr(self, "other_force"):
+            opn = float(pih_cfg.fw_other_pen_scale) * self.other_force.clamp(max=10.0)
+            reward = reward - opn
+            self._reward_terms["other_force_pen"] = -opn
+            self._reward_terms["total_reward"] = reward
+        if float(getattr(pih_cfg, "fw_in_window_rew_scale", 0.0)) > 0.0 and hasattr(self, "fw_in_window"):
+            wr = float(pih_cfg.fw_in_window_rew_scale) * (self.fw_in_window & ~self.latch_open_ep).float()
+            reward = reward + wr
+            self._reward_terms["fw_in_window_rew"] = wr
             self._reward_terms["total_reward"] = reward
         if float(getattr(pih_cfg, "door_break_penalty", 0.0)) > 0.0 and "broken" in self._termination_reasons:
             bpen = float(pih_cfg.door_break_penalty) * self._termination_reasons["broken"].float()
