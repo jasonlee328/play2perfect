@@ -95,6 +95,8 @@ class KeyLockCfg:
     # rewards
     release_rew_scale: float = 300.0     # potential on min(tip dist, release_dist) / release_dist after the clear goal
     still_rew_scale: float = 200.0       # potential on still_count / still_steps
+    unpinched_turn_penalty: float = 0.0  # per turning step (key advanced > turn_step_deg) with < 2 pads loaded = exactly the
+                                         # steps that count against the official 85 % pinch share
     still_action_penalty: float = 0.0    # per step once released: x mean |arm action| (arm actions are joint velocities, so
                                          # holding still = zero arm action)
     still_speed_penalty: float = 0.0     # per step once released: x palm speed (m/s) / 0.01 + joint-target change (rad), released only
@@ -456,6 +458,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_pinch_ok += (turning & (npad >= 2)).float()
         self._key_pinch_over += (turning & (self.key_pad_f.max(-1).values > float(kl.pinch_max_n))).float()
         self._key_turning_ok = turning & (npad >= 2)
+        self._key_unpinched_turn = turning & (npad < 2)
         self._key_turn_touch += (turning & (self.key_hand_f > float(kl.pinch_pad_n))).float()
         self._key_turn_linkf += turning.float().unsqueeze(-1) * self.key_link_f[:, :self._key_turn_linkf.shape[1]]
         self._key_prev_ang = ang.clone()
@@ -663,6 +666,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             rl = self._key_released_now.float()
             spen = spen + float(kl.still_action_penalty) * self._key_arm_act * rl
             self.extras["key/released_arm_action"] = (self._key_arm_act * rl).sum() / rl.sum().clamp(min=1.0)
+        if float(kl.unpinched_turn_penalty) > 0.0 and hasattr(self, "_key_unpinched_turn"):
+            spen = spen + float(kl.unpinched_turn_penalty) * self._key_unpinched_turn.float()
         extra = rel - back + pinch - fail - unp - slip_pen - spen
         r = r + extra
         for name, v in (("key_release_rew", rel), ("key_turnback_pen", -back), ("key_pinch_rew", pinch), ("key_unpinched_cut", -unp),
