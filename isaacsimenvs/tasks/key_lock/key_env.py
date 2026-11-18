@@ -60,6 +60,11 @@ class KeyLockCfg:
     contact_n: float = 0.05              # common.CONTACT_FREE_N
     pinch_pad_n: float = 1.0
     pinch_frac: float = 0.85
+    # pinch window: "turning" = steps on which the key advanced (pre-11-18); "grip" = official analogue
+    # (turn_key_unlock_door_flat.py:281-290: grip close T[2] .. settle end T[4], regrasps excluded) = from the first step
+    # with >= 2 pads loaded until release starts after the key cleared (first step past clear with < 2 pads), skipping
+    # steps with no pad in contact (hand open = regrasp)
+    pinch_window: str = "turning"
     pinch_frac_ramp_steps: int = 0       # > 0: the required pinch share ramps 0 -> pinch_frac over this many env steps
     pinch_frac_offset_steps: int = 0     # (a resume restarts common_step_counter: set this to continue the ramp)
     pinch_max_n: float = 50.0
@@ -458,6 +463,14 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_turn_steps += turning.float()
         self._key_pinch_ok += (turning & (npad >= 2)).float()
         self._key_pinch_over += (turning & (self.key_pad_f.max(-1).values > float(kl.pinch_max_n))).float()
+        if not hasattr(self, "_kw_n"):
+            self._kw_n, self._kw_ok = torch.zeros_like(ang), torch.zeros_like(ang)
+            self._kw_on = torch.zeros_like(turning); self._kw_end = torch.zeros_like(turning)
+        self._kw_on |= (npad >= 2) & ~self._kw_end
+        self._kw_end |= self._kw_on & (ang >= self.key_clear) & (npad < 2)
+        touching = (self.key_pad_f > float(kl.contact_n)).any(-1)
+        inw = self._kw_on & ~self._kw_end & touching
+        self._kw_n += inw.float(); self._kw_ok += (inw & (npad >= 2)).float()
         self._key_turning_ok = turning & (npad >= 2)
         self._key_unpinched_turn = turning & (npad < 2)
         self._key_turn_touch += (turning & (self.key_hand_f > float(kl.pinch_pad_n))).float()
@@ -522,8 +535,13 @@ class KeyLockEnv(PreciseAssemblyEnv):
         if int(kl.pinch_frac_ramp_steps) > 0:
             pf *= min(1.0, float(self.common_step_counter + int(kl.pinch_frac_offset_steps)) / float(kl.pinch_frac_ramp_steps))
         self.extras["key/pinch_frac_required"] = torch.tensor(pf, device=self.device)
+        if str(kl.pinch_window) == "grip" and hasattr(self, "_kw_n"):
+            share = self._kw_ok / self._kw_n.clamp(min=1.0)
+        else:
+            share = self._key_pinch_ok / ts
+        self._key_pinch_share = share
         pinch_ok = ((self._key_turn_steps >= float(kl.pinch_min_turn_steps))
-                    & (self._key_pinch_ok / ts >= pf)
+                    & (share >= pf)
                     & (self._key_pinch_over / ts <= float(kl.pinch_max_frac)))
         self._key_pinch_ok_ep = pinch_ok
         if not bool(kl.require_pinch):
@@ -621,6 +639,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
         # end-of-episode snapshots for evals (the auto reset after _get_dones clears the live counters)
         self._key_last_turn = self._key_turn_steps.clone()
         self._key_last_pinch = self._key_pinch_ok.clone()
+        self._key_last_share = self._key_pinch_share.clone() if hasattr(self, "_key_pinch_share") else None
         self._key_last_over = self._key_pinch_over.clone()
         self._key_last_amax = self._key_amax.clone()
         self._key_last_dmax = self._key_dmax.clone()
@@ -691,6 +710,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
                   self._key_start_max, self._key_rel_phi, self._key_still_phi, self._key_amax, self._key_dmax,
                   self._key_turn_touch, self._key_turn_linkf):
             t[env_ids] = 0.0
+        if hasattr(self, "_kw_n"):
+            self._kw_n[env_ids] = 0.0; self._kw_ok[env_ids] = 0.0
+            self._kw_on[env_ids] = False; self._kw_end[env_ids] = False
         if hasattr(self, "key_fmin2"):
             self.key_fmin2[env_ids] = torch.exp(torch.empty(len(env_ids), device=self.device).uniform_(self._p2_lo, self._p2_hi))
             self._p2_slip_acc[env_ids] = 0.0; self._p2_lag[env_ids] = 0.0
