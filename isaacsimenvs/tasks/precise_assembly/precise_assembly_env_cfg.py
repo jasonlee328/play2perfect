@@ -184,6 +184,7 @@ class PreciseAssemblyCfg:
     card_settle_steps: int = 0           # policy steps after reset with actions held at the reset targets, before the checks
     card_freeze_hold: bool = False       # also hold the reset targets through the card_hold_steps window (the official script holds still there)
     card_hand_lock_z: float = 0.0        # > 0: hand joint targets held at the grasp while the card bottom is above this (m, holder frame) and not released
+    card_transport_end_at_lock: bool = False  # held_through_transport / slipped stop at card bottom < card_hand_lock_z (hand adaptation)
     card_missed_slot_z: float = 0.0      # > 0: fail "missed_slot" when the held card's bottom is below this (m) while its centre is off the slot
     card_path_rew_scale: float = 0.0     # potential-based shaping toward the slot (per m of 3 x lateral + bottom-height progress)
     card_missed_slot_x: float = 0.0035   # slot centre x of the seated card (holder frame)

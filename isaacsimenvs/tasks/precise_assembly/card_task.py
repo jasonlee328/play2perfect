@@ -253,6 +253,10 @@ class CardTask:
             self.tr_p[end_hold], self.tr_q[end_hold] = p7[end_hold], q7[end_hold]
             transport = (st >= c.card_hold_steps) & ~self.released
             hold_window = st >= c.card_hold_steps
+        if getattr(c, "card_transport_end_at_lock", False) and float(getattr(c, "card_hand_lock_z", 0.0)) > 0.0:
+            # A10 hand adaptation: transport ends where the release may begin (card bottom below card_hand_lock_z); the
+            # official parallel gripper opens instantly, this hand's fingers drag the card while they open
+            transport = transport & (bot[..., 2].min(-1).values > c.card_hand_lock_z)
         slip1 = (cur - self._pts(self.tr_p, self.tr_q, self.corners)).norm(dim=-1).max(-1).values
         # official: slip up to the release = the first contact-free step. Our release flag lags (it needs
         # card_release_steps contact-free steps + 2 mm of motion), and a dropped card falls tens of mm in that lag
