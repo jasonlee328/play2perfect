@@ -1445,11 +1445,24 @@ class PreciseAssemblyEnv(PlayEnv):
             # turning the cap back > 1 deg off the lock loosens it (the preload is gone)
             self._turn_torque_step()
             if not loosen and getattr(self, "turn_vseat", None) is None:
-                near = torch.where(at_last, near & self.turn_tight, near)
+                # last goal = seated + tight. tight is earned only through the tool (torque into the lock), so the tool
+                # tip need not still sit in the recess when it is credited (policies lift the tool right after snugging)
+                near_ang = rem <= math.radians(float(pih_cfg.unlock_tol_deg))
+                near = torch.where(at_last, near_ang & self.turn_tight, near)
             self._turn_update_lock_inertia()
             self.extras["turn_tight_frac"] = self.turn_tight.float().mean()
             self.extras["turn_lock_torque_mean"] = self.turn_lock_torque.mean()
             self.extras["turn_u_mm_mean"] = self.turn_u.mean() * 1e3
+        import os as _os
+        if _os.environ.get("A9_GOALDBG") and getattr(self, "turn_thread", False):
+            m = at_last & ~self.retract_phase
+            if bool(m.any()):
+                tlo = getattr(self, "_tl_out", None)
+                print("GOALDBG n %d rem_deg med %.2f q90 %.2f near_ang %.2f tight %.2f lockT_mNm med %.2f q90 %.2f tipout %.2f" % (
+                    int(m.sum()), math.degrees(rem[m].median()), math.degrees(rem[m].quantile(0.9)),
+                    (rem[m] <= math.radians(float(pih_cfg.unlock_tol_deg))).float().mean(),
+                    self.turn_tight[m].float().mean(), self.turn_lock_torque[m].median() * 1e3,
+                    self.turn_lock_torque[m].quantile(0.9) * 1e3, 0.0 if tlo is None else tlo[m].float().mean()), flush=True)
         self._near_goal = near
         self._near_goal_steps = update_near_goal_steps(
             near_goal=near, near_goal_steps=self._turn_prev_near_steps,
