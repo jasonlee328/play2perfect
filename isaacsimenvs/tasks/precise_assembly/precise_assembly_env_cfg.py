@@ -190,6 +190,24 @@ class PreciseAssemblyCfg:
     card_path_lean_w: float = 0.0        # path potential: + w (m/deg) x lean difference to the front deck card while over the slot
     card_rob_deck_pen: float = 0.0       # per-step penalty x robot <-> deck contact force (N), capped (A10)
     card_rob_deck_pen_cap: float = 5.0
+    # A10 residual RL on the scripted expert (card_expert.py): joint target = expert target + scale x policy action
+    card_expert_residual: bool = False
+    card_residual_arm_scale: float = 0.05   # rad per unit action (arm)
+    card_residual_hand_scale: float = 0.1   # rad per unit action (hand)
+    card_expert_obs: bool = False           # obs field card_expert_phase (7 one-hot phases + time in phase), actor + critic
+    card_expert_x_mm: float = 3.5
+    card_expert_z_hi_mm: float = 100.0
+    card_expert_release_mm: float = 35.0
+    card_expert_t_hold: float = 1.3
+    card_expert_t_carry: float = 4.0
+    card_expert_t_align: float = 1.0
+    card_expert_v_mm_s: float = 20.0
+    card_expert_v_slow_mm_s: float = 5.0
+    card_expert_slow_z_mm: float = 50.0
+    card_expert_t_open: float = 0.1
+    card_expert_t_retreat: float = 1.5
+    card_expert_gain: float = 0.6
+    card_expert_open: float = 0.45
     card_deck_fail_hold_steps: int = 0   # deck_disturbed terminates only after N consecutive steps over the tolerance (0 = at once)
     card_missed_slot_x: float = 0.0035   # slot centre x of the seated card (holder frame)
     card_missed_slot_xy_tol: float = 0.006

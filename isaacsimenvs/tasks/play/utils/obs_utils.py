@@ -354,6 +354,11 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "card_expert_phase" in OBS_FIELD_SIZES:
+        ex = getattr(env, "_card_expert", None)
+        obs_clean["card_expert_phase"] = ex.phase_obs() if ex is not None else torch.zeros(
+            env.num_envs, OBS_FIELD_SIZES["card_expert_phase"], device=env.device)
+
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel

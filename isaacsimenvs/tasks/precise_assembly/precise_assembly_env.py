@@ -325,6 +325,12 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if getattr(cfg.precise_assembly, "card_expert_obs", False):
+            from .card_expert import N_PHASE
+            OBS_FIELD_SIZES["card_expert_phase"] = N_PHASE + 1
+            for lst in ("obs_list", "state_list"):
+                if "card_expert_phase" not in getattr(cfg.obs, lst):
+                    setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "card_expert_phase"))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
@@ -385,6 +391,12 @@ class PreciseAssemblyEnv(PlayEnv):
                 from .card_task import CardTask
                 self._card = card = CardTask(self)
             card.reset(env_ids)
+            if getattr(self.cfg.precise_assembly, "card_expert_residual", False) or \
+                    getattr(self.cfg.precise_assembly, "card_expert_obs", False):
+                if getattr(self, "_card_expert", None) is None:
+                    from .card_expert import CardExpert
+                    self._card_expert = CardExpert(self, card)
+                self._card_expert.reset(env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
@@ -666,6 +678,25 @@ class PreciseAssemblyEnv(PlayEnv):
             body.set_external_force_and_torque(torch.zeros_like(torque), torque, is_global=True)
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
+        ex = getattr(self, "_card_expert", None)
+        if ex is not None and getattr(self.cfg.precise_assembly, "card_expert_residual", False):
+            # residual on the scripted expert: replaces the delta-action pipeline (no smoothing / delay), and the
+            # settle / hand-lock target overrides below (the expert holds the pinch itself until its open phase)
+            e = ex.step()
+            a = actions.clone().to(self.device).clamp(-1.0, 1.0)[:, self._perm_canon_to_lab]
+            c = self.cfg.precise_assembly
+            t = e.clone()
+            t[:, self._arm_joint_ids] = e[:, self._arm_joint_ids] + c.card_residual_arm_scale * a[:, :7]
+            t[:, self._hand_joint_ids] = e[:, self._hand_joint_ids] + c.card_residual_hand_scale * a[:, 7:]
+            t = torch.minimum(torch.maximum(t, ex.lo), ex.hi)
+            self._cur_targets[:] = t
+            self._prev_targets = t.clone()
+            from isaacsimenvs.tasks.play.utils.action_utils import apply_wrench_dr
+            apply_wrench_dr(self)
+            self._apply_joint_detents()
+            return
+        if ex is not None:
+            ex.step()   # obs only: keep the phase clock running
         super()._pre_physics_step(actions)
         card = getattr(self, "_card", None)
         S = int(getattr(self.cfg.precise_assembly, "card_settle_steps", 0))
