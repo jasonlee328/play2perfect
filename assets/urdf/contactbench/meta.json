@@ -670,7 +670,7 @@
      20.5
     ]
    ],
-   "collision_comp_inward_mm": 0.054
+   "collision_comp_inward_mm": 0.029
   },
   "usb_jaw_02_l": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.2mm_indent.stl (jaw crop)",
@@ -704,7 +704,7 @@
      20.5
     ]
    ],
-   "collision_comp_inward_mm": 0.054
+   "collision_comp_inward_mm": 0.029
   },
   "usb_jaw_04_r": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.4mm_indent.stl (jaw crop)",
@@ -738,7 +738,7 @@
      20.5
     ]
    ],
-   "collision_comp_inward_mm": 0.072
+   "collision_comp_inward_mm": 0.034
   },
   "usb_jaw_04_l": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.4mm_indent.stl (jaw crop)",
@@ -772,7 +772,7 @@
      20.5
     ]
    ],
-   "collision_comp_inward_mm": 0.072
+   "collision_comp_inward_mm": 0.034
   },
   "usb_jaw_06_r": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.6mm_indent.stl (jaw crop)",
@@ -806,7 +806,7 @@
      20.5
     ]
    ],
-   "collision_comp_inward_mm": 0.091
+   "collision_comp_inward_mm": 0.03
   },
   "usb_jaw_06_l": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.6mm_indent.stl (jaw crop)",
@@ -840,7 +840,7 @@
      20.5
     ]
    ],
-   "collision_comp_inward_mm": 0.091
+   "collision_comp_inward_mm": 0.03
   },
   "usb_stick_1": {
    "src": "official_sim/assets/kit/usb-stick-1/usb_1.stl",
@@ -9329,7 +9329,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.6
   },
   "cb_usb_1_spring04": {
    "object": "usb_stick_1",
@@ -9464,7 +9465,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.6
   },
   "cb_usb_1_spring06": {
    "object": "usb_stick_1",
@@ -9599,7 +9601,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.55
   },
   "cb_usb_2": {
    "object": "usb_stick_2",
@@ -9734,7 +9737,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.6
   },
   "cb_usb_2_spring04": {
    "object": "usb_stick_2",
@@ -9869,7 +9873,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.6
   },
   "cb_usb_2_spring06": {
    "object": "usb_stick_2",
@@ -10004,7 +10009,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.55
   },
   "cb_usb_3": {
    "object": "usb_stick_3",
@@ -10139,7 +10145,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.6
   },
   "cb_usb_3_spring04": {
    "object": "usb_stick_3",
@@ -10274,7 +10281,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.6
   },
   "cb_usb_3_spring06": {
    "object": "usb_stick_3",
@@ -10409,7 +10417,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.55
   },
   "cb_usb_4": {
    "object": "usb_stick_4",
@@ -10544,7 +10553,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.6
   },
   "cb_usb_4_spring04": {
    "object": "usb_stick_4",
@@ -10679,7 +10689,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.6
   },
   "cb_usb_4_spring06": {
    "object": "usb_stick_4",
@@ -10814,7 +10825,8 @@
      -0.8
     ],
     "stick_mass_g": 15.0
-   }
+   },
+   "distractor_friction": 0.55
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"

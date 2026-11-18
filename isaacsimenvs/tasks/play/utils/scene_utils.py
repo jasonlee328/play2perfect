@@ -1595,6 +1595,17 @@ def apply_physx_material_properties(env) -> None:
         view.set_material_properties(materials, env_ids)
 
     d_mu = float(getattr(assets_cfg, "distractor_friction", -1.0))
+    # per-problem jaw friction (A12 USB: meta.json problems[<p>]["distractor_friction"] overrides the cfg value)
+    try:
+        import json as _json
+        from evaluation.problems.contactbench.problems import ASSETS_DIR as _CB
+        _pn = str(getattr(env, "_pih_problem_name", "")).split("contactbench.")[-1]
+        _pm = _json.loads((_CB / "meta.json").read_text())["problems"].get(_pn, {})
+        if "distractor_friction" in _pm:
+            d_mu = float(_pm["distractor_friction"])
+            print(f"[scene] {_pn}: per-problem distractor_friction {d_mu}", flush=True)
+    except Exception as _e:  # noqa: BLE001
+        print(f"[scene] per-problem distractor_friction lookup skipped: {_e}", flush=True)
     if d_mu >= 0.0:
         for body in getattr(env, "distractors", ()) or ():
             view = body.root_physx_view
