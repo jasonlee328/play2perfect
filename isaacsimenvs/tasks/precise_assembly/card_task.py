@@ -316,7 +316,12 @@ class CardTask:
         self.pos_hist = torch.roll(self.pos_hist, 1, 0)
         self.pos_hist[0] = pc
         # potential for card_path_rew_scale (A10): 3 x lateral distance to the slot centre + bottom height above the floor
-        phi = -(3.0 * torch.sqrt((pc[:, 0] - getattr(c, "card_missed_slot_x", 0.0035)) ** 2 + pc[:, 1] ** 2) + (zlow - FLOOR_Z).clamp(min=0.0))
+        lat = torch.sqrt((pc[:, 0] - getattr(c, "card_missed_slot_x", 0.0035)) ** 2 + pc[:, 1] ** 2)
+        phi = -(3.0 * lat + (zlow - FLOOR_Z).clamp(min=0.0))
+        lw = float(getattr(c, "card_path_lean_w", 0.0))
+        if lw > 0.0:
+            # over the slot (lateral < 2 cm): match the front deck card's lean before the release (m per deg)
+            phi = phi - lw * lean_d * (lat < 0.02).float()
         if not hasattr(self, "path_phi"):
             self.path_phi = torch.full_like(phi, float('nan'))
         held = (~self.released) & (self.step >= int(getattr(c, "card_settle_steps", 0)))
