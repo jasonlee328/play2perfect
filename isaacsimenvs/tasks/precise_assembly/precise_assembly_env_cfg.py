@@ -367,6 +367,9 @@ class PreciseAssemblyCfg:
     # a holder until the hand has it), at most object_start_hold_max_steps policy steps.
     object_start_hold_until_grasp: int = 0
     object_start_hold_max_steps: int = 360
+    # A7 training aid: > 0 = object_start_hold_steps fades linearly to 0 over this many env steps (+ offset).
+    object_start_hold_ramp_steps: int = 0
+    object_start_hold_ramp_offset_steps: int = 0
     # A7 grasp stage: goals are credited only after the holder released the object because the hand grasped it.
     object_start_hold_gate_goals: bool = False
     probe_key_driver_k: float = 0.0

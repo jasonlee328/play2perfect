@@ -838,6 +838,12 @@ class PreciseAssemblyEnv(PlayEnv):
         if not hasattr(self, "_hold_substeps"):
             self._hold_substeps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         dec = int(self.cfg.decimation)
+        hr = int(getattr(self.cfg.precise_assembly, "object_start_hold_ramp_steps", 0))
+        if hr > 0:   # training aid: the holder's time fades N -> 0 over hr env steps (+ offset)
+            f = min(1.0, float(self.common_step_counter
+                               + int(getattr(self.cfg.precise_assembly, "object_start_hold_ramp_offset_steps", 0))) / hr)
+            N = int(round(N * (1.0 - f)))
+            self.extras["ak_hold_steps_eff"] = torch.tensor(float(N), device=self.device)
         held = self._hold_substeps < N * dec
         pads_req = int(getattr(self.cfg.precise_assembly, "object_start_hold_until_grasp", 0))
         if pads_req > 0:
