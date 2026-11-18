@@ -245,6 +245,11 @@ class PreciseAssemblyCfg:
     # A9 (official turned_by_the_tool_in_hand: both pads loaded > 98% of the turning): > 0 = turning progress pays only
     # in policy steps where >= this many fingertip pads touch the tool (last step's taxels; like turn_progress_requires_tool)
     turn_progress_requires_pads: int = 0
+    # A9 play2perfect-style tool-pose waypoints (turn_thread): non-empty = extra object-pose goals in front of the
+    # turn goals, each = the tool's start pose rotated by that many degrees about the screw axis (tightening) and moved
+    # along it by angle / 360 x lead, e.g. (45, 90, 135) for the 172 deg default; a SimToolReal-style pose tracker
+    # turns the screw by following them. Their success / reward use the normal keypoint distance.
+    turn_pose_goals_deg: tuple[float, ...] = ()
     retract_keep_object: bool = False
     retract_keep_move_m: float = 0.05
     retract_keep_still_mps: float = 0.03

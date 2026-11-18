@@ -369,6 +369,11 @@ class PreciseAssemblyEnv(PlayEnv):
         else:
             self._num_prelude_goals = 0
             self._prelude_lift_offset = 0.0
+        self._turn_pose_goals = [float(v) for v in (getattr(pih_cfg, "turn_pose_goals_deg", ()) or ())]
+        if self._turn_pose_goals:
+            if self._num_prelude_goals > 0:
+                raise ValueError("turn_pose_goals_deg needs a goal mode without prelude waypoints")
+            self._num_prelude_goals = len(self._turn_pose_goals)
         self._num_total_insertion_goals = (
             self._num_insertion_goals + self._num_prelude_goals
         )
@@ -677,7 +682,7 @@ class PreciseAssemblyEnv(PlayEnv):
         # insertion-only envs when goal_mode=transportPreInsertFinal. Both
         # waypoints share the pre-insert orientation (so the policy reorients
         # during the lift) and sit at the same height = start_z + lift_offset.
-        if self._num_prelude_goals > 0 and insertion_mask.any():
+        if self._num_prelude_goals > 0 and insertion_mask.any() and not self._turn_pose_goals:
             ins_ids = env_ids[insertion_mask]
             # post-reset peg world position (local to env_origin)
             start_pos = (
@@ -775,6 +780,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_released_early[env_ids] = False
             self._turn_early_clear[env_ids] = 0
             self.turn_at_stop_steps[env_ids] = 0
+        if getattr(self, "_turn_pose_goals", None) and getattr(self, "turn_mode", False):
+            self._build_turn_pose_goals(env_ids)
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
 
@@ -1315,6 +1322,22 @@ class PreciseAssemblyEnv(PlayEnv):
         self.extras["retract_keep_lost_frac"] = self._retract_keep_lost.float().mean()
         return clear
 
+    def _build_turn_pose_goals(self, env_ids) -> None:
+        """A9: prelude waypoints = the tool's start pose turned by turn_pose_goals_deg about the screw axis (+ thread
+        advance along it), env-local world frame (pos xyz + quat wxyz), like play2perfect's quarter-turn screw goals."""
+        axis_w, anchor_w = self._turn_axis_w()
+        axis, anchor = axis_w[env_ids], anchor_w[env_ids] - self.scene.env_origins[env_ids]
+        p0 = self.object.data.root_pos_w[env_ids] - self.scene.env_origins[env_ids]
+        q0 = self.object.data.root_quat_w[env_ids]
+        lead = self.turn_lead[env_ids] if hasattr(self, "turn_lead") else torch.zeros(len(env_ids), device=self.device)
+        travel = (self.unlock_angle[env_ids] - self.turn_offset[env_ids])
+        for k, deg in enumerate(self._turn_pose_goals):
+            a = torch.clamp(torch.full_like(travel, math.radians(deg)), max=travel)
+            r = quat_from_angle_axis(a, axis)
+            pos = anchor + quat_apply(r, p0 - anchor) + axis * (a / (2.0 * math.pi) * lead).unsqueeze(-1)
+            self._prelude_pose_world[env_ids, k, 0:3] = pos
+            self._prelude_pose_world[env_ids, k, 3:7] = quat_mul(r, q0)
+
     def _turn_vseat_sample(self, env_ids) -> None:
         """A9 design C: hidden virtual seat = physical lock angle - U(lo, hi) deg (after the lock angle is set)."""
         if getattr(self, "turn_vseat", None) is None:
@@ -1362,6 +1385,8 @@ class PreciseAssemblyEnv(PlayEnv):
         from isaacsimenvs.tasks.play.utils.reward_utils import update_near_goal_steps
         pih_cfg = self.cfg.precise_assembly
         n_pre = int(getattr(pih_cfg, "turn_prelude_goals", 0))
+        if getattr(self, "_turn_pose_goals", None):
+            n_pre = len(self._turn_pose_goals)
         if n_pre > 0:
             # the first n_pre goals are ordinary object-pose goals (e.g. tool above the screw, tool engaged); keep the
             # values compute_intermediate_values set for envs still in them
