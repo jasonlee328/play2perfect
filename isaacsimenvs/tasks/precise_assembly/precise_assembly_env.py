@@ -1305,6 +1305,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 # robot <-> deck cards contact force (N, capped): keeps the fingers off the deck while seating (A10)
                 c_rew = c_rew - pih_cfg.card_rob_deck_pen * card.f_rob_deck.clamp(max=pih_cfg.card_rob_deck_pen_cap)
                 self._reward_terms["card_rob_deck"] = card.f_rob_deck
+            if float(getattr(pih_cfg, "card_deck_motion_pen", 0.0)) > 0.0 and hasattr(card, "deck_moved_now"):
+                # per step: deck displacement / rotation from rest in units of the official tolerances (3 mm, 3 deg), capped
+                dm = card.deck_moved_now / pih_cfg.card_deck_move_tol + card.deck_rot_now / pih_cfg.card_deck_rot_tol
+                c_rew = c_rew - pih_cfg.card_deck_motion_pen * dm.clamp(max=pih_cfg.card_deck_motion_pen_cap)
+                self._reward_terms["card_deck_motion"] = dm
             if pih_cfg.card_hold_rew > 0.0:
                 # per step while the pinch is loaded and the card not yet released (shaping, A10)
                 c_rew = c_rew + pih_cfg.card_hold_rew * card.meas["pinch"] * (~card.released).float()

@@ -195,6 +195,9 @@ class PreciseAssemblyCfg:
     card_nontip_pen_cap: float = 5.0
     card_rob_deck_pen: float = 0.0       # per-step penalty x robot <-> deck contact force (N), capped (A10)
     card_rob_deck_pen_cap: float = 5.0
+    card_deck_motion_pen: float = 0.0    # per-step penalty x (deck move / 3 mm + deck rot / 3 deg), capped (A10)
+    card_deck_motion_pen_cap: float = 4.0
+    card_lean_ref_rest: bool = False     # path lean term vs the front card's rest lean, not its current lean
     # A10 residual RL on the scripted expert (card_expert.py): joint target = expert target + scale x policy action
     card_expert_residual: bool = False
     card_residual_arm_scale: float = 0.05   # rad per unit action (arm)
