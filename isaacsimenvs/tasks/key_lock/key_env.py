@@ -73,6 +73,8 @@ class KeyLockCfg:
     drift_net: bool = True               # official (turn_key_unlock_door_flat.py:264-267): NET palm displacement between the
     still_shape_anchor: bool = False     # drift_net shaping: the still potential counts consecutive released steps with the
                                          # palm within drift_mm/2 of an anchor (=> net drift <= drift_mm), not just released time
+    arm_deadband: float = 0.0            # |arm velocity action| below this -> 0 (arm actions are velocities: a tiny bias
+                                         # otherwise creeps the palm; applies to every policy and every phase)
                                          # first and last step of the still window < drift_mm; False = every step within
                                          # drift_mm of the window start (stricter, pre-11-17 behaviour)
     drift_start_mm: float = 0.0          # > 0: the stillness tolerance ramps drift_start_mm -> drift_mm over drift_ramp_steps
@@ -295,6 +297,11 @@ class KeyLockEnv(PreciseAssemblyEnv):
         return quat_from_angle_axis(-ang, axis_w), axis_w
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
+        db = float(self.cfg.key_lock.arm_deadband)
+        if db > 0.0:
+            actions = actions.clone()
+            a = actions[:, :7]
+            actions[:, :7] = torch.where(a.abs() < db, torch.zeros_like(a), a)
         self._key_arm_act = actions[:, :7].abs().mean(-1).to(self.device)
         super()._pre_physics_step(actions)
 
