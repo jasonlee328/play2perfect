@@ -291,7 +291,10 @@ def setup_scene(env) -> None:
         env.object = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths))
         env.goal_viz = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths))
     else:
-        env.hole = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0]))
+        _hcfg = _pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0])
+        if getattr(env.cfg.precise_assembly, "usb_task", "off") != "off":
+            _hcfg.spawn.activate_contact_sensors = True   # A12: robot <-> slot contact (released_and_clear)
+        env.hole = RigidObject(_hcfg)
         _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0])
         _usb = getattr(env.cfg.precise_assembly, "usb_task", "off") != "off"
         if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)) or _usb:

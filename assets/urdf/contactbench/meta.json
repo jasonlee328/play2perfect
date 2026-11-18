@@ -669,7 +669,8 @@
      5.0,
      20.5
     ]
-   ]
+   ],
+   "collision_comp_inward_mm": 0.054
   },
   "usb_jaw_02_l": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.2mm_indent.stl (jaw crop)",
@@ -702,7 +703,8 @@
      5.0,
      20.5
     ]
-   ]
+   ],
+   "collision_comp_inward_mm": 0.054
   },
   "usb_jaw_04_r": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.4mm_indent.stl (jaw crop)",
@@ -735,7 +737,8 @@
      5.0,
      20.5
     ]
-   ]
+   ],
+   "collision_comp_inward_mm": 0.072
   },
   "usb_jaw_04_l": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.4mm_indent.stl (jaw crop)",
@@ -768,7 +771,8 @@
      5.0,
      20.5
     ]
-   ]
+   ],
+   "collision_comp_inward_mm": 0.072
   },
   "usb_jaw_06_r": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.6mm_indent.stl (jaw crop)",
@@ -801,7 +805,8 @@
      5.0,
      20.5
     ]
-   ]
+   ],
+   "collision_comp_inward_mm": 0.091
   },
   "usb_jaw_06_l": {
    "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.6mm_indent.stl (jaw crop)",
@@ -834,7 +839,8 @@
      5.0,
      20.5
     ]
-   ]
+   ],
+   "collision_comp_inward_mm": 0.091
   },
   "usb_stick_1": {
    "src": "official_sim/assets/kit/usb-stick-1/usb_1.stl",
