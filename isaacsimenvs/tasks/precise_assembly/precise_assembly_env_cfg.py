@@ -250,6 +250,9 @@ class PreciseAssemblyCfg:
     # along it by angle / 360 x lead, e.g. (45, 90, 135) for the 172 deg default; a SimToolReal-style pose tracker
     # turns the screw by following them. Their success / reward use the normal keypoint distance.
     turn_pose_goals_deg: tuple[float, ...] = ()
+    # A9 dense snug reward (turn_thread): per step, scale x min(turn_lock_torque / turn_tight_torque, 1) while a tool
+    # tip is in the recess and the retract has not started (pays pushing the seated screw toward the tight torque)
+    turn_snug_rew: float = 0.0
     retract_keep_object: bool = False
     retract_keep_move_m: float = 0.05
     retract_keep_still_mps: float = 0.03

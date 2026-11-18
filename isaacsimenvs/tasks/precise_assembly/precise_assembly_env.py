@@ -2305,6 +2305,17 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward - c_pen
             self._reward_terms["crack_terminal_penalty"] = -c_pen
             self._reward_terms["total_reward"] = reward
+        snw = float(getattr(pih_cfg, "turn_snug_rew", 0.0))
+        if snw > 0.0 and getattr(self, "turn_thread", False):
+            frac = torch.clamp(self.turn_lock_torque / max(1e-6, float(pih_cfg.turn_tight_torque)), 0.0, 1.0)
+            if getattr(self, "_tl_out", None) is not None:
+                frac = frac * (~self._tl_out).float()
+            if getattr(self, "retract_phase", None) is not None:
+                frac = frac * (~self.retract_phase).float()
+            s_rew = snw * frac
+            reward = reward + s_rew
+            self._reward_terms["turn_snug_rew"] = s_rew
+            self._reward_terms["total_reward"] = reward
         tsp = float(getattr(pih_cfg, "turn_toolless_step_penalty", 0.0))
         if tsp > 0.0 and getattr(self, "_tl_step_deg", None) is not None:
             # A9: per degree of screw rotation while no tool tip is in the recess (official: turned by the tool in hand)
