@@ -92,6 +92,11 @@ class JointSpec:
     stiffness: float = 0.0
     detent_count: int = 0
     detent_torque: float = 0.0
+    # "prismatic" (A12 USB jaws): slides along ``axis``; ``lower`` / ``upper`` end stops in m, ``stiffness`` N/m,
+    # ``damping`` N s/m (a linear drive to 0). The *_deg / detent fields are ignored then.
+    kind: str = "revolute"
+    lower: float | None = None
+    upper: float | None = None
 
 
 @dataclass(frozen=True)

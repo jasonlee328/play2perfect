@@ -113,6 +113,8 @@ class PreciseAssemblyCfg:
     # the hole frame, and the goal index reached. Each reset samples one entry;
     # the episode then continues from that goal. "" keeps the normal reset.
     start_state_file: str = ""
+    # A12 USB (usb_task.py): "off" | "report" (contact views + verdict logged) | "gate" (verdict = task success)
+    usb_task: str = "off"
     # Clutter problems (Problem.distractors): per-step reward -= distractor_penalty_scale * the largest distractor
     # displacement from its reset pose (m); with terminate_on_disturb the episode ends once it exceeds
     # distractor_disturb_tol. Both off by default (and no effect on problems without distractors).

@@ -97,11 +97,25 @@ def _create_fixture_joints(env) -> None:
         for i in range(env.num_envs):
             b0 = _rigid_body_prim(stage, f"/World/envs/env_{i}/Hole").GetPath()
             b1 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{body_root}").GetPath()
-            jp = UsdPhysics.RevoluteJoint.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
+            pris = getattr(j, "kind", "revolute") == "prismatic"
+            jcls = UsdPhysics.PrismaticJoint if pris else UsdPhysics.RevoluteJoint
+            jp = jcls.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
             jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
             jp.CreateAxisAttr("Z")
             jp.CreateLocalPos0Attr(Gf.Vec3f(*j.anchor)); jp.CreateLocalRot0Attr(q0)
             jp.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jp.CreateLocalRot1Attr(Gf.Quatf(q1))
+            if pris:
+                # limits in m (stage units), linear drive stiffness N/m, damping N s/m
+                if j.lower is not None:
+                    jp.CreateLowerLimitAttr(float(j.lower))
+                if j.upper is not None:
+                    jp.CreateUpperLimitAttr(float(j.upper))
+                if j.damping or j.stiffness:
+                    drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "linear")
+                    drive.CreateTypeAttr("force")
+                    drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
+                    drive.CreateDampingAttr(float(j.damping)); drive.CreateStiffnessAttr(float(j.stiffness))
+                continue
             if j.lower_deg is not None:
                 jp.CreateLowerLimitAttr(float(j.lower_deg))
             if j.upper_deg is not None:
@@ -252,14 +266,17 @@ def setup_scene(env) -> None:
     else:
         env.hole = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0]))
         _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0])
-        if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)):
+        _usb = getattr(env.cfg.precise_assembly, "usb_task", "off") != "off"
+        if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)) or _usb:
             _ocfg.spawn.activate_contact_sensors = True   # PhysxContactReportAPI: hand-on-object force (A1)
         env.object = RigidObject(_ocfg)
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
-    env.distractors = tuple(
-        RigidObject(_pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd))
-        for k, usd in enumerate(distractor_usd_paths)
-    )
+    def _dcfg(k, usd):
+        dc = _pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd)
+        if getattr(env.cfg.precise_assembly, "usb_task", "off") != "off":
+            dc.spawn.activate_contact_sensors = True   # A12: stick / robot <-> USB jaw contact
+        return RigidObject(dc)
+    env.distractors = tuple(_dcfg(k, usd) for k, usd in enumerate(distractor_usd_paths))
     _log_scene_step(setup_t0, f"spawned robot/table/hole/object/goalviz + {len(env.distractors)} distractors")
 
     spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())

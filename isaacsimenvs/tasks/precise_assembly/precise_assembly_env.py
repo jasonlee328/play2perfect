@@ -633,6 +633,16 @@ class PreciseAssemblyEnv(PlayEnv):
             angles.append(2.0 * torch.atan2(s, q_rel[:, 0]))
         a = torch.stack(angles)
         self.cb_joint_angle = torch.atan2(torch.sin(a), torch.cos(a))
+        # prismatic joints: displacement along the axis since reset (m), self.cb_joint_disp (J, N); 0 for revolute
+        disp = []
+        for j, body in zip(self._pih_joints, self._joint_bodies()):
+            if getattr(j, "kind", "revolute") != "prismatic":
+                disp.append(torch.zeros(self.num_envs, device=self.device)); continue
+            p0 = torch.tensor(self._joint_reset_pose_rel(j)[:3], device=self.device, dtype=torch.float32)
+            rel = quat_apply_inverse(hq, body.data.root_pos_w - self.scene.env_origins - self.hole_pos) - p0
+            ax = torch.tensor(j.axis, device=self.device, dtype=torch.float32)
+            disp.append((rel * (ax / ax.norm())).sum(-1))
+        self.cb_joint_disp = torch.stack(disp)
 
     def _apply_joint_detents(self) -> None:
         if not any(j.detent_count > 0 and j.detent_torque != 0.0 for j in self._pih_joints):
