@@ -461,18 +461,22 @@ class PreciseAssemblyEnv(PlayEnv):
             return
         # A9 grip crack (A3 force_window recipe): contact reporting on the object for the hand-link contact view
         from . import scene_utils as _su
-        orig = _su.build_rigid_object_cfg
+        origs = {nm: getattr(_su, nm) for nm in ("build_rigid_object_cfg", "_pih_rigid_object_cfg")}
 
-        def cfg_contacts(prim_path, usd_paths):
-            c = orig(prim_path, usd_paths)
-            if prim_path.endswith("/Object"):
-                c.spawn.activate_contact_sensors = True
-            return c
-        _su.build_rigid_object_cfg = cfg_contacts
+        def wrap(fn):
+            def cfg_contacts(prim_path, usd):
+                c = fn(prim_path, usd)
+                if prim_path.endswith("/Object"):
+                    c.spawn.activate_contact_sensors = True
+                return c
+            return cfg_contacts
+        for nm, fn in origs.items():
+            setattr(_su, nm, wrap(fn))
         try:
             setup_scene(self)
         finally:
-            _su.build_rigid_object_cfg = orig
+            for nm, fn in origs.items():
+                setattr(_su, nm, fn)
 
     # ---- A9 design B: the screwdriver handle cracks above a grip-force limit; hidden handle friction per env -------
     _GRIP_LINKS = ("left_thumb_MC", "left_thumb_PP", "left_thumb_DP",
