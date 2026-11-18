@@ -123,6 +123,9 @@ class PreciseAssemblyCfg:
     dropped_terminal_penalty: float = 0.0   # A9: one-time penalty when the episode ends `dropped`
     grip_pads_rew: float = 0.0   # A9: per-step reward while >= grip_pads_min fingertip pads touch the object (not in retract)
     grip_pads_min: int = 2
+    grip_links_rew: float = 0.0   # A9: per-step reward while >= grip_links_min hand links press on the tool (needs grip_measure)
+    grip_links_min: int = 2
+    grip_link_min_force: float = 0.1
 
     # Start episodes mid-task from a bank of recorded teacher states (npz from
     # dagger/record_start_states.py): robot joint state + targets, peg pose in

@@ -540,6 +540,8 @@ class PreciseAssemblyEnv(PlayEnv):
         mag = F.norm(dim=-1)
         self.grip_force = mag.sum(-1)
         self.grip_peak = mag.max(-1).values
+        self.grip_links = (mag > float(getattr(pc, "grip_link_min_force", 0.1))).sum(-1)   # A9: hand links pressing on the tool
+        self.extras["grip_links_mean"] = self.grip_links.float().mean()
         self.grip_ep_max = torch.maximum(self.grip_ep_max, self.grip_force)
         self.extras["grip_force_mean"] = self.grip_force.mean()
         self.extras["grip_over_fmin_mean"] = (self.grip_force / self.grip_fmin).mean()
@@ -2181,6 +2183,16 @@ class PreciseAssemblyEnv(PlayEnv):
             t_pen = tsp * self._tl_step_deg
             reward = reward - t_pen
             self._reward_terms["toolless_step_penalty"] = -t_pen
+            self._reward_terms["total_reward"] = reward
+        gl = float(getattr(pih_cfg, "grip_links_rew", 0.0))
+        if gl > 0.0 and getattr(self, "grip_links", None) is not None:
+            # A9: reward each step >= grip_links_min hand links press on the tool (whole-hand grip, incl. finger sides,
+            # which the fingertip pads miss), not in the retract phase
+            held_l = (self.grip_links >= int(getattr(pih_cfg, "grip_links_min", 2))).float()
+            if getattr(self, "retract_phase", None) is not None:
+                held_l = held_l * (~self.retract_phase).float()
+            reward = reward + gl * held_l
+            self._reward_terms["grip_links_rew"] = gl * held_l
             self._reward_terms["total_reward"] = reward
         gp = float(getattr(pih_cfg, "grip_pads_rew", 0.0))
         tac = getattr(self, "_last_tactile", None)
