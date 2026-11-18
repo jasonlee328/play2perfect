@@ -71,6 +71,8 @@ class KeyLockCfg:
     still_steps: int = 42                # 0.7 s at 60 Hz
     drift_mm: float = 2.0
     drift_net: bool = True               # official (turn_key_unlock_door_flat.py:264-267): NET palm displacement between the
+    still_shape_anchor: bool = False     # drift_net shaping: the still potential counts consecutive released steps with the
+                                         # palm within drift_mm/2 of an anchor (=> net drift <= drift_mm), not just released time
                                          # first and last step of the still window < drift_mm; False = every step within
                                          # drift_mm of the window start (stricter, pre-11-17 behaviour)
     drift_start_mm: float = 0.0          # > 0: the stillness tolerance ramps drift_start_mm -> drift_mm over drift_ramp_steps
@@ -474,6 +476,15 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self._key_still = torch.where(released & (self._key_rel_run >= W) & net_ok,
                                           torch.full_like(self._key_still, W), self._key_still)
             still_ok = released
+            if bool(kl.still_shape_anchor):
+                if not hasattr(self, "_key_calm"):
+                    self._key_calm = torch.zeros_like(self._key_still)
+                near = (palm - self._key_palm_anchor).norm(dim=-1) <= 0.5 * dmm * 1e-3
+                calm_ok = released & near & (self._key_calm > 0)
+                self._key_calm = torch.where(calm_ok, self._key_calm + 1,
+                                             torch.where(released, torch.ones_like(self._key_calm), torch.zeros_like(self._key_calm)))
+                self._key_palm_anchor = torch.where((released & ~calm_ok).unsqueeze(-1), palm, self._key_palm_anchor)
+                self.extras["key/calm_steps_mean"] = (self._key_calm.float() * released.float()).sum() / released.float().sum().clamp(min=1.0)
         else:
             near_anchor = (palm - self._key_palm_anchor).norm(dim=-1) <= dmm * 1e-3
             still_ok = released & near_anchor & (self._key_still > 0)
@@ -610,7 +621,10 @@ class KeyLockEnv(PreciseAssemblyEnv):
         ang = self.cb_joint_angle[k]
         rp = self.retract_phase.float()
         phi = (self._key_min_tip / float(kl.release_dist)).clamp(0.0, 1.0) * rp
-        sphi = (self._key_still.float() / float(kl.still_steps)).clamp(0.0, 1.0) * rp
+        sc = self._key_still.float()
+        if bool(kl.drift_net) and bool(kl.still_shape_anchor) and hasattr(self, "_key_calm"):
+            sc = torch.maximum(self._key_calm.float(), (self._key_still >= int(kl.still_steps)).float() * float(kl.still_steps))
+        sphi = (sc / float(kl.still_steps)).clamp(0.0, 1.0) * rp
         rel = float(kl.release_rew_scale) * (phi - self._key_rel_phi) + float(kl.still_rew_scale) * (sphi - self._key_still_phi)
         self._key_rel_phi, self._key_still_phi = phi, sphi
         back = float(kl.turnback_penalty) * (self.retract_phase & (ang < self.key_clear)).float()
