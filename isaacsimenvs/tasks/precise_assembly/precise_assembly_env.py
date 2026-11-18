@@ -1294,8 +1294,10 @@ class PreciseAssemblyEnv(PlayEnv):
         obj_disp = (tip - self._retract_keep_obj0).norm(dim=-1)
         self._retract_keep_disp = torch.minimum(obj_disp, disp)
         self._retract_keep_lost = (drift > float(pc.retract_keep_drop_m)) & self.retract_phase
+        self._retract_keep_held_out = None
         tl = getattr(self, "_tl_out", None)
         tip_out = torch.ones(n, dtype=torch.bool, device=self.device) if tl is None else tl
+        self._retract_keep_held_out = (drift < float(pc.retract_keep_drift_m)) & tip_out & self.retract_phase
         clear = ((disp >= float(pc.retract_keep_move_m)) & (speed < float(pc.retract_keep_still_mps))
                  & (drift < float(pc.retract_keep_drift_m)) & tip_out)
         import os as _os
@@ -1305,6 +1307,10 @@ class PreciseAssemblyEnv(PlayEnv):
                 int(m.sum()), disp[m].mean(), drift[m].median(), speed[m].median(), tip_out[m].float().mean(),
                 (disp[m] >= float(pc.retract_keep_move_m)).float().mean(), (speed[m] < float(pc.retract_keep_still_mps)).float().mean(),
                 (drift[m] < float(pc.retract_keep_drift_m)).float().mean(), clear[m].float().mean()), flush=True)
+            print("KEEPDBG2 tipdisp %.3f lost %.2f drift_q90 %.4f atgoal %.2f kp %.4f" % (
+                obj_disp[m].mean(), (drift[m] > float(pc.retract_keep_drop_m)).float().mean(), drift[m].quantile(0.9),
+                (self._keypoints_max_dist[m] <= pc.retract_success_tolerance * self.cfg.reward.keypoint_scale).float().mean(),
+                self._keypoints_max_dist[m].mean()), flush=True)
         self.extras["retract_keep_disp_mean"] = (disp * self.retract_phase.float()).sum() / self.retract_phase.float().sum().clamp(min=1)
         self.extras["retract_keep_lost_frac"] = self._retract_keep_lost.float().mean()
         return clear
@@ -2205,7 +2211,12 @@ class PreciseAssemblyEnv(PlayEnv):
                 prev = torch.where(self._just_entered_retract, d, self._retract_prev_d)
                 self._retract_prev_d = d.clone()
                 mean_fingertip_dist = d - prev
+            tw = float(getattr(pih_cfg, "retract_keep_tipout_rew", 0.0))
+            tip_rew = 0.0
+            if tw > 0.0 and getattr(self, "_retract_keep_held_out", None) is not None:
+                tip_rew = tw * self._retract_keep_held_out.float()
             retract_rew = (
+                tip_rew +
                 mean_fingertip_dist * pih_cfg.retract_reward_scale * object_at_goal
                 + self._just_retracted.float() * self.retract_success_bonus
             ) * self.retract_phase.float()
