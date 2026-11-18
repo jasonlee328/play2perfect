@@ -267,7 +267,8 @@ class CardTask:
             ((self.nocontact >= c.card_release_steps) & moved_in_hand) | (self.nocontact >= 15))
         if just_rel.any():
             # the release step = the first contact-free step; its corners ~ the current ones (a few ms later)
-            self.rel_inside[just_rel] = (self._in_slot(bot) & (bot[..., 2] <= WALL_TOP_Z).all(-1))[just_rel]
+            rel_top = float(getattr(c, "card_release_top_z", WALL_TOP_Z))
+            self.rel_inside[just_rel] = (self._in_slot(bot) & (bot[..., 2] <= rel_top).all(-1))[just_rel]
             self.rel_palm[just_rel] = b[just_rel]
             self.released |= just_rel
         self.just_rel_inside = just_rel & self.rel_inside

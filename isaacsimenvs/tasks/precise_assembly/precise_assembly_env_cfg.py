@@ -224,6 +224,10 @@ class PreciseAssemblyCfg:
     # the board before the release, no card <-> board contact after the pick (board = fixture contact while the card
     # centre is over the board, x > card_platform_x_min), pads loaded on >= card_loaded_frac of the steps pick -> release.
     # Transport slip is measured from the pick (lowest point > board top + 2 mm with the pinch loaded).
+    # released_inside_slot height limit (m, holder frame): official = the 17 mm side-wall tops. A10 hand variant: the
+    # 5-finger hand cannot hold the card that low without touching the deck (trajbank3-5), so cb_card_hand uses the
+    # post tops + 5 mm (0.042); the no-hand probe drops from there land on the floor 8/8.
+    card_release_top_z: float = 0.017
     card_platform: bool = False
     card_platform_top_z: float = 0.120
     card_platform_lift: float = 0.030
