@@ -676,6 +676,17 @@ class PreciseAssemblyEnv(PlayEnv):
             if m.any():
                 self._cur_targets[m] = card.settle_tgt[m]
                 self._prev_targets[m] = card.settle_tgt[m]
+        uz = float(getattr(self.cfg.precise_assembly, "card_hand_lock_z", 0.0))
+        if card is not None and uz > 0.0 and hasattr(card, "settle_tgt") and hasattr(card, "zlow"):
+            if not hasattr(self, "_card_hand_ids"):
+                self._card_hand_ids = torch.tensor([i for i, n in enumerate(self.robot.joint_names) if n.startswith("left_")],
+                                                   device=self.device)
+            lock = (card.zlow > uz) & ~card.released     # fingers keep the grasp until the card bottom is low in the slot
+            if lock.any():
+                li = lock.nonzero(as_tuple=True)[0]
+                h = self._card_hand_ids
+                self._cur_targets[li[:, None], h] = card.settle_tgt[li[:, None], h]
+                self._prev_targets[li[:, None], h] = card.settle_tgt[li[:, None], h]
         self._apply_joint_detents()
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:

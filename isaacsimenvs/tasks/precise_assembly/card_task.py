@@ -267,6 +267,7 @@ class CardTask:
             if k == len(dists) - 1:
                 front_p, front_q = pk, qk
         zlow = bot[..., 2].min(-1).values
+        self.zlow = zlow
         n_front = quat_apply(front_q, torch.tensor([0.0, 0.0, 1.0], device=env.device).expand(env.num_envs, 3))
         gap = ((pc - front_p) * n_front).sum(-1) - 2 * HALF[2]
         lean_d = (self._lean_deg(qc) - self._lean_deg(front_q)).abs()
