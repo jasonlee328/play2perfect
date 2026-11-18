@@ -219,6 +219,15 @@ class PreciseAssemblyCfg:
     card_deck_fail_curriculum_steps: int = 0
     card_deck_fail_curriculum_offset: int = 0
     card_deck_lean_range_deg: tuple[float, ...] = ()   # fragile: hidden per-episode deck lean [lo, hi] deg
+    # cb_card_platform (place_card_into_holder_from_platform.py:571-600): held_in_hand_at_start is replaced by
+    # picked_up_from_platform = card rests on the board at the start, its lowest point gets >= card_platform_lift above
+    # the board before the release, no card <-> board contact after the pick (board = fixture contact while the card
+    # centre is over the board, x > card_platform_x_min), pads loaded on >= card_loaded_frac of the steps pick -> release.
+    # Transport slip is measured from the pick (lowest point > board top + 2 mm with the pinch loaded).
+    card_platform: bool = False
+    card_platform_top_z: float = 0.120
+    card_platform_lift: float = 0.030
+    card_platform_x_min: float = 0.080
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:

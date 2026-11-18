@@ -72,6 +72,9 @@ class CardTask:
         self.i7 = int(bi[0])
         self.arm_ids = env.robot.find_bodies("iiwa14_link_.*")[0]
         self.deck_ref_p = None
+        # cb_card_platform state
+        self.plat = bool(getattr(self.c, "card_platform", False))
+        self.picked = z(torch.bool); self.rest_ok = z(torch.bool); self.board_after = z(torch.bool); self.lift_max = z()
 
     # ------------------------------------------------------------------ views
     def _make_views(self):
@@ -121,9 +124,11 @@ class CardTask:
                   self.final_count, self.break_count, self.f_env_ep_max):
             t[env_ids] = 0
         self.pos_hist[:, env_ids] = float('nan')
-        for t in (self.released, self.rel_inside, self.success):
+        for t in (self.released, self.rel_inside, self.success, self.picked, self.board_after):
             t[env_ids] = False
         self.hold_ok[env_ids] = True
+        self.rest_ok[env_ids] = False
+        self.lift_max[env_ids] = 0.0
         for t in self.fail.values():
             t[env_ids] = False
         env = self.env
@@ -220,29 +225,45 @@ class CardTask:
         # after it (official t = 0 is after its scripted grasp, i.e. a settled pinch)
         st = self.step - int(getattr(c, "card_settle_steps", 0))
         first = st == 0
-        self.ref_p[first], self.ref_q[first] = p7[first], q7[first]
-        in_hold = (st >= 0) & (st < c.card_hold_steps)
-        slip0 = (cur - self._pts(self.ref_p, self.ref_q, self.corners)).norm(dim=-1).max(-1).values
-        self.slip_hold = torch.where(in_hold, torch.maximum(self.slip_hold, slip0), self.slip_hold)
-        self.hold_ok &= ~in_hold | (pinch & (self.f_env < c.card_clear_force))
-        end_hold = st == c.card_hold_steps
-        self.tr_p[end_hold], self.tr_q[end_hold] = p7[end_hold], q7[end_hold]
-        transport = (st >= c.card_hold_steps) & ~self.released
+        pc, qc = self._rel_hole(op, oq)
+        bot = self._pts(pc, qc, self.bottom)
+        if self.plat:
+            # picked_up_from_platform: the card starts resting on the board; the pick = first step its lowest point is
+            # > 2 mm above the board with the pinch loaded; transport (slip, loaded share) runs from the pick
+            zl_all = self._pts(pc, qc, self.corners)[..., 2].min(-1).values
+            top = c.card_platform_top_z
+            self.rest_ok = torch.where(first, (zl_all - top).abs() < 0.001, self.rest_ok)
+            just_pick = (~self.picked) & (st >= 0) & pinch & (zl_all > top + 0.002)
+            self.tr_p[just_pick], self.tr_q[just_pick] = p7[just_pick], q7[just_pick]
+            self.picked |= just_pick
+            self.lift_max = torch.where(self.picked & ~self.released, torch.maximum(self.lift_max, zl_all - top), self.lift_max)
+            over_board = pc[:, 0] > c.card_platform_x_min
+            self.board_after |= self.picked & over_board & (F_ce[:, -1] > 0.01)
+            transport = self.picked & ~self.released
+            hold_window = self.picked
+        else:
+            self.ref_p[first], self.ref_q[first] = p7[first], q7[first]
+            in_hold = (st >= 0) & (st < c.card_hold_steps)
+            slip0 = (cur - self._pts(self.ref_p, self.ref_q, self.corners)).norm(dim=-1).max(-1).values
+            self.slip_hold = torch.where(in_hold, torch.maximum(self.slip_hold, slip0), self.slip_hold)
+            self.hold_ok &= ~in_hold | (pinch & (self.f_env < c.card_clear_force))
+            end_hold = st == c.card_hold_steps
+            self.tr_p[end_hold], self.tr_q[end_hold] = p7[end_hold], q7[end_hold]
+            transport = (st >= c.card_hold_steps) & ~self.released
+            hold_window = st >= c.card_hold_steps
         slip1 = (cur - self._pts(self.tr_p, self.tr_q, self.corners)).norm(dim=-1).max(-1).values
         self.slip_tr = torch.where(transport, torch.maximum(self.slip_tr, slip1), self.slip_tr)
         self.tr_steps += transport.float()
         self.tr_loaded += (transport & pinch).float()
 
-        # card + deck in the receptive frame
-        pc, qc = self._rel_hole(op, oq)
-        bot = self._pts(pc, qc, self.bottom)
+        # card + deck in the receptive frame (pc, qc, bot computed above)
         free = (f_robot_card < c.card_clear_force) if tac_on is None else (f_robot_card < c.card_clear_force) & ~tac_on.any(-1)
         self.nocontact = torch.where(free, self.nocontact + 1, torch.zeros_like(self.nocontact))
         # release = pads off the card for card_release_steps AND the card moved > 2 mm in the hand frame (a real
         # release: it slides / drops), or no contact at all for 15 steps; a few contact-free substep reads while the
         # card stays put in the pinch (PhysX patch flicker) are not a release
         moved_in_hand = slip1 > 0.002
-        just_rel = (~self.released) & (st >= c.card_hold_steps) & (
+        just_rel = (~self.released) & hold_window & (
             ((self.nocontact >= c.card_release_steps) & moved_in_hand) | (self.nocontact >= 15))
         if just_rel.any():
             # the release step = the first contact-free step; its corners ~ the current ones (a few ms later)
@@ -281,15 +302,20 @@ class CardTask:
             & (gap < c.card_gap_tol) & (gap > -c.card_gap_tol) & (speed < c.card_rest_speed)
         clear = self.released & (f_rob_scene < c.card_clear_force) & ((b - self.rel_palm).norm(dim=-1) >= c.card_clear_dist)
         stopped = env.robot.data.body_lin_vel_w[:, self.arm_ids].norm(dim=-1).max(-1).values < c.card_stop_speed
-        held = self.hold_ok & (self.slip_hold < c.card_hold_slip) & (self.slip_tr < c.card_transport_slip) \
-            & (self.tr_loaded >= c.card_loaded_frac * self.tr_steps)
+        tr_ok = (self.slip_tr < c.card_transport_slip) & (self.tr_loaded >= c.card_loaded_frac * self.tr_steps)
+        if self.plat:
+            start_ok = self.rest_ok & self.picked & (self.lift_max >= c.card_platform_lift) & ~self.board_after \
+                & (self.tr_loaded >= c.card_loaded_frac * self.tr_steps)
+        else:
+            start_ok = self.hold_ok & (self.slip_hold < c.card_hold_slip)
+        held = start_ok & tr_ok
         end_ok = in_holder & deck_ok & clear & stopped & self.rel_inside & held
         self.final_count = torch.where(end_ok, self.final_count + 1, torch.zeros_like(self.final_count))
         self.success = self.final_count >= c.card_final_steps
 
         # early-fail conditions (used for termination when card_terminate_on_fail)
         hold_done = st >= c.card_hold_steps
-        self.fail["dropped_at_start"] = hold_done & ~(self.hold_ok & (self.slip_hold < c.card_hold_slip)) if c.card_fail_hold else torch.zeros_like(deck_ok)
+        self.fail["dropped_at_start"] = hold_done & ~(self.hold_ok & (self.slip_hold < c.card_hold_slip)) if (c.card_fail_hold and not self.plat) else torch.zeros_like(deck_ok)
         slip_tol = c.card_transport_slip
         if c.card_fail_slip and getattr(c, "card_slip_fail_curriculum_steps", 0) > 0:
             a_s = min(1.0, float(env.common_step_counter + c.card_slip_fail_curriculum_offset) / float(c.card_slip_fail_curriculum_steps))
@@ -310,10 +336,12 @@ class CardTask:
             over = self.f_env > c.card_break_force
             self.break_count = torch.where(over, self.break_count + 1, torch.zeros_like(self.break_count))
             self.fail["broken"] = self.break_count >= c.card_break_steps
-        self.checks = dict(held_in_hand_at_start=self.hold_ok & (self.slip_hold < c.card_hold_slip),
+        first_check = "picked_up_from_platform" if self.plat else "held_in_hand_at_start"
+        self.checks = {first_check: start_ok}
+        self.checks.update(dict(
                            held_through_transport=(self.slip_tr < c.card_transport_slip) & (self.tr_loaded >= c.card_loaded_frac * self.tr_steps),
                            released_inside_slot=self.released & self.rel_inside, card_in_holder=in_holder,
-                           existing_cards_remain=deck_ok, released_and_clear=clear, robot_stopped=stopped)
+                           existing_cards_remain=deck_ok, released_and_clear=clear, robot_stopped=stopped))
         self.meas = dict(gap_mm=gap * 1e3, lean_diff_deg=lean_d, zlow_mm=(zlow - FLOOR_Z) * 1e3, deck_moved_mm=deck_moved * 1e3,
                          deck_rot_deg=deck_rot, slip_hold_mm=self.slip_hold * 1e3, slip_tr_mm=self.slip_tr * 1e3,
                          f_env=self.f_env, f_env_ep_max=self.f_env_ep_max, f_robot_scene=f_rob_scene,
