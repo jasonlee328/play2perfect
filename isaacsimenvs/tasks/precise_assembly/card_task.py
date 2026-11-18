@@ -265,6 +265,11 @@ class CardTask:
         # card + deck in the receptive frame (pc, qc, bot computed above)
         free = (f_robot_card < c.card_clear_force) if tac_on is None else (f_robot_card < c.card_clear_force) & ~tac_on.any(-1)
         self.nocontact = torch.where(free, self.nocontact + 1, torch.zeros_like(self.nocontact))
+        # corners at the first contact-free step (the official release instant), used by released_inside_slot
+        if not hasattr(self, "bot_free"):
+            self.bot_free = bot.clone()
+        f1 = self.nocontact == 1
+        self.bot_free[f1] = bot[f1]
         # release = pads off the card for card_release_steps AND the card moved > 2 mm in the hand frame (a real
         # release: it slides / drops), or no contact at all for 15 steps; a few contact-free substep reads while the
         # card stays put in the pinch (PhysX patch flicker) are not a release
@@ -272,9 +277,10 @@ class CardTask:
         just_rel = (~self.released) & hold_window & (
             ((self.nocontact >= c.card_release_steps) & moved_in_hand) | (self.nocontact >= 15))
         if just_rel.any():
-            # the release step = the first contact-free step; its corners ~ the current ones (a few ms later)
+            # the release step = the first contact-free step; its corners are kept in bot_free
             rel_top = float(getattr(c, "card_release_top_z", WALL_TOP_Z))
-            self.rel_inside[just_rel] = (self._in_slot(bot) & (bot[..., 2] <= rel_top).all(-1))[just_rel]
+            bf = self.bot_free
+            self.rel_inside[just_rel] = (self._in_slot(bf) & (bf[..., 2] <= rel_top).all(-1))[just_rel]
             self.rel_palm[just_rel] = b[just_rel]
             self.released |= just_rel
         self.just_rel_inside = just_rel & self.rel_inside
@@ -330,6 +336,12 @@ class CardTask:
         self.slip_fail_tol = slip_tol
         self.fail["slipped"] = transport & (self.slip_tr >= slip_tol) if c.card_fail_slip else torch.zeros_like(deck_ok)
         self.fail["released_outside"] = self.released & ~self.rel_inside
+        mz = float(getattr(c, "card_missed_slot_z", 0.0))
+        if mz > 0.0:   # card pushed low while not over the slot (lands beside the holder / on the walls)
+            off = ((pc[:, 0] - c.card_missed_slot_x).abs() > c.card_missed_slot_xy_tol) | (pc[:, 1].abs() > c.card_missed_slot_xy_tol)
+            self.fail["missed_slot"] = (~self.released) & (zlow < mz) & off
+        else:
+            self.fail["missed_slot"] = torch.zeros_like(self.released)
         # early-termination tolerance: curriculum from (card_deck_fail_move_start, _rot_start) to the official values
         # over card_deck_fail_curriculum_steps env steps; the success check always uses the official 3 mm / 3 deg
         a = 1.0

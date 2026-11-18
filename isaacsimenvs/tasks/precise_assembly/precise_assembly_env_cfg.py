@@ -184,6 +184,9 @@ class PreciseAssemblyCfg:
     card_settle_steps: int = 0           # policy steps after reset with actions held at the reset targets, before the checks
     card_freeze_hold: bool = False       # also hold the reset targets through the card_hold_steps window (the official script holds still there)
     card_hand_lock_z: float = 0.0        # > 0: hand joint targets held at the grasp while the card bottom is above this (m, holder frame) and not released
+    card_missed_slot_z: float = 0.0      # > 0: fail "missed_slot" when the held card's bottom is below this (m) while its centre is off the slot
+    card_missed_slot_x: float = 0.0035   # slot centre x of the seated card (holder frame)
+    card_missed_slot_xy_tol: float = 0.006
                                          #   start (a restored pinch settles; see card_task.py)
     card_hold_slip: float = 0.0005       # held_in_hand_at_start: < 0.5 mm in the link7 frame
     card_transport_slip: float = 0.001   # held_through_transport: < 1 mm
