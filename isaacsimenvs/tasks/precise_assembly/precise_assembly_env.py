@@ -1274,19 +1274,30 @@ class PreciseAssemblyEnv(PlayEnv):
             self._retract_keep_rel0 = rel.clone()
             self._retract_keep_prev = tcp.clone()
             self._retract_keep_lost = torch.zeros(n, dtype=torch.bool, device=self.device)
+            self._retract_keep_obj0 = self.object.data.root_pos_w.clone()
         ent = self._just_entered_retract | ~self.retract_phase
         self._retract_keep_tcp0 = torch.where(ent.unsqueeze(-1), tcp, self._retract_keep_tcp0)
         self._retract_keep_rel0 = torch.where(ent.unsqueeze(-1), rel, self._retract_keep_rel0)
+        self._retract_keep_obj0 = torch.where(ent.unsqueeze(-1), self.object.data.root_pos_w, self._retract_keep_obj0)
         disp = (tcp - self._retract_keep_tcp0).norm(dim=-1)
         drift = (rel - self._retract_keep_rel0).norm(dim=-1)
         speed = (tcp - self._retract_keep_prev).norm(dim=-1) / max(1e-6, float(self.step_dt))
         self._retract_keep_prev = tcp.clone()
-        self._retract_keep_disp = disp
+        # reward signal: the TOOL's displacement (carried), not the hand's (sliding off the tool earned it before)
+        obj_disp = (self.object.data.root_pos_w - self._retract_keep_obj0).norm(dim=-1)
+        self._retract_keep_disp = torch.minimum(obj_disp, disp)
         self._retract_keep_lost = (drift > float(pc.retract_keep_drop_m)) & self.retract_phase
         tl = getattr(self, "_tl_out", None)
         tip_out = torch.ones(n, dtype=torch.bool, device=self.device) if tl is None else tl
         clear = ((disp >= float(pc.retract_keep_move_m)) & (speed < float(pc.retract_keep_still_mps))
                  & (drift < float(pc.retract_keep_drift_m)) & tip_out)
+        import os as _os
+        if _os.environ.get("A9_KEEPDBG") and bool(self.retract_phase.any()):
+            m = self.retract_phase
+            print("KEEPDBG n %d disp %.3f drift %.4f speed %.3f tipout %.2f moved %.2f still %.2f held %.2f clear %.2f" % (
+                int(m.sum()), disp[m].mean(), drift[m].median(), speed[m].median(), tip_out[m].float().mean(),
+                (disp[m] >= float(pc.retract_keep_move_m)).float().mean(), (speed[m] < float(pc.retract_keep_still_mps)).float().mean(),
+                (drift[m] < float(pc.retract_keep_drift_m)).float().mean(), clear[m].float().mean()), flush=True)
         self.extras["retract_keep_disp_mean"] = (disp * self.retract_phase.float()).sum() / self.retract_phase.float().sum().clamp(min=1)
         self.extras["retract_keep_lost_frac"] = self._retract_keep_lost.float().mean()
         return clear
