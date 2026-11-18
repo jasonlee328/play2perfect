@@ -83,6 +83,8 @@ class KeyLockCfg:
     release_arm_scale: float = 1.0       # < 1: once released (hand >= release_dist away, no contact), arm velocity actions
                                          # are scaled by this (fine mode for the stillness check; every policy, train + eval)
     p2_fmin_hint: bool = False           # G1 oracle: the actor's latch_hint field carries F_min / 12 N (needs latch_hint_obs)
+    p2_over_penalty: float = 0.0         # per step x clamp((F_ema / (rho F_min) - p2_over_start) / (1 - p2_over_start), 0, 1):
+    p2_over_start: float = 0.8           # dense warning before the break (the break itself stays the official-style fail)
                                          # first and last step of the still window < drift_mm; False = every step within
                                          # drift_mm of the window start (stricter, pre-11-17 behaviour)
     drift_start_mm: float = 0.0          # > 0: the stillness tolerance ramps drift_start_mm -> drift_mm over drift_ramp_steps
@@ -601,6 +603,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 rho = float(kl.p2_rho_start) + f * (rho - float(kl.p2_rho_start))
             self.extras["key/p2_rho_cur"] = torch.tensor(rho, device=self.device)
             if rho > 0.0:
+                st = float(kl.p2_over_start)
+                self._p2_over = ((self._p2_f / (rho * self.key_fmin2) - st) / max(1e-3, 1.0 - st)).clamp(0.0, 1.0)
+                self.extras["key/p2_over_mean"] = self._p2_over.mean()
                 over = self._p2_f > rho * self.key_fmin2
                 self._key_break_count = torch.where(over, self._key_break_count + 1, torch.zeros_like(self._key_break_count))
                 self._key_broken = self._key_break_count >= int(kl.break_steps)
@@ -677,6 +682,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
         if ar is not None:
             unp = (1.0 - float(kl.approach_unpinched_scale)) * ar.clamp(min=0.0) * (~self._key_turning_ok).float()
         slip_pen = float(kl.p2_slip_penalty) * self._p2_slipping.float() if bool(kl.p2_enabled) else torch.zeros_like(r)
+        if bool(kl.p2_enabled) and float(kl.p2_over_penalty) > 0.0 and hasattr(self, "_p2_over"):
+            slip_pen = slip_pen + float(kl.p2_over_penalty) * self._p2_over
         spen = torch.zeros_like(r)
         if float(kl.still_speed_penalty) > 0.0 and hasattr(self, "_key_released_now"):
             pv = self.robot.data.body_lin_vel_w[:, self._palm_id, :].norm(dim=-1)
