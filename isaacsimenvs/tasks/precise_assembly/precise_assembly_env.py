@@ -1384,6 +1384,19 @@ class PreciseAssemblyEnv(PlayEnv):
             dz = self.turn_u_start[env_ids] - float(self.cfg.precise_assembly.turn_thread_engaged_mm) * 1e-3
             w = w.clone()
             w[:, 0:3] -= axis_w[env_ids] * dz.unsqueeze(-1)
+        lift = tuple(getattr(self.cfg.precise_assembly, "object_start_lift_mm", ()) or ())
+        if len(lift) == 2 and getattr(self, "turn_thread", False):
+            lo, hi = float(lift[0]), float(lift[1])
+            ramp = int(getattr(self.cfg.precise_assembly, "object_start_lift_ramp_steps", 0))
+            if ramp > 0:
+                f = min(1.0, float(self.common_step_counter
+                                   + int(getattr(self.cfg.precise_assembly, "object_start_lift_offset_steps", 0))) / ramp)
+                hi = lo + (hi - lo) * f
+            h = (lo + (hi - lo) * torch.rand(env_ids.numel(), device=self.device)) * 1e-3
+            axis_w, _ = self._turn_axis_w()
+            w = w.clone()
+            w[:, 0:3] -= axis_w[env_ids] * h.unsqueeze(-1)   # axis points into the hole (see follow_thread)
+            self.extras["ak_start_lift_hi_mm"] = torch.tensor(hi, device=self.device)
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         if int(getattr(self.cfg.precise_assembly, "object_start_hold_steps", 0)) > 0:
             if getattr(self, "_object_start_pose_w", None) is None:

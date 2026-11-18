@@ -264,6 +264,13 @@ class PreciseAssemblyCfg:
     # pose (built for turn_thread_engaged_mm) moves along the axis with the actual start height.
     turn_thread_engaged_range_mm: tuple[float, ...] = ()
     object_start_follow_thread: bool = False
+    # A7 training aid (insertion curriculum): non-empty [lo, hi] mm = the held tool's start pose is raised along the
+    # hole axis by U(lo, hi') mm per episode, hi' = lo + (hi - lo) * min(1, (step + offset) / ramp) (ramp 0 = full range).
+    # With object_start_hold_* the tool is pinned there, aligned above the recess, until the hand has it; the hand must
+    # then insert it (the in-hand start, at a growing height). Off at eval.
+    object_start_lift_mm: tuple[float, ...] = ()
+    object_start_lift_ramp_steps: int = 0
+    object_start_lift_offset_steps: int = 0
     # A7 (Allen key screw): thread drag on the jointed body, applied every substep at the velocity level (official
     # _allen_key ThreadModel): Coulomb running friction (N m; official TAU_RUN0 0.0015) + viscous (N m s / rad; official
     # SCREW_KD 0.004). Never reverses the spin, so an undriven light screw stops (stiction). 0 = off (bottle default).
