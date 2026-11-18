@@ -147,6 +147,8 @@ class KeyLockCfg:
     p2_slip_penalty: float = 2.0         # per slipping step
     p2_force: str = "pads"               # force the window acts on: "pads" (sum of the 5 fingertip pads = the pinch) | "hand"
     p2_force_ema: float = 0.2            # weight of the newest step in the smoothed force
+    p2_track_rew: float = 0.0            # per turning step: scale x (1 - |log(F_break_ema / (sqrt(rho) F_min))| / log(rho)),
+                                         # clipped to [-1, 1] (privileged shaping toward the middle of the allowed band)
     p2_slip_ema: float = -1.0            # > 0: slip uses its own (faster) EMA of the pad force; break keeps p2_force_ema
     p2_ema_seed_onset: bool = False      # seed the smoothed force with the raw force at each contact onset (else it ramps
                                          # up from 0 and every fresh grasp reads as a slip whatever F_min is)
@@ -626,6 +628,12 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 over = self._p2_f > rho * self.key_fmin2
                 self._key_break_count = torch.where(over, self._key_break_count + 1, torch.zeros_like(self._key_break_count))
                 self._key_broken = self._key_break_count >= int(kl.break_steps)
+            if float(kl.p2_track_rew) > 0.0:
+                rr = max(rho, 1.05) if rho > 0.0 else 2.0
+                tgt = math.sqrt(rr) * self.key_fmin2
+                dev = torch.log(self._p2_f.clamp(min=1e-3) / tgt).abs() / math.log(rr)
+                self._p2_track = (1.0 - dev).clamp(-1.0, 1.0) * turn2.float()
+                self.extras["key/p2_track_mean"] = (self._p2_track.sum() / turn2.float().sum().clamp(min=1.0))
             self.extras["key/p2_slipping_frac"] = slipping.float().mean()
             self.extras["key/p2_force_mean"] = self._p2_f.mean()
             self.extras["key/p2_lag_deg_mean"] = torch.rad2deg(self._p2_lag).mean()
@@ -712,6 +720,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self.extras["key/released_arm_action"] = (self._key_arm_act * rl).sum() / rl.sum().clamp(min=1.0)
         if float(kl.unpinched_turn_penalty) > 0.0 and hasattr(self, "_key_unpinched_turn"):
             spen = spen + float(kl.unpinched_turn_penalty) * self._key_unpinched_turn.float()
+        if float(kl.p2_track_rew) > 0.0 and hasattr(self, "_p2_track"):
+            spen = spen - float(kl.p2_track_rew) * self._p2_track
         extra = rel - back + pinch - fail - unp - slip_pen - spen
         r = r + extra
         for name, v in (("key_release_rew", rel), ("key_turnback_pen", -back), ("key_pinch_rew", pinch), ("key_unpinched_cut", -unp),
