@@ -66,7 +66,7 @@ class CardTask:
         self.success = z(torch.bool)
         self.just_rel_inside = z(torch.bool)
         self.pos_hist = torch.zeros(12, N, 3, device=d)   # card centre (receptive frame), last 12 policy steps
-        self.fail = {k: z(torch.bool) for k in ("dropped_at_start", "slipped", "released_outside", "deck_disturbed", "broken")}
+        self.fail = {k: z(torch.bool) for k in ("dropped_at_start", "slipped", "released_outside", "deck_disturbed", "broken", "missed_slot")}
         self.checks = {}
         bi, _ = env.robot.find_bodies("iiwa14_link_7")
         self.i7 = int(bi[0])
