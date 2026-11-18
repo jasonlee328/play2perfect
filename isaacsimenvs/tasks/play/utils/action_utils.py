@@ -59,9 +59,14 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
 
     # Hand: absolute [-1, 1] scale.
     hand_action = actions[:, 7:]
-    hand_raw = env._hand_lower + 0.5 * (hand_action + 1.0) * (
-        env._hand_upper - env._hand_lower
-    )
+    hand_delta = float(getattr(act_cfg, "hand_delta_scale", 0.0))
+    if hand_delta > 0.0:
+        # A12: relative hand (like the arm): zero action holds the current grip
+        hand_raw = env._prev_targets[:, 7:] + hand_delta * dt * hand_action
+    else:
+        hand_raw = env._hand_lower + 0.5 * (hand_action + 1.0) * (
+            env._hand_upper - env._hand_lower
+        )
     hand_smoothed = (
         act_cfg.hand_moving_average * hand_raw
         + (1.0 - act_cfg.hand_moving_average) * env._prev_targets[:, 7:]
