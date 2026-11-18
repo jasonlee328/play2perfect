@@ -766,6 +766,67 @@ class PreciseAssemblyEnv(PlayEnv):
         self._object_start_hold()
         if getattr(self, "turn_mode", False):
             self._turn_substep()
+            self._turn_capture()
+
+    def _turn_capture(self) -> None:
+        """A7 training aid: see turn_capture_k (cfg)."""
+        pc = self.cfg.precise_assembly
+        k = float(getattr(pc, "turn_capture_k", 0.0))
+        tips = getattr(pc, "turn_tool_tips_m", ())
+        if k <= 0.0 or not tips:
+            return
+        ramp = int(pc.turn_capture_ramp_steps)
+        scale = 1.0 if ramp <= 0 else max(0.0, 1.0 - float(self.common_step_counter + int(pc.turn_capture_offset_steps))
+                                          / ramp)
+        self.extras["turn_capture_scale"] = torch.tensor(scale, device=self.device)
+        if scale <= 0.0:
+            if not getattr(self, "_capture_cleared", False):   # the wrench is persistent: write zeros once at the end
+                z = torch.zeros(self.num_envs, 1, 3, device=self.device)
+                self.object.set_external_force_and_torque(z, z, is_global=False)
+                self._capture_cleared = True
+            return
+        axis_w, anchor_w = self._turn_axis_w()
+        up = -axis_w
+        u = getattr(self, "turn_u", torch.zeros_like(self.turn_angle))
+        head_top = anchor_w + (u + float(pc.turn_tool_head_top_m)).unsqueeze(-1) * up
+        pos, quat = self.object.data.root_pos_w, self.object.data.root_quat_w
+        best_r = torch.full_like(self.turn_angle, 1e9)
+        best_h = torch.zeros_like(self.turn_angle)
+        best_off = torch.zeros(self.num_envs, 3, device=self.device)
+        best_rad = torch.zeros(self.num_envs, 3, device=self.device)
+        for t in tips:
+            tl = torch.tensor([float(v) for v in t], device=self.device).expand(self.num_envs, 3)
+            off = quat_apply(quat, tl)
+            rel = pos + off - head_top
+            h = (rel * up).sum(-1)
+            radv = rel - h.unsqueeze(-1) * up
+            r = radv.norm(dim=-1)
+            pick = r < best_r
+            best_r = torch.where(pick, r, best_r); best_h = torch.where(pick, h, best_h)
+            best_off = torch.where(pick.unsqueeze(-1), off, best_off)
+            best_rad = torch.where(pick.unsqueeze(-1), radv, best_rad)
+        on = (best_r < float(pc.turn_capture_radius_m)) & (best_h.abs() < float(pc.turn_capture_band_m))
+        self.extras["turn_capture_on_frac"] = on.float().mean()
+        vel = self.object.data.root_vel_w
+        w = vel[:, 3:6]
+        v_tip = vel[:, 0:3] + torch.cross(w, best_off, dim=-1)
+        v_rad = v_tip - (v_tip * up).sum(-1, keepdim=True) * up
+        f = -(k * best_rad + float(pc.turn_capture_d) * v_rad)
+        ax = quat_apply(quat, torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3))
+        ax = ax * torch.sign((ax * up).sum(-1, keepdim=True) + 1e-9)
+        w_perp = w - (w * up).sum(-1, keepdim=True) * up
+        tq = float(pc.turn_capture_k_rot) * torch.cross(ax, up, dim=-1) - float(pc.turn_capture_d_rot) * w_perp
+        tq = tq + torch.cross(best_off, f, dim=-1)
+        m = (on.float() * scale).unsqueeze(-1)
+        f_w = (f * m).unsqueeze(1); t_w = (tq * m).unsqueeze(1)
+        fd = getattr(self, "_object_forces", None); td = getattr(self, "_object_torques", None)
+        if fd is not None and fd.shape == f_w.shape:
+            f_w = f_w + fd
+        if td is not None and td.shape == t_w.shape:
+            t_w = t_w + td
+        q_b = quat.unsqueeze(1)
+        self.object.set_external_force_and_torque(quat_apply_inverse(q_b, f_w), quat_apply_inverse(q_b, t_w),
+                                                  is_global=False)
 
     def _object_start_hold(self) -> None:
         """A7: object_start_hold_steps N > 0 = for the first N policy steps of every episode the object is pinned at its

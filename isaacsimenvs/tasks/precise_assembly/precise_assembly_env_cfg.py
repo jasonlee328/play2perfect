@@ -302,6 +302,18 @@ class PreciseAssemblyCfg:
     # axis - turn_tool_tilt_free_deg, rad, >= 0), so the key stays upright in the recess through regrasps (0 = off)
     turn_tool_tilt_penalty_scale: float = 0.0
     turn_tool_tilt_free_deg: float = 10.0
+    # A7 training aid (curriculum, off in evals): a spring wrench that keeps an engaged tool in the recess through
+    # regrasps (tip pulled to the axis, long axis (object x) to the hole axis), only while a tip is within
+    # turn_capture_radius_m of the axis and turn_capture_band_m of the head top; strength fades 1 -> 0 over
+    # turn_capture_ramp_steps env steps (+ _offset_steps). 0 stiffness = off.
+    turn_capture_k: float = 0.0
+    turn_capture_d: float = 0.4
+    turn_capture_k_rot: float = 0.05
+    turn_capture_d_rot: float = 0.002
+    turn_capture_radius_m: float = 0.004
+    turn_capture_band_m: float = 0.006
+    turn_capture_ramp_steps: int = 0
+    turn_capture_offset_steps: int = 0
     # A7: the turn-progress reward / turn goals count only while a tool tip is in the recess (no reward for turning the
     # head with the fingers).
     turn_progress_requires_tool: bool = False
