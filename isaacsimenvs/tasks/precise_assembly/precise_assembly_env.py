@@ -1268,6 +1268,10 @@ class PreciseAssemblyEnv(PlayEnv):
             if pih_cfg.card_clear_rew_scale > 0.0:
                 c_rew = c_rew + pih_cfg.card_clear_rew_scale * card.checks["card_in_holder"].float() \
                     * card.meas["palm_from_release"].clamp(max=pih_cfg.card_clear_dist) * card.released.float()
+            if float(getattr(pih_cfg, "card_stop_rew_scale", 0.0)) > 0.0:
+                arm_v = self.robot.data.body_lin_vel_w[:, card.arm_ids].norm(dim=-1).max(-1).values
+                c_rew = c_rew + pih_cfg.card_stop_rew_scale * torch.exp(-arm_v / pih_cfg.card_stop_speed) \
+                    * (card.checks["card_in_holder"] & card.checks["released_and_clear"]).float()
             fails = [v for k, v in tr.items() if k.startswith("card_")]
             if fails:
                 c_rew = c_rew - pih_cfg.card_fail_penalty * torch.stack(fails).any(0).float()

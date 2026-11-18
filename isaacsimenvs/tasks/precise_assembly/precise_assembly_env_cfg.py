@@ -215,6 +215,9 @@ class PreciseAssemblyCfg:
     card_slip_fail_curriculum_offset: int = 0
     card_fail_penalty: float = 200.0
     card_success_bonus: float = 1000.0
+    # per step once the card is in the holder, released and the hand clear: scale x exp(-max arm link speed / card_stop_speed)
+    # (the official robot_stopped check needs the arm < 5 mm/s over the final window; card_clear_rew is flat past 50 mm)
+    card_stop_rew_scale: float = 0.0
     card_release_bonus: float = 200.0    # once, released inside the slot
     card_hold_rew: float = 0.0          # per step, pinch loaded and not released (shaping)
     card_clear_rew_scale: float = 0.0    # per step: scale x min(link7 dist from release, clear_dist) while card_in_holder
