@@ -77,6 +77,7 @@ class KeyLockCfg:
                                          # otherwise creeps the palm; applies to every policy and every phase)
     release_arm_scale: float = 1.0       # < 1: once released (hand >= release_dist away, no contact), arm velocity actions
                                          # are scaled by this (fine mode for the stillness check; every policy, train + eval)
+    p2_fmin_hint: bool = False           # G1 oracle: the actor's latch_hint field carries F_min / 12 N (needs latch_hint_obs)
                                          # first and last step of the still window < drift_mm; False = every step within
                                          # drift_mm of the window start (stricter, pre-11-17 behaviour)
     drift_start_mm: float = 0.0          # > 0: the stillness tolerance ramps drift_start_mm -> drift_mm over drift_ramp_steps

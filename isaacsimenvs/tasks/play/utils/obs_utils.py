@@ -371,6 +371,9 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             th = env.unlock_angle / math.radians(90.0)
             if not bool(getattr(env.cfg.precise_assembly, "latch_hint_theta", True)):
                 th = torch.zeros_like(th)
+            kl = getattr(env.cfg, "key_lock", None)
+            if kl is not None and bool(getattr(kl, "p2_fmin_hint", False)) and hasattr(env, "key_fmin2"):
+                th = env.key_fmin2 / 12.0                     # key task phase 2: privileged hidden F_min (N / 12)
             obs_clean["latch_hint"] = torch.stack([th * m, m], dim=-1)
         else:
             obs_clean["latch_hint"] = torch.zeros(n, 2, device=env.device)
