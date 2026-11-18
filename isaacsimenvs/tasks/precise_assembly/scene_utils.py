@@ -300,6 +300,8 @@ def setup_scene(env) -> None:
     # creates per-env prims correctly post-clone, and the RayCaster branch
     # can pre-create its Xform parent on each env explicitly.
     setup_student_camera(env)
+    from isaacsimenvs.tasks.play.utils import visual_dr
+    visual_dr.setup(env)
 
 
 __all__ = ["setup_scene"]

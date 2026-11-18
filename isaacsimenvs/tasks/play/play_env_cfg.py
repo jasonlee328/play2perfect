@@ -220,6 +220,20 @@ class StudentObsCfg:
     # plane isn't drawn, so a short far plane hides the neighbouring envs behind the scene.
     view2_clipping_range: tuple[float, float] = (0.1, 5.0)
 
+    # Visual domain randomization (A6, utils/visual_dr.py; off by default). Resampled per
+    # episode and env: camera pose (+-pos m per axis, +-rot deg per axis), focal length
+    # scale, colours of table / tray / sticks / backdrop, per-env sphere light, dome scale.
+    vdr_enabled: bool = False
+    vdr_seed: int = 0
+    vdr_cam_pos_m: float = 0.0
+    vdr_cam_rot_deg: float = 0.0
+    vdr_focal_scale: tuple[float, float] = (1.0, 1.0)
+    vdr_colors: bool = False
+    vdr_backdrop: bool = False
+    vdr_lights: bool = False
+    vdr_light_intensity: tuple[float, float] = (2.0e4, 2.0e5)
+    vdr_dome_scale: tuple[float, float] = (1.0, 1.0)
+
     focal_length: float = 24.0
     horizontal_aperture: float = 33.19737869997174
     # USD PinholeCamera aperture offsets shift the principal point without

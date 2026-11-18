@@ -86,6 +86,8 @@ class PlayEnv(DirectRLEnv):
             self,
             torch.as_tensor(env_ids, device=self.device, dtype=torch.long),
         )
+        from isaacsimenvs.tasks.play.utils import visual_dr
+        visual_dr.reset(self, env_ids)
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         apply_action_pipeline(self, actions)
