@@ -124,6 +124,17 @@ class PreciseAssemblyEnv(PlayEnv):
             self._object_mass = (m0[:, 0:1] * ratio).to(self.device)
             print(f"[PreciseAssemblyEnv] object mass {float(m0[0, 0]) * 1e3:.2f} g -> {m_kg * 1e3:.2f} g", flush=True)
 
+        # A12: optional hand stiffness scale (joint stiffness and damping of every left_* hand joint x k). Our hand's
+        # fingertip joints are ~10x softer than the official gripper's fingers: under the USB jaws' side load the pinched
+        # stick tilts and wedges 2-8 mm short. k = 3 holds the pinch at ~11 N per pad (official 12 N).
+        kp_s = float(getattr(cfg.precise_assembly, "hand_stiffness_scale", 1.0))
+        if kp_s != 1.0:
+            hid = [i for i, n in enumerate(self.robot.joint_names) if n.startswith("left_")]
+            k0 = self.robot.data.joint_stiffness[:, hid].clone(); d0 = self.robot.data.joint_damping[:, hid].clone()
+            self.robot.write_joint_stiffness_to_sim(k0 * kp_s, joint_ids=hid)
+            self.robot.write_joint_damping_to_sim(d0 * kp_s, joint_ids=hid)
+            print(f"[PreciseAssemblyEnv] hand stiffness x{kp_s} on {len(hid)} joints", flush=True)
+
         # When student_obs is enabled, the env exposes three obs groups via
         # `_get_observations`: "policy" = student obs (image+proprio, what
         # the depth-CNN reads), "critic" = state_list (privileged), and
