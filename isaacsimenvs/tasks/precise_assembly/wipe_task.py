@@ -13,7 +13,7 @@ Per policy step:
   under    = ink cells (5 mm, in the board frame) inside the felt footprint (eraser x / y extents, eraser yaw)
   a cell gains a step when under & felt_ok & F in force_window_N; it is erased after erase_steps steps
   pressed_too_hard (fail) = F > fail_force_N for fail_steps steps in a row
-  dropped (fail)          = eraser > wipe_drop_dist from the palm centre, or felt tilted > wipe_drop_tilt_deg
+  dropped (fail)          = eraser drifts > wipe_drop_dist from its in-hand pose (palm frame, captured at step 1), or felt tilted > wipe_drop_tilt_deg
   incomplete (fail)       = the last waypoint is credited with < success_frac of the cells erased
   success                 = the last waypoint is credited with >= success_frac erased
 Goals: the waypoints are at the nominal board height; with wipe_task on the env credits them z-free (keypoint
@@ -138,11 +138,17 @@ class WipeTask:
         self.over_count = torch.where(over, self.over_count + 1, torch.zeros_like(self.over_count))
         self.fail["pressed_too_hard"] = self.over_count >= self.fail_steps
         self.over_ever = self.over_ever | self.fail["pressed_too_hard"]
-        palm = env.robot.data.body_state_w[:, env._palm_body_id, 0:3]
         tilt_bad = ez[:, 2] < self.cos_drop
-        self.fail["dropped"] = ((ep - palm).norm(dim=-1) > float(self.c.wipe_drop_dist)) | tilt_bad
+        # drift of the real eraser from its in-hand pose captured at the episode start (palm frame of the
+        # actor-obs hook); the palm body origin itself sits ~245 mm from a tip-pinched eraser
+        drift = torch.zeros(N, device=env.device)
+        if getattr(self, "_palm_p", None) is not None:
+            vp = self._palm_p + quat_apply(self._palm_q, self.off_p)
+            drift = torch.where(self.need_off, drift, (ep - vp).norm(dim=-1))
+        self.drift = drift
+        self.fail["dropped"] = (drift > float(self.c.wipe_drop_dist)) | tilt_bad
         self.meas = dict(shear_mm=getattr(self, 'shear_mm', torch.zeros(N, 5, device=env.device)).amax(-1), force=F, frac=self.frac, gap_mm=gap * 1e3, felt_cos=ez[:, 2], h_mm=self.h * 1e3,
-                         F_ep_max=self.F_ep_max, inwin_steps=self.inwin_steps, contact_steps=self.contact_steps)
+                         drift_mm=getattr(self,'drift',torch.zeros(N,device=env.device))*1e3, F_ep_max=self.F_ep_max, inwin_steps=self.inwin_steps, contact_steps=self.contact_steps)
         self.inwin = inwin
 
     def gate(self, stroke_done: torch.Tensor) -> torch.Tensor:
@@ -162,6 +168,7 @@ class WipeTask:
             self.off_q[m] = quat_mul(quat_conjugate(palm_rot[m]), eq[m])
             self.need_off[m] = False
         use = ~self.need_off
+        self._palm_p, self._palm_q = palm_pos_w.clone(), palm_rot.clone()
         vp = palm_pos_w + quat_apply(palm_rot, self.off_p)
         vq = quat_mul(palm_rot, self.off_q)
         vp = torch.where(use[:, None], vp, ep); vq = torch.where(use[:, None], vq, eq)
@@ -212,7 +219,7 @@ class WipeTask:
         fv = self.v_eb.get_contact_force_matrix(float(env.physics_dt)).to(env.device).sum(1)   # (N, 3) on the eraser
         fv = fv * float(self.c.wipe_force_scale)
         on = img.flatten(2).amax(-1) > 0                                                        # (N, nf) pads in contact
-        share = fv[:, None] / on.sum(-1, keepdim=True).clamp_min(1)[..., None]                  # (N, nf, 3) world
+        share = (fv[:, None] / on.sum(-1, keepdim=True).clamp_min(1)[..., None]).expand(N, nf, 3).contiguous()  # (N, nf, 3) world
         bq = env.robot.data.body_quat_w[:, self.sh_body]                                        # (N, nf, 4)
         t = quat_apply_inverse(bq.reshape(-1, 4), share.reshape(-1, 3)).view(N, nf, 3)          # DP frame
         t = t - (t * self.sh_nrm[None]).sum(-1, keepdim=True) * self.sh_nrm[None]               # in the pad plane
