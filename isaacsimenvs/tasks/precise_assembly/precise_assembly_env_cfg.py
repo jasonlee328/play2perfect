@@ -205,6 +205,7 @@ class PreciseAssemblyCfg:
     retr_path_rew_scale: float = 0.0      # x change of the potential (rise capped at retr_lift_m, then 0.3 - dist to place)
     retr_release_bonus: float = 0.0       # once, at the release after the lift
     retr_tip_rew: float = 0.0             # per step before the release: fingertip pads on the card (saturates at 2)
+    retr_path_neat_gate: bool = False     # path reward paid only while the deck is neat
     retr_press_max: float = 0.0           # fragile: robot -> picked-card force limit while it is in the slot (N); 0 = off
     card_path_floor_z: float = 0.0       # path potential height term floors at this height above the slot floor (m)
     card_lean_ref_rest: bool = False     # path lean term vs the front card's rest lean, not its current lean

@@ -197,7 +197,8 @@ class RetrieveTask:
         """Per-step task reward (cfg retr_*)."""
         c = self.c
         r = c.card_success_bonus * tr["max_successes"].float()
-        r = r + c.retr_path_rew_scale * self.dphi
+        gate = self.checks["deck_remains_neat"].float() if bool(getattr(c, "retr_path_neat_gate", False)) else 1.0
+        r = r + c.retr_path_rew_scale * self.dphi * gate
         r = r + c.retr_release_bonus * self.just_rel.float()
         r = r + c.retr_tip_rew * (self.n_tips.clamp(max=2.0) / 2.0) * (~self.released).float()
         r = r - c.card_rob_deck_pen * self.f_rob_deck.clamp(max=c.card_rob_deck_pen_cap)
