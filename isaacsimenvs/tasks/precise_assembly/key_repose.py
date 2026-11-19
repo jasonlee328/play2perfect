@@ -11,7 +11,8 @@ unchanged in the palm frame. Success tolerance: the keypoint max distance (rewar
 teacher/keyrepose/env_keyrepose.txt) maps 1.5 cm to ~15 deg of rotation or 1.5 cm of position.
 
 Dropped (fail): the key's COM is more than ``key_drop_dist`` from every fingertip for ``key_drop_steps`` steps,
-or it is more than ``key_drop_below`` below the palm.
+or the key's COM is within ``key_drop_table_m`` of the table top (``key_drop_below`` > 0: also more than that
+below the palm).
 """
 from __future__ import annotations
 
@@ -118,7 +119,12 @@ class KeyRepose:
         ft = e.robot.data.body_state_w[:, e._fingertip_body_ids, 0:3]
         dmin = (ft - kp.unsqueeze(1)).norm(dim=-1).min(dim=-1).values
         pp, pq = self._palm()
-        below = (pp[:, 2] - kp[:, 2]) > float(c.key_drop_below)
+        below = torch.zeros_like(dmin, dtype=torch.bool)
+        if float(c.key_drop_below) > 0.0:
+            below = (pp[:, 2] - kp[:, 2]) > float(c.key_drop_below)
+        from .precise_assembly_env import TABLE_HALF_HEIGHT
+        top = e._table_z_per_env + TABLE_HALF_HEIGHT + e.scene.env_origins[:, 2]
+        below = below | (kp[:, 2] < top + float(c.key_drop_table_m))   # key on / near the table = dropped
         far = dmin > float(c.key_drop_dist)
         self.far_steps = torch.where(far, self.far_steps + 1, torch.zeros_like(self.far_steps))
         self.dropped = (self.far_steps >= int(c.key_drop_steps)) | below
