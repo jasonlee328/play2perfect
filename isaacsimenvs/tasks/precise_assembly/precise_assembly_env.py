@@ -642,6 +642,11 @@ class PreciseAssemblyEnv(PlayEnv):
                                                   dtype=torch.float32).unsqueeze(-1)
             self.button_travel_ep_max = torch.zeros(B, self.num_envs, device=self.device)
         self.button_travel = (self._button_rest_z - rel[..., 2]).clamp(min=0.0)
+        hs = float(self.cfg.precise_assembly.button_hard_stop_m)
+        if hs > 0.0:
+            # the software stop runs before each substep, so the last substep's overshoot is undone on the next one:
+            # read travel as the stop does
+            self.button_travel = self.button_travel.clamp(max=hs)
         self.button_travel_ep_max = torch.maximum(self.button_travel_ep_max, self.button_travel)
         c = self.cfg.precise_assembly
         thr = float(c.button_wrong_m)
