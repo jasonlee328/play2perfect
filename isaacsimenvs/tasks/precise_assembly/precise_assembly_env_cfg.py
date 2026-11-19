@@ -340,6 +340,13 @@ class PreciseAssemblyCfg:
     turn_tip_near_fingers: tuple[str, ...] = ("thumb", "index")
     turn_tip_near_off_m: float = 0.02
     turn_tip_near_sigma_m: float = 0.015
+    # A7 top grasp: per-step reward x mean over thumb + index of exp(-max(d - off, 0) / sigma), d = fingertip body to
+    # the handle point (key frame; default mid short leg), + per-step penalty while no key tip is in the recess
+    turn_handle_near_rew: float = 0.0
+    turn_handle_point_m: tuple[float, float, float] = (-0.023654, 0.0, -0.015)
+    turn_handle_near_off_m: float = 0.02
+    turn_handle_near_sigma_m: float = 0.01
+    turn_tool_out_pen: float = 0.0
     # A9: no tool tip in the recess -> the screw's axial spin is removed every substep (official: undriven screw stops at
     # once, armature 2e-7; ours coasts on its 2e-4 inertia). Off = A7 behaviour.
     turn_coast_stop: bool = False

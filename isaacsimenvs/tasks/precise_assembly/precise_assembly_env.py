@@ -2051,6 +2051,34 @@ class PreciseAssemblyEnv(PlayEnv):
                 near_r = near_r * (~self.retract_phase).float()
             reward = reward + tn * near_r
             self._reward_terms["turn_tip_near_rew"] = tn * near_r
+        th = float(getattr(pih_cfg, "turn_handle_near_rew", 0.0))
+        if getattr(self, "turn_mode", False) and th != 0.0:
+            # A7 top grasp (user 11-19: hold the key by its top handle): per step, mean over thumb + index of
+            # exp(-max(d - turn_handle_near_off_m, 0) / turn_handle_near_sigma_m), d = fingertip body to the handle point
+            # turn_handle_point_m (key frame); not in the retract phase
+            if getattr(self, "_ak_tip_w", None) is None:
+                names = [self.robot.body_names[i] for i in self._fingertip_body_ids]
+                fl = list(getattr(pih_cfg, "turn_tip_near_fingers", ["thumb", "index"]))
+                w = torch.tensor([float(any(f_ in n for f_ in fl)) for n in names], device=self.device)
+                self._ak_tip_w = w / w.sum().clamp(min=1.0)
+            hp = torch.tensor([float(v) for v in getattr(pih_cfg, "turn_handle_point_m", (-0.023654, 0.0, -0.015))],
+                              device=self.device).expand(self.num_envs, 3)
+            hw = self.object.data.root_pos_w + quat_apply(self.object.data.root_quat_w, hp)
+            ft = self.robot.data.body_pos_w[:, self._fingertip_body_ids]
+            dh = ((ft - hw.unsqueeze(1)).norm(dim=-1) - float(getattr(pih_cfg, "turn_handle_near_off_m", 0.02))).clamp(min=0.0)
+            hr = (torch.exp(-dh / float(getattr(pih_cfg, "turn_handle_near_sigma_m", 0.01))) * self._ak_tip_w).sum(-1)
+            if hasattr(self, "retract_phase"):
+                hr = hr * (~self.retract_phase).float()
+            reward = reward + th * hr
+            self._reward_terms["turn_handle_near_rew"] = th * hr
+        to = float(getattr(pih_cfg, "turn_tool_out_pen", 0.0))
+        if getattr(self, "turn_mode", False) and to != 0.0 and getattr(self, "_tl_out", None) is not None:
+            # A7: per step with no key tip in the recess (the key lifted / carried off the screw), not in the retract phase
+            out = self._tl_out.float()
+            if hasattr(self, "retract_phase"):
+                out = out * (~self.retract_phase).float()
+            reward = reward - to * out
+            self._reward_terms["turn_tool_out_pen"] = -to * out
         pt = float(getattr(pih_cfg, "turn_pad_turn_rew", 0.0))
         pn = float(getattr(pih_cfg, "turn_nopad_turn_pen", 0.0))
         if getattr(self, "turn_mode", False) and (pt != 0.0 or pn != 0.0) and getattr(self, "_ak_pads_on", None) is not None:
