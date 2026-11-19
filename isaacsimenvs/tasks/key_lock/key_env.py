@@ -170,6 +170,8 @@ class KeyLockCfg:
     key_pull_n: float = 3.0              # net outward hand force on the key (N)
     key_pull_steps: int = 5
     key_pull_click_mm: float = 2.0
+    key_pull_click_mode: str = "shift"   # "shift" = constant outward offset in the window; "vibrate" = +- offset,
+                                         # sign flipping every policy step
     key_pull_rew: float = 0.0            # per step in the window: x clamp(outward force / key_pull_n, 0, 1)
     key_window_rew: float = 0.0          # per step the key sits in the hidden window (dense hint to stop there)
     hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
@@ -396,7 +398,10 @@ class KeyLockEnv(PreciseAssemblyEnv):
             if not bool(self.key_in_window.any()):
                 return None
             up = torch.zeros_like(self.object.data.root_pos_w)
-            up[:, 2] = self.key_in_window.float() * float(kl.key_pull_click_mm) * 1e-3
+            amp = float(kl.key_pull_click_mm) * 1e-3
+            if str(kl.key_pull_click_mode) == "vibrate":
+                amp = amp * (1.0 if (int(self.common_step_counter) % 2 == 0) else -1.0)
+            up[:, 2] = self.key_in_window.float() * amp
             return self.object.data.root_pos_w + up, self.object.data.root_quat_w
         if not bool(self.cfg.key_lock.p2_enabled) or not hasattr(self, "_p2_lag") or not bool((self._p2_lag > 0).any()):
             return None
