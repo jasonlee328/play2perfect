@@ -118,6 +118,17 @@ class PreciseAssemblyCfg:
     start_state_file: str = ""
     # A12 USB (usb_task.py): "off" | "report" (contact views + verdict logged) | "gate" (verdict = task success)
     usb_task: str = "off"
+    # A13 key repose (key_repose.py): goal = the key's start pose in the palm frame turned about its long axis
+    key_repose: bool = False
+    key_flip_deg: tuple = (45.0, 90.0, 135.0, 180.0)   # one goal per angle, in order; last = the task
+    key_flip_ramp_steps: int = 0        # > 0: all angles scaled from key_flip_ramp_start to 1 over this many env steps
+    key_flip_ramp_start: float = 0.25
+    key_flip_ramp_offset_steps: int = 0  # set on a resume (the step counter restarts)
+    key_drop_dist: float = 0.04         # m, key COM from the nearest fingertip
+    key_drop_steps: int = 5
+    key_drop_below: float = 0.12        # m, key COM below the palm
+    key_drop_penalty: float = 200.0
+    key_hold_rew: float = 0.0           # per step while the key is not dropped (fingertip within key_drop_dist)
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
     usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
     usb_hold_steps: int = 36           # held_in_hand_at_start window (0.6 s)

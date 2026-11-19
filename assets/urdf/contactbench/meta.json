@@ -10827,6 +10827,108 @@
     "stick_mass_g": 15.0
    },
    "distractor_friction": 0.55
+  },
+  "cb_keyrepose": {
+   "object": "key_1",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "ContactBench task 11 (website tasks.json '11'; not in the official sim, docs/tasks.md:473)",
+    "task": "in-hand repose: flip the key about its long axis in a fingertip pinch, goal in the palm frame",
+    "key": 1,
+    "grip_point_key_frame_m": [
+     -0.00765,
+     0.00024,
+     0.0
+    ]
+   }
+  },
+  "cb_keyrepose_key2": {
+   "object": "key_2",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "ContactBench task 11 (website tasks.json '11'; not in the official sim, docs/tasks.md:473)",
+    "task": "in-hand repose: flip the key about its long axis in a fingertip pinch, goal in the palm frame",
+    "key": 2,
+    "grip_point_key_frame_m": [
+     -0.00497,
+     3e-05,
+     0.0
+    ]
+   }
+  },
+  "cb_keyrepose_key3": {
+   "object": "key_3",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "ContactBench task 11 (website tasks.json '11'; not in the official sim, docs/tasks.md:473)",
+    "task": "in-hand repose: flip the key about its long axis in a fingertip pinch, goal in the palm frame",
+    "key": 3,
+    "grip_point_key_frame_m": [
+     -0.00764,
+     0.00024,
+     0.0
+    ]
+   }
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"

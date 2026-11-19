@@ -297,6 +297,7 @@ def setup_scene(env) -> None:
         env.hole = RigidObject(_hcfg)
         _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0])
         _usb = getattr(env.cfg.precise_assembly, "usb_task", "off") != "off"
+        _usb = _usb or bool(getattr(env.cfg.precise_assembly, "key_repose", False))   # A13: hand-on-key contact views
         if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)) or _usb:
             _ocfg.spawn.activate_contact_sensors = True   # PhysxContactReportAPI: hand-on-object force (A1)
         env.object = RigidObject(_ocfg)

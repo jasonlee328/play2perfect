@@ -294,6 +294,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self._pih_receptive_urdf_abs = str(receptive_urdf)
         self._pih_object_scale = tuple(float(v) for v in object_spec.scale)
         self._pih_hole_z_offset = float(problem.hole_z_offset)
+        if pih_cfg.key_repose:   # A13: one (palm-frame) goal per flip angle; the waypoint poses are unused
+            insert_pose_sequence = tuple(insert_pose_sequence[:1]) * len(pih_cfg.key_flip_deg)
         self._pih_insert_pose_sequence = tuple(insert_pose_sequence)
         self._num_insertion_goals = len(self._pih_insert_pose_sequence)
 
@@ -773,6 +775,16 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _write_goal_pose(self, env_ids: torch.Tensor, is_first_goal: bool = False) -> None:
         n = env_ids.numel()
+        if self.cfg.precise_assembly.key_repose:
+            if getattr(self, "_key", None) is None:
+                from .key_repose import KeyRepose
+                self._key = KeyRepose(self)
+            if is_first_goal:
+                self._key.reset(env_ids)
+            k = (self._successes[env_ids] % self.env_max_goals[env_ids].clamp_min(1)).long()
+            self.goal_viz.write_root_pose_to_sim(self._key.goal_world(env_ids, k), env_ids=env_ids)
+            self.goal_viz.write_root_velocity_to_sim(torch.zeros(n, 6, device=self.device), env_ids=env_ids)
+            return
         env_origins = self.scene.env_origins[env_ids]
         is_random_goal = self.is_random_goal_env[env_ids]
 
@@ -1048,6 +1060,8 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
+        if getattr(self, "_key", None) is not None:
+            self._key.update()
         compute_intermediate_values(self)
 
         pih_cfg = self.cfg.precise_assembly
@@ -1173,7 +1187,10 @@ class PreciseAssemblyEnv(PlayEnv):
                 max_successes = self._usb.success.clone()
                 if pih_cfg.usb_terminate_on_fail:
                     usb_fail = {k: v & ~max_successes for k, v in self._usb.fail.items()}
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed
+        key_dropped = torch.zeros_like(fall)
+        if getattr(self, "_key", None) is not None:
+            key_dropped = self._key.dropped & ~max_successes
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | key_dropped
         for v in usb_fail.values():
             terminated = terminated | v
         truncated = self.episode_length_buf >= self.max_episode_length
@@ -1185,6 +1202,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "dropped": dropped,
             "disturbed": disturbed,
             "crushed": crushed,
+            "key_dropped": key_dropped,
             **{f"usb_{k}": v for k, v in usb_fail.items()},
             "timeout": truncated,
         }
@@ -1311,6 +1329,15 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["usb/success"] = usb.success.float().mean()
             self.extras["usb/pushing"] = usb.pushing.float().mean()
             self.extras["usb/released"] = usb.released.float().mean()
+        key = getattr(self, "_key", None)
+        if key is not None:   # A13
+            k_rew = -pih_cfg.key_drop_penalty * self._termination_reasons["key_dropped"].float()
+            if pih_cfg.key_hold_rew > 0.0:
+                k_rew = k_rew + pih_cfg.key_hold_rew * (key.fingertip_dmin < pih_cfg.key_drop_dist).float()
+            reward = reward + k_rew
+            self._reward_terms["key_reward"] = k_rew
+            self._reward_terms["total_reward"] = reward
+            key.log(self.extras)
 
         log_step_metrics(self)
         self._log_peg_metrics()
@@ -1339,6 +1366,11 @@ class PreciseAssemblyEnv(PlayEnv):
             sf["neighbours_out_of_box_cm"] = self.distractor_disp_ep_max * 100.0
             sf["ended_disturbed"] = self._termination_reasons["disturbed"].float() \
                 if "disturbed" in self._termination_reasons else torch.zeros_like(task)
+        key = getattr(self, "_key", None)
+        if key is not None:
+            sf["key_dropped"] = self._termination_reasons["key_dropped"].float() \
+                if "key_dropped" in getattr(self, "_termination_reasons", {}) else torch.zeros_like(task)
+            sf["key_min_final_rot_err_deg"] = key.min_final_rot_err.clone()
         self.extras["success_final"] = {k: v.detach().clone() for k, v in sf.items()}
 
         prev_ratio = (
