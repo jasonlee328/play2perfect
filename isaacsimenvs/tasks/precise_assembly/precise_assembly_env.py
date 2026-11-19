@@ -467,6 +467,11 @@ class PreciseAssemblyEnv(PlayEnv):
                     self._tactile_post = wipe.shear_tactile
             wipe.reset(env_ids)
         self._reset_kp_scale(env_ids)
+        b = float(getattr(self.cfg.domain_randomization, "joint_pos_obs_bias_rad", 0.0))
+        if b > 0.0:
+            if getattr(self, "_jpos_obs_bias", None) is None:
+                self._jpos_obs_bias = torch.zeros(self.num_envs, self.robot.num_joints, device=self.device)
+            self._jpos_obs_bias[env_ids] = (torch.rand(env_ids.numel(), self.robot.num_joints, device=self.device) * 2 - 1) * b
 
     def _reset_kp_scale(self, env_ids: torch.Tensor) -> None:
         """A16 kp_scale_range_{arm,hand}: hidden per-episode PD gain scales (stiffness x s, damping x sqrt(s))."""

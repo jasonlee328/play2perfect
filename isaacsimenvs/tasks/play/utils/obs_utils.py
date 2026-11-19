@@ -365,6 +365,9 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     obs_noisy["object_vel"] = noisy_obj_vel
     obs_noisy["keypoints_rel_palm"] = keypoints_rel_palm_noisy
     obs_noisy["keypoints_rel_goal"] = keypoints_rel_goal_noisy
+    jb = getattr(env, "_jpos_obs_bias", None)
+    if jb is not None:
+        obs_noisy["joint_pos"] = joint_pos + jb
     if dr.joint_velocity_obs_noise_std > 0:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
