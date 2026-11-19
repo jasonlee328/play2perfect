@@ -165,14 +165,20 @@ class RetrieveTask:
         self.f_press = f_rob_card * in_slot_card.float()
         self.f_press_ep_max = torch.maximum(self.f_press_ep_max, self.f_press)
         if hasattr(self, "lock_F"):
-            r = float(getattr(c, "retr_lock_ratio", 1.4))
+            r = float(getattr(c, "retr_lock_ratio", 1.4)); dw = float(getattr(c, "retr_lock_dwell", 8))
+            lr = float(getattr(c, "retr_lock_ramp_steps", 0.0))
+            if lr > 0:   # curriculum: window ratio and dwell shrink from the *_start values to the final ones
+                a_l = min(1.0, float(env.common_step_counter + getattr(c, "retr_lock_offset_steps", 0.0)) / lr)
+                r = float(c.retr_lock_ratio_start) + (r - float(c.retr_lock_ratio_start)) * a_l
+                dw = float(c.retr_lock_dwell_start) + (dw - float(c.retr_lock_dwell_start)) * a_l
+            self.lock_lim = (r, dw)
             if getattr(self, "_lock_fresh", None) is not None:   # lock pose = the card pose after the reset write
                 ids = self._lock_fresh
                 self.lock_pose[ids, :3] = env.object.data.root_pos_w[ids]; self.lock_pose[ids, 3:] = env.object.data.root_quat_w[ids]
                 self._lock_fresh = None
             inwin = (self.f_press >= self.lock_F) & (self.f_press <= r * self.lock_F)
             self.lock_count = torch.where(self.locked & inwin, self.lock_count + 1, torch.zeros_like(self.lock_count))
-            unl = self.locked & (self.lock_count >= int(getattr(c, "retr_lock_dwell", 8)))
+            unl = self.locked & (self.lock_count >= max(1, int(round(dw))))
             self.unlock_step[unl] = self.step[unl].float()
             self.locked &= ~unl
             ids = self.locked.nonzero(as_tuple=False).squeeze(-1)
