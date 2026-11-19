@@ -119,6 +119,7 @@ class PreciseAssemblyCfg:
     # A12 USB (usb_task.py): "off" | "report" (contact views + verdict logged) | "gate" (verdict = task success)
     usb_task: str = "off"
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
+    hand_stiffness_scale: float = 1.0  # A12: hand joint stiffness and damping x this (1 = unchanged)
     usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
     usb_hold_steps: int = 36           # held_in_hand_at_start window (0.6 s)
     usb_pad_force: float = 0.2         # N, a link "carries" the stick
