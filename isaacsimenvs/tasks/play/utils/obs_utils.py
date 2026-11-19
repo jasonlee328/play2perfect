@@ -179,6 +179,11 @@ def compute_intermediate_values(env) -> None:
     if getattr(env, "_zfree_goal", False):   # A16 wipe: goals credited / rewarded without the absolute height
         dz = obj_kp[..., 2].mean(dim=1) - goal_kp[..., 2].mean(dim=1)
         goal_kp = goal_kp.clone(); goal_kp[..., 2] += dz.unsqueeze(1)
+        _w = getattr(env, "_wipe", None)
+        _fmin = float(getattr(env.cfg.precise_assembly, "wipe_goal_min_force_N", 0.0))
+        if _w is not None and _fmin > 0.0:   # board waypoints count only while the felt presses >= fmin (no hovering)
+            _need = (env._successes >= 1) & (_w.F < _fmin)
+            goal_kp[..., 2] += _need.float().unsqueeze(1)
     # Fingertip distance to the object's keypoint centroid (its geometric middle; the root can sit at one end).
     env._curr_fingertip_dist_center = torch.norm(ft_pos - obj_kp.mean(dim=1, keepdim=True), dim=-1)
 
