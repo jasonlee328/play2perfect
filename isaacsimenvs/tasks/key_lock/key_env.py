@@ -153,6 +153,8 @@ class KeyLockCfg:
                                          # (stiffness 0); their policy action a in [-1, 1] -> closing effort (a + 1) / 2 x
                                          # torque_max, so the action sets the squeeze directly (not faithful to the hand)
     torque_max: float = -1.0             # N m; <= 0: 0.8 x the joint effort limit
+    torque_pd_scale: float = 0.0         # hybrid: keep this fraction of the PD stiffness on the torque joints (posture + a
+                                         # light base grip; position targets still apply); the action adds the effort on top
     hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
                                          # x sqrt): domain randomization so the policy learns to turn with a light grip too
     p2_slip_ema: float = -1.0            # > 0: slip uses its own (faster) EMA of the pad force; break keeps p2_force_ema
@@ -357,7 +359,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._tq_zero_stiff(torch.arange(self.num_envs, device=self.device))
 
     def _tq_zero_stiff(self, env_ids):
-        z = torch.zeros(len(env_ids), len(self._tq_ids), device=self.device)
+        if not hasattr(self, "_tq_K0"):
+            self._tq_K0 = self.robot.data.joint_stiffness[:, self._tq_ids].clone()
+        z = self._tq_K0[env_ids] * float(self.cfg.key_lock.torque_pd_scale)
         self.robot.write_joint_stiffness_to_sim(z, joint_ids=self._tq_ids, env_ids=env_ids)
 
     def _apply_action(self) -> None:
