@@ -169,6 +169,7 @@ class KeyLockCfg:
     key_pull_window_offset_steps: int = 0
     key_pull_n: float = 3.0              # net outward hand force on the key (N)
     key_pull_steps: int = 5
+    key_pull_win_any: bool = False       # a pull counts as in-window if the key was in the window at any step of it
     key_pull_click_mm: float = 2.0
     key_pull_click_twist_deg: float = 10.0  # "twist" mode: felt key rotated back about the lock axis (like the slip cue)
     key_pull_click_mode: str = "shift"   # "shift" = constant outward offset in the window; "vibrate" = +- offset,
@@ -667,14 +668,18 @@ class KeyLockEnv(PreciseAssemblyEnv):
             pulling = self.key_hand_fz > float(kl.key_pull_n)
             self._kp_cnt = torch.where(pulling, self._kp_cnt + 1, torch.zeros_like(self._kp_cnt))
             done_pull = self._kp_cnt >= int(kl.key_pull_steps)
-            self._key_ok = done_pull & win
+            if not hasattr(self, "_kp_winany"):
+                self._kp_winany = torch.zeros(N, dtype=torch.bool, device=self.device)
+            self._kp_winany = pulling & (self._kp_winany | win)
+            winx = self._kp_winany if bool(kl.key_pull_win_any) else win
+            self._key_ok = done_pull & winx
             prog = (ang / self._kp_target).clamp(0.0, 1.0)
             if not hasattr(self, "_kp_prog"):
                 self._kp_prog = prog.clone()
             self._kp_dprog = (prog - self._kp_prog).clamp(min=0.0)
             self._kp_prog = torch.maximum(self._kp_prog, prog)
             self.extras["key/progress_mean"] = self._kp_prog.mean()
-            self._kp_wrong = done_pull & ~win
+            self._kp_wrong = done_pull & ~winx
             over = ang > self._kp_target + math.radians(float(kl.key_strip_deg))
             self._kp_over = over
             self.extras["key/pull_in_window_frac"] = win.float().mean()
@@ -888,6 +893,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             t[env_ids] = 0.0
         if hasattr(self, "_kp_cnt"):
             self._kp_cnt[env_ids] = 0.0; self._kp_wrong[env_ids] = False
+            if hasattr(self, "_kp_winany"):
+                self._kp_winany[env_ids] = False
             lo, hi = (float(v) for v in self.cfg.key_lock.key_pull_target_range_deg)
             if hi > 0.0:
                 self._kp_target[env_ids] = torch.deg2rad(lo + (hi - lo) * torch.rand(len(env_ids), device=self.device))
