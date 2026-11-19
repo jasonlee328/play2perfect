@@ -276,6 +276,11 @@ class PreciseAssemblyCfg:
     # at vseat (no tight / torque requirement); turning more than turn_vseat_over_deg past vseat strips the screw.
     turn_vseat_offset_range_deg: tuple[float, ...] = ()
     turn_vseat_over_deg: float = 45.0
+    # curriculum: > 0 = the strip window ramps from turn_vseat_over_start_deg down to turn_vseat_over_deg over this many
+    # env steps (common_step_counter + turn_vseat_over_offset_steps; a resume restarts the counter)
+    turn_vseat_over_ramp_steps: int = 0
+    turn_vseat_over_start_deg: float = 150.0
+    turn_vseat_over_offset_steps: int = 0
     turn_vseat_tactile: bool = True
     # > 0: fail `stripped` (-turn_strip_penalty) once the cap is turned more than this past its stop (any mode).
     turn_strip_over_deg: float = 0.0

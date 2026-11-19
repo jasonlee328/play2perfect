@@ -1524,7 +1524,13 @@ class PreciseAssemblyEnv(PlayEnv):
             if over_deg > 0.0:
                 new |= self.turn_angle > self.unlock_angle + math.radians(over_deg)
             if getattr(self, "turn_vseat", None) is not None:
-                new |= self.turn_angle > self.turn_vseat + math.radians(float(pih_cfg.turn_vseat_over_deg))
+                vo = float(pih_cfg.turn_vseat_over_deg)
+                vr = int(getattr(pih_cfg, "turn_vseat_over_ramp_steps", 0))
+                if vr > 0:
+                    fr = min(1.0, float(self.common_step_counter + int(pih_cfg.turn_vseat_over_offset_steps)) / float(vr))
+                    vo = float(pih_cfg.turn_vseat_over_start_deg) + fr * (vo - float(pih_cfg.turn_vseat_over_start_deg))
+                self.extras["turn_vseat_over_cur"] = vo
+                new |= self.turn_angle > self.turn_vseat + math.radians(vo)
             if getattr(self, "turn_thread", False) and float(pih_cfg.turn_strip_torque) > 0.0:
                 new |= self.turn_lock_torque > float(pih_cfg.turn_strip_torque)   # our over-torque rule (not official)
             brk = float(getattr(pih_cfg, "turn_break_torque", 0.0))
