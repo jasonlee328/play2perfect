@@ -1306,6 +1306,14 @@ class PreciseAssemblyEnv(PlayEnv):
                     * usb.meas["palm_from_release"].clamp(max=pih_cfg.usb_clear_dist)
             if pih_cfg.usb_hold_rew > 0.0:
                 u_rew = u_rew + pih_cfg.usb_hold_rew * usb.meas["pinch"] * (~usb.released).float()
+            if float(getattr(pih_cfg, "usb_lat_rew_scale", 0.0)) > 0.0:
+                # potential on -(lateral tip error) before the release: pays centring the plug over the 0.175 mm/side mouth
+                phl = -usb.meas["lat_mm"] * 1e-3
+                if not hasattr(usb, "phl_prev"):
+                    usb.phl_prev = phl.clone()
+                d_l = torch.where((usb.step <= 1) | usb.released, torch.zeros_like(phl), phl - usb.phl_prev)
+                usb.phl_prev = phl.clone()
+                u_rew = u_rew + float(pih_cfg.usb_lat_rew_scale) * d_l
             if pih_cfg.usb_seat_rew_scale > 0.0:
                 phi = -usb.meas["seat_err_mm"] * 1e-3
                 if not hasattr(usb, "phi_prev"):

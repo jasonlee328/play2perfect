@@ -126,6 +126,10 @@ class UsbTask:
         seat_err = torch.maximum((pc - self.seat_p).norm(dim=-1),
                                  (tip - torch.tensor([0.0, 0.0, TIP_SEAT_Z], device=env.device)).norm(dim=-1))
         inserted = seat_err < c.usb_seat_tol
+        lat = tip[:, :2].norm(dim=-1)                                   # plug tip off the slot axis (m)
+        ax_s = quat_apply(qc, torch.tensor([0.0, 0.0, 1.0], device=env.device).expand(N, 3))
+        ax_0 = quat_apply(self.seat_q[None].expand(N, 4), torch.tensor([0.0, 0.0, 1.0], device=env.device).expand(N, 3))
+        tilt_deg = torch.rad2deg(torch.acos((ax_s * ax_0).sum(-1).clamp(-1.0, 1.0)))
 
         st = self.step - int(c.usb_settle_steps)
         first = st == 0
@@ -171,7 +175,7 @@ class UsbTask:
         self.checks = dict(held_in_hand_at_start=self.hold_ok & (st >= c.usb_hold_steps), finger_pinch_real=pinch_real,
                            fully_inserted=inserted, released_and_clear=clear, no_motion_when_pushed=no_motion & (self.push_count > 0),
                            stays_seated_after_release=stays & self.released)
-        self.meas = dict(seat_err_mm=seat_err * 1e3, tip_z_mm=tip[:, 2] * 1e3, push_gain_mm=gain * 1e3,
+        self.meas = dict(seat_err_mm=seat_err * 1e3, tip_z_mm=tip[:, 2] * 1e3, lat_mm=lat * 1e3, tilt_deg=tilt_deg, push_gain_mm=gain * 1e3,
                          palm_from_release=palm_from_rel, pinch=pinch.float(), slip_hold_mm=self.slip_hold * 1e3,
                          f_rob_stick=F_rs.sum(-1), f_rob_scene=F_scene,
                          pinch_share=self.pre_loaded / self.pre_steps.clamp(min=1.0))
