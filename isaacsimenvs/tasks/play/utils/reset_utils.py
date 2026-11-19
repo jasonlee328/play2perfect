@@ -205,6 +205,10 @@ def _randomize_robot_dof_state(env, env_ids: torch.Tensor) -> None:
     """Reset DOF state and seed previous targets from the reset pose."""
     cfg = env.cfg.reset
     default_pos = env.robot.data.default_joint_pos[env_ids]  # (n, num_dofs)
+    off = tuple(getattr(cfg, "arm_default_offset", ()) or ())
+    if off:
+        default_pos = default_pos.clone()
+        default_pos[:, env._arm_joint_ids] += torch.tensor(off, device=default_pos.device, dtype=default_pos.dtype)
     lower = env.robot.data.joint_pos_limits[env_ids, :, 0]
     upper = env.robot.data.joint_pos_limits[env_ids, :, 1]
 
