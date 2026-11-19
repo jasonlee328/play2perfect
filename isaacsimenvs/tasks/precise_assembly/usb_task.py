@@ -45,6 +45,7 @@ class UsbTask:
         self.pre_steps = z(); self.pre_loaded = z(); self.pre_f_th = z(); self.pre_f_ix = z()
         self.released = z(torch.bool); self.nocontact = z(torch.long)
         self.rel_p = torch.zeros(N, 3, device=d); self.rel_palm = torch.zeros(N, 3, device=d)
+        self.rel_tipz = z()
         self.pushing = z(torch.bool); self.push_count = z(torch.long); self.push_tip0 = z()
         self.success = z(torch.bool); self.just_rel_seated = z(torch.bool)
         self.ref_p = torch.zeros(N, 3, device=d)
@@ -149,6 +150,7 @@ class UsbTask:
         self.nocontact = torch.where(free, self.nocontact + 1, torch.zeros_like(self.nocontact))
         just_rel = (~self.released) & (st >= c.usb_hold_steps) & (self.nocontact >= c.usb_release_steps)
         self.rel_p[just_rel] = pc[just_rel]
+        self.rel_tipz[just_rel] = tip[just_rel, 2]
         self.rel_palm[just_rel] = b[just_rel]
         self.released |= just_rel
         self.just_rel_seated = just_rel & inserted
@@ -162,7 +164,10 @@ class UsbTask:
         self.pushing |= start
         self.push_count = torch.where(self.pushing, self.push_count + 1, self.push_count)
         gain = (self.push_tip0 - tip[:, 2]).clamp(min=0.0)
-        stays = (pc - self.rel_p).norm(dim=-1) < c.usb_stay_tol
+        if str(getattr(c, "usb_stay_mode", "depth")) == "pos":   # old A12 rule: 3D stick drift since the release
+            stays = (pc - self.rel_p).norm(dim=-1) < c.usb_stay_tol
+        else:   # official (plug_in_usb.py:578-580): |final depth - depth before release| < 0.3 mm, along the slot axis
+            stays = (tip[:, 2] - self.rel_tipz).abs() < c.usb_stay_tol
         no_motion = gain < c.usb_push_gain_tol
         mean_th = self.pre_f_th / self.pre_steps.clamp(min=1.0); mean_ix = self.pre_f_ix / self.pre_steps.clamp(min=1.0)
         if str(getattr(c, "usb_pinch_mode", "mean_force")) == "frac":   # old A12 rule: pinch loaded on >= usb_pinch_frac of the steps

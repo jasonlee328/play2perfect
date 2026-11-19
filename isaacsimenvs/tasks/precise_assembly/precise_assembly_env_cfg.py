@@ -135,6 +135,7 @@ class PreciseAssemblyCfg:
     usb_push_steps: int = 36           # 0.6 s
     usb_push_gain_tol: float = 0.0003  # no_motion_when_pushed (l.154)
     usb_stay_tol: float = 0.0003       # stays_seated_after_release (l.155)
+    usb_stay_mode: str = "depth"       # stays_seated: "depth" (official, axial depth change) | "pos" (old 3D drift)
     usb_unseated_steps: int = 30       # released + untouched + not inserted for this long = fail
     usb_terminate_on_fail: bool = True
     usb_success_bonus: float = 1000.0
