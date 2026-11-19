@@ -661,6 +661,22 @@ class PreciseAssemblyEnv(PlayEnv):
         self.extras["button_wrong_thr_mm"] = thr * 1e3
         self.button_wrong = (self.button_travel[1:] > thr).any(dim=0) if self.button_travel.shape[0] > 1 \
             else torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        vals = tuple(float(v) for v in c.button_click_values_mm)
+        if vals:
+            if not hasattr(self, "button_click_x"):
+                idx = torch.arange(self.num_envs, device=self.device) % len(vals)
+                self.button_click_x = torch.tensor(vals, device=self.device)[idx] * 1e-3
+                self.button_under = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                self.button_over = torch.zeros_like(self.button_under)
+            t0, pk, x = self.button_travel[0], self.button_travel_ep_max[0], self.button_click_x
+            w = float(c.button_click_window_m)
+            self.button_in_click = (t0 >= x) & (t0 <= x + w)
+            self.button_released = t0 < float(c.button_release_m)
+            self.button_over = pk > x + w
+            self.button_under = self.button_released & (pk >= float(c.button_press_start_m)) & (pk < x)
+            self.button_wrong = self.button_wrong | self.button_over | self.button_under
+            self.extras["button_over_frac"] = self.button_over.float().mean()
+            self.extras["button_under_frac"] = self.button_under.float().mean()
 
     def _apply_button_goal(self, prev_near_steps: torch.Tensor) -> None:
         """The only goal is credited by the target's travel, not keypoints (3 mm is inside the keypoint tolerance)."""
@@ -668,6 +684,8 @@ class PreciseAssemblyEnv(PlayEnv):
         c = self.cfg.precise_assembly
         self._button_update()
         pressed = self.button_travel[0] >= float(c.button_actuate_m)
+        if tuple(c.button_click_values_mm):
+            pressed = (self.button_travel_ep_max[0] >= self.button_click_x) & self.button_released
         if c.button_require_pad:
             pressed = pressed & self._button_pad_on_target()
         at_last = (self._successes == self.env_max_goals - 1) & ~self.is_random_goal_env
@@ -902,6 +920,11 @@ class PreciseAssemblyEnv(PlayEnv):
     def _tactile_object_pose(self):
         """Object (pos, quat) the fingertip tactile ray-casts against, or None (= the real pose). Door latch
         touch-only cue: knob raised latch_tactile_pop_mm (world z) while in the unlock window and still latched."""
+        cmm = float(getattr(self.cfg.precise_assembly, "button_click_tactile_mm", 0.0))
+        if self.cfg.precise_assembly.button_mode and cmm != 0.0 and hasattr(self, "button_in_click"):
+            up = torch.zeros_like(self.object.data.root_pos_w)
+            up[:, 2] = self.button_in_click.float() * (cmm * 1e-3)
+            return self.object.data.root_pos_w + up, self.object.data.root_quat_w
         mm = float(getattr(self.cfg.precise_assembly, "latch_tactile_pop_mm", 0.0))
         om = float(getattr(self.cfg.precise_assembly, "latch_tactile_open_mm", 0.0))
         if (mm <= 0.0 and om == 0.0) or not self._latch_on() or not hasattr(self, "latch_in_window") \
@@ -2061,6 +2084,8 @@ class PreciseAssemblyEnv(PlayEnv):
             if float(pih_cfg.button_press_rew_scale) > 0.0:
                 # potential on the target's travel up to the actuation point (privileged reward only)
                 phi = (self.button_travel[0] / float(pih_cfg.button_actuate_m)).clamp(0.0, 1.0)
+                if tuple(pih_cfg.button_click_values_mm) and hasattr(self, "button_click_x"):
+                    phi = (self.button_travel_ep_max[0] / self.button_click_x).clamp(0.0, 1.0)
                 if pih_cfg.button_require_pad:
                     # progress only counts with a pad on the target: phi holds its last pad value otherwise
                     if hasattr(self, "_button_phi_prev"):

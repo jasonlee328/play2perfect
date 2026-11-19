@@ -188,6 +188,16 @@ class PreciseAssemblyCfg:
     button_require_pad: bool = False
     # light-touch feel bonus (reward only): one-time button_feel_bonus per key once a fingertip pad touches it for
     # button_feel_steps consecutive steps while its travel stays < button_feel_max_m (feel without actuating)
+    # hidden click depth (single key): env i clicks at button_click_values_mm[i % K] (hidden, fixed per env). Success =
+    # press past the click and let go (travel < button_release_m) with the episode peak in [x, x + window]. Pressing
+    # deeper than x + window = "wrong_key" (over-press); letting go after a press >= button_press_start_m but short of x
+    # = "wrong_key" (under-press). Touch-only click: the fingertip tactile ray-casts the key raised
+    # button_click_tactile_mm while its travel is inside [x, x + window] (physics unchanged).
+    button_click_values_mm: tuple[float, ...] = ()
+    button_click_window_m: float = 0.0004
+    button_click_tactile_mm: float = 1.0
+    button_release_m: float = 0.0003
+    button_press_start_m: float = 0.0005
     button_feel_bonus: float = 0.0
     button_feel_max_m: float = 0.001
     button_feel_steps: int = 3
