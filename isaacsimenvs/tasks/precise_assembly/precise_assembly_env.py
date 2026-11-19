@@ -72,6 +72,18 @@ class PreciseAssemblyEnv(PlayEnv):
 
         super().__init__(cfg, render_mode, **kwargs)
 
+        # A12: optional object mass override (solver conditioning: a 15 g USB stick can't spread the stiff spring
+        # jaws in PhysX, the official sim already raises the print mass for the same reason). Inertia scales alike.
+        m_kg = float(getattr(cfg.precise_assembly, "object_mass_kg", 0.0))
+        if m_kg > 0.0:
+            view = self.object.root_physx_view
+            ids = torch.arange(self.num_envs, dtype=torch.int32)
+            m0 = view.get_masses().clone(); i0 = view.get_inertias().clone()
+            ratio = m_kg / m0[:, 0:1].clamp(min=1e-9)
+            view.set_masses(m0 * ratio, ids); view.set_inertias(i0 * ratio, ids)
+            self._object_mass = (m0[:, 0:1] * ratio).to(self.device)
+            print(f"[PreciseAssemblyEnv] object mass {float(m0[0, 0]) * 1e3:.2f} g -> {m_kg * 1e3:.2f} g", flush=True)
+
         # When student_obs is enabled, the env exposes three obs groups via
         # `_get_observations`: "policy" = student obs (image+proprio, what
         # the depth-CNN reads), "critic" = state_list (privileged), and
