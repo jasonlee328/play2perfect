@@ -205,6 +205,7 @@ class PreciseAssemblyCfg:
     retr_path_rew_scale: float = 0.0      # x change of the potential (rise capped at retr_lift_m, then 0.3 - dist to place)
     retr_release_bonus: float = 0.0       # once, at the release after the lift
     retr_tip_rew: float = 0.0             # per step before the release: fingertip pads on the card (saturates at 2)
+    retr_fric_values: tuple = ()          # fragile: hidden card(-card) friction per env, env i gets values[i % K]
     retr_tol_start: float = 1.0           # deck-neat tolerances x k, k ramps retr_tol_start -> 1 (training curriculum)
     retr_tol_ramp_steps: float = 0.0
     retr_tol_offset_steps: float = 0.0

@@ -96,6 +96,16 @@ class RetrieveTask:
             self.phi_reach[env_ids] = float("nan")
         env = self.env
         if self.deck_ref_p is None:
+            vals = list(getattr(self.c, "retr_fric_values", ()) or ())
+            if vals:   # fragile variant: hidden card friction per env (fixed for the env's life; bucketed = few materials)
+                idx = torch.arange(env.num_envs) % len(vals)
+                mu = torch.tensor(vals, dtype=torch.float32)[idx]
+                self.card_mu = mu.to(env.device)
+                all_ids = torch.arange(env.num_envs)
+                for b in [env.object] + list(env.distractors):
+                    m = b.root_physx_view.get_material_properties()
+                    m[:, :, 0] = mu[:, None]; m[:, :, 1] = mu[:, None]
+                    b.root_physx_view.set_material_properties(m, all_ids)
             K = len(env.distractors)
             self.deck_ref_p = torch.zeros(K, env.num_envs, 3, device=env.device)
             self.deck_ref_n = torch.zeros(K, env.num_envs, 3, device=env.device)
@@ -207,7 +217,8 @@ class RetrieveTask:
         self.reach_dist = dtip
         self.n_tips = n_tips
         self.checks = dict(single_card_on_table=on_tab, deck_remains_neat=neat, released_and_clear=clear)
-        self.meas = dict(rise_mm=rise * 1e3, rise_max_mm=self.rise_max * 1e3, deck_disp_mm=disp_max * 1e3, deck_tilt_deg=tilt_max,
+        mu_m = self.card_mu if hasattr(self, "card_mu") else torch.zeros(env.num_envs, device=d)
+        self.meas = dict(card_mu=mu_m, rise_mm=rise * 1e3, rise_max_mm=self.rise_max * 1e3, deck_disp_mm=disp_max * 1e3, deck_tilt_deg=tilt_max,
                          card_z_mm=pc[:, 2] * 1e3, card_x_mm=pc[:, 0] * 1e3, flat_cos=nc[:, 2].abs(), f_press=self.f_press,
                          f_press_ep_max=self.f_press_ep_max, f_rob_deck=f_rob_deck, f_card_env=f_card_env,
                          palm_from_release=moved * self.released.float(), reach_dist_mm=self.reach_dist * 1e3, lifted=self.lifted.float(), released=self.released.float())
