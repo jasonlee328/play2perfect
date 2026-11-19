@@ -303,6 +303,15 @@ class PreciseAssemblyCfg:
     turn_tool_head_top_m: float = 0.007
     turn_tool_radial_m: float = 0.0015
     turn_tool_out_m: float = 0.0005
+    # A7 official no-cam-out check (eval): while a key end is > turn_camout_depth_m into the recess, its flats must stay
+    # within turn_camout_angle_deg of the recess flats and the end within turn_camout_radial_m of the axis; a violation
+    # sets turn_camout and, with turn_camout_fail, ends the episode as `toolless`. offset = key-vs-screw flat reference.
+    turn_camout_check: bool = False
+    turn_camout_fail: bool = False
+    turn_camout_radial_m: float = 0.001
+    turn_camout_angle_deg: float = 15.0
+    turn_camout_depth_m: float = 0.001
+    turn_camout_offset_deg: float = 0.0
     turn_toolless_max_deg: float = 0.0
     turn_toolless_penalty: float = 0.0
     # A7 shaping (training only): per-step penalty scale x (tilt of the tool's long axis (object frame x) from the hole

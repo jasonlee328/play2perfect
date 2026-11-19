@@ -644,6 +644,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.turn_prev_ep_toolless_deg[env_ids] = self.turn_toolless_deg[env_ids]
             self.turn_toolless_deg[env_ids] = 0.0
             self.turn_toolless[env_ids] = False
+            if getattr(self, "turn_camout", None) is not None:
+                self.turn_camout[env_ids] = False
             if getattr(self, "_tl_seg_start", None) is not None:
                 self._tl_seg_start[env_ids] = self.turn_angle[env_ids]
                 self._tl_out[env_ids] = False
@@ -1379,6 +1381,22 @@ class PreciseAssemblyEnv(PlayEnv):
         head_top = anchor_w + (u + float(pc.turn_tool_head_top_m)).unsqueeze(-1) * up
         pos, quat = self.object.data.root_pos_w, self.object.data.root_quat_w
         inside = torch.zeros_like(self.turn_toolless)
+        camout_on = bool(getattr(pc, "turn_camout_check", False))
+        if camout_on:
+            engaged_any = torch.zeros_like(self.turn_toolless)
+            cam = torch.zeros_like(self.turn_toolless)
+            # official no-cam-out: while the key end is engaged in the recess, its flats stay within
+            # turn_camout_angle_deg of the recess flats and the end within turn_camout_radial_m of the axis.
+            # Flats: key object-frame y (normal to both legs) vs the screw body's x, both projected on the plane
+            # normal to the axis, compared mod 90 deg (square section / square recess).
+            kq = quat_apply(quat, torch.tensor([0.0, 1.0, 0.0], device=self.device).expand(self.num_envs, 3))
+            bq = self._joint_bodies()[int(pc.unlock_joint)].data.root_quat_w
+            sx = quat_apply(bq, torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3))
+            kq = kq - (kq * up).sum(-1, keepdim=True) * up
+            sx = sx - (sx * up).sum(-1, keepdim=True) * up
+            sy = torch.cross(up, sx, dim=-1)
+            ang = torch.rad2deg(torch.atan2((kq * sy).sum(-1), (kq * sx).sum(-1))) - float(pc.turn_camout_offset_deg)
+            flat_err = ((ang + 45.0) % 90.0 - 45.0).abs()
         for t in tips:
             tl = torch.tensor([float(v) for v in t], device=self.device).expand(self.num_envs, 3)
             tw = pos + quat_apply(quat, tl)
@@ -1386,6 +1404,19 @@ class PreciseAssemblyEnv(PlayEnv):
             h = (rel * up).sum(-1)
             radial = (rel - h.unsqueeze(-1) * up).norm(dim=-1)
             inside |= (radial < float(pc.turn_tool_radial_m)) & (h < float(pc.turn_tool_out_m))
+            if camout_on:
+                eng = (h < -float(pc.turn_camout_depth_m)) & (radial < float(pc.turn_tool_radial_m) + 0.002)
+                engaged_any |= eng
+                cam |= eng & ((radial > float(pc.turn_camout_radial_m)) | (flat_err > float(pc.turn_camout_angle_deg)))
+        if camout_on:
+            if getattr(self, "turn_camout", None) is None or self.turn_camout.shape != cam.shape:
+                self.turn_camout = torch.zeros_like(cam)
+            self.turn_camout |= cam
+            self.extras["turn_camout_frac"] = cam.float().mean()
+            if bool(engaged_any.any()):
+                self.extras["turn_camout_flat_err_med"] = flat_err[engaged_any].median()
+            if bool(getattr(pc, "turn_camout_fail", False)):
+                self.turn_toolless |= cam
         # NET rotation over each stretch with no tool tip in the recess (sim jitter averages out; a slow real turn by
         # fingers still accumulates): committed (closed stretches) + |angle - angle at the stretch's start|
         if getattr(self, "_tl_seg_start", None) is None:
