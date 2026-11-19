@@ -149,6 +149,10 @@ class KeyLockCfg:
     p2_force_ema: float = 0.2            # weight of the newest step in the smoothed force
     p2_track_rew: float = 0.0            # per turning step: scale x (1 - |log(F_break_ema / (sqrt(rho) F_min))| / log(rho)),
                                          # clipped to [-1, 1] (privileged shaping toward the middle of the allowed band)
+    torque_joints: tuple = ()            # phase-2 gripper variant: these hand joints (name substrings) are torque-controlled
+                                         # (stiffness 0); their policy action a in [-1, 1] -> closing effort (a + 1) / 2 x
+                                         # torque_max, so the action sets the squeeze directly (not faithful to the hand)
+    torque_max: float = -1.0             # N m; <= 0: 0.8 x the joint effort limit
     hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
                                          # x sqrt): domain randomization so the policy learns to turn with a light grip too
     p2_slip_ema: float = -1.0            # > 0: slip uses its own (faster) EMA of the pad force; break keeps p2_force_ema
@@ -328,7 +332,39 @@ class KeyLockEnv(PreciseAssemblyEnv):
                              torch.ones_like(self._key_released_now, dtype=actions.dtype)).to(actions.device)
             actions[:, :7] = actions[:, :7] * sc.unsqueeze(-1)
         self._key_arm_act = actions[:, :7].abs().mean(-1).to(self.device)
+        self._tq_setup()
+        if hasattr(self, "_tq_ids"):
+            self._tq_act = actions[:, self._tq_canon].to(self.device).clamp(-1.0, 1.0)
         super()._pre_physics_step(actions)
+
+    def _tq_setup(self):
+        kl = self.cfg.key_lock
+        if hasattr(self, "_tq_ids") or not tuple(kl.torque_joints):
+            return
+        from isaacsimenvs.tasks.play.utils.scene_utils import JOINT_NAMES_CANONICAL
+        rob = self.robot
+        subs = [str(x) for x in kl.torque_joints]
+        self._tq_ids = [i for i, nm in enumerate(rob.joint_names) if any(x in nm for x in subs)]
+        self._tq_canon = [JOINT_NAMES_CANONICAL.index(rob.joint_names[i]) for i in self._tq_ids]
+        lim = getattr(rob.data, "joint_effort_limits", None)
+        tmax = float(kl.torque_max)
+        if tmax <= 0.0 and lim is not None:
+            self._tq_max = 0.8 * lim[:, self._tq_ids].clone()
+        else:
+            self._tq_max = torch.full((self.num_envs, len(self._tq_ids)), max(tmax, 0.3), device=self.device)
+        self._tq_act = torch.zeros(self.num_envs, len(self._tq_ids), device=self.device)
+        print(f"[key_lock] torque-controlled joints {[rob.joint_names[i] for i in self._tq_ids]} max {self._tq_max[0].tolist()}", flush=True)
+        self._tq_zero_stiff(torch.arange(self.num_envs, device=self.device))
+
+    def _tq_zero_stiff(self, env_ids):
+        z = torch.zeros(len(env_ids), len(self._tq_ids), device=self.device)
+        self.robot.write_joint_stiffness_to_sim(z, joint_ids=self._tq_ids, env_ids=env_ids)
+
+    def _apply_action(self) -> None:
+        super()._apply_action()
+        if hasattr(self, "_tq_ids"):
+            eff = 0.5 * (self._tq_act + 1.0) * self._tq_max
+            self.robot.set_joint_effort_target(eff, joint_ids=self._tq_ids)
 
     def _tactile_object_pose(self):
         """Phase 2 v2: the tactile ray-cast sees the key rotated back about the lock axis by the slip lag (physics and
@@ -751,6 +787,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self.key_hand_stiff[env_ids] = sc
             rob.write_joint_stiffness_to_sim(self._hs_K0[env_ids] * sc.unsqueeze(-1), joint_ids=self._hs_ids, env_ids=env_ids)
             rob.write_joint_damping_to_sim(self._hs_D0[env_ids] * sc.sqrt().unsqueeze(-1), joint_ids=self._hs_ids, env_ids=env_ids)
+        if hasattr(self, "_tq_ids"):
+            self._tq_zero_stiff(env_ids)
         if not hasattr(self, "_key_still"):
             return
         self._ja_reinit[env_ids] = True
