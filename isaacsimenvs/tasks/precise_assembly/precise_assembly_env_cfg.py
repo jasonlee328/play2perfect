@@ -138,6 +138,8 @@ class PreciseAssemblyCfg:
     # wipe_shear_cap_mm. The ray-cast depth sensor alone cannot see a load parallel to a flat pinched face. 0 = off.
     wipe_shear_mm_per_N: float = 0.0
     wipe_shear_cap_mm: float = 4.0
+    # A16 touch-only load cue (gel indentation model): pad image x (1 + wipe_press_gain_per_N x |pad load share|), clipped to 1. 0 = off.
+    wipe_press_gain_per_N: float = 0.0
     # A16 hidden per-episode PD gain scales (stiffness x s, damping x sqrt(s)), arm and hand drawn separately; not in any
     # obs, so the joint tracking error no longer maps to a known force. (1, 1) = off.
     kp_scale_range_arm: tuple[float, float] = (1.0, 1.0)

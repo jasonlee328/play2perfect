@@ -236,7 +236,11 @@ class WipeTask:
         grid = torch.stack([src_c, src_r], -1) / (res - 1) * 2 - 1                              # x = col, y = row
         out = Fn.grid_sample(img.reshape(N * nf, 1, res, res), grid.reshape(N * nf, res, res, 2),
                              mode="bilinear", padding_mode="zeros", align_corners=True)
-        return out.view(N, -1)
+        g = float(getattr(self.c, "wipe_press_gain_per_N", 0.0))
+        if g > 0.0:
+            ld = share.norm(dim=-1) * on.float()                                                 # (N, nf) N per pad
+            out = (out.view(N, nf, res * res) * (1.0 + g * ld)[..., None]).clamp(max=1.0)
+        return out.reshape(N, -1)
 
     # ------------------------------------------------------------------ reward
     def reward(self, tr: dict) -> torch.Tensor:

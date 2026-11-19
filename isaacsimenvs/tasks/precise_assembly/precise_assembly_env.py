@@ -463,7 +463,7 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._zfree_goal = True
                 if self.cfg.precise_assembly.wipe_virtual_obs:
                     self._actor_obs_hook = wipe.actor_obs_hook
-                if float(self.cfg.precise_assembly.wipe_shear_mm_per_N) > 0.0:
+                if float(self.cfg.precise_assembly.wipe_shear_mm_per_N) > 0.0 or float(getattr(self.cfg.precise_assembly, "wipe_press_gain_per_N", 0.0)) > 0.0:
                     self._tactile_post = wipe.shear_tactile
             wipe.reset(env_ids)
         self._reset_kp_scale(env_ids)
