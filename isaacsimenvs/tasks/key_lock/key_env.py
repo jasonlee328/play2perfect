@@ -170,6 +170,7 @@ class KeyLockCfg:
     key_pull_n: float = 3.0              # net outward hand force on the key (N)
     key_pull_steps: int = 5
     key_pull_click_mm: float = 2.0
+    key_pull_click_twist_deg: float = 10.0  # "twist" mode: felt key rotated back about the lock axis (like the slip cue)
     key_pull_click_mode: str = "shift"   # "shift" = constant outward offset in the window; "vibrate" = +- offset,
                                          # sign flipping every policy step
     key_pull_rew: float = 0.0            # per step in the window: x clamp(outward force / key_pull_n, 0, 1)
@@ -397,6 +398,16 @@ class KeyLockEnv(PreciseAssemblyEnv):
         if bool(kl.key_pull) and hasattr(self, "key_in_window"):
             if not bool(self.key_in_window.any()):
                 return None
+            if str(kl.key_pull_click_mode) == "twist":
+                from isaaclab.utils.math import quat_from_angle_axis, quat_mul
+                j = self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)]
+                door = self.distractors[int(j.parent[10:])]
+                dq = door.data.root_quat_w
+                ax = quat_apply(dq, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(dq.shape[0], 3))
+                an = door.data.root_pos_w + quat_apply(dq, torch.tensor(j.anchor, device=self.device, dtype=torch.float32).expand(dq.shape[0], 3))
+                rot = quat_from_angle_axis(-self.key_in_window.float() * math.radians(float(kl.key_pull_click_twist_deg)), ax)
+                pos, quat = self.object.data.root_pos_w, self.object.data.root_quat_w
+                return an + quat_apply(rot, pos - an), quat_mul(rot, quat)
             up = torch.zeros_like(self.object.data.root_pos_w)
             amp = float(kl.key_pull_click_mm) * 1e-3
             if str(kl.key_pull_click_mode) == "vibrate":
