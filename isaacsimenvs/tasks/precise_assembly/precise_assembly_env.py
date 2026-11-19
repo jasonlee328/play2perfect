@@ -1339,10 +1339,15 @@ class PreciseAssemblyEnv(PlayEnv):
         q0 = self.object.data.root_quat_w[env_ids]
         lead = self.turn_lead[env_ids] if hasattr(self, "turn_lead") else torch.zeros(len(env_ids), device=self.device)
         travel = (self.unlock_angle[env_ids] - self.turn_offset[env_ids])
+        over = math.radians(float(getattr(self.cfg.precise_assembly, "turn_pose_goal_overshoot_deg", 0.0)))
         for k, deg in enumerate(self._turn_pose_goals):
             a = torch.clamp(torch.full_like(travel, math.radians(deg)), max=travel)
-            r = quat_from_angle_axis(a, axis)
-            pos = anchor + quat_apply(r, p0 - anchor) + axis * (a / (2.0 * math.pi) * lead).unsqueeze(-1)
+            # last waypoint: orientation turned past the seat by turn_pose_goal_overshoot_deg (position stays at the seat),
+            # so a pose tracker keeps twisting into the stop = seat torque
+            a_rot = a + over if k == len(self._turn_pose_goals) - 1 else a
+            r = quat_from_angle_axis(a_rot, axis)
+            r_pos = quat_from_angle_axis(a, axis)
+            pos = anchor + quat_apply(r_pos, p0 - anchor) + axis * (a / (2.0 * math.pi) * lead).unsqueeze(-1)
             self._prelude_pose_world[env_ids, k, 0:3] = pos
             self._prelude_pose_world[env_ids, k, 3:7] = quat_mul(r, q0)
 
