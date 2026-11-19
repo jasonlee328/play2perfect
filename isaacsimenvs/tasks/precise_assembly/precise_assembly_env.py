@@ -602,6 +602,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.button_travel[:, env_ids] = 0.0
             if hasattr(self, "_button_phi_prev"):
                 self._button_phi_prev[env_ids] = 0.0
+            if hasattr(self, "_button_touched"):
+                self._button_touched[:, env_ids] = False
         if getattr(self, "unlock_angle", None) is not None:
             self.unlock_prev_ep_max[env_ids] = self.unlock_max_angle[env_ids]  # kept across the auto-reset
             self.unlock_max_angle[env_ids] = 0.0
@@ -2017,6 +2019,17 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._button_phi_prev = phi.clone()
                 reward = reward + pr
                 self._reward_terms["button_press_rew"] = pr
+            if float(pih_cfg.button_touch_bonus) > 0.0 and getattr(self, "_tactile", None) is not None \
+                    and hasattr(self._tactile, "body_pad_depth"):
+                touched = (self._tactile.body_pad_depth > 0).any(dim=-1)                 # (B, N)
+                if not hasattr(self, "_button_touched"):
+                    self._button_touched = torch.zeros_like(touched)
+                new = touched & ~self._button_touched
+                self._button_touched |= touched
+                tb = float(pih_cfg.button_touch_bonus) * new.float().sum(0)
+                reward = reward + tb
+                self._reward_terms["button_touch_bonus"] = tb
+                self.extras["button_keys_touched"] = self._button_touched.float().sum(0).mean()
             self._reward_terms["total_reward"] = reward
 
         if float(getattr(pih_cfg, "door_break_penalty", 0.0)) > 0.0 and "broken" in self._termination_reasons:

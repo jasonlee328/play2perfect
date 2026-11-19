@@ -175,9 +175,15 @@ class TactileSensor:
     def compute(self) -> torch.Tensor:
         env = self.env
         result = self._cast(env.object, list(zip(self.meshes, self.asset_env_ids)))
+        # per-body contact (B, N, 5 pads): max depth per pad, body 0 = object, then the distractors (privileged; for
+        # rewards / labels only, never in the policy obs)
+        per = [result.view(env.num_envs, len(FINGERS), -1).amax(-1)]
         all_ids = torch.arange(env.num_envs, device=self.device)
         for body, mesh in self.extra:
-            result = torch.maximum(result, self._cast(body, [(mesh, all_ids)]))
+            r = self._cast(body, [(mesh, all_ids)])
+            per.append(r.view(env.num_envs, len(FINGERS), -1).amax(-1))
+            result = torch.maximum(result, r)
+        self.body_pad_depth = torch.stack(per)
         return _deform_quantize(result) / 255.0
 
     def _cast(self, obj, mesh_ids) -> torch.Tensor:

@@ -173,6 +173,8 @@ class PreciseAssemblyCfg:
     button_wrong_m: float = 0.001
     button_wrong_penalty: float = 100.0
     button_press_rew_scale: float = 0.0
+    # one-time bonus the first time any fingertip pad touches each key (privileged; needs tactile.fingertip_distractors)
+    button_touch_bonus: float = 0.0
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0
