@@ -169,7 +169,9 @@ class KeyLockCfg:
     key_pull_window_offset_steps: int = 0
     key_pull_n: float = 3.0              # net outward hand force on the key (N)
     key_pull_steps: int = 5
-    key_pull_win_any: bool = False       # a pull counts as in-window if the key was in the window at any step of it
+    key_pull_win_any: bool = False
+    key_cue_to_latch: bool = False       # expose the hidden pull window as env.latch_in_window, so the privileged
+                                         # actor field latch_cue (precise_assembly.latch_cue_obs) carries it (oracle)       # a pull counts as in-window if the key was in the window at any step of it
     key_pull_click_mm: float = 2.0
     key_pull_click_twist_deg: float = 10.0  # "twist" mode: felt key rotated back about the lock axis (like the slip cue)
     key_pull_click_mode: str = "shift"   # "shift" = constant outward offset in the window; "vibrate" = +- offset,
@@ -665,6 +667,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self.extras["key/pull_window_deg"] = torch.tensor(wdeg)
             win = (ang - self._kp_target).abs() <= math.radians(wdeg)
             self.key_in_window = win
+            if bool(kl.key_cue_to_latch):
+                self.latch_in_window = win.clone()
             pulling = self.key_hand_fz > float(kl.key_pull_n)
             self._kp_cnt = torch.where(pulling, self._kp_cnt + 1, torch.zeros_like(self._kp_cnt))
             done_pull = self._kp_cnt >= int(kl.key_pull_steps)
