@@ -155,6 +155,20 @@ class KeyLockCfg:
     torque_max: float = -1.0             # N m; <= 0: 0.8 x the joint effort limit
     torque_pd_scale: float = 0.0         # hybrid: keep this fraction of the PD stiffness on the torque joints (posture + a
                                          # light base grip; position targets still apply); the action adds the effort on top
+    key_clutch: bool = False             # hidden-angle variant: no plug stop in physics (the key turns on freely past it);
+                                         # the tactile ray-cast sees the key frozen at the stop (slip = touch-only cue);
+                                         # turning more than key_strip_deg past the stop = fail "stripped"
+    key_strip_deg: float = 45.0
+    key_pull: bool = False               # pull-out variant (needs key_clutch): success = an outward (+z) pull on the key
+                                         # while it sits within key_pull_window_deg of its hidden stop angle; a pull
+                                         # elsewhere = fail "wrong_pull"; at the window the tactile ray-cast sees the
+                                         # key shifted key_pull_click_mm outward (touch-only click)
+    key_pull_window_deg: float = 8.0
+    key_pull_n: float = 3.0              # net outward hand force on the key (N)
+    key_pull_steps: int = 5
+    key_pull_click_mm: float = 2.0
+    key_pull_rew: float = 0.0            # per step in the window: x clamp(outward force / key_pull_n, 0, 1)
+    key_window_rew: float = 0.0          # per step the key sits in the hidden window (dense hint to stop there)
     hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
                                          # x sqrt): domain randomization so the policy learns to turn with a light grip too
     p2_slip_ema: float = -1.0            # > 0: slip uses its own (faster) EMA of the pad force; break keeps p2_force_ema
@@ -206,7 +220,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_tau_f_np = np.asarray(cbf["drag_Nm"], dtype=np.float64) * scale
         k = int(self.cfg.precise_assembly.unlock_joint)
         stops = np.asarray(cbf["stop_deg"], dtype=np.float64)
-        self._key_soft_stop_np = stops > 179.0
+        self._key_soft_stop_np = (stops > 179.0) | bool(kl.key_clutch)
         for i in range(n):
             jp = stage.GetPrimAtPath(f"/World/envs/env_{i}/FixtureJoint{k}")
             if self._key_soft_stop_np[i]:
@@ -372,7 +386,15 @@ class KeyLockEnv(PreciseAssemblyEnv):
 
     def _tactile_object_pose(self):
         """Phase 2 v2: the tactile ray-cast sees the key rotated back about the lock axis by the slip lag (physics and
-        joint state unchanged). None = the real pose."""
+        joint state unchanged). Pull variant: in the hidden window the felt key is shifted outward (touch-only click).
+        None = the real pose."""
+        kl = self.cfg.key_lock
+        if bool(kl.key_pull) and hasattr(self, "key_in_window"):
+            if not bool(self.key_in_window.any()):
+                return None
+            up = torch.zeros_like(self.object.data.root_pos_w)
+            up[:, 2] = self.key_in_window.float() * float(kl.key_pull_click_mm) * 1e-3
+            return self.object.data.root_pos_w + up, self.object.data.root_quat_w
         if not bool(self.cfg.key_lock.p2_enabled) or not hasattr(self, "_p2_lag") or not bool((self._p2_lag > 0).any()):
             return None
         from isaaclab.utils.math import quat_from_angle_axis, quat_mul
@@ -401,7 +423,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
         c = self.cfg.precise_assembly
         k = int(c.unlock_joint)
         ang = self.cb_joint_angle[k]
-        over = torch.where(ang > self._key_stop_hi, ang - self._key_stop_hi,
+        hi = self._key_stop_hi + (1e6 if bool(self.cfg.key_lock.key_clutch) else 0.0)
+        over = torch.where(ang > hi, ang - hi,
                            torch.where(ang < self._key_stop_lo, ang - self._key_stop_lo, torch.zeros_like(ang)))
         over = torch.where(self._key_soft_stop_t, over, torch.zeros_like(over))
         ids = (over != 0).nonzero(as_tuple=False).squeeze(-1)
@@ -488,7 +511,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
         kl = self.cfg.key_lock
         c = self.cfg.precise_assembly
         N = self.num_envs
-        F = self._key_view.get_contact_force_matrix(self.physics_dt).reshape(N, self._key_nl, 3).norm(dim=-1)
+        Fv = self._key_view.get_contact_force_matrix(self.physics_dt).reshape(N, self._key_nl, 3)
+        self.key_hand_fz = Fv[..., 2].sum(-1)              # net world-z force of the hand on the key (+ = outward)
+        F = Fv.norm(dim=-1)
         Fd = self._door_view.get_contact_force_matrix(self.physics_dt).reshape(N, self._key_nl, 3).norm(dim=-1)
         self.key_pad_f = F[:, self._key_pad_idx]
         self.key_link_f = F
@@ -601,6 +626,22 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_cleared_ep |= cleared
         self._key_released_ep |= released
         self._key_ok = opened & pinch_ok
+        if bool(kl.key_pull):
+            if not hasattr(self, "_kp_cnt"):
+                self._kp_cnt = torch.zeros(N, device=self.device)
+                self._kp_target = torch.as_tensor(np.radians(self._cbf["stop_deg"]), device=self.device, dtype=torch.float32)
+                self._kp_wrong = torch.zeros(N, dtype=torch.bool, device=self.device)
+            win = (ang - self._kp_target).abs() <= math.radians(float(kl.key_pull_window_deg))
+            self.key_in_window = win
+            pulling = self.key_hand_fz > float(kl.key_pull_n)
+            self._kp_cnt = torch.where(pulling, self._kp_cnt + 1, torch.zeros_like(self._kp_cnt))
+            done_pull = self._kp_cnt >= int(kl.key_pull_steps)
+            self._key_ok = done_pull & win
+            self._kp_wrong = done_pull & ~win
+            over = ang > self._kp_target + math.radians(float(kl.key_strip_deg))
+            self._kp_over = over
+            self.extras["key/pull_in_window_frac"] = win.float().mean()
+            self.extras["key/pull_force_mean"] = self.key_hand_fz.mean()
         self._key_fail_pinch = opened & ~pinch_ok
         if bool(kl.pinch_fail_at_clear) and bool(kl.require_pinch):
             self._key_fail_pinch = self._key_fail_pinch | (first_clear & ~pinch_ok)
@@ -705,9 +746,11 @@ class KeyLockEnv(PreciseAssemblyEnv):
         broken = self._key_broken & ~succ
         slipped = self._key_slipped & ~succ & ~broken
         start_unl = self._key_start_unlocked & ~succ
+        wrong = (self._kp_wrong & ~succ) if hasattr(self, "_kp_wrong") else torch.zeros_like(succ)
+        overt = (self._kp_over & ~succ) if hasattr(self, "_kp_over") else torch.zeros_like(succ)
         self._termination_reasons = {"key_broken": broken, "slipped": slipped, "probe_fail": probe_fail, "pinch_fail": pinch_fail,
-                                     "start_unlocked": start_unl, **tr}
-        self._key_term = broken | slipped | probe_fail | pinch_fail | start_unl
+                                     "start_unlocked": start_unl, "wrong_pull": wrong, "overturned": overt, **tr}
+        self._key_term = broken | slipped | probe_fail | pinch_fail | start_unl | wrong | overt
         # end-of-episode snapshots for evals (the auto reset after _get_dones clears the live counters)
         self._key_last_turn = self._key_turn_steps.clone()
         self._key_last_pinch = self._key_pinch_ok.clone()
@@ -764,6 +807,10 @@ class KeyLockEnv(PreciseAssemblyEnv):
             spen = spen + float(kl.unpinched_turn_penalty) * self._key_unpinched_turn.float()
         if float(kl.p2_track_rew) > 0.0 and hasattr(self, "_p2_track"):
             spen = spen - float(kl.p2_track_rew) * self._p2_track
+        if bool(kl.key_pull) and hasattr(self, "key_in_window"):
+            w = self.key_in_window.float()
+            spen = spen - float(kl.key_window_rew) * w \
+                - float(kl.key_pull_rew) * w * (self.key_hand_fz / float(kl.key_pull_n)).clamp(0.0, 1.0)
         extra = rel - back + pinch - fail - unp - slip_pen - spen
         r = r + extra
         for name, v in (("key_release_rew", rel), ("key_turnback_pen", -back), ("key_pinch_rew", pinch), ("key_unpinched_cut", -unp),
@@ -800,6 +847,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
                   self._key_start_max, self._key_rel_phi, self._key_still_phi, self._key_amax, self._key_dmax,
                   self._key_turn_touch, self._key_turn_linkf):
             t[env_ids] = 0.0
+        if hasattr(self, "_kp_cnt"):
+            self._kp_cnt[env_ids] = 0.0; self._kp_wrong[env_ids] = False
         if hasattr(self, "_kw_n"):
             self._kw_n[env_ids] = 0.0; self._kw_ok[env_ids] = 0.0
             self._kw_on[env_ids] = False; self._kw_end[env_ids] = False
