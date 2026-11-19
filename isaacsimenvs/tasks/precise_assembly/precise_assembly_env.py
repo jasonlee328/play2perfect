@@ -761,6 +761,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self.turn_angle += d
         self._turn_prev_wrapped = a
         self._turn_last_d = d
+        if int(getattr(self.cfg.precise_assembly, "turn_pad_grip_min_pads", 0)) > 0:
+            a, d = self._turn_pad_grip(k, a, d)
         lower = math.radians(float(self.cfg.precise_assembly.turn_lower_deg))
         over = self.turn_angle - self.unlock_angle
         pc = self.cfg.precise_assembly
@@ -809,6 +811,38 @@ class PreciseAssemblyEnv(PlayEnv):
         body.write_root_velocity_to_sim(vel, env_ids=ids)
         self.turn_angle[ids] += c
         self._turn_prev_wrapped[ids] = torch.atan2(torch.sin(a[ids] + c), torch.cos(a[ids] + c))
+
+    def _turn_pad_grip(self, k, a, d):
+        """turn_pad_grip_min_pads: undo this substep's tightening (d > 0) where fewer than N fingertip pads touch the cap."""
+        pc = self.cfg.precise_assembly
+        tac = getattr(self, "_last_tactile", None)
+        if tac is None:
+            npad = torch.zeros(self.num_envs, device=self.device)
+        else:
+            npad = (tac.reshape(tac.shape[0], 5, -1).amax(-1) > float(pc.turn_pad_thresh)).float().sum(-1)
+        block = (d > 0) & (npad < int(pc.turn_pad_grip_min_pads))
+        self._turn_pad_blocked = block
+        ids = block.nonzero(as_tuple=False).squeeze(-1)
+        if ids.numel() == 0:
+            return a, d
+        body = self._joint_bodies()[k]
+        axis_w, anchor_w = self._turn_axis_w()
+        ax, an, c = axis_w[ids], anchor_w[ids], -d[ids]
+        rot = quat_from_angle_axis(c, ax)
+        pos = body.data.root_pos_w[ids]
+        quat = body.data.root_quat_w[ids]
+        vel = body.data.root_vel_w[ids].clone()
+        w_ax = (vel[:, 3:6] * ax).sum(-1).clamp_min(0.0)
+        vel[:, 3:6] -= w_ax.unsqueeze(-1) * ax
+        body.write_root_pose_to_sim(torch.cat([an + quat_apply(rot, pos - an), quat_mul(rot, quat)], -1), env_ids=ids)
+        body.write_root_velocity_to_sim(vel, env_ids=ids)
+        self.turn_angle[ids] += c
+        a = a.clone(); d = d.clone()
+        a[ids] = torch.atan2(torch.sin(a[ids] + c), torch.cos(a[ids] + c))
+        d[ids] = 0.0
+        self._turn_prev_wrapped = a.clone()
+        self._turn_last_d = d
+        return a, d
 
     def _turn_axis_inertia(self, body, axis_w) -> torch.Tensor:
         """Cap moment of inertia about the turn axis (kg m^2, (N,)), from the PhysX body inertia (body frame)."""

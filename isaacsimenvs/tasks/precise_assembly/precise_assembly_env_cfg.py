@@ -201,6 +201,10 @@ class PreciseAssemblyCfg:
     turn_pad_thresh: float = 0.0
     turn_pad_turn_rew_scale: float = 0.0
     turn_pad_contact_rew: float = 0.0
+    # Pad grip (A1 11-19): > 0 = the cap can only be TIGHTENED while >= this many fingertip pads touch it (taxel >
+    # turn_pad_thresh, last policy step's real taxels); otherwise each physics substep's tightening increment is undone
+    # and the tightening spin removed (finger sides / palm cannot turn it). Loosening is unaffected. 0 = off.
+    turn_pad_grip_min_pads: int = 0
     turn_stop_band_deg: float = 3.0
     # What counts as "working the cap" at the stop for turn_strip_steps: > 0 = any fingertip within this distance (m)
     # of the cap centre (hovering on / pushing a tight cap); 0 = a fingertip tactile pad in contact.
