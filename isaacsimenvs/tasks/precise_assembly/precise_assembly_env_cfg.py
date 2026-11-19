@@ -206,6 +206,7 @@ class PreciseAssemblyCfg:
     retr_release_bonus: float = 0.0       # once, at the release after the lift
     retr_tip_rew: float = 0.0             # per step before the release: fingertip pads on the card (saturates at 2)
     retr_fric_values: tuple = ()          # fragile: hidden card(-card) friction per env, env i gets values[i % K]
+    retr_carry_held_only: bool = False    # transport term of the path potential only while the card is held
     retr_hold_check: bool = False         # hold rule: releasing the card in the air / away from the place point = fail 'dropped'
     retr_release_max_z: float = 0.015     # m, card centre above the table (hole frame) at release
     retr_release_xy_tol: float = 0.05     # m, card centre from the place point at release

@@ -218,7 +218,12 @@ class RetrieveTask:
         lift_h = float(getattr(c, "retr_lift_m", 0.04))
         phi_rise = rise.clamp(min=0.0, max=lift_h)
         dist = (pc - place).norm(dim=-1)
-        phi = phi_rise + self.lifted.float() * (0.3 - dist).clamp(min=0.0)
+        carry = self.lifted.float()
+        if bool(getattr(c, "retr_carry_held_only", False)):
+            # transport progress counts only while the hand holds the card (or after a valid set-down): a flick or
+            # drop loses it, so throwing the card toward the place point earns nothing
+            carry = carry * (touch | self.released).float()
+        phi = phi_rise + carry * (0.3 - dist).clamp(min=0.0)
         self.dphi = (phi - self.phi).nan_to_num(0.0)
         self.phi = phi
         n_tips = (f_tips > 0.05).sum(-1).float()
