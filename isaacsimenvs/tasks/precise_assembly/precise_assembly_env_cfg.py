@@ -255,6 +255,11 @@ class PreciseAssemblyCfg:
     # A9 dense snug reward (turn_thread): per step, scale x min(turn_lock_torque / turn_tight_torque, 1) while a tool
     # tip is in the recess and the retract has not started (pays pushing the seated screw toward the tight torque)
     turn_snug_rew: float = 0.0
+    # A9 tool-upright penalty: per step while the tool tip (turn_tool_tips_m[0]) is within 3 cm of the screw head and
+    # before the retract, scale x clamp(tilt - turn_tilt_free_deg, 0, 45) / 45, tilt = angle between the tool's long
+    # axis (object +x, toward the tip) and the screw axis (play2perfect-like upright turning)
+    turn_tilt_penalty: float = 0.0
+    turn_tilt_free_deg: float = 5.0
     retract_keep_object: bool = False
     retract_keep_move_m: float = 0.05
     retract_keep_still_mps: float = 0.03

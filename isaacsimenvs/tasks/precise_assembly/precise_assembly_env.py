@@ -2341,6 +2341,27 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward - c_pen
             self._reward_terms["crack_terminal_penalty"] = -c_pen
             self._reward_terms["total_reward"] = reward
+        tpw = float(getattr(pih_cfg, "turn_tilt_penalty", 0.0))
+        if tpw > 0.0 and getattr(self, "turn_thread", False):
+            axis_w, anchor_w = self._turn_axis_w()
+            q = self.object.data.root_quat_w
+            ex = torch.zeros_like(axis_w); ex[:, 0] = 1.0
+            tool_ax = quat_apply(q, ex)
+            cosang = (tool_ax * axis_w).sum(-1).clamp(-1.0, 1.0)
+            tilt = torch.rad2deg(torch.acos(cosang))
+            tips = getattr(pih_cfg, "turn_tool_tips_m", ())
+            near = torch.ones_like(tilt, dtype=torch.bool)
+            if tips:
+                tl = torch.tensor([float(v) for v in tips[0]], device=self.device).expand(self.num_envs, 3)
+                tip_w = self.object.data.root_pos_w + quat_apply(q, tl)
+                near = (tip_w - anchor_w).norm(dim=-1) < 0.05
+            if getattr(self, "retract_phase", None) is not None:
+                near = near & ~self.retract_phase
+            t_pen = tpw * torch.clamp(tilt - float(pih_cfg.turn_tilt_free_deg), 0.0, 45.0) / 45.0 * near.float()
+            reward = reward - t_pen
+            self._reward_terms["turn_tilt_penalty"] = -t_pen
+            self.extras["turn_tool_tilt_deg_near"] = (tilt * near.float()).sum() / near.float().sum().clamp(min=1)
+            self._reward_terms["total_reward"] = reward
         snw = float(getattr(pih_cfg, "turn_snug_rew", 0.0))
         if snw > 0.0 and getattr(self, "turn_thread", False):
             frac = torch.clamp(self.turn_lock_torque / max(1e-6, float(pih_cfg.turn_tight_torque)), 0.0, 1.0)
