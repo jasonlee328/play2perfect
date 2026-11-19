@@ -98,6 +98,9 @@ class KeyRepose:
             self.base_p[new] = quat_apply_inverse(pq, self.key0_p[new] - pp)
             self.base_q[new] = quat_mul(quat_conjugate(pq), self.key0_q[new])
             self.ready[new] = True
+            if not hasattr(self, "fresh"):
+                self.fresh = torch.zeros_like(self.ready)
+            self.fresh[new] = True
         ids = torch.arange(e.num_envs, device=e.device)
         k = (e._successes % e.env_max_goals.clamp_min(1)).long()
         g = self.goal_world(ids, k)
@@ -120,6 +123,19 @@ class KeyRepose:
         dqf = quat_mul(quat_conjugate(gf[:, 3:7]), kq)
         self.final_rot_err = torch.rad2deg(2.0 * torch.acos(dqf[:, 0].abs().clamp(max=1.0)))
         self.min_final_rot_err = torch.minimum(self.min_final_rot_err, self.final_rot_err)
+        # potential shaping toward the FINAL goal (waypoint switches don't jump): twist about the key x and swing (rest)
+        twf = torch.stack([dqf[:, 0], dqf[:, 1], torch.zeros_like(dqf[:, 0]), torch.zeros_like(dqf[:, 0])], -1)
+        twf = twf / twf.norm(dim=-1, keepdim=True).clamp_min(1e-9)
+        ftw = 2.0 * torch.acos(twf[:, 0].abs().clamp(max=1.0))
+        fsw = 2.0 * torch.acos(quat_mul(dqf, quat_conjugate(twf))[:, 0].abs().clamp(max=1.0))
+        phi = -(ftw + float(c.key_shape_swing_w) * fsw)
+        if not hasattr(self, "phi_prev"):
+            self.phi_prev = phi.clone()
+        fresh = self.fresh if hasattr(self, "fresh") else torch.ones_like(self.ready)
+        self.phi_prev = torch.where(fresh, phi, self.phi_prev)
+        self.shape = phi - self.phi_prev
+        self.phi_prev = phi
+        self.fresh = torch.zeros_like(self.ready)
 
         # dropped
         ft = e.robot.data.body_state_w[:, e._fingertip_body_ids, 0:3]

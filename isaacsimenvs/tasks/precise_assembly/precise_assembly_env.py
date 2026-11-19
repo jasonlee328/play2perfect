@@ -1334,6 +1334,8 @@ class PreciseAssemblyEnv(PlayEnv):
             k_rew = -pih_cfg.key_drop_penalty * self._termination_reasons["key_dropped"].float()
             if pih_cfg.key_hold_rew > 0.0:
                 k_rew = k_rew + pih_cfg.key_hold_rew * (key.fingertip_dmin < pih_cfg.key_drop_dist).float()
+            if pih_cfg.key_shape_scale > 0.0 and hasattr(key, "shape"):
+                k_rew = k_rew + pih_cfg.key_shape_scale * key.shape
             if pih_cfg.key_pad_rew > 0.0 and getattr(self, "_last_tactile", None) is not None:
                 tp = self._last_tactile.reshape(self.num_envs, 5, -1).amax(-1)   # real taxels (before policy_override)
                 both = (tp[:, 0] > 0.02) & (tp[:, 1] > 0.02)                      # thumb + index pads on the key

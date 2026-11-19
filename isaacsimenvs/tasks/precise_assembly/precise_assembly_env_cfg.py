@@ -129,6 +129,8 @@ class PreciseAssemblyCfg:
     key_drop_below: float = 0.0         # m, > 0: also dropped when the key COM is this far below the palm
     key_drop_table_m: float = 0.01      # m, dropped when the key COM is within this of the table top
     key_drop_penalty: float = 200.0
+    key_shape_scale: float = 0.0        # > 0: reward scale x (decrease of final twist + w x swing error, rad) per step
+    key_shape_swing_w: float = 1.0
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
     key_hold_rew: float = 0.0           # per step while the key is not dropped (fingertip within key_drop_dist)
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
