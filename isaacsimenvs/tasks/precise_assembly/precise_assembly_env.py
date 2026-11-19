@@ -2001,6 +2001,22 @@ class PreciseAssemblyEnv(PlayEnv):
                 held = held * (~self.retract_phase).float()
             reward = reward + gp * held
             self._reward_terms["turn_pad_grip_rew"] = gp * held
+        tn = float(getattr(pih_cfg, "turn_tip_near_rew", 0.0))
+        if getattr(self, "turn_mode", False) and tn != 0.0:
+            # A7 fingertip pinch shaping: per step, mean over the listed fingers (thumb + index by default) of
+            # exp(-max(d - turn_tip_near_off_m, 0) / turn_tip_near_sigma_m), d = fingertip body (DIP-joint origin) to key
+            # root distance; not in the retract phase
+            if getattr(self, "_ak_tip_w", None) is None:
+                names = [self.robot.body_names[i] for i in self._fingertip_body_ids]
+                fl = list(getattr(pih_cfg, "turn_tip_near_fingers", ["thumb", "index"]))
+                w = torch.tensor([float(any(f in n for f in fl)) for n in names], device=self.device)
+                self._ak_tip_w = w / w.sum().clamp(min=1.0)
+            d = (self._curr_fingertip_distances - float(getattr(pih_cfg, "turn_tip_near_off_m", 0.02))).clamp(min=0.0)
+            near_r = (torch.exp(-d / float(getattr(pih_cfg, "turn_tip_near_sigma_m", 0.015))) * self._ak_tip_w).sum(-1)
+            if hasattr(self, "retract_phase"):
+                near_r = near_r * (~self.retract_phase).float()
+            reward = reward + tn * near_r
+            self._reward_terms["turn_tip_near_rew"] = tn * near_r
         pt = float(getattr(pih_cfg, "turn_pad_turn_rew", 0.0))
         pn = float(getattr(pih_cfg, "turn_nopad_turn_pen", 0.0))
         if getattr(self, "turn_mode", False) and (pt != 0.0 or pn != 0.0) and getattr(self, "_ak_pads_on", None) is not None:

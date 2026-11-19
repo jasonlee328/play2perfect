@@ -334,6 +334,12 @@ class PreciseAssemblyCfg:
     turn_pad_turn_rew: float = 0.0
     turn_nopad_turn_pen: float = 0.0
     turn_pad_turn_min: int = 1
+    # A7 fingertip pinch shaping (per step): turn_tip_near_rew x mean over turn_tip_near_fingers of
+    # exp(-max(d - off, 0) / sigma), d = fingertip body to key root
+    turn_tip_near_rew: float = 0.0
+    turn_tip_near_fingers: tuple[str, ...] = ("thumb", "index")
+    turn_tip_near_off_m: float = 0.02
+    turn_tip_near_sigma_m: float = 0.015
     turn_preload_free_deg: float = 10.0
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9
