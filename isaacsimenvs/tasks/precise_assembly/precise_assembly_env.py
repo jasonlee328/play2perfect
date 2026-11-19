@@ -1303,6 +1303,11 @@ class PreciseAssemblyEnv(PlayEnv):
         # reward signal: the TOOL's displacement (carried), not the hand's (sliding off the tool earned it before)
         obj_disp = (tip - self._retract_keep_obj0).norm(dim=-1)
         self._retract_keep_disp = torch.minimum(obj_disp, disp)
+        if bool(getattr(pc, "retract_keep_rew_held_only", False)):
+            # pay displacement only while the tool is still held (palm-frame drift < retract_keep_drift_m): sliding the
+            # tool in the grip then gives back what it earned
+            self._retract_keep_disp = torch.where(drift < float(pc.retract_keep_drift_m), self._retract_keep_disp,
+                                                  torch.zeros_like(self._retract_keep_disp))
         self._retract_keep_lost = (drift > float(pc.retract_keep_drop_m)) & self.retract_phase
         self._retract_keep_held_out = None
         tl = getattr(self, "_tl_out", None)
