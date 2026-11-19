@@ -144,11 +144,13 @@ def _create_fixture_joints(env) -> None:
                     jp.CreateLowerLimitAttr(float(j.lower))
                 if j.upper is not None:
                     jp.CreateUpperLimitAttr(float(j.upper))
+                ks_np = getattr(env, "_joint_stiffness_scale_np", None)
+                ks = float(ks_np[k, i]) if ks_np is not None else 1.0   # A16 hidden board stiffness (damping x sqrt)
                 if j.damping or j.stiffness:
                     drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "linear")
                     drive.CreateTypeAttr("force")
                     drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
-                    drive.CreateDampingAttr(float(j.damping)); drive.CreateStiffnessAttr(float(j.stiffness))
+                    drive.CreateDampingAttr(float(j.damping) * math.sqrt(ks)); drive.CreateStiffnessAttr(float(j.stiffness) * ks)
                 continue
             if j.lower_deg is not None:
                 jp.CreateLowerLimitAttr(float(j.lower_deg))

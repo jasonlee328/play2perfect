@@ -366,7 +366,9 @@ class PreciseAssemblyEnv(PlayEnv):
         # A16 wipe: hidden per-env board rest height h (fixed for the env's life), applied to joint 0's fixture anchor
         # (+ gravity sag m g / k) in scene_utils._create_fixture_joints and to distractor0's reset pose.
         self._wipe_h_np = None
+        self._wipe_k_np = None
         self._joint_anchor_offset_np = None
+        self._joint_stiffness_scale_np = None
         if pih_cfg.wipe_task != "off":
             import numpy as np
             from .wipe_task import load_layout
@@ -382,7 +384,17 @@ class PreciseAssemblyEnv(PlayEnv):
                 lo, hi = [float(v) for v in (pih_cfg.wipe_height_range_mm or L["height_range_mm"])]
                 h = rng.uniform(lo, hi, n_env) * 1e-3
             self._wipe_h_np = h
-            sag = float(L["board_mass_kg"]) * 9.81 / float(self._pih_joints[0].stiffness)
+            k0 = float(self._pih_joints[0].stiffness)
+            kr = [float(v) for v in pih_cfg.wipe_stiffness_range]
+            if kr:   # hidden per-env board spring stiffness (N/m, log-uniform, env lifetime)
+                rngk = np.random.default_rng(int(pih_cfg.wipe_seed) + 202)
+                kv = np.exp(rngk.uniform(np.log(kr[0]), np.log(kr[1]), n_env))
+            else:
+                kv = np.full(n_env, k0)
+            self._wipe_k_np = kv
+            self._joint_stiffness_scale_np = np.ones((len(self._pih_joints), n_env))
+            self._joint_stiffness_scale_np[0] = kv / k0
+            sag = float(L["board_mass_kg"]) * 9.81 / kv
             self._joint_anchor_offset_np = np.zeros((len(self._pih_joints), n_env))
             self._joint_anchor_offset_np[0] = h + sag
 

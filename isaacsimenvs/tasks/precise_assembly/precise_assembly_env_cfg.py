@@ -123,6 +123,7 @@ class PreciseAssemblyCfg:
     wipe_height_range_mm: tuple = ()   # () = the problem's layout["wipe"]["height_range_mm"]; hidden per-env board height
     wipe_height_values_mm: tuple = ()  # if set: env i gets values[i % K] (evals at fixed heights)
     wipe_seed: int = 0
+    wipe_stiffness_range: tuple = ()   # () = the layout's spring k; (lo, hi) N/m = hidden per-env k, log-uniform
     wipe_force_scale: float = 1.0      # contact-matrix reading x this (eraser <-> board reads the true load: calib_v1)
     wipe_drop_dist: float = 0.03       # eraser drifts > this from its captured in-hand pose = dropped (pads ~13 mm half-width)
     wipe_drop_tilt_deg: float = 60.0   # felt tilted more than this from the board normal = dropped
