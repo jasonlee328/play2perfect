@@ -175,6 +175,8 @@ class KeyLockCfg:
                                          # sign flipping every policy step
     key_pull_rew: float = 0.0            # per step in the window: x clamp(outward force / key_pull_n, 0, 1)
     key_window_rew: float = 0.0
+    key_pull_target_range_deg: tuple[float, float] = (0.0, 0.0)  # (lo, hi) > 0: hidden pull target ~ U(lo, hi) per
+                                         # episode instead of the lock's stop angle
     key_progress_rew: float = 0.0        # potential: scale x increase of clamp(angle / target, 0, 1) (critic knows the
                                          # target; the actor does not) so the hand learns to regrasp and keep turning          # per step the key sits in the hidden window (dense hint to stop there)
     hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
@@ -651,6 +653,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
             if not hasattr(self, "_kp_cnt"):
                 self._kp_cnt = torch.zeros(N, device=self.device)
                 self._kp_target = torch.as_tensor(np.radians(self._cbf["stop_deg"]), device=self.device, dtype=torch.float32)
+                lo, hi = (float(v) for v in kl.key_pull_target_range_deg)
+                if hi > 0.0:
+                    self._kp_target = torch.deg2rad(lo + (hi - lo) * torch.rand(N, device=self.device))
                 self._kp_wrong = torch.zeros(N, dtype=torch.bool, device=self.device)
             wdeg = float(kl.key_pull_window_deg)
             if float(kl.key_pull_window_start_deg) > wdeg and int(kl.key_pull_window_ramp_steps) > 0:
@@ -883,6 +888,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
             t[env_ids] = 0.0
         if hasattr(self, "_kp_cnt"):
             self._kp_cnt[env_ids] = 0.0; self._kp_wrong[env_ids] = False
+            lo, hi = (float(v) for v in self.cfg.key_lock.key_pull_target_range_deg)
+            if hi > 0.0:
+                self._kp_target[env_ids] = torch.deg2rad(lo + (hi - lo) * torch.rand(len(env_ids), device=self.device))
             if hasattr(self, "_kp_prog"):
                 self._kp_prog[env_ids] = 0.0
         if hasattr(self, "_kw_n"):
