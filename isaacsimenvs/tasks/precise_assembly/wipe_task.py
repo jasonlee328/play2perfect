@@ -134,7 +134,14 @@ class WipeTask:
         self.frac = after.float() / self.C
         self.inwin_steps += inwin.float()
         self.contact_steps += (F > 0.5).float()
-        over = F > self.fail_F
+        cs = int(getattr(self.c, "wipe_curr_steps", 0))
+        a = 1.0 if cs <= 0 else min(1.0, float(env.common_step_counter + int(self.c.wipe_curr_offset_steps)) / cs)
+        self.curr_a = a
+        fail_F = self.fail_F + (float(self.c.wipe_curr_fail_F_start) - self.fail_F) * (1.0 - a) if cs > 0 else self.fail_F
+        drop_d = float(self.c.wipe_drop_dist)
+        if cs > 0:
+            drop_d = drop_d + (float(self.c.wipe_curr_drop_start) - drop_d) * (1.0 - a)
+        over = F > fail_F
         self.over_count = torch.where(over, self.over_count + 1, torch.zeros_like(self.over_count))
         self.fail["pressed_too_hard"] = self.over_count >= self.fail_steps
         self.over_ever = self.over_ever | self.fail["pressed_too_hard"]
@@ -148,7 +155,7 @@ class WipeTask:
             vp = ps[:, 0:3] + quat_apply(ps[:, 3:7], self.off_p)
             drift = torch.where(self.need_off, drift, (ep - vp).norm(dim=-1))
         self.drift = drift
-        self.fail["dropped"] = (drift > float(self.c.wipe_drop_dist)) | tilt_bad
+        self.fail["dropped"] = (drift > drop_d) | tilt_bad
         self.meas = dict(shear_mm=getattr(self, 'shear_mm', torch.zeros(N, 5, device=env.device)).amax(-1), force=F, frac=self.frac, gap_mm=gap * 1e3, felt_cos=ez[:, 2], h_mm=self.h * 1e3,
                          drift_mm=getattr(self,'drift',torch.zeros(N,device=env.device))*1e3, F_ep_max=self.F_ep_max, inwin_steps=self.inwin_steps, contact_steps=self.contact_steps)
         self.inwin = inwin

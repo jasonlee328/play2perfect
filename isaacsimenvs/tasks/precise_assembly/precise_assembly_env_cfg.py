@@ -128,6 +128,12 @@ class PreciseAssemblyCfg:
     wipe_drop_dist: float = 0.03       # eraser drifts > this from its captured in-hand pose = dropped (pads ~13 mm half-width)
     wipe_drop_tilt_deg: float = 60.0   # felt tilted more than this from the board normal = dropped
     wipe_virtual_obs: bool = True      # actor sees the palm-rigid virtual eraser (wipe_task.py docstring)
+    # A16 curriculum over env steps: over-force fail threshold and drop distance start loose and shrink linearly to the
+    # layout's fail_force_N / wipe_drop_dist over wipe_curr_steps (0 = off); offset added on resume.
+    wipe_curr_steps: int = 0
+    wipe_curr_offset_steps: int = 0
+    wipe_curr_fail_F_start: float = 30.0
+    wipe_curr_drop_start: float = 0.06
     wipe_cell_bonus: float = 5.0       # per newly erased cell (240 cells)
     wipe_success_bonus: float = 500.0
     wipe_fail_penalty: float = 200.0
