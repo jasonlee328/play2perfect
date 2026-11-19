@@ -604,6 +604,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._button_phi_prev[env_ids] = 0.0
             if hasattr(self, "_button_touched"):
                 self._button_touched[:, env_ids] = False
+            if hasattr(self, "_button_felt"):
+                self._button_felt[:, env_ids] = False
+                self._button_feel_cnt[:, env_ids] = 0.0
         if getattr(self, "unlock_angle", None) is not None:
             self.unlock_prev_ep_max[env_ids] = self.unlock_max_angle[env_ids]  # kept across the auto-reset
             self.unlock_max_angle[env_ids] = 0.0
@@ -2080,6 +2083,25 @@ class PreciseAssemblyEnv(PlayEnv):
                 reward = reward + tb
                 self._reward_terms["button_touch_bonus"] = tb
                 self.extras["button_keys_touched"] = self._button_touched.float().sum(0).mean()
+            if float(pih_cfg.button_feel_bonus) > 0.0 and getattr(self, "_tactile", None) is not None \
+                    and hasattr(self._tactile, "body_pad_depth") and hasattr(self, "button_travel"):
+                light = (self._tactile.body_pad_depth > 0).any(dim=-1) & (self.button_travel < float(pih_cfg.button_feel_max_m))
+                if not hasattr(self, "_button_feel_cnt"):
+                    self._button_feel_cnt = torch.zeros_like(self.button_travel)
+                    self._button_felt = torch.zeros_like(light)
+                self._button_feel_cnt = torch.where(light, self._button_feel_cnt + 1, torch.zeros_like(self._button_feel_cnt))
+                felt = self._button_feel_cnt >= int(pih_cfg.button_feel_steps)
+                newf = felt & ~self._button_felt
+                self._button_felt |= felt
+                fb = float(pih_cfg.button_feel_bonus) * newf.float().sum(0)
+                reward = reward + fb
+                self._reward_terms["button_feel_bonus"] = fb
+                self.extras["button_keys_felt"] = self._button_felt.float().sum(0).mean()
+            if float(pih_cfg.button_dead_pen_scale) > 0.0 and hasattr(self, "button_travel"):
+                over = (self.button_travel[1:] - float(pih_cfg.button_dead_pen_from_m)).clamp(min=0.0).sum(0) / 1e-3
+                dp = float(pih_cfg.button_dead_pen_scale) * over
+                reward = reward - dp
+                self._reward_terms["button_dead_pen"] = -dp
             self._reward_terms["total_reward"] = reward
 
         if float(getattr(pih_cfg, "door_break_penalty", 0.0)) > 0.0 and "broken" in self._termination_reasons:

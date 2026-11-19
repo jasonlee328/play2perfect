@@ -186,6 +186,14 @@ class PreciseAssemblyCfg:
     # the target counts as pressed (goal credit + press potential) only while a fingertip pad touches it (a pad
     # press, not a poke with the nail end or a knuckle); wrong presses fail however they happen
     button_require_pad: bool = False
+    # light-touch feel bonus (reward only): one-time button_feel_bonus per key once a fingertip pad touches it for
+    # button_feel_steps consecutive steps while its travel stays < button_feel_max_m (feel without actuating)
+    button_feel_bonus: float = 0.0
+    button_feel_max_m: float = 0.001
+    button_feel_steps: int = 3
+    # graded dead-key penalty per step: button_dead_pen_scale x sum over dead keys of max(0, travel - from) / 1 mm
+    button_dead_pen_scale: float = 0.0
+    button_dead_pen_from_m: float = 0.0005
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0
