@@ -2001,6 +2001,25 @@ class PreciseAssemblyEnv(PlayEnv):
                 held = held * (~self.retract_phase).float()
             reward = reward + gp * held
             self._reward_terms["turn_pad_grip_rew"] = gp * held
+        pt = float(getattr(pih_cfg, "turn_pad_turn_rew", 0.0))
+        pn = float(getattr(pih_cfg, "turn_nopad_turn_pen", 0.0))
+        if getattr(self, "turn_mode", False) and (pt != 0.0 or pn != 0.0) and getattr(self, "_ak_pads_on", None) is not None:
+            # A7 fingertip turning: per radian of tightening this step, + turn_pad_turn_rew while >= turn_pad_turn_min
+            # fingertip pads touch the key (and a tool tip is in the recess), - turn_nopad_turn_pen otherwise (turned by
+            # finger sides / palm / the head). Real taxels, so the zero twin gets the same rule.
+            prev = getattr(self, "_ak_prev_turn", None)
+            if prev is None or prev.shape != self.turn_angle.shape:
+                prev = self.turn_angle.clone()
+            d = (self.turn_angle - prev).clamp(0.0, 0.2)
+            self._ak_prev_turn = self.turn_angle.clone()
+            padok = self._ak_pads_on >= int(getattr(pih_cfg, "turn_pad_turn_min", 1))
+            tl = getattr(self, "_tl_out", None)
+            if tl is not None:
+                padok = padok & ~tl
+            r_pt = pt * d * padok.float() - pn * d * (~padok).float()
+            reward = reward + r_pt
+            self._reward_terms["turn_pad_turn_rew"] = r_pt
+            self.extras["ak_turn_padded_frac"] = (d * padok.float()).sum() / d.sum().clamp(min=1e-6)
         if getattr(self, "turn_mode", False) and float(pih_cfg.turn_over_penalty) != 0.0:
             over_pen = -float(pih_cfg.turn_over_penalty) * self._turn_over_inc
             reward = reward + over_pen

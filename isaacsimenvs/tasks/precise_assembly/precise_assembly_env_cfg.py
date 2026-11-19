@@ -329,6 +329,11 @@ class PreciseAssemblyCfg:
     # A7: per-step reward while >= turn_pad_grip_min fingertip pads touch the key (encourage a fingertip pinch)
     turn_pad_grip_rew: float = 0.0
     turn_pad_grip_min: int = 2
+    # A7 fingertip turning: per rad of tightening, + turn_pad_turn_rew with >= turn_pad_turn_min pads on the key and a
+    # tool tip in the recess, - turn_nopad_turn_pen otherwise
+    turn_pad_turn_rew: float = 0.0
+    turn_nopad_turn_pen: float = 0.0
+    turn_pad_turn_min: int = 1
     turn_preload_free_deg: float = 10.0
     turn_tight_torque: float = 0.15
     turn_tight_steps: int = 9
