@@ -1074,6 +1074,12 @@ class PreciseAssemblyEnv(PlayEnv):
         if pih_cfg.allow_goal_skip:
             self._apply_goal_skip()
         is_success = self._is_success.clone()
+        hold_wp = int(getattr(pih_cfg, "key_waypoint_hold_steps", 0))
+        if hold_wp > 0 and getattr(self, "_key", None) is not None:
+            # A13: intermediate flip waypoints are pass-through (hold_wp near-goal steps); only the last goal
+            # needs termination.success_steps (a flat key cannot rest at 45 deg in a pinch)
+            inter = (self._successes + 1 < self.env_max_goals) & ~self.is_random_goal_env
+            is_success = torch.where(inter, self._near_goal_steps >= hold_wp, is_success)
         if pih_cfg.enable_retract:
             is_success &= ~self.retract_phase
         is_success = self._apply_strict_success(is_success)
