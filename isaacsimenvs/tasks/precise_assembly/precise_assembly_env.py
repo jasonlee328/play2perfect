@@ -652,6 +652,8 @@ class PreciseAssemblyEnv(PlayEnv):
         c = self.cfg.precise_assembly
         self._button_update()
         pressed = self.button_travel[0] >= float(c.button_actuate_m)
+        if c.button_require_pad:
+            pressed = pressed & self._button_pad_on_target()
         at_last = (self._successes == self.env_max_goals - 1) & ~self.is_random_goal_env
         steps = update_near_goal_steps(near_goal=pressed, near_goal_steps=prev_near_steps,
                                        force_consecutive=True)
@@ -661,6 +663,12 @@ class PreciseAssemblyEnv(PlayEnv):
         self.extras["button_target_travel_mm"] = self.button_travel[0].mean() * 1e3
         self.extras["button_dead_travel_mm"] = self.button_travel[1:].max(dim=0).values.mean() * 1e3
         self.extras["button_pressed_frac"] = pressed.float().mean()
+
+    def _button_pad_on_target(self) -> torch.Tensor:
+        ts = getattr(self, "_tactile", None)
+        if ts is None or not hasattr(ts, "body_pad_depth"):
+            return torch.ones(self.num_envs, dtype=torch.bool, device=self.device)
+        return (ts.body_pad_depth[0] > 0).any(dim=-1)
 
     def _button_virtual_pose(self):
         """Actor's view: (pos rel. env origin, quat wxyz) of a virtual key at the pad centre moved down by the max
@@ -2012,6 +2020,12 @@ class PreciseAssemblyEnv(PlayEnv):
             if float(pih_cfg.button_press_rew_scale) > 0.0:
                 # potential on the target's travel up to the actuation point (privileged reward only)
                 phi = (self.button_travel[0] / float(pih_cfg.button_actuate_m)).clamp(0.0, 1.0)
+                if pih_cfg.button_require_pad:
+                    # progress only counts with a pad on the target: phi holds its last pad value otherwise
+                    if hasattr(self, "_button_phi_prev"):
+                        phi = torch.where(self._button_pad_on_target(), phi, self._button_phi_prev)
+                    else:
+                        phi = phi * self._button_pad_on_target().float()
                 if not hasattr(self, "_button_phi_prev"):
                     self._button_phi_prev = phi.clone()
                 pr = float(pih_cfg.button_press_rew_scale) * (phi - self._button_phi_prev) * (~self.retract_phase).float() \
