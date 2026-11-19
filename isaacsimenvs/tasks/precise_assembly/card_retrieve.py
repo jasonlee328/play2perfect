@@ -42,7 +42,7 @@ class RetrieveTask:
         self.success = z(torch.bool)
         self.just_rel = z(torch.bool)
         self.rise_max = z()
-        self.fail = {k: z(torch.bool) for k in ("deck_disturbed", "broken")}
+        self.fail = {k: z(torch.bool) for k in ("deck_disturbed", "broken", "dropped")}
         self.checks, self.meas = {}, {}
         bi, _ = env.robot.find_bodies("iiwa14_link_7")
         self.i7 = int(bi[0])
@@ -161,6 +161,16 @@ class RetrieveTask:
         self.nocontact = torch.where(touch, torch.zeros_like(self.nocontact), self.nocontact + 1)
         palm = env.robot.data.body_pos_w[:, self.i7] - env.scene.env_origins
         just = (~self.released) & self.lifted & (self.nocontact >= c.card_release_steps)
+        # hold rule (A10 11-19): the card must stay in the hand until it is set down at the place point; a release
+        # higher than retr_release_max_z above the table or farther than retr_release_xy_tol from the place point
+        # (a flick / drop) fails the episode as 'dropped'
+        place_xy = torch.tensor(list(c.retr_place_xy), device=d)
+        low = pc[:, 2] < float(getattr(c, "retr_release_max_z", 1.0))
+        near = (pc[:, :2] - place_xy).norm(dim=-1) < float(getattr(c, "retr_release_xy_tol", 10.0))
+        self.just_drop = just & ~(low & near)
+        if bool(getattr(c, "retr_hold_check", False)):
+            self.fail["dropped"] = self.just_drop
+            just = just & ~self.just_drop
         self.rel_palm[just] = palm[just]
         self.released |= just
         self.just_rel = just
@@ -168,7 +178,8 @@ class RetrieveTask:
         neat = torch.ones(env.num_envs, dtype=torch.bool, device=d)
         k0, ramp = float(getattr(c, "retr_tol_start", 1.0)), float(getattr(c, "retr_tol_ramp_steps", 0.0))
         a_t = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter + getattr(c, "retr_tol_offset_steps", 0)) / ramp)
-        tol_k = k0 + (1.0 - k0) * a_t
+        k1 = float(getattr(c, "retr_tol_end", 1.0))
+        tol_k = k0 + (k1 - k0) * a_t
         self.tol_k = tol_k
         disp_max = torch.zeros(env.num_envs, device=d); tilt_max = torch.zeros(env.num_envs, device=d)
         for k, b in enumerate(env.distractors):

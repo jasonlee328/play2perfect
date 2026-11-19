@@ -206,6 +206,10 @@ class PreciseAssemblyCfg:
     retr_release_bonus: float = 0.0       # once, at the release after the lift
     retr_tip_rew: float = 0.0             # per step before the release: fingertip pads on the card (saturates at 2)
     retr_fric_values: tuple = ()          # fragile: hidden card(-card) friction per env, env i gets values[i % K]
+    retr_hold_check: bool = False         # hold rule: releasing the card in the air / away from the place point = fail 'dropped'
+    retr_release_max_z: float = 0.015     # m, card centre above the table (hole frame) at release
+    retr_release_xy_tol: float = 0.05     # m, card centre from the place point at release
+    retr_tol_end: float = 1.0             # deck-neat tolerance multiplier at the end of the ramp
     retr_tol_start: float = 1.0           # deck-neat tolerances x k, k ramps retr_tol_start -> 1 (training curriculum)
     retr_tol_ramp_steps: float = 0.0
     retr_tol_offset_steps: float = 0.0
