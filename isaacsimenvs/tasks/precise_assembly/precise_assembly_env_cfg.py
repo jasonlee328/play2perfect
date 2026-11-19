@@ -113,6 +113,8 @@ class PreciseAssemblyCfg:
     # the hole frame, and the goal index reached. Each reset samples one entry;
     # the episode then continues from that goal. "" keeps the normal reset.
     start_state_file: str = ""
+    object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
+    hand_stiffness_scale: float = 1.0  # A12: hand joint stiffness and damping x this (1 = unchanged)
     # Clutter problems (Problem.distractors): per-step reward -= distractor_penalty_scale * the largest distractor
     # displacement from its reset pose (m); with terminate_on_disturb the episode ends once it exceeds
     # distractor_disturb_tol. Both off by default (and no effect on problems without distractors).
