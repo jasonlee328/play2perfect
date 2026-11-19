@@ -223,6 +223,9 @@ class PreciseAssemblyCfg:
     retr_tol_offset_steps: float = 0.0
     retr_reach_rew_scale: float = 0.0     # x change of -max(thumb, index DP dist to the card top edge), before the lift
     retr_path_neat_gate: bool = False     # path reward paid only while the deck is neat
+    card_press_gain_per_N: float = 0.0    # touch-only load cue: pad image x (1 + g x fingertip force on the card); 0 = off
+    kp_scale_range_arm: tuple = (1.0, 1.0)  # hidden per-episode PD gain scales (from A16); (1, 1) = off
+    kp_scale_range_hand: tuple = (1.0, 1.0)
     retr_lock_force_range: tuple = (0.0, 0.0)  # fragile lock: hidden unlock force F ~ logU[lo, hi] N per episode; (0,0) = off
     retr_lock_ratio: float = 1.4          # unlock needs press in [F, ratio F] for retr_lock_dwell steps; > ratio F = broken
     retr_lock_dwell: int = 8

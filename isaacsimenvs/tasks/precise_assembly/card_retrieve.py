@@ -79,6 +79,16 @@ class RetrieveTask:
         hq = env.hole_quat_wxyz
         return quat_apply_inverse(hq, pos_w - hp), quat_mul(quat_conjugate(hq), quat_w)
 
+    def press_tactile(self, t):
+        """Touch-only load cue (gel indentation model): each pad image x (1 + card_press_gain_per_N x that fingertip's
+        contact force on the card), clipped to 1. The ray-cast depth of a rigid card does not grow with press force."""
+        g = float(getattr(self.c, "card_press_gain_per_N", 0.0))
+        ft = getattr(self, "f_tips", None)
+        if g <= 0.0 or ft is None:
+            return t
+        N = t.shape[0]
+        return (t.view(N, 5, -1) * (1.0 + g * ft)[..., None]).clamp(max=1.0).reshape(N, -1)
+
     @staticmethod
     def _normal(q):
         return quat_apply(q, torch.tensor([0.0, 0.0, 1.0], device=q.device).expand(q.shape[0], 3))
@@ -159,6 +169,7 @@ class RetrieveTask:
         pc, qc = self._rel_hole(env.object.data.root_pos_w, env.object.data.root_quat_w)
         nc = self._normal(qc)
         f_rob_card, f_tips, f_rob_deck, f_rob_hold, f_card_env = self._forces()
+        self.f_tips = f_tips
         self.f_rob_deck, self.f_rob_card = f_rob_deck, f_rob_card
         # press force on the picked card (robot -> card) while it is still in the slot (centre below the post tops)
         in_slot_card = (pc[:, 2] < 0.045) & (pc[:, 0].abs() < SLOT_X + 0.01)

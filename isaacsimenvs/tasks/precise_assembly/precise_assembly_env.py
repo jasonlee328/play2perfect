@@ -395,12 +395,34 @@ class PreciseAssemblyEnv(PlayEnv):
                     from .card_task import CardTask
                     self._card = card = CardTask(self)
             card.reset(env_ids)
+            if float(getattr(self.cfg.precise_assembly, "card_press_gain_per_N", 0.0)) > 0.0:
+                self._tactile_post = card.press_tactile
+            self._reset_kp_scale(env_ids)
             if getattr(self.cfg.precise_assembly, "card_expert_residual", False) or \
                     getattr(self.cfg.precise_assembly, "card_expert_obs", False):
                 if getattr(self, "_card_expert", None) is None:
                     from .card_expert import CardExpert
                     self._card_expert = CardExpert(self, card)
                 self._card_expert.reset(env_ids)
+
+    def _reset_kp_scale(self, env_ids: torch.Tensor) -> None:
+        """Hidden per-episode PD gain scales (stiffness x s, damping x sqrt(s)); from A16. Not in any obs, so the
+        joint tracking error no longer maps to a known force."""
+        pa = self.cfg.precise_assembly
+        for part, pat in (("arm", "iiwa14_.*"), ("hand", "left_.*")):
+            lo, hi = (float(v) for v in getattr(pa, f"kp_scale_range_{part}", (1.0, 1.0)))
+            if lo == 1.0 and hi == 1.0:
+                continue
+            key = f"_kp_{part}"
+            if not hasattr(self, key):
+                ids, _ = self.robot.find_joints(pat)
+                ids = torch.as_tensor(ids, device=self.device, dtype=torch.long)
+                setattr(self, key, (ids, self.robot.data.default_joint_stiffness[:, ids].clone(),
+                                    self.robot.data.default_joint_damping[:, ids].clone()))
+            ids, kp0, kd0 = getattr(self, key)
+            sv = lo + (hi - lo) * torch.rand(env_ids.numel(), device=self.device)
+            self.robot.write_joint_stiffness_to_sim(kp0[env_ids] * sv[:, None], joint_ids=ids, env_ids=env_ids)
+            self.robot.write_joint_damping_to_sim(kd0[env_ids] * sv.sqrt()[:, None], joint_ids=ids, env_ids=env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
