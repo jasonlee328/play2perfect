@@ -688,6 +688,8 @@ class PreciseAssemblyEnv(PlayEnv):
             # settle / hand-lock target overrides below (the expert holds the pinch itself until its open phase)
             e = ex.step()
             a = actions.clone().to(self.device).clamp(-1.0, 1.0)[:, self._perm_canon_to_lab]
+            if getattr(self.cfg.precise_assembly, "card_residual_hold_off", False):
+                a = a * (ex.phase()[0] != 0).float().unsqueeze(-1)
             c = self.cfg.precise_assembly
             t = e.clone()
             t[:, self._arm_joint_ids] = e[:, self._arm_joint_ids] + c.card_residual_arm_scale * a[:, :7]

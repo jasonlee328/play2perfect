@@ -212,6 +212,7 @@ class PreciseAssemblyCfg:
     card_expert_residual: bool = False
     card_residual_arm_scale: float = 0.05   # rad per unit action (arm)
     card_residual_hand_scale: float = 0.1   # rad per unit action (hand)
+    card_residual_hold_off: bool = False    # no residual during the expert's start hold (phase 0): the official 0.5 mm hold check
     card_expert_obs: bool = False           # obs field card_expert_phase (7 one-hot phases + time in phase), actor + critic
     card_expert_x_mm: float = 3.5
     card_expert_z_hi_mm: float = 100.0
