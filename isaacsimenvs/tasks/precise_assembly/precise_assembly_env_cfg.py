@@ -235,6 +235,9 @@ class PreciseAssemblyCfg:
     retr_lock_offset_steps: float = 0.0
     retr_lock_ratio_start: float = 3.0
     retr_lock_dwell_start: float = 3.0
+    retr_lock_press_rew: float = 0.0     # x change of min(press / F, 1) while locked (1 once unlocked)
+    retr_lock_win_rew: float = 0.0       # per step with the press inside [F, r F] while locked
+    retr_lock_unlock_bonus: float = 0.0  # once at unlock
     retr_press_max: float = 0.0           # fragile: robot -> picked-card force limit while it is in the slot (N); 0 = off
     card_path_floor_z: float = 0.0       # path potential height term floors at this height above the slot floor (m)
     card_lean_ref_rest: bool = False     # path lean term vs the front card's rest lean, not its current lean

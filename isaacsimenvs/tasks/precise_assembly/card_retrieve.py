@@ -112,6 +112,8 @@ class RetrieveTask:
             u = torch.rand(len(env_ids), device=self.env.device)
             self.lock_F[env_ids] = float(lo) * (float(hi) / float(lo)) ** u
             self.locked[env_ids] = True; self.lock_count[env_ids] = 0; self.unlock_step[env_ids] = 0
+            if hasattr(self, "phi_press"):
+                self.phi_press[env_ids] = float("nan")
             self._lock_fresh = env_ids
         if hasattr(self, "phi_reach"):
             self.phi_reach[env_ids] = float("nan")
@@ -202,6 +204,14 @@ class RetrieveTask:
             unl = self.locked & (self.lock_count >= max(1, int(round(dw))))
             self.unlock_step[unl] = self.step[unl].float()
             self.locked &= ~unl
+            self.just_unl = unl
+            self.lock_inwin = self.locked & inwin
+            # press shaping potential (privileged F, reward only): press / F capped at 1 while locked, 1 once unlocked
+            php = torch.where(self.locked, (self.f_press / self.lock_F).clamp(0.0, 1.0), torch.ones_like(self.f_press))
+            if not hasattr(self, "phi_press"):
+                self.phi_press = torch.full_like(php, float("nan"))
+            self.dphi_press = (php - self.phi_press).nan_to_num(0.0)
+            self.phi_press = php
             ids = self.locked.nonzero(as_tuple=False).squeeze(-1)
             if len(ids):   # still locked: the card is held at its start pose (pose-level stick, velocity zeroed)
                 env.object.write_root_pose_to_sim(self.lock_pose[ids], ids)
@@ -317,6 +327,10 @@ class RetrieveTask:
         r = r + c.retr_path_rew_scale * self.dphi * gate
         r = r + float(getattr(c, "retr_reach_rew_scale", 0.0)) * self.dphi_reach
         r = r + c.retr_release_bonus * self.just_rel.float()
+        if hasattr(self, "dphi_press"):   # fragile lock shaping
+            r = r + float(getattr(c, "retr_lock_press_rew", 0.0)) * self.dphi_press
+            r = r + float(getattr(c, "retr_lock_win_rew", 0.0)) * self.lock_inwin.float()
+            r = r + float(getattr(c, "retr_lock_unlock_bonus", 0.0)) * self.just_unl.float()
         r = r + float(getattr(c, "retr_setdown_bonus", 0.0)) * self.setdown * (~self.just_drop).float()
         r = r + c.retr_tip_rew * (self.n_tips.clamp(max=2.0) / 2.0) * (~self.released).float()
         r = r - c.card_rob_deck_pen * self.f_rob_deck.clamp(max=c.card_rob_deck_pen_cap)
