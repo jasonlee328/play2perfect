@@ -118,8 +118,18 @@ class RetrieveTask:
         env = self.env
         if self.deck_ref_p is None:
             vals = list(getattr(self.c, "retr_fric_values", ()) or ())
+            fr = tuple(getattr(self.c, "retr_fric_range", (0.0, 0.0)))
+            if not vals and fr[1] > 0.0:   # DR: card friction U[lo, hi], bucketed into 8 materials (PhysX material limit)
+                vals = [float(fr[0]) + (float(fr[1]) - float(fr[0])) * k / 7.0 for k in range(8)]
+            ms = tuple(getattr(self.c, "retr_mass_scale_range", (1.0, 1.0)))
+            if ms != (1.0, 1.0):   # DR: per-env card mass scale (all 4 cards), fixed for the env's life
+                all_ids = torch.arange(env.num_envs)
+                for b in [env.object] + list(env.distractors):
+                    m = b.root_physx_view.get_masses()
+                    sc = float(ms[0]) + (float(ms[1]) - float(ms[0])) * torch.rand(env.num_envs)
+                    b.root_physx_view.set_masses(m * sc[:, None], all_ids)
             if vals:   # fragile variant: hidden card friction per env (fixed for the env's life; bucketed = few materials)
-                idx = torch.arange(env.num_envs) % len(vals)
+                idx = torch.randperm(env.num_envs) % len(vals) if fr[1] > 0.0 else torch.arange(env.num_envs) % len(vals)
                 mu = torch.tensor(vals, dtype=torch.float32)[idx]
                 self.card_mu = mu.to(env.device)
                 all_ids = torch.arange(env.num_envs)
