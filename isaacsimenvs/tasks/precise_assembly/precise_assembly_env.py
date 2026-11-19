@@ -402,8 +402,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self._button_slot_np = None
         if pih_cfg.button_mode:
             import numpy as np
-            if not (self._pih_object_start_rel and self._pih_distractor_pose_rel):
-                raise ValueError("button_mode needs object_start_pose + distractors (the key slots)")
+            if not self._pih_object_start_rel:
+                raise ValueError("button_mode needs object_start_pose (distractors = dead keys, optional)")
             n_env, B = int(cfg.scene.num_envs), 1 + len(self._pih_distractor_pose_rel)
             rng = np.random.default_rng(int(pih_cfg.button_seed) + 7)
             tgt = (np.full(n_env, int(pih_cfg.button_fixed_slot)) if int(pih_cfg.button_fixed_slot) >= 0
@@ -659,7 +659,8 @@ class PreciseAssemblyEnv(PlayEnv):
             thr = float(c.button_wrong_start_m) + (thr - float(c.button_wrong_start_m)) * a
         self.button_wrong_thr = thr
         self.extras["button_wrong_thr_mm"] = thr * 1e3
-        self.button_wrong = (self.button_travel[1:] > thr).any(dim=0)
+        self.button_wrong = (self.button_travel[1:] > thr).any(dim=0) if self.button_travel.shape[0] > 1 \
+            else torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
 
     def _apply_button_goal(self, prev_near_steps: torch.Tensor) -> None:
         """The only goal is credited by the target's travel, not keypoints (3 mm is inside the keypoint tolerance)."""
@@ -676,7 +677,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self._near_goal_steps = torch.where(at_last, steps, self._near_goal_steps)
         self._is_success = self._near_goal_steps >= self.cfg.termination.success_steps
         self.extras["button_target_travel_mm"] = self.button_travel[0].mean() * 1e3
-        self.extras["button_dead_travel_mm"] = self.button_travel[1:].max(dim=0).values.mean() * 1e3
+        if self.button_travel.shape[0] > 1:
+            self.extras["button_dead_travel_mm"] = self.button_travel[1:].max(dim=0).values.mean() * 1e3
         self.extras["button_pressed_frac"] = pressed.float().mean()
 
     def _button_pad_on_target(self) -> torch.Tensor:

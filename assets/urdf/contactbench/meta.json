@@ -12580,6 +12580,130 @@
     "dead": "ring",
     "note": "A15: env.precise_assembly.button_mode=true permutes the target's slot per env (hidden) and credits the goal by travel >= actuate_m; a dead key past wrong_m fails the episode."
    }
+  },
+  "cb_button1": {
+   "object": "button_key_dot",
+   "fixture": "button_pad4",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.022,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.019,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "joints": [
+    {
+     "body": "object",
+     "anchor": [
+      0.0,
+      0.0,
+      0.022
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "kind": "prismatic",
+     "lower_m": 0.0,
+     "upper_m": 0.004,
+     "stiffness": 75.0,
+     "damping": 1.0,
+     "preload": 0.3
+    }
+   ],
+   "layout": {
+    "slots_m": [
+     [
+      0.0,
+      0.0,
+      0.022
+     ]
+    ],
+    "actuate_m": 0.002,
+    "travel_m": 0.004,
+    "preload_n": 0.3,
+    "k_n_m": 75.0,
+    "target": "dot",
+    "dead": null,
+    "note": "A15 single key: success = travel >= actuate_m (button_mode credits by travel)."
+   }
+  },
+  "cb_button1_stiff": {
+   "object": "button_key_dot",
+   "fixture": "button_pad4",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.022,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.019,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "joints": [
+    {
+     "body": "object",
+     "anchor": [
+      0.0,
+      0.0,
+      0.022
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      -1.0
+     ],
+     "kind": "prismatic",
+     "lower_m": 0.0,
+     "upper_m": 0.004,
+     "stiffness": 150.0,
+     "damping": 1.0,
+     "preload": 0.6
+    }
+   ],
+   "layout": {
+    "slots_m": [
+     [
+      0.0,
+      0.0,
+      0.022
+     ]
+    ],
+    "actuate_m": 0.002,
+    "travel_m": 0.004,
+    "preload_n": 0.6,
+    "k_n_m": 150.0,
+    "target": "dot",
+    "dead": null,
+    "note": "A15 single key: success = travel >= actuate_m (button_mode credits by travel)."
+   }
   }
  },
  "parts": {
