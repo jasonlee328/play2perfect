@@ -109,6 +109,12 @@ class KeyRepose:
         self.pos_err = (kp - g[:, 0:3]).norm(dim=-1)
         dq = quat_mul(quat_conjugate(g[:, 3:7]), kq)
         self.rot_err = torch.rad2deg(2.0 * torch.acos(dq[:, 0].abs().clamp(max=1.0)))
+        # swing-twist about the key's long axis (object x): twist = flip still missing, swing = the rest
+        tw = torch.stack([dq[:, 0], dq[:, 1], torch.zeros_like(dq[:, 0]), torch.zeros_like(dq[:, 0])], -1)
+        tw = tw / tw.norm(dim=-1, keepdim=True).clamp_min(1e-9)
+        self.twist_err = torch.rad2deg(2.0 * torch.acos(tw[:, 0].abs().clamp(max=1.0)))
+        sw = quat_mul(dq, quat_conjugate(tw))
+        self.swing_err = torch.rad2deg(2.0 * torch.acos(sw[:, 0].abs().clamp(max=1.0)))
         last = torch.full_like(k, self.flip.numel() - 1)
         gf = self.goal_world(ids, last)
         dqf = quat_mul(quat_conjugate(gf[:, 3:7]), kq)
@@ -132,6 +138,8 @@ class KeyRepose:
 
     def log(self, extras):
         extras["key_rot_err_deg"] = self.rot_err.mean()
+        extras["key_twist_err_deg"] = self.twist_err.mean()
+        extras["key_swing_err_deg"] = self.swing_err.mean()
         extras["key_pos_err_mm"] = self.pos_err.mean() * 1e3
         extras["key_final_rot_err_deg"] = self.final_rot_err.mean()
         extras["key_flip_scale"] = self.scale()
