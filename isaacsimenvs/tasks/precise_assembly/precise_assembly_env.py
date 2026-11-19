@@ -649,6 +649,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._tl_out[env_ids] = False
                 self._tl_committed[env_ids] = 0.0
             self._turn_prev_step_angle[env_ids] = self.turn_angle[env_ids]
+            # A7: turn_angle still holds the previous episode's value here (the new start state's angle is read on the
+            # next step), so re-anchor the toolless bookkeeping on the first check after the reset
+            if not hasattr(self, "_tl_fresh"):
+                self._tl_fresh = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            self._tl_fresh[env_ids] = True
             self.turn_released_early[env_ids] = False
             self._turn_early_clear[env_ids] = 0
             self.turn_at_stop_steps[env_ids] = 0
@@ -1354,6 +1359,14 @@ class PreciseAssemblyEnv(PlayEnv):
         head top + turn_tool_out_m); more than turn_toolless_max_deg = fail `toolless` (-turn_toolless_penalty)."""
         pc = self.cfg.precise_assembly
         tips = getattr(pc, "turn_tool_tips_m", ())
+        fresh = getattr(self, "_tl_fresh", None)
+        if fresh is not None and bool(fresh.any()):
+            self._turn_prev_step_angle = torch.where(fresh, self.turn_angle, self._turn_prev_step_angle)
+            if getattr(self, "_tl_seg_start", None) is not None:
+                self._tl_seg_start = torch.where(fresh, self.turn_angle, self._tl_seg_start)
+                self._tl_out = self._tl_out & ~fresh
+                self._tl_committed = torch.where(fresh, torch.zeros_like(self._tl_committed), self._tl_committed)
+            self._tl_fresh = torch.zeros_like(fresh)
         d = (self.turn_angle - self._turn_prev_step_angle).abs()
         prev_angle = self._turn_prev_step_angle.clone()
         self._turn_prev_step_angle = self.turn_angle.clone()
