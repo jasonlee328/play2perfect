@@ -110,7 +110,9 @@ class RetrieveTask:
         F_rc = self.v_rob_card.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1)
         f_rob_card = F_rc.sum(-1)
         f_tips = F_rc[:, self.tip_ids]
-        f_rob_deck = sum(v.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1).sum(-1) for v in self.v_rob_deck)
+        f_rob_deck = torch.zeros(N, device=self.env.device)
+        for v in self.v_rob_deck:
+            f_rob_deck = f_rob_deck + v.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1).sum(-1)
         f_rob_hold = torch.zeros(N, device=self.env.device)
         for v in self.v_rob_holder:
             f_rob_hold = f_rob_hold + v.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1).sum(-1)
