@@ -198,6 +198,24 @@ class PreciseAssemblyCfg:
     card_rob_deck_pen_cap: float = 5.0
     card_deck_motion_pen: float = 0.0    # per-step penalty x (deck move / 3 mm + deck rot / 3 deg), capped (A10)
     card_deck_motion_pen_cap: float = 4.0
+    # A14 platform (card_task="platform", ContactBench task 6 pick_up_object_on_platform.py:98-133)
+    plat_lift_m: float = 0.030            # lift (final - start z) >= 30 mm
+    plat_lift_slack_m: float = 0.005      # window restarts if the part sinks this far below the lift height
+    plat_hold_steps: int = 90             # 1.5 s at 60 Hz
+    plat_pad_N: float = 0.5               # both pads > 0.5 N
+    plat_pad_frac: float = 0.95           # on >= 95% of hold frames
+    plat_slip_m: float = 0.002            # part motion rel. finger midpoint < 2 mm over the hold
+    plat_edge_y: float = -0.1175          # push edge (hole frame)
+    plat_top_z: float = 0.220             # board top (hole frame)
+    plat_drop_m: float = 0.05             # fail 'dropped' below top - this
+    plat_front_m: float = 0.0275          # part centre -> outboard edge (card 27.5 mm; key 30.9 mm)
+    plat_overhang_cap_m: float = 0.025    # shaping: overhang paid up to this
+    plat_slide_w: float = 1.0             # weight of overhang vs rise in the potential
+    plat_rise_cap_m: float = 0.06
+    plat_path_rew_scale: float = 0.0      # x change of the potential (overhang + rise)
+    plat_reach_rew_scale: float = 0.0     # x change of -(max fingertip distance to the part), capped 0.3 m
+    plat_pinch_rew: float = 0.0           # per step: thumb + a finger each > plat_pad_N
+    plat_hold_rew: float = 0.0            # per step inside a hold window while pinched
     # A10 retrieve (card_task="retrieve", ContactBench task 5 retrieve_card_from_deck.py)
     retr_other_disp_max: float = 0.005    # OTHER_DISP_MAX (retrieve_card_from_deck.py:53)
     retr_shear_obs: bool = False                               # A10: actor field tactile_shear = fingertip 3D contact force on card 1 in link frames

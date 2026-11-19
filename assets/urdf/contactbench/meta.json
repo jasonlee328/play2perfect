@@ -637,6 +637,52 @@
    "collision": "coacd 24",
    "mass_g_density620": 0.22,
    "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
+  },
+  "card_5g": {
+   "src": "card.stl",
+   "extents_mm": [
+    85.0,
+    55.0,
+    1.2
+   ],
+   "mass_g": 5.0,
+   "com_src_mm": [
+    0.0,
+    -0.0,
+    0.6
+   ],
+   "object_scale": [
+    2.125,
+    1.375,
+    0.03
+   ],
+   "collision": "box",
+   "mass_g_density620": 3.47,
+   "mass_model": "official slide_off_edge.py:187-190 (5 g; print model gave 6.94 g); inertia scaled",
+   "copied_from": "card"
+  },
+  "key_1_12g": {
+   "src": "keys/key_1.stl",
+   "extents_mm": [
+    49.73,
+    20.0,
+    2.5
+   ],
+   "mass_g": 12.0,
+   "com_src_mm": [
+    7.758,
+    -0.244,
+    1.239
+   ],
+   "object_scale": [
+    1.2434,
+    0.5,
+    0.0625
+   ],
+   "collision": "coacd 16",
+   "mass_g_density620": 0.69,
+   "mass_model": "official slide_off_edge.py:187-190 (12 g; print model gave 1.37 g); inertia scaled",
+   "copied_from": "key_1"
   }
  },
  "fixtures": {
@@ -1039,6 +1085,22 @@
     "official_sim/assets/bodies_kit/card_holder_kit/holder.stl + 3 fused cards"
    ],
    "collision": "boxes (A10 card_tasks.py)",
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "platform_board": {
+   "src": [
+    "analytic boxes: slide_off_edge.py:162-172 + pick_up_object_on_platform.py:59-74"
+   ],
+   "collision": "boxes (A14 platform_tasks.py)",
+   "extents_mm": [
+    320.0,
+    235.00000000000003,
+    220.0
+   ],
    "origin_src_mm": [
     0.0,
     0.0,
@@ -9291,6 +9353,162 @@
      "clear_move_mm": 50.0
     },
     "rigid_deck": true
+   }
+  },
+  "cb_platform": {
+   "fixture": "platform_board",
+   "object": "card_5g",
+   "object_start_pose": [
+    0.0,
+    -0.05000000000000002,
+    0.22075,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     -0.11475000000000002,
+     0.22075,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     -0.11475000000000002,
+     0.28075,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "front_m": 0.0275,
+   "layout": {
+    "source": "contactbench-sim appendix_tasks/pick_up_object_on_platform.py + tasks/slide_off_edge.py",
+    "board_mm": [
+     320.0,
+     235.00000000000003,
+     18.0
+    ],
+    "board_top_mm": 220.0,
+    "leg_mm": 20.0,
+    "edge_y_mm": -117.50000000000001,
+    "inset_mm": 40.0,
+    "card_mm": [
+     85.0,
+     55.0,
+     1.2
+    ],
+    "card_g": 5.0,
+    "key_g": 12.0,
+    "mu": {
+     "pad": 1.4,
+     "card": 0.15,
+     "table": 0.15
+    },
+    "mu_pairs": {
+     "pad_card": 0.7749999999999999,
+     "card_table": 0.15
+    },
+    "verdict": {
+     "lift_min_mm": 30.0,
+     "hold_s": 1.5,
+     "pad_N": 0.5,
+     "pad_frac": 0.95,
+     "slip_max_mm": 2.0,
+     "starts_mid_platform_mm": 50.0,
+     "src": "pick_up_object_on_platform.py:98-133"
+    },
+    "frame": "fixture origin on the table top under the board centre, +y toward the robot, push edge at -y",
+    "start_mm": [
+     0.0,
+     -50.0,
+     220.75
+    ]
+   }
+  },
+  "cb_platform_key": {
+   "fixture": "platform_board",
+   "object": "key_1_12g",
+   "object_start_pose": [
+    0.0,
+    -0.046600000000000016,
+    0.22135000000000002,
+    0.0,
+    0.0,
+    -0.7071067811865475,
+    0.7071067811865476
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     -0.09753400000000002,
+     0.22135000000000002,
+     0.0,
+     0.0,
+     -0.7071067811865475,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     -0.09753400000000002,
+     0.28135,
+     0.0,
+     0.0,
+     -0.7071067811865475,
+     0.7071067811865476
+    ]
+   ],
+   "front_m": 0.0309,
+   "layout": {
+    "source": "contactbench-sim appendix_tasks/pick_up_object_on_platform.py + tasks/slide_off_edge.py",
+    "board_mm": [
+     320.0,
+     235.00000000000003,
+     18.0
+    ],
+    "board_top_mm": 220.0,
+    "leg_mm": 20.0,
+    "edge_y_mm": -117.50000000000001,
+    "inset_mm": 40.0,
+    "card_mm": [
+     85.0,
+     55.0,
+     1.2
+    ],
+    "card_g": 5.0,
+    "key_g": 12.0,
+    "mu": {
+     "pad": 1.4,
+     "card": 0.15,
+     "table": 0.15
+    },
+    "mu_pairs": {
+     "pad_card": 0.7749999999999999,
+     "card_table": 0.15
+    },
+    "verdict": {
+     "lift_min_mm": 30.0,
+     "hold_s": 1.5,
+     "pad_N": 0.5,
+     "pad_frac": 0.95,
+     "slip_max_mm": 2.0,
+     "starts_mid_platform_mm": 50.0,
+     "src": "pick_up_object_on_platform.py:98-133"
+    },
+    "frame": "fixture origin on the table top under the board centre, +y toward the robot, push edge at -y",
+    "start_mm": [
+     0.0,
+     -46.6,
+     221.35
+    ]
    }
   }
  },
