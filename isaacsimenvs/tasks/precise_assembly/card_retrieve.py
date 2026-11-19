@@ -63,7 +63,12 @@ class RetrieveTask:
         self.v_rob_card = sim.create_rigid_contact_view(obj, filter_patterns=links)
         self.v_rob_deck = [sim.create_rigid_contact_view(_glob(b.root_physx_view.prim_paths[0]), filter_patterns=links)
                            for b in env.distractors]
-        self.v_rob_holder = sim.create_rigid_contact_view(_glob(env.hole.root_physx_view.prim_paths[0]), filter_patterns=links)
+        try:
+            self.v_rob_holder = [sim.create_rigid_contact_view(_glob(env.hole.root_physx_view.prim_paths[0]), filter_patterns=links)]
+            self.v_rob_holder[0].filter_count
+        except Exception as e:  # noqa: BLE001
+            print(f"[card_retrieve] WARNING: no robot-holder contact view ({e}); released_and_clear ignores the holder")
+            self.v_rob_holder = []
         others = [_glob(b.root_physx_view.prim_paths[0]) for b in env.distractors] + [_glob(env.hole.root_physx_view.prim_paths[0])]
         self.v_card_env = sim.create_rigid_contact_view(obj, filter_patterns=others)
         self._views = True
@@ -104,7 +109,9 @@ class RetrieveTask:
         f_rob_card = F_rc.sum(-1)
         f_tips = F_rc[:, self.tip_ids]
         f_rob_deck = sum(v.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1).sum(-1) for v in self.v_rob_deck)
-        f_rob_hold = self.v_rob_holder.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1).sum(-1)
+        f_rob_hold = torch.zeros(N, device=self.env.device)
+        for v in self.v_rob_holder:
+            f_rob_hold = f_rob_hold + v.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1).sum(-1)
         f_card_env = self.v_card_env.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1).sum(-1)
         return f_rob_card, f_tips, f_rob_deck, f_rob_hold, f_card_env
 
