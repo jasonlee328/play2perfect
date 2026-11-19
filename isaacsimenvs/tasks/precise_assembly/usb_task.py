@@ -42,7 +42,7 @@ class UsbTask:
         z = lambda dt=torch.float32: torch.zeros(N, device=d, dtype=dt)
         self.step = z(torch.long)
         self.hold_ok = z(torch.bool); self.slip_hold = z()
-        self.pre_steps = z(); self.pre_loaded = z(); self.pre_f_th = z(); self.pre_f_ix = z()
+        self.pre_steps = z(); self.pre_loaded = z(); self.pre_f_th = z(); self.pre_f_ix = z(); self.ins_steps = z(); self.ever_ins = z(torch.bool)
         self.released = z(torch.bool); self.nocontact = z(torch.long)
         self.rel_p = torch.zeros(N, 3, device=d); self.rel_palm = torch.zeros(N, 3, device=d)
         self.rel_tipz = z()
@@ -79,9 +79,9 @@ class UsbTask:
 
     # ------------------------------------------------------------------ reset
     def reset(self, env_ids):
-        for t in (self.step, self.slip_hold, self.pre_steps, self.pre_loaded, self.pre_f_th, self.pre_f_ix, self.nocontact, self.push_count):
+        for t in (self.step, self.slip_hold, self.pre_steps, self.pre_loaded, self.pre_f_th, self.pre_f_ix, self.ins_steps, self.nocontact, self.push_count):
             t[env_ids] = 0
-        for t in (self.released, self.pushing, self.success, self.just_rel_seated):
+        for t in (self.released, self.pushing, self.success, self.just_rel_seated, self.ever_ins):
             t[env_ids] = False
         self.hold_ok[env_ids] = True
         for t in self.fail.values():
@@ -144,8 +144,16 @@ class UsbTask:
         self.hold_ok &= ~in_hold | pinch
         pre = (st >= 0) & ~self.released
         self.pre_steps += pre.float(); self.pre_loaded += (pre & pinch).float()
-        self.pre_f_th += pre.float() * F_rs[:, self.i_th]; self.pre_f_ix += pre.float() * F_rs[:, self.i_ix]
+        if str(getattr(c, "usb_pinch_window", "insert")) == "insert":
+            # official (plug_in_usb.py:403-435, 553): pad force averaged over the INSERT phase only = after the
+            # initial hold, until the stick first seats (the seated hold before the release is not counted)
+            win = (st >= c.usb_hold_steps) & ~self.ever_ins & ~self.released
+        else:   # "pre_release": every step from the settle to the release (old, stricter)
+            win = pre
+        self.ins_steps += win.float()
+        self.pre_f_th += win.float() * F_rs[:, self.i_th]; self.pre_f_ix += win.float() * F_rs[:, self.i_ix]
 
+        self.ever_ins |= inserted
         free = ~touching
         self.nocontact = torch.where(free, self.nocontact + 1, torch.zeros_like(self.nocontact))
         just_rel = (~self.released) & (st >= c.usb_hold_steps) & (self.nocontact >= c.usb_release_steps)
@@ -169,7 +177,7 @@ class UsbTask:
         else:   # official (plug_in_usb.py:578-580): |final depth - depth before release| < 0.3 mm, along the slot axis
             stays = (tip[:, 2] - self.rel_tipz).abs() < c.usb_stay_tol
         no_motion = gain < c.usb_push_gain_tol
-        mean_th = self.pre_f_th / self.pre_steps.clamp(min=1.0); mean_ix = self.pre_f_ix / self.pre_steps.clamp(min=1.0)
+        mean_th = self.pre_f_th / self.ins_steps.clamp(min=1.0); mean_ix = self.pre_f_ix / self.ins_steps.clamp(min=1.0)
         if str(getattr(c, "usb_pinch_mode", "mean_force")) == "frac":   # old A12 rule: pinch loaded on >= usb_pinch_frac of the steps
             pinch_real = self.pre_loaded >= c.usb_pinch_frac * self.pre_steps.clamp(min=1.0)
         else:   # official (plug_in_usb.py:553, 590-592): mean force on EACH pad during the insertion >= 3 N
