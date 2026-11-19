@@ -174,7 +174,9 @@ class KeyLockCfg:
     key_pull_click_mode: str = "shift"   # "shift" = constant outward offset in the window; "vibrate" = +- offset,
                                          # sign flipping every policy step
     key_pull_rew: float = 0.0            # per step in the window: x clamp(outward force / key_pull_n, 0, 1)
-    key_window_rew: float = 0.0          # per step the key sits in the hidden window (dense hint to stop there)
+    key_window_rew: float = 0.0
+    key_progress_rew: float = 0.0        # potential: scale x increase of clamp(angle / target, 0, 1) (critic knows the
+                                         # target; the actor does not) so the hand learns to regrasp and keep turning          # per step the key sits in the hidden window (dense hint to stop there)
     hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
                                          # x sqrt): domain randomization so the policy learns to turn with a light grip too
     p2_slip_ema: float = -1.0            # > 0: slip uses its own (faster) EMA of the pad force; break keeps p2_force_ema
@@ -661,6 +663,12 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self._kp_cnt = torch.where(pulling, self._kp_cnt + 1, torch.zeros_like(self._kp_cnt))
             done_pull = self._kp_cnt >= int(kl.key_pull_steps)
             self._key_ok = done_pull & win
+            prog = (ang / self._kp_target).clamp(0.0, 1.0)
+            if not hasattr(self, "_kp_prog"):
+                self._kp_prog = prog.clone()
+            self._kp_dprog = (prog - self._kp_prog).clamp(min=0.0)
+            self._kp_prog = torch.maximum(self._kp_prog, prog)
+            self.extras["key/progress_mean"] = self._kp_prog.mean()
             self._kp_wrong = done_pull & ~win
             over = ang > self._kp_target + math.radians(float(kl.key_strip_deg))
             self._kp_over = over
@@ -833,6 +841,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             spen = spen - float(kl.p2_track_rew) * self._p2_track
         if bool(kl.key_pull) and hasattr(self, "key_in_window"):
             w = self.key_in_window.float()
+            if hasattr(self, "_kp_dprog"):
+                spen = spen - float(kl.key_progress_rew) * self._kp_dprog
             spen = spen - float(kl.key_window_rew) * w \
                 - float(kl.key_pull_rew) * w * (self.key_hand_fz / float(kl.key_pull_n)).clamp(0.0, 1.0)
         extra = rel - back + pinch - fail - unp - slip_pen - spen
@@ -873,6 +883,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             t[env_ids] = 0.0
         if hasattr(self, "_kp_cnt"):
             self._kp_cnt[env_ids] = 0.0; self._kp_wrong[env_ids] = False
+            if hasattr(self, "_kp_prog"):
+                self._kp_prog[env_ids] = 0.0
         if hasattr(self, "_kw_n"):
             self._kw_n[env_ids] = 0.0; self._kw_ok[env_ids] = 0.0
             self._kw_on[env_ids] = False; self._kw_end[env_ids] = False
