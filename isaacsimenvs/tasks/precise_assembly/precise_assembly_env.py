@@ -498,10 +498,14 @@ class PreciseAssemblyEnv(PlayEnv):
             self._hand_kd0 = self.robot.data.default_joint_damping[:, self._hand_kp_ids].clone()
             self.hand_kp_scale = torch.ones(self.num_envs, device=self.device)
         n = env_ids.numel()
-        s = lo + (hi - lo) * torch.rand(n, device=self.device)
-        self.hand_kp_scale[env_ids] = s
-        kp = self._hand_kp0[env_ids] * s[:, None]
-        kd = self._hand_kd0[env_ids] * s.sqrt()[:, None]
+        J = self._hand_kp_ids.numel()
+        if bool(getattr(self.cfg.precise_assembly, "hand_kp_per_joint", False)):
+            sj = lo + (hi - lo) * torch.rand(n, J, device=self.device)
+        else:
+            sj = (lo + (hi - lo) * torch.rand(n, device=self.device))[:, None].expand(n, J)
+        self.hand_kp_scale[env_ids] = sj.mean(-1)
+        kp = self._hand_kp0[env_ids] * sj
+        kd = self._hand_kd0[env_ids] * sj.sqrt()
         self.robot.write_joint_stiffness_to_sim(kp, joint_ids=self._hand_kp_ids, env_ids=env_ids)
         self.robot.write_joint_damping_to_sim(kd, joint_ids=self._hand_kp_ids, env_ids=env_ids)
 
@@ -2004,6 +2008,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self.door_pull_force_ep_max = torch.maximum(self.door_pull_force_ep_max, self.door_pull_force)
             self.door_stop_torque.zero_(); self.door_pull_torque.zero_(); self.door_pull_force.zero_()
         self._hand_force_update()
+        _kN = int(getattr(self.cfg.precise_assembly, "hand_kp_resample_steps", 0))
+        if _kN > 0 and hasattr(self, "_hand_kp_ids"):
+            _ids = (torch.rand(self.num_envs, device=self.device) < 1.0 / _kN).nonzero(as_tuple=False).squeeze(-1)
+            if _ids.numel() > 0:
+                self._reset_hand_kp(_ids)
         crushed = torch.zeros_like(fall)
         if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and hasattr(self, "_crush_count"):
             crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes

@@ -374,6 +374,10 @@ class PreciseAssemblyCfg:
     # sampled at reset and not in any obs. Breaks the joint-tracking-error -> grip-force mapping that lets proprio read
     # the fragile-door forces; the tactile reading stays calibrated. (1, 1) = off.
     hand_kp_scale_range: tuple[float, float] = (1.0, 1.0)
+    # A8: resample the hidden hand gain scale mid-episode (each env w.p. 1/N per policy step, 0 = per episode only),
+    # and draw one scale per hand joint instead of one per hand, so free-motion system ID can't recover it.
+    hand_kp_resample_steps: int = 0
+    hand_kp_per_joint: bool = False
     # A8 force window (11-18, user: "only unlock with the right amount of force, grasp with the fingertips only").
     # Needs hand_force_sense + latch_cbf. tip force = sum of |contact force| (x hand_force_gain) on the 5 DP links
     # (where the TacMap pads are); other = every other robot link (palm, PP, MP...).
