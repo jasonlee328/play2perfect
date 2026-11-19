@@ -94,6 +94,12 @@ class JointSpec:
     detent_torque: float = 0.0
     # The joint's other end: "fixture" (the receptive fixture) or "distractor<k>" (e.g. a knob on a hinged door).
     parent: str = "fixture"
+    # "revolute" (default) or "prismatic" (slides along ``axis``; e.g. a key switch). Prismatic uses ``lower_m`` /
+    # ``upper_m`` (m), ``stiffness`` (N/m), ``damping`` (N s/m) and ``preload`` (N pushing toward lower_m at rest).
+    kind: str = "revolute"
+    lower_m: float | None = None
+    upper_m: float | None = None
+    preload: float = 0.0
 
 
 @dataclass(frozen=True)

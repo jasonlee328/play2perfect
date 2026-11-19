@@ -159,6 +159,20 @@ class PreciseAssemblyCfg:
     unlock_tol_deg: float = 3.0
     unlock_joint: int = 0
     unlock_seed: int = 0
+    # A15 keypad (cb_button*): button_mode = the object + distractors are key caps on prismatic joints; per env (fixed
+    # for its life) the target key is placed in a random slot (the slots are the problem's object + distractor poses).
+    # Goal credited while the target travel >= button_actuate_m (success_steps); any dead key pressed past
+    # button_wrong_m = termination "wrong_key" (-button_wrong_penalty). button_hide_from_actor: the actor's object /
+    # goal obs are a virtual key at the pad centre (moved down by the max travel of all keys), so only touch tells
+    # which key is the target. button_fixed_slot >= 0 puts the target in that slot in every env (oracle / debug).
+    button_mode: bool = False
+    button_hide_from_actor: bool = True
+    button_seed: int = 0
+    button_fixed_slot: int = -1
+    button_actuate_m: float = 0.002
+    button_wrong_m: float = 0.001
+    button_wrong_penalty: float = 100.0
+    button_press_rew_scale: float = 0.0
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0

@@ -399,6 +399,26 @@ class PreciseAssemblyEnv(PlayEnv):
             if float(cfg.reset.table_reset_z_range) != 0.0 or float(pih_cfg.hole_yaw_range_deg) != 0.0:
                 print("[PreciseAssemblyEnv] WARNING: jointed problem with table_reset_z_range / hole_yaw_range_deg "
                       "!= 0: the fixture keeps its spawn pose (use env.reset.table_reset_z_range=0.0)", flush=True)
+        self._button_slot_np = None
+        if pih_cfg.button_mode:
+            import numpy as np
+            if not (self._pih_object_start_rel and self._pih_distractor_pose_rel):
+                raise ValueError("button_mode needs object_start_pose + distractors (the key slots)")
+            n_env, B = int(cfg.scene.num_envs), 1 + len(self._pih_distractor_pose_rel)
+            rng = np.random.default_rng(int(pih_cfg.button_seed) + 7)
+            tgt = (np.full(n_env, int(pih_cfg.button_fixed_slot)) if int(pih_cfg.button_fixed_slot) >= 0
+                   else rng.integers(0, B, n_env))
+            slots = np.zeros((n_env, B), dtype=np.int64)
+            for i in range(n_env):
+                rest = [b for b in range(B) if b != tgt[i]]
+                slots[i] = [tgt[i]] + rest     # body 0 (target) in slot tgt, dead keys fill the rest in order
+            self._button_slot_np = slots
+            home = np.array([self._pih_object_start_rel[:3]] + [p[:3] for p in self._pih_distractor_pose_rel])
+            self._button_home_np = home          # slot b = the problem's pose of body b
+            # offset of body b in env i (receptive frame) = slot position - its default position
+            self._button_off_np = home[slots] - home[None, :, :]        # (N, B, 3)
+            print(f"[PreciseAssemblyEnv] button_mode: {B} keys, target slot counts "
+                  f"{np.bincount(tgt, minlength=B).tolist()}", flush=True)
         self._unlock_deg_np = None
         if pih_cfg.unlock_angle_range_deg or pih_cfg.unlock_angle_values_deg:
             import numpy as np
@@ -575,6 +595,13 @@ class PreciseAssemblyEnv(PlayEnv):
         if pih_cfg.start_state_file and insertion_mask.any():
             self._apply_start_states(env_ids[insertion_mask])
 
+        if pih_cfg.button_mode and hasattr(self, "button_travel_ep_max"):
+            self.button_prev_ep_max = getattr(self, "button_prev_ep_max", torch.zeros_like(self.button_travel_ep_max))
+            self.button_prev_ep_max[:, env_ids] = self.button_travel_ep_max[:, env_ids]   # kept for evals
+            self.button_travel_ep_max[:, env_ids] = 0.0
+            self.button_travel[:, env_ids] = 0.0
+            if hasattr(self, "_button_phi_prev"):
+                self._button_phi_prev[env_ids] = 0.0
         if getattr(self, "unlock_angle", None) is not None:
             self.unlock_prev_ep_max[env_ids] = self.unlock_max_angle[env_ids]  # kept across the auto-reset
             self.unlock_max_angle[env_ids] = 0.0
@@ -585,10 +612,83 @@ class PreciseAssemblyEnv(PlayEnv):
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
 
-    def _pose_rel_hole_to_world(self, env_ids: torch.Tensor, pose7) -> torch.Tensor:
-        """(n, 7) world pose (pos + quat wxyz) of a receptive-frame pose7 (xyz + quat xyzw) for env_ids."""
+    def _body_slot_offset_np(self, body: str, i: int):
+        """button_mode: receptive-frame offset of ``body`` ("object" / "distractor<k>") in env i (zeros otherwise)."""
+        import numpy as np
+        if getattr(self, "_button_slot_np", None) is None:
+            return np.zeros(3)
+        b = 0 if body == "object" else 1 + int(body[10:])
+        return self._button_off_np[i, b]
+
+    def _button_off(self, b: int, env_ids: torch.Tensor) -> torch.Tensor | None:
+        if getattr(self, "_button_slot_np", None) is None:
+            return None
+        if not hasattr(self, "_button_off_t"):
+            self._button_off_t = torch.as_tensor(self._button_off_np, device=self.device, dtype=torch.float32)
+        return self._button_off_t[env_ids, b]
+
+    def _button_update(self) -> None:
+        """Travel (m, + = pressed) of every key (B, N), per-episode max, wrong-key flag."""
+        bodies = [self.object, *self.distractors]
+        pos = torch.stack([b.data.root_pos_w for b in bodies])                     # (B, N, 3)
+        rel = pos - (self.hole_pos + self.scene.env_origins).unsqueeze(0)
+        B = rel.shape[0]
+        rel = quat_apply_inverse(self.hole_quat_wxyz.unsqueeze(0).expand(B, -1, -1).reshape(-1, 4),
+                                 rel.reshape(-1, 3)).reshape(B, -1, 3)
+        if not hasattr(self, "_button_rest_z"):
+            self._button_rest_z = torch.as_tensor(self._button_home_np[:, 2], device=self.device,
+                                                  dtype=torch.float32).unsqueeze(-1)
+            self.button_travel_ep_max = torch.zeros(B, self.num_envs, device=self.device)
+        self.button_travel = (self._button_rest_z - rel[..., 2]).clamp(min=0.0)
+        self.button_travel_ep_max = torch.maximum(self.button_travel_ep_max, self.button_travel)
+        c = self.cfg.precise_assembly
+        self.button_wrong = (self.button_travel[1:] > float(c.button_wrong_m)).any(dim=0)
+
+    def _apply_button_goal(self, prev_near_steps: torch.Tensor) -> None:
+        """The only goal is credited by the target's travel, not keypoints (3 mm is inside the keypoint tolerance)."""
+        from isaacsimenvs.tasks.play.utils.reward_utils import update_near_goal_steps
+        c = self.cfg.precise_assembly
+        self._button_update()
+        pressed = self.button_travel[0] >= float(c.button_actuate_m)
+        at_last = (self._successes == self.env_max_goals - 1) & ~self.is_random_goal_env
+        steps = update_near_goal_steps(near_goal=pressed, near_goal_steps=prev_near_steps,
+                                       force_consecutive=True)
+        self._near_goal = torch.where(at_last, pressed, self._near_goal)
+        self._near_goal_steps = torch.where(at_last, steps, self._near_goal_steps)
+        self._is_success = self._near_goal_steps >= self.cfg.termination.success_steps
+        self.extras["button_target_travel_mm"] = self.button_travel[0].mean() * 1e3
+        self.extras["button_dead_travel_mm"] = self.button_travel[1:].max(dim=0).values.mean() * 1e3
+        self.extras["button_pressed_frac"] = pressed.float().mean()
+
+    def _button_virtual_pose(self):
+        """Actor's view: (pos rel. env origin, quat wxyz) of a virtual key at the pad centre moved down by the max
+        travel of all keys, and its virtual goal (same goal offset as the real one)."""
+        if not hasattr(self, "_button_centre"):
+            centre = self._button_home_np.mean(axis=0)
+            self._button_centre = torch.as_tensor(centre, device=self.device, dtype=torch.float32)
+            goal_off = torch.as_tensor(self._insert_pos_rel[-1], device=self.device, dtype=torch.float32) \
+                - torch.as_tensor(self._button_home_np[0], device=self.device, dtype=torch.float32)
+            self._button_goal_off = goal_off
+            self._button_q0 = _xyzw_to_wxyz(torch.tensor([self._pih_object_start_rel[3:7]], device=self.device,
+                                                         dtype=torch.float32))
+        n = self.num_envs
+        tr = getattr(self, "button_travel", None)
+        down = tr.max(dim=0).values if tr is not None else torch.zeros(n, device=self.device)
+        hq = self.hole_quat_wxyz
+        p = self._button_centre.expand(n, 3).clone()
+        p[:, 2] -= down
+        pos = self.hole_pos + quat_apply(hq, p)
+        q = quat_mul(hq, self._button_q0.expand(n, 4))
+        gpos = self.hole_pos + quat_apply(hq, self._button_centre.expand(n, 3) + self._button_goal_off)
+        return pos, q, gpos, q
+
+    def _pose_rel_hole_to_world(self, env_ids: torch.Tensor, pose7, off: torch.Tensor | None = None) -> torch.Tensor:
+        """(n, 7) world pose (pos + quat wxyz) of a receptive-frame pose7 (xyz + quat xyzw) for env_ids
+        (+ an optional per-env receptive-frame position offset ``off`` (n, 3))."""
         n = env_ids.numel()
         p = torch.tensor(pose7[:3], device=self.device, dtype=torch.float32).expand(n, 3)
+        if off is not None:
+            p = p + off
         q = _xyzw_to_wxyz(torch.tensor([pose7[3:7]], device=self.device, dtype=torch.float32)).expand(n, 4)
         hq = self.hole_quat_wxyz[env_ids]
         pos = self.hole_pos[env_ids] + quat_apply(hq, p) + self.scene.env_origins[env_ids]
@@ -606,7 +706,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.distractor_moved_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_rise = torch.zeros(self.num_envs, device=self.device)
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
-            w = self._pose_rel_hole_to_world(env_ids, pose)
+            w = self._pose_rel_hole_to_world(env_ids, pose, self._button_off(1 + k, env_ids))
             body.write_root_pose_to_sim(w, env_ids=env_ids)
             body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
             self._distractor_reset_pos[k, env_ids] = w[:, :3]
@@ -1234,7 +1334,7 @@ class PreciseAssemblyEnv(PlayEnv):
                     keeper.write_root_pose_to_sim(self._pose_rel_hole_to_world(ids, pose), env_ids=ids)
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
-        w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
+        w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel, self._button_off(0, env_ids))
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
@@ -1328,6 +1428,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 tail_idx = subgoal_idx[in_tail] - self._num_prelude_goals
                 hole_q = self.hole_quat_wxyz[tail_ids]
                 insert_pos = self._insert_pos_rel[tail_idx]
+                boff = self._button_off(0, tail_ids)
+                if boff is not None:
+                    insert_pos = insert_pos + boff
                 insert_q = self._insert_quat_wxyz[tail_idx]
                 ins_pos_local[in_tail] = (
                     self.hole_pos[tail_ids] + quat_apply(hole_q, insert_pos)
@@ -1615,6 +1718,8 @@ class PreciseAssemblyEnv(PlayEnv):
         pih_cfg = self.cfg.precise_assembly
         if getattr(self, "unlock_angle", None) is not None:
             self._apply_unlock_goal(prev_near_steps)
+        if pih_cfg.button_mode:
+            self._apply_button_goal(prev_near_steps)
         if pih_cfg.allow_goal_skip:
             self._apply_goal_skip()
         is_success = self._is_success.clone()
@@ -1779,7 +1884,12 @@ class PreciseAssemblyEnv(PlayEnv):
             self.door_stop_torque_ep_max = torch.maximum(self.door_stop_torque_ep_max, self.door_stop_torque)
             self.door_pull_force_ep_max = torch.maximum(self.door_pull_force_ep_max, self.door_pull_force)
             self.door_stop_torque.zero_(); self.door_pull_torque.zero_(); self.door_pull_force.zero_()
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop | broken
+        wrong_key = torch.zeros_like(fall)
+        if pih_cfg.button_mode and hasattr(self, "button_wrong"):
+            wrong_key = self.button_wrong & ~max_successes
+            self.extras["button_wrong_frac"] = self.button_wrong.float().mean()
+        terminated = (fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned
+                      | false_stop | broken | wrong_key)
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1792,6 +1902,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "overturned": overturned,
             "false_stop": false_stop,
             "broken": broken,
+            "wrong_key": wrong_key,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1889,6 +2000,23 @@ class PreciseAssemblyEnv(PlayEnv):
             fall_pen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
             reward = reward - fall_pen
             self._reward_terms["fall_terminal_penalty"] = -fall_pen
+            self._reward_terms["total_reward"] = reward
+
+        if pih_cfg.button_mode and hasattr(self, "button_travel"):
+            if float(pih_cfg.button_wrong_penalty) > 0.0:
+                wpen = float(pih_cfg.button_wrong_penalty) * self._termination_reasons["wrong_key"].float()
+                reward = reward - wpen
+                self._reward_terms["button_wrong_penalty"] = -wpen
+            if float(pih_cfg.button_press_rew_scale) > 0.0:
+                # potential on the target's travel up to the actuation point (privileged reward only)
+                phi = (self.button_travel[0] / float(pih_cfg.button_actuate_m)).clamp(0.0, 1.0)
+                if not hasattr(self, "_button_phi_prev"):
+                    self._button_phi_prev = phi.clone()
+                pr = float(pih_cfg.button_press_rew_scale) * (phi - self._button_phi_prev) * (~self.retract_phase).float() \
+                    if hasattr(self, "retract_phase") else float(pih_cfg.button_press_rew_scale) * (phi - self._button_phi_prev)
+                self._button_phi_prev = phi.clone()
+                reward = reward + pr
+                self._reward_terms["button_press_rew"] = pr
             self._reward_terms["total_reward"] = reward
 
         if float(getattr(pih_cfg, "door_break_penalty", 0.0)) > 0.0 and "broken" in self._termination_reasons:

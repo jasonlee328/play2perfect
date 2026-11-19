@@ -277,6 +277,12 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     kp_offsets = env._keypoint_offsets * env._object_scale_multiplier.unsqueeze(1)
     obj_kp = _keypoints_world(obj_pos, obj_rot, kp_offsets)
     goal_kp = _keypoints_world(goal_pos, goal_rot, kp_offsets)
+    button_hide = (getattr(env, "_button_slot_np", None) is not None
+                   and bool(env.cfg.precise_assembly.button_hide_from_actor))
+    if button_hide:
+        # A15 keypad: the actor sees a virtual key at the pad centre (+ its goal), never which slot is the target
+        noisy_obj_pos, noisy_obj_rot, v_goal_pos, v_goal_rot = env._button_virtual_pose()
+        noisy_obj_vel = torch.zeros_like(obj_vel)
     noisy_obj_kp = _keypoints_world(noisy_obj_pos, noisy_obj_rot, kp_offsets)
 
     # Optional per-env yaw noise on the observed goal (world +Z about goal_pos).
@@ -290,6 +296,8 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         noisy_goal_kp = _keypoints_world(goal_pos, noisy_goal_rot, kp_offsets)
     else:
         noisy_goal_kp = goal_kp
+    if button_hide:
+        noisy_goal_kp = _keypoints_world(v_goal_pos, v_goal_rot, kp_offsets)
 
     keypoints_rel_palm_clean = obj_kp - palm_pos.unsqueeze(1)
     keypoints_rel_palm_noisy = noisy_obj_kp - palm_pos.unsqueeze(1)

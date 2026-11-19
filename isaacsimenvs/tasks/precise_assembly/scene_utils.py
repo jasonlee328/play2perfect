@@ -105,7 +105,8 @@ def _create_fixture_joints(env) -> None:
             for j in joints:
                 pose = env._joint_reset_pose_rel(j)
                 root = "Object" if j.body == "object" else f"Distractor{int(j.body[10:])}"
-                set_local_pose(f"/World/envs/env_{i}/{root}", np.asarray(pose[:3]) + hole_np[i],
+                set_local_pose(f"/World/envs/env_{i}/{root}", np.asarray(pose[:3]) + hole_np[i]
+                               + env._body_slot_offset_np(j.body, i),
                                (pose[6], pose[3], pose[4], pose[5]))
     for k, j in enumerate(joints):
         pose = env._joint_reset_pose_rel(j)
@@ -127,13 +128,38 @@ def _create_fixture_joints(env) -> None:
             pos0 = Gf.Vec3f(Gf.Rotation(q_p).GetInverse().TransformDir(anchor - p_p))
             qq = q_p.GetInverse() * Gf.Quatd(q0.GetReal(), Gf.Vec3d(q0.GetImaginary()))
             rot0 = Gf.Quatf(qq)
+        prismatic = getattr(j, "kind", "revolute") == "prismatic"
         for i in range(env.num_envs):
             b0 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{parent_root}").GetPath()
             b1 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{body_root}").GetPath()
+            pos0_i = pos0
+            if parent == "fixture":
+                pos0_i = Gf.Vec3f(*(np.asarray(j.anchor, float) + env._body_slot_offset_np(j.body, i)).tolist())
+            if prismatic:
+                # key switch: slides along the axis, end stops lower_m / upper_m (m), linear spring + preload
+                jp = UsdPhysics.PrismaticJoint.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
+                jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
+                jp.CreateAxisAttr("Z")
+                jp.CreateLocalPos0Attr(pos0_i); jp.CreateLocalRot0Attr(rot0)
+                jp.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jp.CreateLocalRot1Attr(Gf.Quatf(q1))
+                if j.lower_m is not None:
+                    jp.CreateLowerLimitAttr(float(j.lower_m))
+                if j.upper_m is not None:
+                    jp.CreateUpperLimitAttr(float(j.upper_m))
+                kk = float(j.stiffness) * float(getattr(env, "_button_k_scale", 1.0))
+                pre = float(j.preload) * float(getattr(env, "_button_k_scale", 1.0))
+                if kk or j.damping:
+                    drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "linear")
+                    drive.CreateTypeAttr("force")
+                    # spring F = -k (x - x_t) with x_t = lower - preload / k: preload at the rest stop
+                    tgt = float(j.lower_m or 0.0) - (pre / kk if kk else 0.0)
+                    drive.CreateTargetPositionAttr(tgt); drive.CreateTargetVelocityAttr(0.0)
+                    drive.CreateDampingAttr(float(j.damping)); drive.CreateStiffnessAttr(kk)
+                continue
             jp = UsdPhysics.RevoluteJoint.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
             jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
             jp.CreateAxisAttr("Z")
-            jp.CreateLocalPos0Attr(pos0); jp.CreateLocalRot0Attr(rot0)
+            jp.CreateLocalPos0Attr(pos0_i); jp.CreateLocalRot0Attr(rot0)
             jp.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jp.CreateLocalRot1Attr(Gf.Quatf(q1))
             if j.lower_deg is not None:
                 jp.CreateLowerLimitAttr(float(j.lower_deg))
