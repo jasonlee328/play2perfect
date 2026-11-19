@@ -195,6 +195,12 @@ class PreciseAssemblyCfg:
     # button_click_tactile_mm while its travel is inside [x, x + window] (physics unchanged).
     button_click_values_mm: tuple[float, ...] = ()
     button_click_window_m: float = 0.0004
+    # curriculum: the over-press window starts at button_click_window_start_m (> 0) and narrows linearly to
+    # button_click_window_m over button_click_ramp_steps env steps (offset for resumes). The touch click stays
+    # [x, x + button_click_window_m] throughout.
+    button_click_window_start_m: float = 0.0
+    button_click_ramp_steps: int = 0
+    button_click_ramp_offset_steps: int = 0
     button_click_tactile_mm: float = 1.0
     button_release_m: float = 0.0003
     button_press_start_m: float = 0.0005

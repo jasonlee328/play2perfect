@@ -672,7 +672,13 @@ class PreciseAssemblyEnv(PlayEnv):
             w = float(c.button_click_window_m)
             self.button_in_click = (t0 >= x) & (t0 <= x + w)
             self.button_released = t0 < float(c.button_release_m)
-            self.button_over = pk > x + w
+            wo = w
+            if float(c.button_click_window_start_m) > 0.0 and int(c.button_click_ramp_steps) > 0:
+                a = min(1.0, float(self.common_step_counter + int(c.button_click_ramp_offset_steps))
+                        / float(c.button_click_ramp_steps))
+                wo = float(c.button_click_window_start_m) + (w - float(c.button_click_window_start_m)) * a
+            self.extras["button_click_window_mm"] = wo * 1e3
+            self.button_over = pk > x + wo
             self.button_under = self.button_released & (pk >= float(c.button_press_start_m)) & (pk < x)
             self.button_wrong = self.button_wrong | self.button_over | self.button_under
             self.extras["button_over_frac"] = self.button_over.float().mean()
