@@ -223,6 +223,9 @@ class PreciseAssemblyCfg:
     retr_tol_offset_steps: float = 0.0
     retr_reach_rew_scale: float = 0.0     # x change of -max(thumb, index DP dist to the card top edge), before the lift
     retr_path_neat_gate: bool = False     # path reward paid only while the deck is neat
+    retr_lock_force_range: tuple = (0.0, 0.0)  # fragile lock: hidden unlock force F ~ logU[lo, hi] N per episode; (0,0) = off
+    retr_lock_ratio: float = 1.4          # unlock needs press in [F, ratio F] for retr_lock_dwell steps; > ratio F = broken
+    retr_lock_dwell: int = 8
     retr_press_max: float = 0.0           # fragile: robot -> picked-card force limit while it is in the slot (N); 0 = off
     card_path_floor_z: float = 0.0       # path potential height term floors at this height above the slot floor (m)
     card_lean_ref_rest: bool = False     # path lean term vs the front card's rest lean, not its current lean

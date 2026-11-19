@@ -92,6 +92,17 @@ class RetrieveTask:
         for t in self.fail.values():
             t[env_ids] = False
         self.phi[env_ids] = float("nan")
+        lo, hi = tuple(getattr(self.c, "retr_lock_force_range", (0.0, 0.0)))
+        if hi > 0.0:   # press-force lock: hidden per-episode unlock force F, log-uniform in [lo, hi]
+            if not hasattr(self, "lock_F"):
+                N = self.env.num_envs; dv = self.env.device
+                self.lock_F = torch.zeros(N, device=dv); self.locked = torch.zeros(N, dtype=torch.bool, device=dv)
+                self.lock_count = torch.zeros(N, dtype=torch.long, device=dv)
+                self.lock_pose = torch.zeros(N, 7, device=dv); self.unlock_step = torch.zeros(N, device=dv)
+            u = torch.rand(len(env_ids), device=self.env.device)
+            self.lock_F[env_ids] = float(lo) * (float(hi) / float(lo)) ** u
+            self.locked[env_ids] = True; self.lock_count[env_ids] = 0; self.unlock_step[env_ids] = 0
+            self._lock_fresh = env_ids
         if hasattr(self, "phi_reach"):
             self.phi_reach[env_ids] = float("nan")
         env = self.env
@@ -153,6 +164,24 @@ class RetrieveTask:
         in_slot_card = (pc[:, 2] < 0.045) & (pc[:, 0].abs() < SLOT_X + 0.01)
         self.f_press = f_rob_card * in_slot_card.float()
         self.f_press_ep_max = torch.maximum(self.f_press_ep_max, self.f_press)
+        if hasattr(self, "lock_F"):
+            r = float(getattr(c, "retr_lock_ratio", 1.4))
+            if getattr(self, "_lock_fresh", None) is not None:   # lock pose = the card pose after the reset write
+                ids = self._lock_fresh
+                self.lock_pose[ids, :3] = env.object.data.root_pos_w[ids]; self.lock_pose[ids, 3:] = env.object.data.root_quat_w[ids]
+                self._lock_fresh = None
+            inwin = (self.f_press >= self.lock_F) & (self.f_press <= r * self.lock_F)
+            self.lock_count = torch.where(self.locked & inwin, self.lock_count + 1, torch.zeros_like(self.lock_count))
+            unl = self.locked & (self.lock_count >= int(getattr(c, "retr_lock_dwell", 8)))
+            self.unlock_step[unl] = self.step[unl].float()
+            self.locked &= ~unl
+            ids = self.locked.nonzero(as_tuple=False).squeeze(-1)
+            if len(ids):   # still locked: the card is held at its start pose (pose-level stick, velocity zeroed)
+                env.object.write_root_pose_to_sim(self.lock_pose[ids], ids)
+                env.object.write_root_velocity_to_sim(torch.zeros(len(ids), 6, device=d), ids)
+            # pressing harder than r x F while the card is in the slot breaks it (hidden per-episode limit)
+            self.break_count = torch.where(self.f_press > r * self.lock_F, self.break_count + 1, torch.zeros_like(self.break_count))
+            self.fail["broken"] = self.break_count >= int(c.card_break_steps)
         rise = pc[:, 2] - self.ref_p[:, 2]
         self.rise_max = torch.maximum(self.rise_max, rise)
         self.lifted |= rise > float(getattr(c, "retr_lift_m", 0.04))
@@ -213,7 +242,7 @@ class RetrieveTask:
         self.deck_over = torch.where(~neat, self.deck_over + 1, torch.zeros_like(self.deck_over))
         self.fail["deck_disturbed"] = self.deck_over >= max(1, int(c.card_deck_fail_hold_steps))
         pmax = float(getattr(c, "retr_press_max", 0.0))
-        if pmax > 0.0:
+        if pmax > 0.0 and not hasattr(self, "lock_F"):
             self.break_count = torch.where(self.f_press > pmax, self.break_count + 1, torch.zeros_like(self.break_count))
             self.fail["broken"] = self.break_count >= int(c.card_break_steps)
         # shaping potential: card rise (capped at the lift height), then distance to the place point once lifted
@@ -244,7 +273,11 @@ class RetrieveTask:
         self.n_tips = n_tips
         self.checks = dict(single_card_on_table=on_tab, deck_remains_neat=neat, released_and_clear=clear)
         mu_m = self.card_mu if hasattr(self, "card_mu") else torch.zeros(env.num_envs, device=d)
-        self.meas = dict(card_mu=mu_m, rise_mm=rise * 1e3, rise_max_mm=self.rise_max * 1e3, deck_disp_mm=disp_max * 1e3, deck_tilt_deg=tilt_max,
+        if hasattr(self, "lock_F"):
+            lock_m = dict(lock_F=self.lock_F, locked=self.locked.float(), unlock_step=self.unlock_step)
+        else:
+            lock_m = {}
+        self.meas = dict(**lock_m, card_mu=mu_m, rise_mm=rise * 1e3, rise_max_mm=self.rise_max * 1e3, deck_disp_mm=disp_max * 1e3, deck_tilt_deg=tilt_max,
                          card_z_mm=pc[:, 2] * 1e3, card_x_mm=pc[:, 0] * 1e3, flat_cos=nc[:, 2].abs(), f_press=self.f_press,
                          f_press_ep_max=self.f_press_ep_max, f_rob_deck=f_rob_deck, f_card_env=f_card_env,
                          palm_from_release=moved * self.released.float(), reach_dist_mm=self.reach_dist * 1e3, lifted=self.lifted.float(), released=self.released.float())
