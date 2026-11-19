@@ -2380,6 +2380,17 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["turn_tilt_penalty"] = -t_pen
             self.extras["turn_tool_tilt_deg_near"] = (tilt * near.float()).sum() / near.float().sum().clamp(min=1)
             self._reward_terms["total_reward"] = reward
+        bkw = float(getattr(pih_cfg, "turn_backoff_penalty", 0.0))
+        if bkw > 0.0 and getattr(self, "turn_thread", False) and getattr(self, "retract_phase", None) is not None:
+            prev = getattr(self, "_turn_bk_prev", None)
+            if prev is None or prev.shape != self.turn_angle.shape:
+                prev = self.turn_angle.clone()
+            back = torch.clamp(prev - self.turn_angle, min=0.0) * self.retract_phase.float()
+            self._turn_bk_prev = self.turn_angle.clone()
+            b_pen = bkw * torch.rad2deg(back)
+            reward = reward - b_pen
+            self._reward_terms["turn_backoff_penalty"] = -b_pen
+            self._reward_terms["total_reward"] = reward
         snw = float(getattr(pih_cfg, "turn_snug_rew", 0.0))
         if snw > 0.0 and getattr(self, "turn_thread", False):
             frac = torch.clamp(self.turn_lock_torque / max(1e-6, float(pih_cfg.turn_tight_torque)), 0.0, 1.0)

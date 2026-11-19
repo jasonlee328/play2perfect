@@ -260,6 +260,8 @@ class PreciseAssemblyCfg:
     # axis (object +x, toward the tip) and the screw axis (play2perfect-like upright turning)
     turn_tilt_penalty: float = 0.0
     turn_tilt_free_deg: float = 5.0
+    # per step, scale x degrees the screw turned BACK (loosening) during the retract phase (lifting the tool out)
+    turn_backoff_penalty: float = 0.0
     retract_keep_object: bool = False
     retract_keep_move_m: float = 0.05
     retract_keep_still_mps: float = 0.03
