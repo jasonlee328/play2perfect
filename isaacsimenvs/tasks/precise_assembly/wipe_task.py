@@ -201,7 +201,7 @@ class WipeTask:
         """Actor-side goal that advances by stroke position only (no force): the true goal index advances only
         while the board force is >= wipe_goal_min_force_N, so showing it to the actor would leak a 2 N force
         threshold. Lead-in (index 0) -> 1 when the true lead-in is credited (force-free); then index k+1 once
-        the virtual eraser x (hole frame) passes board waypoint k minus wipe_actor_goal_margin_m."""
+        the virtual eraser x (hole frame) passes board waypoint k plus wipe_actor_goal_margin_m."""
         env = self.env
         assert env._num_prelude_goals == 0, "wipe actor goal: prelude goals not supported"
         N, d = env.num_envs, env.device
@@ -213,7 +213,7 @@ class WipeTask:
         xs = env._insert_pos_rel[:n, 0]                                     # (n,)
         mg = float(getattr(env.cfg.precise_assembly, "wipe_actor_goal_margin_m", 0.004))
         started = (env._successes >= 1) | (self.a_idx >= 1)
-        passed = (rel[:, 0:1] >= xs[1:].unsqueeze(0) - mg).long()           # (N, n-1): board waypoints passed
+        passed = (rel[:, 0:1] >= xs[1:].unsqueeze(0) + mg).long()           # (N, n-1): board waypoints passed (x > wp + margin)
         # board waypoints are passed in order: count the leading run of passed ones
         run = torch.cumprod(passed, dim=1).sum(dim=1)
         cand = torch.where(started, 1 + run, torch.zeros_like(run)).clamp(max=n - 1)
