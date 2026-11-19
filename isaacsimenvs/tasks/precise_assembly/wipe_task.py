@@ -74,6 +74,12 @@ class WipeTask:
         self.cos_drop = math.cos(math.radians(float(c.wipe_drop_tilt_deg)))
         win_o = tuple(getattr(c, "wipe_force_window_N", ()) or ())
         self.win = [float(v) for v in (win_o if len(win_o) == 2 else L["force_window_N"])]
+        # hidden per-episode window: low edge ~ U(wipe_window_lo_range_N), width wipe_window_width_N
+        self.win_lo = torch.full((N,), self.win[0], device=d); self.win_hi = torch.full((N,), self.win[1], device=d)
+        self.lo_rng = tuple(getattr(c, "wipe_window_lo_range_N", ()) or ())
+        self.win_w = float(getattr(c, "wipe_window_width_N", 1.5))
+        if len(self.lo_rng) == 2:
+            self._sample_win(torch.arange(N, device=d))
         fo = float(getattr(c, "wipe_fail_force_N", 0.0) or 0.0)
         self.fail_F = fo if fo > 0.0 else float(L["fail_force_N"]); self.fail_steps = int(L["fail_steps"])
         self.erase_steps = int(L["erase_steps"]); self.succ_frac = float(L["success_frac"])
@@ -81,6 +87,10 @@ class WipeTask:
         self.off_p = torch.zeros(N, 3, device=d); self.off_q = torch.zeros(N, 4, device=d); self.off_q[:, 0] = 1.0
         self.need_off = torch.ones(N, device=d, dtype=torch.bool)
         self._views = False
+
+    def _sample_win(self, env_ids):
+        lo = self.lo_rng[0] + (self.lo_rng[1] - self.lo_rng[0]) * torch.rand(len(env_ids), device=self.win_lo.device)
+        self.win_lo[env_ids] = lo; self.win_hi[env_ids] = lo + self.win_w
 
     def _make_views(self):
         env = self.env
@@ -101,6 +111,8 @@ class WipeTask:
         for v in self.fail.values():
             v[env_ids] = False
         self.need_off[env_ids] = True
+        if len(self.lo_rng) == 2:
+            self._sample_win(env_ids)
 
     # ------------------------------------------------------------------ geometry
     def _board_frame(self):
@@ -129,7 +141,7 @@ class WipeTask:
         u = (rel * ex[:, None]).sum(-1); v = (rel * ey[:, None]).sum(-1)
         under = (u.abs() <= self.half[0]) & (v.abs() <= self.half[1])
         gap = e_b[:, 2] - self.eh - self.board_half_t                               # felt above the board top (m)
-        inwin = (F >= self.win[0]) & (F <= self.win[1]) & felt_ok & (gap < 0.003)
+        inwin = (F >= self.win_lo) & (F <= self.win_hi) & felt_ok & (gap < 0.003)
         before = self.erased.sum(-1)
         self.cell_steps += (under & inwin[:, None]).long()
         self.erased = self.cell_steps >= self.erase_steps
@@ -280,6 +292,15 @@ class WipeTask:
         if g > 0.0:
             ld = share.norm(dim=-1) * on.float()                                                 # (N, nf) N per pad
             out = (out.view(N, nf, res * res) * (1.0 + g * ld)[..., None]).clamp(max=1.0)
+        cue = float(getattr(self.c, "wipe_inwin_cue", 0.0))
+        if cue > 0.0:
+            # touch-only 'erasing' cue (felt stick-slip texture): checkerboard added on pads in contact while in window
+            iw = getattr(self, "inwin", None)
+            if iw is not None:
+                rr2 = torch.arange(res, device=env.device)
+                chk = ((rr2[:, None] + rr2[None, :]) % 2).float().view(1, 1, res * res)
+                m = (iw.float()[:, None] * on.float())[..., None]                                  # (N, nf, 1)
+                out = (out.view(N, nf, res * res) + cue * chk * m).clamp(max=1.0)
         return out.reshape(N, -1)
 
     # ------------------------------------------------------------------ reward
@@ -292,5 +313,5 @@ class WipeTask:
         if c.wipe_force_rew > 0.0:
             r = r + c.wipe_force_rew * self.inwin.float()
         if c.wipe_over_rew_scale > 0.0:
-            r = r - c.wipe_over_rew_scale * (self.F - self.win[1]).clamp_min(0.0)
+            r = r - c.wipe_over_rew_scale * (self.F - self.win_hi).clamp_min(0.0)
         return r

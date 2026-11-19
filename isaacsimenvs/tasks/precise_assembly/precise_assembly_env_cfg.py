@@ -136,6 +136,9 @@ class PreciseAssemblyCfg:
     wipe_goal_min_force_N: float = 0.0  # > 0: board waypoints credited / rewarded only with board force >= this
     wipe_actor_goal_xprogress: bool = False   # actor goal advances by stroke x only (hides the force-gated credit)
     wipe_actor_goal_margin_m: float = 0.004
+    wipe_window_lo_range_N: tuple = ()      # hidden per-episode force window low edge U(lo, hi) N; () = fixed window
+    wipe_window_width_N: float = 1.5         # width of the hidden per-episode window
+    wipe_inwin_cue: float = 0.0              # touch-only in-window texture (checkerboard amplitude on pads in contact)
     wipe_ink_scaled_goal_rew: bool = False   # board goal bonus + keypoint reward x ink fraction erased so far
     wipe_curr_offset_steps: int = 0
     wipe_curr_fail_F_start: float = 30.0
