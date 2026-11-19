@@ -409,6 +409,8 @@ class ResetCfg:
     # Per-env XY position noise applied at reset (uniform half-widths in m).
     # Default (0, 0) keeps the table centered on the env origin (legacy behavior).
     table_reset_xy_range_m: tuple[float, float] = (0.0, 0.0)
+    # fixed table xy offset (m) added at every reset, e.g. to keep the table under a fixture moved toward the robot
+    table_offset_xy: tuple[float, float] = (0.0, 0.0)
     # Per-env yaw noise applied at reset (uniform half-width in degrees about z).
     # Default 0.0 preserves the identity quat (legacy behavior).
     table_reset_yaw_range_deg: float = 0.0
