@@ -72,8 +72,10 @@ class WipeTask:
         self.board_half_t = 0.004
         self.cos_felt = math.cos(math.radians(float(L["felt_tilt_deg"])))
         self.cos_drop = math.cos(math.radians(float(c.wipe_drop_tilt_deg)))
-        self.win = [float(v) for v in L["force_window_N"]]
-        self.fail_F = float(L["fail_force_N"]); self.fail_steps = int(L["fail_steps"])
+        win_o = tuple(getattr(c, "wipe_force_window_N", ()) or ())
+        self.win = [float(v) for v in (win_o if len(win_o) == 2 else L["force_window_N"])]
+        fo = float(getattr(c, "wipe_fail_force_N", 0.0) or 0.0)
+        self.fail_F = fo if fo > 0.0 else float(L["fail_force_N"]); self.fail_steps = int(L["fail_steps"])
         self.erase_steps = int(L["erase_steps"]); self.succ_frac = float(L["success_frac"])
         # virtual eraser: in-hand offset (palm body frame) measured on the first step
         self.off_p = torch.zeros(N, 3, device=d); self.off_q = torch.zeros(N, 4, device=d); self.off_q[:, 0] = 1.0

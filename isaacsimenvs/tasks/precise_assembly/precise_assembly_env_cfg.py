@@ -131,6 +131,8 @@ class PreciseAssemblyCfg:
     # A16 curriculum over env steps: over-force fail threshold and drop distance start loose and shrink linearly to the
     # layout's fail_force_N / wipe_drop_dist over wipe_curr_steps (0 = off); offset added on resume.
     wipe_curr_steps: int = 0
+    wipe_force_window_N: tuple = ()   # (lo, hi) N overrides the layout's erase window
+    wipe_fail_force_N: float = 0.0     # > 0 overrides the layout's over-force fail threshold
     wipe_goal_min_force_N: float = 0.0  # > 0: board waypoints credited / rewarded only with board force >= this
     wipe_curr_offset_steps: int = 0
     wipe_curr_fail_F_start: float = 30.0
