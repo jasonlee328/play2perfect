@@ -352,6 +352,7 @@ class ActionCfg:
     dof_speed_scale: float = 1.5
     # A12: > 0 = hand actions are velocity deltas (target += scale * dt * a), not absolute [-1, 1] positions
     hand_delta_scale: float = 0.0
+    arm_action_scale: float = 1.0     # A13: 0 = arm targets frozen at the episode start (in-hand only)
 
 
 # ----------------------------------------------------------------------------

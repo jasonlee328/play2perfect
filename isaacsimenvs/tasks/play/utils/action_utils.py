@@ -48,7 +48,7 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
         ]
 
     # Arm: velocity-delta accumulator.
-    arm_action = actions[:, :7]
+    arm_action = actions[:, :7] * float(getattr(act_cfg, "arm_action_scale", 1.0))   # A13: 0 = arm frozen (fingers only)
     arm_raw = env._prev_targets[:, :7] + act_cfg.dof_speed_scale * dt * arm_action
     arm_raw = torch.clamp(arm_raw, env._arm_lower, env._arm_upper)
     arm_smoothed = (
