@@ -356,6 +356,7 @@ class PreciseAssemblyCfg:
     # of the env's handle friction (hide it: domain_randomization.object_friction_scale_range) and the fingertip friction.
     # grip_measure = log G without a limit. Ratio ramps log-linearly from grip_crack_ratio_start over grip_crack_ramp_steps.
     grip_measure: bool = False
+    obs_nan_guard: bool = False   # A9: zero non-finite obs / reward, end those envs (`nonfinite`)
     grip_crack_ratio: float = 0.0
     grip_crack_steps: int = 3
     grip_crack_penalty: float = 0.0

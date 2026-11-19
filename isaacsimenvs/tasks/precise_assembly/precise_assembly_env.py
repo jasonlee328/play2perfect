@@ -2176,10 +2176,13 @@ class PreciseAssemblyEnv(PlayEnv):
             cracked = self._grip_step()
         else:
             cracked = torch.zeros_like(fall)
+        nonfinite = getattr(self, "_nonfinite_env", None)
+        nonfinite = nonfinite.clone() if nonfinite is not None else torch.zeros_like(fall)
         terminated = (fall | max_successes | hand_far | dropped | retract_fail | disturbed | stripped | released_early
-                      | toolless | cracked)
+                      | toolless | cracked | nonfinite)
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
+            "nonfinite": nonfinite,
             "cracked": cracked,
             "stripped": stripped,
             "released_early": released_early,
@@ -2378,6 +2381,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["dropped_terminal_penalty"] = -d_pen
             self._reward_terms["total_reward"] = reward
 
+        if bool(getattr(pih_cfg, "obs_nan_guard", False)):
+            reward = torch.nan_to_num(reward, nan=0.0, posinf=0.0, neginf=0.0)
         log_step_metrics(self)
         self._log_peg_metrics()
         return reward
@@ -2448,6 +2453,16 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _get_observations(self) -> dict[str, torch.Tensor]:
         obs = build_observations(self)
+        if bool(getattr(self.cfg.precise_assembly, "obs_nan_guard", False)):
+            # A9: a few envs blow up in PhysX (NaN state) under hidden low pad friction; zero their obs and end them next
+            # step (`nonfinite`) instead of letting one NaN env kill the whole run
+            bad = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            for k, v in obs.items():
+                if torch.is_tensor(v) and v.dim() >= 2 and v.shape[0] == self.num_envs:
+                    bad |= ~torch.isfinite(v.reshape(self.num_envs, -1)).all(-1)
+                    obs[k] = torch.nan_to_num(v, nan=0.0, posinf=0.0, neginf=0.0)
+            self._nonfinite_env = bad
+            self.extras["nonfinite_envs"] = bad.float().sum()
         if self._goal_kp_obs_slice is not None:
             policy = obs["policy"]
             policy[:, self._goal_kp_obs_slice].view(self.num_envs, -1, 3).sub_(
