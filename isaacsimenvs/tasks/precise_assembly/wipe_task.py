@@ -96,6 +96,8 @@ class WipeTask:
                   self.contact_steps):
             t[env_ids] = 0
         self.success[env_ids] = False; self.over_ever[env_ids] = False
+        if hasattr(self, "a_idx"):
+            self.a_idx[env_ids] = 0
         for v in self.fail.values():
             v[env_ids] = False
         self.need_off[env_ids] = True
@@ -188,10 +190,37 @@ class WipeTask:
         palm_vel = env.robot.data.body_state_w[:, env._palm_body_id, 7:13]
         obs["object_vel"] = torch.where(use[:, None], palm_vel, obs["object_vel"])
         obs["keypoints_rel_palm"] = vkp - palm_center.unsqueeze(1)
+        if bool(getattr(env.cfg.precise_assembly, "wipe_actor_goal_xprogress", False)):
+            goal_kp = self._actor_goal_kp(vp - origins, vq, kp_offsets, keypoints_world)
         obs["keypoints_rel_goal"] = vkp - goal_kp
         for k in ("reward", "lifted_object", "closest_keypoint_max_dist"):
             if k in obs:
                 obs[k] = torch.zeros_like(obs[k])
+
+    def _actor_goal_kp(self, vp_local, vq, kp_offsets, keypoints_world):
+        """Actor-side goal that advances by stroke position only (no force): the true goal index advances only
+        while the board force is >= wipe_goal_min_force_N, so showing it to the actor would leak a 2 N force
+        threshold. Lead-in (index 0) -> 1 when the true lead-in is credited (force-free); then index k+1 once
+        the virtual eraser x (hole frame) passes board waypoint k minus wipe_actor_goal_margin_m."""
+        env = self.env
+        assert env._num_prelude_goals == 0, "wipe actor goal: prelude goals not supported"
+        N, d = env.num_envs, env.device
+        if not hasattr(self, "a_idx"):
+            self.a_idx = torch.zeros(N, dtype=torch.long, device=d)
+        n = int(env._num_insertion_goals)
+        hq, hp = env.hole_quat_wxyz, env.hole_pos
+        rel = quat_apply_inverse(hq, vp_local - hp)                       # virtual eraser, hole frame
+        xs = env._insert_pos_rel[:n, 0]                                     # (n,)
+        mg = float(getattr(env.cfg.precise_assembly, "wipe_actor_goal_margin_m", 0.004))
+        started = (env._successes >= 1) | (self.a_idx >= 1)
+        passed = (rel[:, 0:1] >= xs[1:].unsqueeze(0) - mg).long()           # (N, n-1): board waypoints passed
+        # board waypoints are passed in order: count the leading run of passed ones
+        run = torch.cumprod(passed, dim=1).sum(dim=1)
+        cand = torch.where(started, 1 + run, torch.zeros_like(run)).clamp(max=n - 1)
+        self.a_idx = torch.maximum(self.a_idx, cand)
+        gpos = hp + quat_apply(hq, env._insert_pos_rel[self.a_idx])
+        gq = quat_mul(hq, env._insert_quat_wxyz[self.a_idx])
+        return keypoints_world(gpos, gq, kp_offsets)
 
     # ------------------------------------------------------------------ touch: pad shear
     def _shear_setup(self):

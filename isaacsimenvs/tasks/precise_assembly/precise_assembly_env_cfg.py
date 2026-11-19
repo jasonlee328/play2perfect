@@ -134,6 +134,8 @@ class PreciseAssemblyCfg:
     wipe_force_window_N: tuple = ()   # (lo, hi) N overrides the layout's erase window
     wipe_fail_force_N: float = 0.0     # > 0 overrides the layout's over-force fail threshold
     wipe_goal_min_force_N: float = 0.0  # > 0: board waypoints credited / rewarded only with board force >= this
+    wipe_actor_goal_xprogress: bool = False   # actor goal advances by stroke x only (hides the force-gated credit)
+    wipe_actor_goal_margin_m: float = 0.004
     wipe_curr_offset_steps: int = 0
     wipe_curr_fail_F_start: float = 30.0
     wipe_curr_drop_start: float = 0.06
