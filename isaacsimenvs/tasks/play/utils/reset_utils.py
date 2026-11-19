@@ -252,6 +252,9 @@ def _reset_table_pose(env, env_ids: torch.Tensor) -> None:
         ry = torch.empty(n, device=env.device).uniform_(-xy_range[1], xy_range[1])
         pos_local[:, 0] = rx
         pos_local[:, 1] = ry
+    off = tuple(float(v) for v in getattr(cfg, "table_offset_xy", (0.0, 0.0)))
+    pos_local[:, 0] += off[0]
+    pos_local[:, 1] += off[1]
 
     # Yaw noise — sample uniform [-r, r] degrees, build a z-axis rotation quat.
     yaw_range_deg = float(cfg.table_reset_yaw_range_deg)
