@@ -504,6 +504,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self._grip_view = self.object._physics_sim_view.create_rigid_contact_view(
             g(self.object.root_physx_view.prim_paths[0]), filter_patterns=[g(p) for p in p0])
         self._grip_nl = len(p0)
+        self._grip_names = [p.split("/")[-1] for p in p0]
         # per-env handle friction (object material, possibly bucket-randomized by object_friction_scale_range) and the
         # fingertip friction; PhysX default combine = average
         om = self.object.root_physx_view.get_material_properties()      # (N, shapes, 3) cpu
@@ -546,6 +547,12 @@ class PreciseAssemblyEnv(PlayEnv):
             self._grip_init()
         F = self._grip_view.get_contact_force_matrix(self.physics_dt).reshape(self.num_envs, self._grip_nl, 3)
         mag = F.norm(dim=-1)
+        self.grip_link_mag = mag
+        if not hasattr(self, "_grip_dp_idx"):
+            self._grip_dp_idx = [i for i, n in enumerate(getattr(self, "_grip_names", [])) if n.endswith("_DP")]
+        # official 'pads loaded' (_screwdriver_kit.py:985-1080): >= 2 fingertip (DP) links pressing on the tool
+        dp = mag[:, self._grip_dp_idx] if self._grip_dp_idx else mag
+        self.grip_pads_loaded = (dp > 0.05).sum(-1) >= 2
         self.grip_force = mag.sum(-1)
         self.grip_peak = mag.max(-1).values
         self.grip_links = (mag > float(getattr(pc, "grip_link_min_force", 0.1))).sum(-1)   # A9: hand links pressing on the tool
