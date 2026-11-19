@@ -164,6 +164,9 @@ class KeyLockCfg:
                                          # elsewhere = fail "wrong_pull"; at the window the tactile ray-cast sees the
                                          # key shifted key_pull_click_mm outward (touch-only click)
     key_pull_window_deg: float = 8.0
+    key_pull_window_start_deg: float = 0.0   # curriculum: window half-width starts here (0 = off) and shrinks linearly
+    key_pull_window_ramp_steps: int = 0      # to key_pull_window_deg over this many env steps (+ offset on a resume)
+    key_pull_window_offset_steps: int = 0
     key_pull_n: float = 3.0              # net outward hand force on the key (N)
     key_pull_steps: int = 5
     key_pull_click_mm: float = 2.0
@@ -631,7 +634,12 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 self._kp_cnt = torch.zeros(N, device=self.device)
                 self._kp_target = torch.as_tensor(np.radians(self._cbf["stop_deg"]), device=self.device, dtype=torch.float32)
                 self._kp_wrong = torch.zeros(N, dtype=torch.bool, device=self.device)
-            win = (ang - self._kp_target).abs() <= math.radians(float(kl.key_pull_window_deg))
+            wdeg = float(kl.key_pull_window_deg)
+            if float(kl.key_pull_window_start_deg) > wdeg and int(kl.key_pull_window_ramp_steps) > 0:
+                f = min(1.0, (int(self.common_step_counter) + int(kl.key_pull_window_offset_steps)) / float(kl.key_pull_window_ramp_steps))
+                wdeg = float(kl.key_pull_window_start_deg) + f * (wdeg - float(kl.key_pull_window_start_deg))
+            self.extras["key/pull_window_deg"] = torch.tensor(wdeg)
+            win = (ang - self._kp_target).abs() <= math.radians(wdeg)
             self.key_in_window = win
             pulling = self.key_hand_fz > float(kl.key_pull_n)
             self._kp_cnt = torch.where(pulling, self._kp_cnt + 1, torch.zeros_like(self._kp_cnt))
