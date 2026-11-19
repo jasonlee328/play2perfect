@@ -4,23 +4,23 @@
   <material name="c"><color rgba="0.92 0.92 0.90 1.0"/></material>
   <link name="receptive">
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="card_holder_kit_platform.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
-    <collision><origin xyz="0.000000 0.000000 0.001000" rpy="0 0 0"/><geometry><box size="0.018000 0.090500 0.002000"/></geometry></collision>
-    <collision><origin xyz="-0.008000 0.000000 0.009500" rpy="0 0 0"/><geometry><box size="0.002000 0.086500 0.015000"/></geometry></collision>
-    <collision><origin xyz="0.000000 -0.044250 0.018500" rpy="0 0 0"/><geometry><box size="0.018000 0.002000 0.037000"/></geometry></collision>
-    <collision><origin xyz="-0.008000 -0.038250 0.027000" rpy="0 0 0"/><geometry><box size="0.002000 0.010000 0.020000"/></geometry></collision>
-    <collision><origin xyz="-0.016750 -0.038250 0.002500" rpy="0 0 0"/><geometry><box size="0.015500 0.014000 0.005000"/></geometry></collision>
-    <collision><origin xyz="-0.008000 0.038250 0.027000" rpy="0 0 0"/><geometry><box size="0.002000 0.010000 0.020000"/></geometry></collision>
-    <collision><origin xyz="-0.016750 0.038250 0.002500" rpy="0 0 0"/><geometry><box size="0.015500 0.014000 0.005000"/></geometry></collision>
-    <collision><origin xyz="0.008000 0.000000 0.009500" rpy="0 0 0"/><geometry><box size="0.002000 0.086500 0.015000"/></geometry></collision>
-    <collision><origin xyz="0.000000 0.044250 0.018500" rpy="0 0 0"/><geometry><box size="0.018000 0.002000 0.037000"/></geometry></collision>
-    <collision><origin xyz="0.008000 -0.038250 0.027000" rpy="0 0 0"/><geometry><box size="0.002000 0.010000 0.020000"/></geometry></collision>
-    <collision><origin xyz="0.016750 -0.038250 0.002500" rpy="0 0 0"/><geometry><box size="0.015500 0.014000 0.005000"/></geometry></collision>
-    <collision><origin xyz="0.008000 0.038250 0.027000" rpy="0 0 0"/><geometry><box size="0.002000 0.010000 0.020000"/></geometry></collision>
-    <collision><origin xyz="0.016750 0.038250 0.002500" rpy="0 0 0"/><geometry><box size="0.015500 0.014000 0.005000"/></geometry></collision>
-    <collision><origin xyz="0.220000 -0.107000 0.118410" rpy="0 0 0"/><geometry><box size="0.254000 0.254000 0.003180"/></geometry></collision>
-    <collision><origin xyz="0.103000 -0.224000 0.058410" rpy="0 0 0"/><geometry><box size="0.020000 0.020000 0.116820"/></geometry></collision>
-    <collision><origin xyz="0.103000 0.010000 0.058410" rpy="0 0 0"/><geometry><box size="0.020000 0.020000 0.116820"/></geometry></collision>
-    <collision><origin xyz="0.337000 -0.224000 0.058410" rpy="0 0 0"/><geometry><box size="0.020000 0.020000 0.116820"/></geometry></collision>
-    <collision><origin xyz="0.337000 0.010000 0.058410" rpy="0 0 0"/><geometry><box size="0.020000 0.020000 0.116820"/></geometry></collision>
+    <collision><origin xyz="0.000000 0.000000 0.001000" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.018000 0.090500 0.002000"/></geometry></collision>
+    <collision><origin xyz="-0.008000 0.000000 0.009500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.002000 0.086500 0.015000"/></geometry></collision>
+    <collision><origin xyz="0.000000 -0.044250 0.018500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.018000 0.002000 0.037000"/></geometry></collision>
+    <collision><origin xyz="-0.008000 -0.038250 0.027000" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.002000 0.010000 0.020000"/></geometry></collision>
+    <collision><origin xyz="-0.016750 -0.038250 0.002500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.015500 0.014000 0.005000"/></geometry></collision>
+    <collision><origin xyz="-0.008000 0.038250 0.027000" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.002000 0.010000 0.020000"/></geometry></collision>
+    <collision><origin xyz="-0.016750 0.038250 0.002500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.015500 0.014000 0.005000"/></geometry></collision>
+    <collision><origin xyz="0.008000 0.000000 0.009500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.002000 0.086500 0.015000"/></geometry></collision>
+    <collision><origin xyz="0.000000 0.044250 0.018500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.018000 0.002000 0.037000"/></geometry></collision>
+    <collision><origin xyz="0.008000 -0.038250 0.027000" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.002000 0.010000 0.020000"/></geometry></collision>
+    <collision><origin xyz="0.016750 -0.038250 0.002500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.015500 0.014000 0.005000"/></geometry></collision>
+    <collision><origin xyz="0.008000 0.038250 0.027000" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.002000 0.010000 0.020000"/></geometry></collision>
+    <collision><origin xyz="0.016750 0.038250 0.002500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.015500 0.014000 0.005000"/></geometry></collision>
+    <collision><origin xyz="0.220000 -0.107000 0.118410" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.254000 0.254000 0.003180"/></geometry></collision>
+    <collision><origin xyz="0.103000 -0.224000 0.058410" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.020000 0.020000 0.116820"/></geometry></collision>
+    <collision><origin xyz="0.103000 0.010000 0.058410" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.020000 0.020000 0.116820"/></geometry></collision>
+    <collision><origin xyz="0.337000 -0.224000 0.058410" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.020000 0.020000 0.116820"/></geometry></collision>
+    <collision><origin xyz="0.337000 0.010000 0.058410" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.020000 0.020000 0.116820"/></geometry></collision>
   </link>
 </robot>

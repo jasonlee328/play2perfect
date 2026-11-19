@@ -156,13 +156,17 @@ class RetrieveTask:
         self.just_rel = just
         # deck
         neat = torch.ones(env.num_envs, dtype=torch.bool, device=d)
+        k0, ramp = float(getattr(c, "retr_tol_start", 1.0)), float(getattr(c, "retr_tol_ramp_steps", 0.0))
+        a_t = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter + getattr(c, "retr_tol_offset_steps", 0)) / ramp)
+        tol_k = k0 + (1.0 - k0) * a_t
+        self.tol_k = tol_k
         disp_max = torch.zeros(env.num_envs, device=d); tilt_max = torch.zeros(env.num_envs, device=d)
         for k, b in enumerate(env.distractors):
             pk, qk = self._rel_hole(b.data.root_pos_w, b.data.root_quat_w)
             disp = (pk - self.deck_ref_p[k]).norm(dim=-1)
             tilt = torch.rad2deg(torch.acos((self._normal(qk) * self.deck_ref_n[k]).sum(-1).abs().clamp(max=1.0)))
             in_slot = (pk[:, 0] > -SLOT_X - 0.01) & (pk[:, 0] < SLOT_X + 0.01) & (pk[:, 1].abs() < SLOT_Y)
-            neat &= (disp < c.retr_other_disp_max) & (tilt < c.retr_other_tilt_max) & in_slot
+            neat &= (disp < c.retr_other_disp_max * tol_k) & (tilt < c.retr_other_tilt_max * tol_k) & in_slot
             disp_max = torch.maximum(disp_max, disp); tilt_max = torch.maximum(tilt_max, tilt)
         self.deck_disp, self.deck_tilt = disp_max, tilt_max
         flat = nc[:, 2].abs() > 0.95
