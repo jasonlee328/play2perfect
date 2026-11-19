@@ -644,7 +644,14 @@ class PreciseAssemblyEnv(PlayEnv):
         self.button_travel = (self._button_rest_z - rel[..., 2]).clamp(min=0.0)
         self.button_travel_ep_max = torch.maximum(self.button_travel_ep_max, self.button_travel)
         c = self.cfg.precise_assembly
-        self.button_wrong = (self.button_travel[1:] > float(c.button_wrong_m)).any(dim=0)
+        thr = float(c.button_wrong_m)
+        if float(c.button_wrong_start_m) > 0.0 and int(c.button_wrong_ramp_steps) > 0:
+            a = min(1.0, float(self.common_step_counter + int(c.button_wrong_offset_steps))
+                    / float(c.button_wrong_ramp_steps))
+            thr = float(c.button_wrong_start_m) + (thr - float(c.button_wrong_start_m)) * a
+        self.button_wrong_thr = thr
+        self.extras["button_wrong_thr_mm"] = thr * 1e3
+        self.button_wrong = (self.button_travel[1:] > thr).any(dim=0)
 
     def _apply_button_goal(self, prev_near_steps: torch.Tensor) -> None:
         """The only goal is credited by the target's travel, not keypoints (3 mm is inside the keypoint tolerance)."""

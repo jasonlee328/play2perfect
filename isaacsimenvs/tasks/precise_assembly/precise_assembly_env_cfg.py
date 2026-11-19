@@ -171,6 +171,11 @@ class PreciseAssemblyCfg:
     button_fixed_slot: int = -1
     button_actuate_m: float = 0.002
     button_wrong_m: float = 0.001
+    # curriculum: the wrong-key threshold starts at button_wrong_start_m (<= 0 = no ramp; e.g. 0.005 = never, past
+    # the 4 mm stop) and moves linearly to button_wrong_m over button_wrong_ramp_steps env steps (offset for resumes)
+    button_wrong_start_m: float = 0.0
+    button_wrong_ramp_steps: int = 0
+    button_wrong_offset_steps: int = 0
     button_wrong_penalty: float = 100.0
     button_press_rew_scale: float = 0.0
     # one-time bonus the first time any fingertip pad touches each key (privileged; needs tactile.fingertip_distractors)
