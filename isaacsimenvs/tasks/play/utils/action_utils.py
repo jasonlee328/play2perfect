@@ -67,6 +67,13 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
         hand_raw = env._hand_lower + 0.5 * (hand_action + 1.0) * (
             env._hand_upper - env._hand_lower
         )
+    pa = getattr(env.cfg, "precise_assembly", None)
+    usb = getattr(env, "_usb", None)
+    if hand_delta > 0.0 and usb is not None and bool(getattr(pa, "usb_hand_lock_until_seated", False)):
+        # A12: the grip is held at its current targets until the stick first seats (like the official scripted
+        # gripper, plug_in_usb.py: constant pinch through 'insert'); after that the hand is free (release)
+        lock = (~usb.ever_ins).unsqueeze(-1)
+        hand_raw = torch.where(lock, env._prev_targets[:, 7:], hand_raw)
     hand_smoothed = (
         act_cfg.hand_moving_average * hand_raw
         + (1.0 - act_cfg.hand_moving_average) * env._prev_targets[:, 7:]
