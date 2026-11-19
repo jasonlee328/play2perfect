@@ -145,6 +145,8 @@ class PreciseAssemblyCfg:
     usb_hold_rew: float = 0.0          # per step while pinched and not released
     usb_seat_rew_scale: float = 0.0    # potential: x change of -seat_err (m), before the release
     usb_lat_rew_scale: float = 0.0     # potential: x change of -(plug tip distance off the slot axis, m), before the release
+    usb_pad_rew_scale: float = 0.0     # per step before the release x min(thumb, index pad force, cap) / cap
+    usb_pad_rew_cap: float = 5.0       # N
     # Clutter problems (Problem.distractors): per-step reward -= distractor_penalty_scale * the largest distractor
     # displacement from its reset pose (m); with terminate_on_disturb the episode ends once it exceeds
     # distractor_disturb_tol. Both off by default (and no effect on problems without distractors).

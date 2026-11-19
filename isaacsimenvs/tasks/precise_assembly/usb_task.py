@@ -190,5 +190,6 @@ class UsbTask:
         self.meas = dict(seat_err_mm=seat_err * 1e3, tip_z_mm=tip[:, 2] * 1e3, lat_mm=lat * 1e3, tilt_deg=tilt_deg, push_gain_mm=gain * 1e3,
                          palm_from_release=palm_from_rel, pinch=pinch.float(), slip_hold_mm=self.slip_hold * 1e3,
                          f_rob_stick=F_rs.sum(-1), f_rob_scene=F_scene,
-                         pinch_share=self.pre_loaded / self.pre_steps.clamp(min=1.0), pad_mean_thumb_n=mean_th, pad_mean_index_n=mean_ix)
+                         pinch_share=self.pre_loaded / self.pre_steps.clamp(min=1.0), pad_mean_thumb_n=mean_th, pad_mean_index_n=mean_ix,
+                         f_thumb=F_rs[:, self.i_th], f_index=F_rs[:, self.i_ix])
         self.inserted, self.clear = inserted, clear

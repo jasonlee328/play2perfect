@@ -1306,6 +1306,11 @@ class PreciseAssemblyEnv(PlayEnv):
                     * usb.meas["palm_from_release"].clamp(max=pih_cfg.usb_clear_dist)
             if pih_cfg.usb_hold_rew > 0.0:
                 u_rew = u_rew + pih_cfg.usb_hold_rew * usb.meas["pinch"] * (~usb.released).float()
+            if float(getattr(pih_cfg, "usb_pad_rew_scale", 0.0)) > 0.0:
+                # per step before the release: weaker of thumb / index pad force, capped (official pinch check needs >= 3 N each)
+                cap = float(getattr(pih_cfg, "usb_pad_rew_cap", 5.0))
+                fmin = torch.minimum(usb.meas["f_thumb"], usb.meas["f_index"]).clamp(max=cap) / cap
+                u_rew = u_rew + float(pih_cfg.usb_pad_rew_scale) * fmin * (~usb.released).float()
             if float(getattr(pih_cfg, "usb_lat_rew_scale", 0.0)) > 0.0:
                 # potential on -(lateral tip error) before the release: pays centring the plug over the 0.175 mm/side mouth
                 phl = -usb.meas["lat_mm"] * 1e-3
