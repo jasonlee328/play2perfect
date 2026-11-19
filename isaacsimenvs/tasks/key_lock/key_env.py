@@ -179,6 +179,7 @@ class KeyLockCfg:
                                          # sign flipping every policy step
     key_pull_rew: float = 0.0            # per step in the window: x clamp(outward force / key_pull_n, 0, 1)
     key_window_rew: float = 0.0
+    key_pull_out_pen: float = 0.0        # per step outside the window: x clamp(outward force / key_pull_n, 0, 1)
     key_pull_target_range_deg: tuple[float, float] = (0.0, 0.0)  # (lo, hi) > 0: hidden pull target ~ U(lo, hi) per
                                          # episode instead of the lock's stop angle
     key_progress_rew: float = 0.0        # potential: scale x increase of clamp(angle / target, 0, 1) (critic knows the
@@ -867,6 +868,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
             w = self.key_in_window.float()
             if hasattr(self, "_kp_dprog"):
                 spen = spen - float(kl.key_progress_rew) * self._kp_dprog
+            spen = spen + float(kl.key_pull_out_pen) * (1.0 - w) * (self.key_hand_fz / float(kl.key_pull_n)).clamp(0.0, 1.0)
             spen = spen - float(kl.key_window_rew) * w \
                 - float(kl.key_pull_rew) * w * (self.key_hand_fz / float(kl.key_pull_n)).clamp(0.0, 1.0)
         extra = rel - back + pinch - fail - unp - slip_pen - spen
