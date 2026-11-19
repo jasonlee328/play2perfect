@@ -1390,7 +1390,13 @@ class PreciseAssemblyEnv(PlayEnv):
             axis_w, anchor_w = self._turn_axis_w()
             rot = quat_from_angle_axis(-over, axis_w)
             pos = self.object.data.root_pos_w
-            return anchor_w + quat_apply(rot, pos - anchor_w), quat_mul(rot, self.object.data.root_quat_w)
+            q_f = quat_mul(rot, self.object.data.root_quat_w)
+            p_f = anchor_w + quat_apply(rot, pos - anchor_w)
+            pop = float(getattr(self.cfg.precise_assembly, "turn_vseat_tactile_pop_mm", 0.0)) * 1e-3
+            if pop > 0.0:
+                ey = torch.zeros_like(p_f); ey[:, 1] = pop
+                p_f = p_f + quat_apply(q_f, ey) * (over > 0.0).float().unsqueeze(-1)
+            return p_f, q_f
         if not (getattr(self, "turn_mode", False) and self.cfg.precise_assembly.turn_clutch):
             return None
         over = torch.clamp(self.turn_angle - self.unlock_angle, min=0.0)
