@@ -92,6 +92,8 @@ class RetrieveTask:
         for t in self.fail.values():
             t[env_ids] = False
         self.phi[env_ids] = float("nan")
+        if hasattr(self, "phi_reach"):
+            self.phi_reach[env_ids] = float("nan")
         env = self.env
         if self.deck_ref_p is None:
             K = len(env.distractors)
@@ -186,12 +188,23 @@ class RetrieveTask:
         self.dphi = (phi - self.phi).nan_to_num(0.0)
         self.phi = phi
         n_tips = (f_tips > 0.05).sum(-1).float()
+        if not hasattr(self, "_reach_ids"):
+            self._reach_ids = env.robot.find_bodies(["left_thumb_DP", "left_index_DP"], preserve_order=True)[0]
+            self.phi_reach = torch.full((env.num_envs,), float("nan"), device=d)
+        up = quat_apply(qc, torch.tensor([0.0, 1.0, 0.0], device=d).expand(env.num_envs, 3))
+        up = up * torch.sign(up[:, 2:3])
+        top_w = env.hole_pos + env.scene.env_origins + quat_apply(env.hole_quat_wxyz, pc + up * 0.0275)
+        dtip = (env.robot.data.body_pos_w[:, self._reach_ids] - top_w[:, None]).norm(dim=-1).max(-1).values
+        phr = -dtip.clamp(max=0.3) * (~self.lifted).float()
+        self.dphi_reach = (phr - self.phi_reach).nan_to_num(0.0) * (~self.lifted).float()
+        self.phi_reach = phr
+        self.reach_dist = dtip
         self.n_tips = n_tips
         self.checks = dict(single_card_on_table=on_tab, deck_remains_neat=neat, released_and_clear=clear)
         self.meas = dict(rise_mm=rise * 1e3, rise_max_mm=self.rise_max * 1e3, deck_disp_mm=disp_max * 1e3, deck_tilt_deg=tilt_max,
                          card_z_mm=pc[:, 2] * 1e3, card_x_mm=pc[:, 0] * 1e3, flat_cos=nc[:, 2].abs(), f_press=self.f_press,
                          f_press_ep_max=self.f_press_ep_max, f_rob_deck=f_rob_deck, f_card_env=f_card_env,
-                         palm_from_release=moved * self.released.float(), lifted=self.lifted.float(), released=self.released.float())
+                         palm_from_release=moved * self.released.float(), reach_dist_mm=self.reach_dist * 1e3, lifted=self.lifted.float(), released=self.released.float())
 
     def reward(self, tr):
         """Per-step task reward (cfg retr_*)."""
@@ -199,6 +212,7 @@ class RetrieveTask:
         r = c.card_success_bonus * tr["max_successes"].float()
         gate = self.checks["deck_remains_neat"].float() if bool(getattr(c, "retr_path_neat_gate", False)) else 1.0
         r = r + c.retr_path_rew_scale * self.dphi * gate
+        r = r + float(getattr(c, "retr_reach_rew_scale", 0.0)) * self.dphi_reach
         r = r + c.retr_release_bonus * self.just_rel.float()
         r = r + c.retr_tip_rew * (self.n_tips.clamp(max=2.0) / 2.0) * (~self.released).float()
         r = r - c.card_rob_deck_pen * self.f_rob_deck.clamp(max=c.card_rob_deck_pen_cap)
