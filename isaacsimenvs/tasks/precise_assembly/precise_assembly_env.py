@@ -869,10 +869,19 @@ class PreciseAssemblyEnv(PlayEnv):
             self._button_update()
         base = self.hole_pos + self.scene.env_origins
         up = quat_apply(self.hole_quat_wxyz, torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(self.num_envs, 3))
-        for b, body in enumerate([self.object, *self.distractors]):
+        vmax = float(getattr(self.cfg.precise_assembly, "button_max_speed_m_s", 0.0))
+        bodies = [self.object, *self.distractors]
+        if vmax > 0.0 and not hasattr(self, "_button_cap_prev"):
+            self._button_cap_prev = torch.zeros(len(bodies), self.num_envs, device=self.device)
+        for b, body in enumerate(bodies):
             pos = body.data.root_pos_w
             z = ((pos - base) * up).sum(-1)
             over = (self._button_rest_z[b] - z) - stop                  # > 0: past the stop
+            if vmax > 0.0:
+                trav = self._button_rest_z[b] - z
+                lim = self._button_cap_prev[b] + vmax * float(self.cfg.sim.dt)
+                over = torch.maximum(over, trav - lim)                   # > 0: past the stop or too fast
+                self._button_cap_prev[b] = torch.minimum(trav, lim).clamp(min=0.0, max=stop)
             ids = (over > 0.0).nonzero(as_tuple=False).squeeze(-1)
             if ids.numel() == 0:
                 continue

@@ -177,6 +177,9 @@ class PreciseAssemblyCfg:
     # hard travel stop (m) enforced in software every physics substep (pose + velocity), 0 = off. The PhysX prismatic
     # limit is soft: a hand slam pushed keys to 5.6 mm past the 4 mm stop (v4 logs). Set to the joint upper limit.
     button_hard_stop_m: float = 0.0
+    # key speed cap (runs with the hard stop, every substep): a key may go down at most button_max_speed_m_s x sim dt
+    # per substep (pose pushed back, downward velocity removed), like a damped key; > 0 enables. Upward is free.
+    button_max_speed_m_s: float = 0.0
     button_wrong_ramp_steps: int = 0
     button_wrong_offset_steps: int = 0
     button_wrong_penalty: float = 100.0
