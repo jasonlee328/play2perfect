@@ -174,6 +174,7 @@ class KeyLockCfg:
                                          # actor field latch_cue (precise_assembly.latch_cue_obs) carries it (oracle)       # a pull counts as in-window if the key was in the window at any step of it
     key_pull_click_mm: float = 2.0
     key_pull_click_twist_deg: float = 10.0  # "twist" mode: felt key rotated back about the lock axis (like the slip cue)
+    key_pull_click_ramp_deg: float = 0.0    # twist mode: felt twist ramps 0 -> full over this many deg below the window
     key_pull_click_mode: str = "shift"   # "shift" = constant outward offset in the window; "vibrate" = +- offset,
                                          # sign flipping every policy step
     key_pull_rew: float = 0.0            # per step in the window: x clamp(outward force / key_pull_n, 0, 1)
@@ -403,7 +404,12 @@ class KeyLockEnv(PreciseAssemblyEnv):
         None = the real pose."""
         kl = self.cfg.key_lock
         if bool(kl.key_pull) and hasattr(self, "key_in_window"):
-            if not bool(self.key_in_window.any()):
+            ramp = float(kl.key_pull_click_ramp_deg)
+            if ramp > 0.0 and hasattr(self, "_kp_cue_level"):
+                lvl = self._kp_cue_level
+            else:
+                lvl = self.key_in_window.float()
+            if not bool((lvl > 0).any()):
                 return None
             if str(kl.key_pull_click_mode) == "twist":
                 from isaaclab.utils.math import quat_from_angle_axis, quat_mul
@@ -412,7 +418,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 dq = door.data.root_quat_w
                 ax = quat_apply(dq, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(dq.shape[0], 3))
                 an = door.data.root_pos_w + quat_apply(dq, torch.tensor(j.anchor, device=self.device, dtype=torch.float32).expand(dq.shape[0], 3))
-                rot = quat_from_angle_axis(-self.key_in_window.float() * math.radians(float(kl.key_pull_click_twist_deg)), ax)
+                rot = quat_from_angle_axis(-lvl * math.radians(float(kl.key_pull_click_twist_deg)), ax)
                 pos, quat = self.object.data.root_pos_w, self.object.data.root_quat_w
                 return an + quat_apply(rot, pos - an), quat_mul(rot, quat)
             up = torch.zeros_like(self.object.data.root_pos_w)
@@ -667,6 +673,10 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self.extras["key/pull_window_deg"] = torch.tensor(wdeg)
             win = (ang - self._kp_target).abs() <= math.radians(wdeg)
             self.key_in_window = win
+            if float(kl.key_pull_click_ramp_deg) > 0.0:
+                lo_edge = self._kp_target - math.radians(wdeg)
+                below = ((ang - (lo_edge - math.radians(float(kl.key_pull_click_ramp_deg)))) / math.radians(float(kl.key_pull_click_ramp_deg))).clamp(0.0, 1.0)
+                self._kp_cue_level = torch.where(win, torch.ones_like(below), torch.where(ang < lo_edge, below, torch.zeros_like(below)))
             if bool(kl.key_cue_to_latch):
                 self.latch_in_window = win.clone()
             pulling = self.key_hand_fz > float(kl.key_pull_n)
