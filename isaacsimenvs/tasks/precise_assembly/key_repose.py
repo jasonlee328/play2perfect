@@ -71,7 +71,11 @@ class KeyRepose:
         p_ready = pp + quat_apply(pq, self.base_p[env_ids])
         q_ready = quat_mul(quat_mul(pq, self.base_q[env_ids]), r)
         p_new = self.key0_p[env_ids]
-        q_new = quat_mul(self.key0_q[env_ids], r)
+        k0 = self.key0_q[env_ids]
+        pre = getattr(self.env, "_key_pre_flip", None)
+        if pre is not None:
+            k0 = quat_mul(k0, quat_from_angle_axis(-pre[env_ids], self.x_axis.expand(env_ids.numel(), 3)))
+        q_new = quat_mul(k0, r)
         p = torch.where(rd.unsqueeze(-1), p_ready, p_new)
         q = torch.where(rd.unsqueeze(-1), q_ready, q_new)
         return torch.cat([p, q], -1)
@@ -97,6 +101,9 @@ class KeyRepose:
             pp, pq = self._palm(new)
             self.base_p[new] = quat_apply_inverse(pq, self.key0_p[new] - pp)
             self.base_q[new] = quat_mul(quat_conjugate(pq), self.key0_q[new])
+            pre = getattr(e, "_key_pre_flip", None)   # bank start already turned by pre: base = start * Rx(-pre)
+            if pre is not None:
+                self.base_q[new] = quat_mul(self.base_q[new], quat_from_angle_axis(-pre[new], self.x_axis.expand(new.numel(), 3)))
             self.ready[new] = True
             if not hasattr(self, "fresh"):
                 self.fresh = torch.zeros_like(self.ready)

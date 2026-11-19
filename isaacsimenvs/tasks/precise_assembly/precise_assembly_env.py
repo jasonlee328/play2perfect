@@ -741,6 +741,8 @@ class PreciseAssemblyEnv(PlayEnv):
             # Robot joints are absolute, so the bank only fits the hole layout it was recorded on.
             self._start_bank_hole_pos = (torch.as_tensor(d["hole_pos"], device=self.device).float()
                                          if "hole_pos" in d.files else None)
+            self._start_bank_pre_flip = (torch.as_tensor(d["key_pre_flip"], device=self.device).float()
+                                         if "key_pre_flip" in d.files else None)   # A13 reverse curriculum
             if self._start_bank_hole_pos is None:
                 print("[PreciseAssemblyEnv] start-state bank has no hole_pos; can't check the hole "
                       "layout matches (use the layout it was recorded on)", flush=True)
@@ -770,6 +772,10 @@ class PreciseAssemblyEnv(PlayEnv):
 
         self._successes[env_ids] = b["successes"][k].long()
         self._start_successes[env_ids] = b["successes"][k].long()
+        if getattr(self, "_start_bank_pre_flip", None) is not None:
+            if not hasattr(self, "_key_pre_flip"):
+                self._key_pre_flip = torch.zeros(self.num_envs, device=self.device)
+            self._key_pre_flip[env_ids] = self._start_bank_pre_flip[k]
         self._lifted_object[env_ids] = b["lifted"][k].bool()
         self._object_init_z[env_ids] = b["object_init_z"][k].float()
 
