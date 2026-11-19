@@ -596,6 +596,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 lo, hi = (math.radians(float(v)) for v in rng_off)
                 self.turn_offset[env_ids] = lo + (hi - lo) * torch.rand(len(env_ids), device=self.device)
             self.turn_angle[env_ids] = self.turn_offset[env_ids]
+            if hasattr(self, "_turn_pad_prev"):
+                self._turn_pad_prev[env_ids] = self.turn_angle[env_ids]
             if getattr(self, "turn_thread", False):
                 # lands on the lip after u_start / L turns, locks play / L turns later (the per-episode stop)
                 two_pi = 2.0 * math.pi
@@ -1696,6 +1698,26 @@ class PreciseAssemblyEnv(PlayEnv):
         reward = reward - lift_rew - lift_bonus_rew + masked_lift_rew + masked_lift_bonus_rew
         self._reward_terms["lifting_rew"] = masked_lift_rew
         self._reward_terms["lift_bonus_rew"] = masked_lift_bonus_rew
+        if getattr(self, "turn_mode", False) and int(getattr(pih_cfg, "turn_pad_min_pads", 0)) > 0:
+            tac = getattr(self, "_last_tactile", None)
+            if tac is None:
+                npad = torch.zeros(self.num_envs, device=self.device)
+            else:
+                npad = (tac.reshape(tac.shape[0], 5, -1).amax(-1) > float(pih_cfg.turn_pad_thresh)).float().sum(-1)
+            gate = (npad >= int(pih_cfg.turn_pad_min_pads)).float()
+            if not hasattr(self, "_turn_pad_prev"):
+                self._turn_pad_prev = self.turn_angle.clone()
+            d = torch.clamp(self.turn_angle - self._turn_pad_prev, min=0.0, max=0.5)
+            self._turn_pad_prev = self.turn_angle.clone()
+            kp = self._reward_terms["keypoint_rew"]
+            pad_rew = (float(pih_cfg.turn_pad_turn_rew_scale) * d + float(pih_cfg.turn_pad_contact_rew)) * gate
+            reward = reward - kp * (1.0 - gate) + pad_rew
+            self._reward_terms["keypoint_rew"] = kp * gate
+            self._reward_terms["turn_pad_rew"] = pad_rew
+            self.extras["turn_pad_gate_frac"] = gate.mean()
+            self.extras["turn_pads_on_mean"] = npad.mean()
+            tot = d.sum()
+            self.extras["turn_pad_turn_share"] = (d * gate).sum() / tot.clamp(min=1e-6)
         if getattr(self, "turn_mode", False) and float(pih_cfg.turn_strip_penalty) != 0.0:
             strip_pen = -float(pih_cfg.turn_strip_penalty) * self._turn_just_stripped.float()
             reward = reward + strip_pen

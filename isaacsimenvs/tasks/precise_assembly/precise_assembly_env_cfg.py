@@ -193,6 +193,14 @@ class PreciseAssemblyCfg:
     # turn_first_goal_deg = fail `released_early` (-turn_early_release_penalty). Off by default.
     turn_early_release_fail: bool = False
     turn_early_release_penalty: float = 300.0
+    # A1 11-19 fingertip turning: >= turn_pad_min_pads fingertip pads (5 TacMap pads, real taxels) touching the cap
+    # (any taxel > turn_pad_thresh) = "pad turn". > 0 enables: the keypoint (turn progress) reward is paid only on pad
+    # turn steps, + turn_pad_turn_rew_scale per rad of tightening on pad turn steps, + turn_pad_contact_rew per step
+    # with that many pads on the cap. 0 = off (default).
+    turn_pad_min_pads: int = 0
+    turn_pad_thresh: float = 0.0
+    turn_pad_turn_rew_scale: float = 0.0
+    turn_pad_contact_rew: float = 0.0
     turn_stop_band_deg: float = 3.0
     # What counts as "working the cap" at the stop for turn_strip_steps: > 0 = any fingertip within this distance (m)
     # of the cap centre (hovering on / pushing a tight cap); 0 = a fingertip tactile pad in contact.
