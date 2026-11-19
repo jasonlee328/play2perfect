@@ -816,6 +816,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
         self._key_term = broken | slipped | probe_fail | pinch_fail | start_unl | wrong | overt
         # end-of-episode snapshots for evals (the auto reset after _get_dones clears the live counters)
         self._key_last_turn = self._key_turn_steps.clone()
+        if hasattr(self, "_kp_target"):                       # pull variant: hidden target + key angle at episode end
+            self._kp_last_target = self._kp_target.clone()
+            self._kp_last_ang = self.cb_joint_angle[int(self.cfg.precise_assembly.unlock_joint)].clone()
         self._key_last_pinch = self._key_pinch_ok.clone()
         self._key_last_share = self._key_pinch_share.clone() if hasattr(self, "_key_pinch_share") else None
         self._key_last_over = self._key_pinch_over.clone()
