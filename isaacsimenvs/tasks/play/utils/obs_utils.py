@@ -176,6 +176,9 @@ def compute_intermediate_values(env) -> None:
 
     obj_kp = _keypoints_world(obj_pos, obj_rot, kp_offsets)
     goal_kp = _keypoints_world(goal_pos, goal_rot, kp_offsets)
+    if getattr(env, "_zfree_goal", False):   # A16 wipe: goals credited / rewarded without the absolute height
+        dz = obj_kp[..., 2].mean(dim=1) - goal_kp[..., 2].mean(dim=1)
+        goal_kp = goal_kp.clone(); goal_kp[..., 2] += dz.unsqueeze(1)
     # Fingertip distance to the object's keypoint centroid (its geometric middle; the root can sit at one end).
     env._curr_fingertip_dist_center = torch.norm(ft_pos - obj_kp.mean(dim=1, keepdim=True), dim=-1)
 
@@ -364,6 +367,9 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
 
+    hook = getattr(env, "_actor_obs_hook", None)
+    if hook is not None:   # A16 wipe: actor-only object fields (virtual eraser)
+        hook(obs_noisy, palm_pos_w, palm_rot, palm_pos, noisy_goal_kp, kp_offsets, env_origins, _keypoints_world)
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)
 

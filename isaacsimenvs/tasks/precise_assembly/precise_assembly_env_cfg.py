@@ -118,6 +118,20 @@ class PreciseAssemblyCfg:
     start_state_file: str = ""
     # A12 USB (usb_task.py): "off" | "report" (contact views + verdict logged) | "gate" (verdict = task success)
     usb_task: str = "off"
+    # A16 wipe (wipe_task.py): "off" | "report" | "gate" (erased >= success_frac at the last waypoint = success)
+    wipe_task: str = "off"
+    wipe_height_range_mm: tuple = ()   # () = the problem's layout["wipe"]["height_range_mm"]; hidden per-env board height
+    wipe_height_values_mm: tuple = ()  # if set: env i gets values[i % K] (evals at fixed heights)
+    wipe_seed: int = 0
+    wipe_force_scale: float = 1.0      # contact-matrix reading x this (eraser <-> board reads the true load: calib_v1)
+    wipe_drop_dist: float = 0.10       # eraser centre > this from the palm centre = dropped
+    wipe_drop_tilt_deg: float = 60.0   # felt tilted more than this from the board normal = dropped
+    wipe_virtual_obs: bool = True      # actor sees the palm-rigid virtual eraser (wipe_task.py docstring)
+    wipe_cell_bonus: float = 5.0       # per newly erased cell (240 cells)
+    wipe_success_bonus: float = 500.0
+    wipe_fail_penalty: float = 200.0
+    wipe_force_rew: float = 0.0        # per step with the felt force in the window (privileged shaping)
+    wipe_over_rew_scale: float = 0.0   # per N above the window, per step
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
     usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
     usb_hold_steps: int = 36           # held_in_hand_at_start window (0.6 s)

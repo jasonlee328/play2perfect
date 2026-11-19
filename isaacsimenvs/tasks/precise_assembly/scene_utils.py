@@ -108,7 +108,10 @@ def _create_fixture_joints(env) -> None:
             for j in joints:
                 pose = env._joint_reset_pose_rel(j)
                 root = "Object" if j.body == "object" else f"Distractor{int(j.body[10:])}"
-                pw = np.asarray(rh.TransformDir(Gf.Vec3d(*pose[:3]))) + hole_np[i]
+                p_rel = np.asarray(pose[:3], float)
+                if j is joints[0] and getattr(env, "_wipe_h_np", None) is not None:   # A16 hidden board height
+                    p_rel = p_rel + float(env._wipe_h_np[i]) * np.asarray(j.axis, float) / np.linalg.norm(j.axis)
+                pw = np.asarray(rh.TransformDir(Gf.Vec3d(*p_rel.tolist()))) + hole_np[i]
                 qb = qh * Gf.Quatd(pose[6], Gf.Vec3d(*pose[3:6]))
                 set_local_pose(f"/World/envs/env_{i}/{root}", pw, (qb.GetReal(), *qb.GetImaginary()))
     for k, j in enumerate(joints):
@@ -129,7 +132,11 @@ def _create_fixture_joints(env) -> None:
             jp = jcls.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
             jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
             jp.CreateAxisAttr("Z")
-            jp.CreateLocalPos0Attr(Gf.Vec3f(*j.anchor)); jp.CreateLocalRot0Attr(q0)
+            a0 = np.asarray(j.anchor, float)
+            off_np = getattr(env, "_joint_anchor_offset_np", None)
+            if off_np is not None:   # per-env rest offset along the axis (A16 hidden board height + sag)
+                a0 = a0 + float(off_np[k, i]) * np.asarray(j.axis, float) / np.linalg.norm(j.axis)
+            jp.CreateLocalPos0Attr(Gf.Vec3f(*a0.tolist())); jp.CreateLocalRot0Attr(q0)
             jp.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jp.CreateLocalRot1Attr(Gf.Quatf(q1))
             if pris:
                 # limits in m (stage units), linear drive stiffness N/m, damping N s/m
@@ -296,14 +303,16 @@ def setup_scene(env) -> None:
             _hcfg.spawn.activate_contact_sensors = True   # A12: robot <-> slot contact (released_and_clear)
         env.hole = RigidObject(_hcfg)
         _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0])
-        _usb = getattr(env.cfg.precise_assembly, "usb_task", "off") != "off"
+        _usb = getattr(env.cfg.precise_assembly, "usb_task", "off") != "off" \
+            or getattr(env.cfg.precise_assembly, "wipe_task", "off") != "off"   # A16: eraser <-> board force
         if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)) or _usb:
             _ocfg.spawn.activate_contact_sensors = True   # PhysxContactReportAPI: hand-on-object force (A1)
         env.object = RigidObject(_ocfg)
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
     def _dcfg(k, usd):
         dc = _pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd)
-        if getattr(env.cfg.precise_assembly, "usb_task", "off") != "off":
+        if getattr(env.cfg.precise_assembly, "usb_task", "off") != "off" \
+                or getattr(env.cfg.precise_assembly, "wipe_task", "off") != "off":
             dc.spawn.activate_contact_sensors = True   # A12: stick / robot <-> USB jaw contact
         return RigidObject(dc)
     env.distractors = tuple(_dcfg(k, usd) for k, usd in enumerate(distractor_usd_paths))

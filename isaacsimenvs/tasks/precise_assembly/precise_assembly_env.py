@@ -363,6 +363,28 @@ class PreciseAssemblyEnv(PlayEnv):
             if float(cfg.reset.table_reset_z_range) != 0.0:
                 print("[PreciseAssemblyEnv] WARNING: jointed problem with table_reset_z_range != 0: the fixture keeps "
                       "its spawn height (use env.reset.table_reset_z_range=0.0)", flush=True)
+        # A16 wipe: hidden per-env board rest height h (fixed for the env's life), applied to joint 0's fixture anchor
+        # (+ gravity sag m g / k) in scene_utils._create_fixture_joints and to distractor0's reset pose.
+        self._wipe_h_np = None
+        self._joint_anchor_offset_np = None
+        if pih_cfg.wipe_task != "off":
+            import numpy as np
+            from .wipe_task import load_layout
+            if len(problem_names) != 1 or not self._pih_joints:
+                raise ValueError("wipe_task needs one jointed wipe problem")
+            self._wipe_layout = L = load_layout(problem_names[0])
+            n_env = int(cfg.scene.num_envs)
+            vals = [float(v) for v in pih_cfg.wipe_height_values_mm]
+            if vals:
+                h = np.array([vals[i % len(vals)] for i in range(n_env)]) * 1e-3
+            else:
+                rng = np.random.default_rng(int(pih_cfg.wipe_seed) + 101)
+                lo, hi = [float(v) for v in (pih_cfg.wipe_height_range_mm or L["height_range_mm"])]
+                h = rng.uniform(lo, hi, n_env) * 1e-3
+            self._wipe_h_np = h
+            sag = float(L["board_mass_kg"]) * 9.81 / float(self._pih_joints[0].stiffness)
+            self._joint_anchor_offset_np = np.zeros((len(self._pih_joints), n_env))
+            self._joint_anchor_offset_np[0] = h + sag
 
         cfg.assets.object_name = problem.insertion_object_name if len(problem_names) == 1 else "multi"
         cfg.assets.object_urdf = self._pih_object_urdf_abs
@@ -405,6 +427,16 @@ class PreciseAssemblyEnv(PlayEnv):
             self.usb_last["success"][env_ids] = usb.success[env_ids].float()
             for f, v in usb.fail.items():
                 self.usb_last[f"fail_{f}"][env_ids] = v[env_ids].float()
+        wipe = getattr(self, "_wipe", None)
+        if wipe is not None and wipe.meas:
+            if not hasattr(self, "wipe_last"):
+                self.wipe_last = {k: torch.zeros(self.num_envs, device=self.device)
+                                  for k in list(wipe.meas) + ["success"] + [f"fail_{f}" for f in wipe.fail]}
+            for k, v in wipe.meas.items():
+                self.wipe_last[k][env_ids] = v[env_ids].float()
+            self.wipe_last["success"][env_ids] = wipe.success[env_ids].float()
+            for f, v in wipe.fail.items():
+                self.wipe_last[f"fail_{f}"][env_ids] = v[env_ids].float()
         super()._reset_idx(env_ids)
         self._reset_peg_episode(env_ids)
         if self.cfg.precise_assembly.usb_task != "off":
@@ -412,6 +444,14 @@ class PreciseAssemblyEnv(PlayEnv):
                 from .usb_task import UsbTask
                 self._usb = usb = UsbTask(self)
             usb.reset(env_ids)
+        if self.cfg.precise_assembly.wipe_task != "off":
+            if wipe is None:
+                from .wipe_task import WipeTask
+                self._wipe = wipe = WipeTask(self)
+                self._zfree_goal = True
+                if self.cfg.precise_assembly.wipe_virtual_obs:
+                    self._actor_obs_hook = wipe.actor_obs_hook
+            wipe.reset(env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
@@ -572,6 +612,12 @@ class PreciseAssemblyEnv(PlayEnv):
         ref = torch.tensor(self.cfg.precise_assembly.strict_ref_local, device=self.device, dtype=torch.float32)
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
             w = self._pose_rel_hole_to_world(env_ids, pose)
+            if k == 0 and getattr(self, "_wipe_h_np", None) is not None:   # A16: hidden board height
+                if not hasattr(self, "_wipe_h_t"):
+                    self._wipe_h_t = torch.as_tensor(self._wipe_h_np, device=self.device, dtype=torch.float32)
+                up = torch.zeros(env_ids.numel(), 3, device=self.device)
+                up[:, 2] = self._wipe_h_t[env_ids]
+                w = w.clone(); w[:, :3] = w[:, :3] + quat_apply(self.hole_quat_wxyz[env_ids], up)
             body.write_root_pose_to_sim(w, env_ids=env_ids)
             body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
             self._distractor_reset_pos[k, env_ids] = w[:, :3]
@@ -1173,6 +1219,13 @@ class PreciseAssemblyEnv(PlayEnv):
                 max_successes = self._usb.success.clone()
                 if pih_cfg.usb_terminate_on_fail:
                     usb_fail = {k: v & ~max_successes for k, v in self._usb.fail.items()}
+        wipe_fail = {}
+        if pih_cfg.wipe_task != "off" and getattr(self, "_wipe", None) is not None:
+            self._wipe.update()
+            if pih_cfg.wipe_task == "gate":
+                max_successes = self._wipe.gate(max_successes)
+                wipe_fail = {k: v & ~max_successes for k, v in self._wipe.fail.items()}
+                usb_fail = {**usb_fail, **{f"__wipe_{k}": v for k, v in wipe_fail.items()}}
         terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed
         for v in usb_fail.values():
             terminated = terminated | v
@@ -1185,7 +1238,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "dropped": dropped,
             "disturbed": disturbed,
             "crushed": crushed,
-            **{f"usb_{k}": v for k, v in usb_fail.items()},
+            **{(k[2:] if k.startswith("__wipe_") else f"usb_{k}"): v for k, v in usb_fail.items()},
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1312,6 +1365,16 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["usb/pushing"] = usb.pushing.float().mean()
             self.extras["usb/released"] = usb.released.float().mean()
 
+        wipe = getattr(self, "_wipe", None)
+        if pih_cfg.wipe_task == "gate" and wipe is not None:
+            w_rew = wipe.reward(self._termination_reasons)
+            reward = reward + w_rew
+            self._reward_terms["wipe_reward"] = w_rew
+            self._reward_terms["total_reward"] = reward
+        if wipe is not None and wipe.meas:
+            for k in ("force", "frac", "gap_mm"):
+                self.extras[f"wipe/{k}"] = wipe.meas[k].mean()
+            self.extras["wipe/inwin"] = wipe.inwin.float().mean()
         log_step_metrics(self)
         self._log_peg_metrics()
         return reward

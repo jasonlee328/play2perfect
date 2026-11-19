@@ -1009,6 +1009,39 @@
     -0.0,
     0.173
    ]
+  },
+  "wipe_eraser": {
+   "src": "A16 wipe_assets.py (box primitive)",
+   "extents_mm": [
+    31.75,
+    63.5,
+    25.0
+   ],
+   "mass_g": 15.0,
+   "object_scale": [
+    1.5875,
+    3.175,
+    1.25
+   ],
+   "collision": "convex box (8 vertices)",
+   "felt_face": "local -z, 5 mm felt layer (visual only)",
+   "why": "footprint = Trainers Warehouse personal whiteboard mini eraser 2.5 x 1.25 in; height 25 mm (real 16.5) so side-pinching pads stay >= 8 mm above the board; 15 g ~ 50 cm^3 felt + foam"
+  },
+  "wipe_board": {
+   "src": "A16 wipe_assets.py (box primitive)",
+   "extents_mm": [
+    240.0,
+    160.0,
+    8.0
+   ],
+   "mass_g": 400.0,
+   "object_scale": [
+    12.0,
+    8.0,
+    0.4
+   ],
+   "collision": "convex box",
+   "why": "dry-erase plate 240 x 160 x 8 mm, 400 g (melamine / steel panels of this size weigh 0.3-0.6 kg)"
   }
  },
  "fixtures": {
@@ -1420,6 +1453,15 @@
     0.0,
     0.0
    ]
+  },
+  "wipe_base": {
+   "src": "A16 wipe_assets.py (box primitive)",
+   "extents_mm": [
+    260.0,
+    180.0,
+    20.0
+   ],
+   "origin": "bottom centre"
   }
  },
  "problems": {
@@ -10827,6 +10869,796 @@
     "stick_mass_g": 15.0
    },
    "distractor_friction": 0.55
+  },
+  "cb_wipe": {
+   "object": "wipe_eraser",
+   "fixture": "wipe_base",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/wipe_board/wipe_board.urdf",
+     [
+      0.0,
+      0.0,
+      0.036,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.036
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.03,
+     "upper": 0.03,
+     "stiffness": 2000.0,
+     "damping": 40.0
+    }
+   ],
+   "object_start_pose": [
+    -0.046,
+    0.0,
+    0.1125,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     -0.046,
+     0.0,
+     0.0825,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A16 tools/contactbench/wipe_tasks.py",
+    "wipe": {
+     "ink_x_mm": [
+      -60.0,
+      60.0
+     ],
+     "ink_y_mm": [
+      -25.0,
+      25.0
+     ],
+     "cell_mm": 5.0,
+     "felt_xy_mm": [
+      31.75,
+      63.5
+     ],
+     "force_window_N": [
+      4.0,
+      12.0
+     ],
+     "fail_force_N": 16.0,
+     "fail_steps": 3,
+     "erase_steps": 2,
+     "felt_tilt_deg": 25.0,
+     "success_frac": 0.9,
+     "waypoint_xy_tol_mm": 8.0,
+     "board_mass_kg": 0.4,
+     "board_top_nominal_m": 0.04,
+     "eraser_half_h_m": 0.0125,
+     "k_N_per_m": 2000.0,
+     "height_range_mm": [
+      -12.0,
+      12.0
+     ]
+    }
+   }
+  },
+  "cb_wipe_high": {
+   "object": "wipe_eraser",
+   "fixture": "wipe_base",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/wipe_board/wipe_board.urdf",
+     [
+      0.0,
+      0.0,
+      0.036,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.036
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.03,
+     "upper": 0.03,
+     "stiffness": 2000.0,
+     "damping": 40.0
+    }
+   ],
+   "object_start_pose": [
+    -0.046,
+    0.0,
+    0.1125,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     -0.046,
+     0.0,
+     0.0825,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A16 tools/contactbench/wipe_tasks.py",
+    "wipe": {
+     "ink_x_mm": [
+      -60.0,
+      60.0
+     ],
+     "ink_y_mm": [
+      -25.0,
+      25.0
+     ],
+     "cell_mm": 5.0,
+     "felt_xy_mm": [
+      31.75,
+      63.5
+     ],
+     "force_window_N": [
+      4.0,
+      12.0
+     ],
+     "fail_force_N": 16.0,
+     "fail_steps": 3,
+     "erase_steps": 2,
+     "felt_tilt_deg": 25.0,
+     "success_frac": 0.9,
+     "waypoint_xy_tol_mm": 8.0,
+     "board_mass_kg": 0.4,
+     "board_top_nominal_m": 0.04,
+     "eraser_half_h_m": 0.0125,
+     "k_N_per_m": 2000.0,
+     "height_range_mm": [
+      12.0,
+      18.0
+     ]
+    }
+   }
+  },
+  "cb_wipe_low": {
+   "object": "wipe_eraser",
+   "fixture": "wipe_base",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/wipe_board/wipe_board.urdf",
+     [
+      0.0,
+      0.0,
+      0.036,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.036
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.03,
+     "upper": 0.03,
+     "stiffness": 2000.0,
+     "damping": 40.0
+    }
+   ],
+   "object_start_pose": [
+    -0.046,
+    0.0,
+    0.1125,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     -0.046,
+     0.0,
+     0.0825,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A16 tools/contactbench/wipe_tasks.py",
+    "wipe": {
+     "ink_x_mm": [
+      -60.0,
+      60.0
+     ],
+     "ink_y_mm": [
+      -25.0,
+      25.0
+     ],
+     "cell_mm": 5.0,
+     "felt_xy_mm": [
+      31.75,
+      63.5
+     ],
+     "force_window_N": [
+      4.0,
+      12.0
+     ],
+     "fail_force_N": 16.0,
+     "fail_steps": 3,
+     "erase_steps": 2,
+     "felt_tilt_deg": 25.0,
+     "success_frac": 0.9,
+     "waypoint_xy_tol_mm": 8.0,
+     "board_mass_kg": 0.4,
+     "board_top_nominal_m": 0.04,
+     "eraser_half_h_m": 0.0125,
+     "k_N_per_m": 2000.0,
+     "height_range_mm": [
+      -18.0,
+      -12.0
+     ]
+    }
+   }
+  },
+  "cb_wipe_stiff": {
+   "object": "wipe_eraser",
+   "fixture": "wipe_base",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/wipe_board/wipe_board.urdf",
+     [
+      0.0,
+      0.0,
+      0.036,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.036
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.03,
+     "upper": 0.03,
+     "stiffness": 4000.0,
+     "damping": 40.0
+    }
+   ],
+   "object_start_pose": [
+    -0.046,
+    0.0,
+    0.1125,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     -0.046,
+     0.0,
+     0.0825,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A16 tools/contactbench/wipe_tasks.py",
+    "wipe": {
+     "ink_x_mm": [
+      -60.0,
+      60.0
+     ],
+     "ink_y_mm": [
+      -25.0,
+      25.0
+     ],
+     "cell_mm": 5.0,
+     "felt_xy_mm": [
+      31.75,
+      63.5
+     ],
+     "force_window_N": [
+      4.0,
+      12.0
+     ],
+     "fail_force_N": 16.0,
+     "fail_steps": 3,
+     "erase_steps": 2,
+     "felt_tilt_deg": 25.0,
+     "success_frac": 0.9,
+     "waypoint_xy_tol_mm": 8.0,
+     "board_mass_kg": 0.4,
+     "board_top_nominal_m": 0.04,
+     "eraser_half_h_m": 0.0125,
+     "k_N_per_m": 4000.0,
+     "height_range_mm": [
+      -12.0,
+      12.0
+     ]
+    }
+   }
+  },
+  "cb_wipe_soft": {
+   "object": "wipe_eraser",
+   "fixture": "wipe_base",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/wipe_board/wipe_board.urdf",
+     [
+      0.0,
+      0.0,
+      0.036,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.036
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.03,
+     "upper": 0.03,
+     "stiffness": 1000.0,
+     "damping": 40.0
+    }
+   ],
+   "object_start_pose": [
+    -0.046,
+    0.0,
+    0.1125,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     -0.046,
+     0.0,
+     0.0825,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     -0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.023,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    [
+     0.046,
+     0.0,
+     0.052500000000000005,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A16 tools/contactbench/wipe_tasks.py",
+    "wipe": {
+     "ink_x_mm": [
+      -60.0,
+      60.0
+     ],
+     "ink_y_mm": [
+      -25.0,
+      25.0
+     ],
+     "cell_mm": 5.0,
+     "felt_xy_mm": [
+      31.75,
+      63.5
+     ],
+     "force_window_N": [
+      4.0,
+      12.0
+     ],
+     "fail_force_N": 16.0,
+     "fail_steps": 3,
+     "erase_steps": 2,
+     "felt_tilt_deg": 25.0,
+     "success_frac": 0.9,
+     "waypoint_xy_tol_mm": 8.0,
+     "board_mass_kg": 0.4,
+     "board_top_nominal_m": 0.04,
+     "eraser_half_h_m": 0.0125,
+     "k_N_per_m": 1000.0,
+     "height_range_mm": [
+      -12.0,
+      12.0
+     ]
+    }
+   }
+  },
+  "cb_wipe_pick": {
+   "object": "wipe_eraser",
+   "fixture": "wipe_base",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/wipe_board/wipe_board.urdf",
+     [
+      0.0,
+      0.0,
+      0.036,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.0,
+      0.0,
+      0.036
+     ],
+     "axis": [
+      0.0,
+      0.0,
+      1.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.03,
+     "upper": 0.03,
+     "stiffness": 2000.0,
+     "damping": 40.0
+    }
+   ],
+   "object_start_pose": [
+    -0.046,
+    0.0,
+    0.053500000000000006,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     -0.046,
+     0.0,
+     0.1125,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A16 tools/contactbench/wipe_tasks.py",
+    "wipe": {
+     "ink_x_mm": [
+      -60.0,
+      60.0
+     ],
+     "ink_y_mm": [
+      -25.0,
+      25.0
+     ],
+     "cell_mm": 5.0,
+     "felt_xy_mm": [
+      31.75,
+      63.5
+     ],
+     "force_window_N": [
+      4.0,
+      12.0
+     ],
+     "fail_force_N": 16.0,
+     "fail_steps": 3,
+     "erase_steps": 2,
+     "felt_tilt_deg": 25.0,
+     "success_frac": 0.9,
+     "waypoint_xy_tol_mm": 8.0,
+     "board_mass_kg": 0.4,
+     "board_top_nominal_m": 0.04,
+     "eraser_half_h_m": 0.0125,
+     "k_N_per_m": 2000.0,
+     "height_range_mm": [
+      0.0,
+      0.0
+     ]
+    },
+    "purpose": "start-bank recording"
+   }
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"
