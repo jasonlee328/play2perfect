@@ -269,6 +269,8 @@ class PreciseAssemblyCfg:
     retract_keep_tipout_rew: float = 0.0
     # retract reward pays tool displacement only while the palm-frame drift is < retract_keep_drift_m
     retract_keep_rew_held_only: bool = False
+    # drift / TCP travel reference re-anchored every step while a tool tip is still in the recess
+    retract_keep_anchor_at_lift: bool = False
     # A9 design C (virtual-seat clutch, turn_thread only): non-empty [lo, hi] = per-episode hidden virtual seat
     # vseat = physical lock angle - U(lo, hi) deg. The physics is unchanged (the screw keeps threading past vseat, so the
     # joint state shows no stall); the fingertip / skin tactile ray-casts the tool rotated back by the over-turn past

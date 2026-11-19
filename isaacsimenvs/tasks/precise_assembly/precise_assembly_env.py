@@ -1300,6 +1300,12 @@ class PreciseAssemblyEnv(PlayEnv):
             self._retract_keep_lost = torch.zeros(n, dtype=torch.bool, device=self.device)
             self._retract_keep_obj0 = tip.clone()
         ent = self._just_entered_retract | ~self.retract_phase
+        if bool(getattr(pc, "retract_keep_anchor_at_lift", False)):
+            # measure drift / hand travel from the moment the tool tip leaves the recess (a retract that starts mid-turn,
+            # e.g. at a hidden virtual seat, would otherwise count finger regrasps as the tool slipping)
+            tl0 = getattr(self, "_tl_out", None)
+            if tl0 is not None:
+                ent = ent | ~tl0
         self._retract_keep_tcp0 = torch.where(ent.unsqueeze(-1), tcp, self._retract_keep_tcp0)
         self._retract_keep_rel0 = torch.where(ent.unsqueeze(-1), rel, self._retract_keep_rel0)
         self._retract_keep_obj0 = torch.where(ent.unsqueeze(-1), tip, self._retract_keep_obj0)
