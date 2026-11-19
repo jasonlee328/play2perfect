@@ -189,6 +189,9 @@ class TactileSensor:
                 depth = torch.where(torch.isfinite(dist) & torch.isfinite(dist2), dist, torch.zeros_like(dist))
                 taxels = torch.zeros(len(depth), len(self.counts), device=self.device).index_add_(1, self.taxel, depth)
                 result[c] = taxels / self.counts
+        scale = getattr(env, "_tactile_depth_scale", None)   # A8 tactile_force_scaled (per-env, None = off)
+        if scale is not None:
+            result = result * scale.unsqueeze(-1)
         return _deform_quantize(result) / 255.0
 
 

@@ -336,6 +336,11 @@ class PreciseAssemblyCfg:
     # A8 (A3's force_window recipe): > 0 = compliant-contact PhysX material on the object (N/m, damping N s/m), so
     # contact depth and the ray-cast taxels read force (A3: k 2000 ~ 0.09 mm/N on a grasped body). 0 = rigid.
     object_compliant_stiffness: float = 0.0
+    # A8: per-env hidden handle stiffness (env i gets values[i % K], N/m; overrides object_compliant_stiffness for the
+    # material, which stays the reference k_ref). tactile_force_scaled: taxel depth x k_i / k_ref, i.e. the pad reads
+    # contact force at the gel's fixed stiffness (a real gel deforms with force, not with the object's penetration).
+    object_compliant_stiffness_values: tuple[float, ...] = ()
+    tactile_force_scaled: bool = False
     # A8 human-style door (ContactBench human demo of task 28: palm-on-top power grasp, no fingers on the panel, one
     # turn-and-pull swinging the door to ~40 deg, held). Needs hand_force_sense. Power grasp = the palm (iiwa14_link_7,
     # the palm is merged into it) + >= hs_grasp_links_min - 1 other hand links each pressing > hs_link_force_min N.

@@ -458,21 +458,34 @@ class PreciseAssemblyEnv(PlayEnv):
             from pxr import PhysxSchema, Usd, UsdPhysics, UsdShade
             import omni.usd
             stage = omni.usd.get_context().get_stage()
-            mat = UsdShade.Material.Define(stage, "/World/A8CompliantMaterial")
-            UsdPhysics.MaterialAPI.Apply(mat.GetPrim())
-            pm = UsdPhysics.MaterialAPI(mat.GetPrim())
+            vals = [float(v) for v in getattr(self.cfg.precise_assembly, "object_compliant_stiffness_values", ()) or ()]
+            if not vals:
+                vals = [k]
             mu = float(self.cfg.assets.object_friction)
-            pm.CreateStaticFrictionAttr(mu); pm.CreateDynamicFrictionAttr(mu); pm.CreateRestitutionAttr(0.0)
-            px = PhysxSchema.PhysxMaterialAPI.Apply(mat.GetPrim())
-            px.CreateCompliantContactStiffnessAttr(k)
-            px.CreateCompliantContactDampingAttr(float(getattr(self.cfg.precise_assembly, "object_compliant_damping", 0.0)))
+            mats = []
+            for j, kj in enumerate(vals):
+                mat = UsdShade.Material.Define(stage, "/World/A8CompliantMaterial" + ("" if j == 0 else f"_{j}"))
+                UsdPhysics.MaterialAPI.Apply(mat.GetPrim())
+                pm = UsdPhysics.MaterialAPI(mat.GetPrim())
+                pm.CreateStaticFrictionAttr(mu); pm.CreateDynamicFrictionAttr(mu); pm.CreateRestitutionAttr(0.0)
+                px = PhysxSchema.PhysxMaterialAPI.Apply(mat.GetPrim())
+                px.CreateCompliantContactStiffnessAttr(kj)
+                px.CreateCompliantContactDampingAttr(float(getattr(self.cfg.precise_assembly, "object_compliant_damping", 0.0)))
+                mats.append(mat)
             n = 0
             for i in range(self.cfg.scene.num_envs):
+                mat = mats[i % len(mats)]
                 root = stage.GetPrimAtPath(f"/World/envs/env_{i}/Object")
                 for prim in Usd.PrimRange(root):
                     if prim.HasAPI(UsdPhysics.CollisionAPI):
                         UsdShade.MaterialBindingAPI.Apply(prim).Bind(mat, UsdShade.Tokens.weakerThanDescendants, "physics")
                         n += 1
+            kv = torch.tensor([vals[i % len(vals)] for i in range(self.cfg.scene.num_envs)], device=self.device)
+            self.object_compliant_k = kv
+            if bool(getattr(self.cfg.precise_assembly, "tactile_force_scaled", False)):
+                self._tactile_depth_scale = kv / k
+            print(f"[a8] compliant k values {vals} (ref {k}), force-scaled taxels "
+                  f"{hasattr(self, '_tactile_depth_scale')}", flush=True)
             print(f"[a8] compliant object material k={k} bound to {n} collision prims", flush=True)
 
     def _reset_idx(self, env_ids) -> None:
