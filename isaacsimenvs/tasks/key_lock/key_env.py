@@ -182,6 +182,9 @@ class KeyLockCfg:
     key_pull_out_pen: float = 0.0        # per step outside the window: x clamp(outward force / key_pull_n, 0, 1)
     key_pull_target_range_deg: tuple[float, float] = (0.0, 0.0)  # (lo, hi) > 0: hidden pull target ~ U(lo, hi) per
                                          # episode instead of the lock's stop angle
+    key_pull_target_start_deg: tuple[float, float] = (0.0, 0.0)  # curriculum: target range starts here and widens
+    key_pull_target_ramp_steps: int = 0                          # linearly to key_pull_target_range_deg (env steps)
+    key_pull_target_offset_steps: int = 0
     key_progress_rew: float = 0.0        # potential: scale x increase of clamp(angle / target, 0, 1) (critic knows the
                                          # target; the actor does not) so the hand learns to regrasp and keep turning          # per step the key sits in the hidden window (dense hint to stop there)
     hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
@@ -441,6 +444,16 @@ class KeyLockEnv(PreciseAssemblyEnv):
         pos, quat = self.object.data.root_pos_w, self.object.data.root_quat_w
         return an + quat_apply(rot, pos - an), quat_mul(rot, quat)
 
+    def _kp_target_range(self):
+        kl = self.cfg.key_lock
+        lo, hi = (float(v) for v in kl.key_pull_target_range_deg)
+        s0, s1 = (float(v) for v in kl.key_pull_target_start_deg)
+        if s1 > 0.0 and int(kl.key_pull_target_ramp_steps) > 0:
+            f = min(1.0, (int(self.common_step_counter) + int(kl.key_pull_target_offset_steps)) / float(kl.key_pull_target_ramp_steps))
+            lo, hi = s0 + f * (lo - s0), s1 + f * (hi - s1)
+        self.extras["key/pull_target_lo"] = torch.tensor(lo); self.extras["key/pull_target_hi"] = torch.tensor(hi)
+        return lo, hi
+
     # ---- physics substep: hinge probes (replaces the knob spring correction of latch_cbf) ----------------------
     def _key_soft_stop(self) -> None:
         """Locks whose stop is past 179 deg: pose-level stops on the unwrapped key angle, every physics substep. Past
@@ -663,7 +676,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
             if not hasattr(self, "_kp_cnt"):
                 self._kp_cnt = torch.zeros(N, device=self.device)
                 self._kp_target = torch.as_tensor(np.radians(self._cbf["stop_deg"]), device=self.device, dtype=torch.float32)
-                lo, hi = (float(v) for v in kl.key_pull_target_range_deg)
+                lo, hi = self._kp_target_range()
                 if hi > 0.0:
                     self._kp_target = torch.deg2rad(lo + (hi - lo) * torch.rand(N, device=self.device))
                 self._kp_wrong = torch.zeros(N, dtype=torch.bool, device=self.device)
@@ -920,7 +933,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self._kp_cnt[env_ids] = 0.0; self._kp_wrong[env_ids] = False
             if hasattr(self, "_kp_winany"):
                 self._kp_winany[env_ids] = False
-            lo, hi = (float(v) for v in self.cfg.key_lock.key_pull_target_range_deg)
+            lo, hi = self._kp_target_range()
             if hi > 0.0:
                 self._kp_target[env_ids] = torch.deg2rad(lo + (hi - lo) * torch.rand(len(env_ids), device=self.device))
             if hasattr(self, "_kp_prog"):
