@@ -680,6 +680,12 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 self._kp_cue_level = torch.where(win, torch.ones_like(below), torch.where(ang < lo_edge, below, torch.zeros_like(below)))
             if bool(kl.key_cue_to_latch):
                 self.latch_in_window = win.clone()
+                # the key env's reset never runs the base _latch_hint_resample, so the hint mask must be set here
+                # (without it both latch_hint and latch_cue read all zeros: found 11-19 from the K8o checkpoint stats)
+                if not hasattr(self, "latch_hint_on") or self.latch_hint_on.shape[0] != N:
+                    self.latch_hint_on = torch.ones(N, dtype=torch.bool, device=self.device)
+                if not hasattr(self, "latch_open"):
+                    self.latch_open = torch.zeros(N, dtype=torch.bool, device=self.device)
             pulling = self.key_hand_fz > float(kl.key_pull_n)
             self._kp_cnt = torch.where(pulling, self._kp_cnt + 1, torch.zeros_like(self._kp_cnt))
             done_pull = self._kp_cnt >= int(kl.key_pull_steps)
