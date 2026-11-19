@@ -175,6 +175,9 @@ class RetrieveTask:
         low = pc[:, 2] < zr
         near = (pc[:, :2] - place_xy).norm(dim=-1) < xr
         self.just_drop = just & ~(low & near)
+        # graded set-down score at the release: 1 at the table on the place point, 0 at >= 10 cm up or >= 15 cm away
+        hz = float(getattr(c, "retr_setdown_z", 0.10)); hx = float(getattr(c, "retr_setdown_xy", 0.15))
+        self.setdown = just.float() * (1 - pc[:, 2] / hz).clamp(0, 1) * (1 - (pc[:, :2] - place_xy).norm(dim=-1) / hx).clamp(0, 1)
         if bool(getattr(c, "retr_hold_check", False)):
             self.fail["dropped"] = self.just_drop
             just = just & ~self.just_drop
@@ -254,6 +257,7 @@ class RetrieveTask:
         r = r + c.retr_path_rew_scale * self.dphi * gate
         r = r + float(getattr(c, "retr_reach_rew_scale", 0.0)) * self.dphi_reach
         r = r + c.retr_release_bonus * self.just_rel.float()
+        r = r + float(getattr(c, "retr_setdown_bonus", 0.0)) * self.setdown * (~self.just_drop).float()
         r = r + c.retr_tip_rew * (self.n_tips.clamp(max=2.0) / 2.0) * (~self.released).float()
         r = r - c.card_rob_deck_pen * self.f_rob_deck.clamp(max=c.card_rob_deck_pen_cap)
         dm = self.deck_disp / c.retr_other_disp_max + self.deck_tilt / c.retr_other_tilt_max
