@@ -8,7 +8,8 @@ Checks (official thresholds are the cfg defaults):
   held_in_hand_at_start   over usb_hold_steps after usb_settle_steps: pinch loaded every step (>= 2 robot contacts
                           on the stick: force on >= 2 links or >= 2 TacMap pads), stick moves < 0.5 mm in the link7
                           frame, nothing but the hand touches it
-  finger_pinch_real       from the start to the release, the pinch is loaded on >= usb_pinch_frac of the steps
+  finger_pinch_real       official: from the start to the release, the mean force on the thumb pad AND on the index pad
+                          is >= usb_pinch_mean_n (3 N) (usb_pinch_mode=frac = the old share-of-steps rule)
   fully_inserted          plug tip and stick origin within usb_seat_tol (0.5 mm) of their CAD seat positions
   released_and_clear      no robot contact on the stick / jaws / slot (< 0.05 N, no TacMap contact) for
                           usb_clear_steps, link7 >= usb_clear_dist (40 mm) from where it was at the release
@@ -41,7 +42,7 @@ class UsbTask:
         z = lambda dt=torch.float32: torch.zeros(N, device=d, dtype=dt)
         self.step = z(torch.long)
         self.hold_ok = z(torch.bool); self.slip_hold = z()
-        self.pre_steps = z(); self.pre_loaded = z()
+        self.pre_steps = z(); self.pre_loaded = z(); self.pre_f_th = z(); self.pre_f_ix = z()
         self.released = z(torch.bool); self.nocontact = z(torch.long)
         self.rel_p = torch.zeros(N, 3, device=d); self.rel_palm = torch.zeros(N, 3, device=d)
         self.pushing = z(torch.bool); self.push_count = z(torch.long); self.push_tip0 = z()
@@ -52,6 +53,7 @@ class UsbTask:
         self._views = False
         bi, _ = env.robot.find_bodies("iiwa14_link_7")
         self.i7 = int(bi[0])
+        self.i_th = int(env.robot.find_bodies("left_thumb_DP")[0][0]); self.i_ix = int(env.robot.find_bodies("left_index_DP")[0][0])
         seat = env._pih_insert_pose_sequence[-1]
         self.seat_p = torch.tensor(seat[:3], device=d, dtype=torch.float32)
         self.seat_q = torch.tensor([seat[6], seat[3], seat[4], seat[5]], device=d, dtype=torch.float32)
@@ -76,7 +78,7 @@ class UsbTask:
 
     # ------------------------------------------------------------------ reset
     def reset(self, env_ids):
-        for t in (self.step, self.slip_hold, self.pre_steps, self.pre_loaded, self.nocontact, self.push_count):
+        for t in (self.step, self.slip_hold, self.pre_steps, self.pre_loaded, self.pre_f_th, self.pre_f_ix, self.nocontact, self.push_count):
             t[env_ids] = 0
         for t in (self.released, self.pushing, self.success, self.just_rel_seated):
             t[env_ids] = False
@@ -141,6 +143,7 @@ class UsbTask:
         self.hold_ok &= ~in_hold | pinch
         pre = (st >= 0) & ~self.released
         self.pre_steps += pre.float(); self.pre_loaded += (pre & pinch).float()
+        self.pre_f_th += pre.float() * F_rs[:, self.i_th]; self.pre_f_ix += pre.float() * F_rs[:, self.i_ix]
 
         free = ~touching
         self.nocontact = torch.where(free, self.nocontact + 1, torch.zeros_like(self.nocontact))
@@ -161,7 +164,11 @@ class UsbTask:
         gain = (self.push_tip0 - tip[:, 2]).clamp(min=0.0)
         stays = (pc - self.rel_p).norm(dim=-1) < c.usb_stay_tol
         no_motion = gain < c.usb_push_gain_tol
-        pinch_real = self.pre_loaded >= c.usb_pinch_frac * self.pre_steps.clamp(min=1.0)
+        mean_th = self.pre_f_th / self.pre_steps.clamp(min=1.0); mean_ix = self.pre_f_ix / self.pre_steps.clamp(min=1.0)
+        if str(getattr(c, "usb_pinch_mode", "mean_force")) == "frac":   # old A12 rule: pinch loaded on >= usb_pinch_frac of the steps
+            pinch_real = self.pre_loaded >= c.usb_pinch_frac * self.pre_steps.clamp(min=1.0)
+        else:   # official (plug_in_usb.py:553, 590-592): mean force on EACH pad during the insertion >= 3 N
+            pinch_real = torch.minimum(mean_th, mean_ix) >= float(getattr(c, "usb_pinch_mean_n", 3.0))
         done_push = self.pushing & (self.push_count >= c.usb_push_steps)
         ok = done_push & inserted & no_motion & stays & pinch_real & self.hold_ok & scene_free
         self.success |= ok
@@ -178,5 +185,5 @@ class UsbTask:
         self.meas = dict(seat_err_mm=seat_err * 1e3, tip_z_mm=tip[:, 2] * 1e3, lat_mm=lat * 1e3, tilt_deg=tilt_deg, push_gain_mm=gain * 1e3,
                          palm_from_release=palm_from_rel, pinch=pinch.float(), slip_hold_mm=self.slip_hold * 1e3,
                          f_rob_stick=F_rs.sum(-1), f_rob_scene=F_scene,
-                         pinch_share=self.pre_loaded / self.pre_steps.clamp(min=1.0))
+                         pinch_share=self.pre_loaded / self.pre_steps.clamp(min=1.0), pad_mean_thumb_n=mean_th, pad_mean_index_n=mean_ix)
         self.inserted, self.clear = inserted, clear

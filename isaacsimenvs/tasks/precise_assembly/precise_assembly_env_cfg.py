@@ -125,6 +125,8 @@ class PreciseAssemblyCfg:
     usb_pad_force: float = 0.2         # N, a link "carries" the stick
     usb_clear_force: float = 0.05      # N, official released_and_clear contact threshold
     usb_pinch_frac: float = 0.9        # finger_pinch_real: share of pre-release steps with the pinch loaded
+    usb_pinch_mode: str = "mean_force"  # finger_pinch_real: "mean_force" (official, mean pad force >= usb_pinch_mean_n) | "frac"
+    usb_pinch_mean_n: float = 3.0      # N per pad (plug_in_usb.py:591)
     usb_seat_tol: float = 0.0005       # fully_inserted (plug_in_usb.py:153)
     usb_release_steps: int = 3
     usb_clear_steps: int = 10
