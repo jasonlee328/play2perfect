@@ -391,6 +391,8 @@ class PreciseAssemblyCfg:
     turn_progress_requires_tool: bool = False
     # A9: no tool tip in the recess -> the screw's axial spin is removed every substep (official: undriven screw stops at
     # once, armature 2e-7; ours coasts on its 2e-4 inertia). Off = A7 behaviour.
+    # A9: > 0 = the screw turns (tightening) at most this many deg/s; excess rotated back every substep (pose level)
+    turn_max_deg_s: float = 0.0
     turn_coast_stop: bool = False
     # A9: a toolless stretch ends at the previous step's angle when the tip re-enters (the re-entry step's turn is the tool's)
     turn_toolless_reentry_fix: bool = False

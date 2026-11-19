@@ -997,6 +997,29 @@ class PreciseAssemblyEnv(PlayEnv):
         d = torch.atan2(torch.sin(a - self._turn_prev_wrapped), torch.cos(a - self._turn_prev_wrapped))
         self.turn_angle += d
         self._turn_prev_wrapped = a
+        cap = float(getattr(self.cfg.precise_assembly, "turn_max_deg_s", 0.0))
+        if cap > 0.0:
+            # A9 speed cap: tightening turn per substep <= cap x dt; the excess is rotated back about the screw axis
+            # and the axial spin clamped (pose level, like the A8 knob cap: a velocity write alone is undone by contacts)
+            lim = math.radians(cap) * float(self.physics_dt)
+            exc = torch.clamp(d - lim, min=0.0)
+            ids_s = (exc > 0).nonzero(as_tuple=False).squeeze(-1)
+            if ids_s.numel() > 0:
+                body_s = self._joint_bodies()[k]
+                ax_w, an_w = self._turn_axis_w()
+                ax, an, c = ax_w[ids_s], an_w[ids_s], -exc[ids_s]
+                rot = quat_from_angle_axis(c, ax)
+                pos = body_s.data.root_pos_w[ids_s]
+                quat = body_s.data.root_quat_w[ids_s]
+                vel = body_s.data.root_vel_w[ids_s].clone()
+                w_ax = (vel[:, 3:6] * ax).sum(-1)
+                vel[:, 3:6] -= torch.clamp(w_ax - math.radians(cap), min=0.0).unsqueeze(-1) * ax
+                body_s.write_root_pose_to_sim(torch.cat([an + quat_apply(rot, pos - an), quat_mul(rot, quat)], -1), env_ids=ids_s)
+                body_s.write_root_velocity_to_sim(vel, env_ids=ids_s)
+                self.turn_angle -= exc
+                d = d - exc
+                a = torch.atan2(torch.sin(a - exc), torch.cos(a - exc))
+                self._turn_prev_wrapped = a
         lower = math.radians(float(self.cfg.precise_assembly.turn_lower_deg))
         over = self.turn_angle - self.unlock_angle
         pc = self.cfg.precise_assembly
