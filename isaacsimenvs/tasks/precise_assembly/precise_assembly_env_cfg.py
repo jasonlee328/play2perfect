@@ -174,6 +174,9 @@ class PreciseAssemblyCfg:
     # curriculum: the wrong-key threshold starts at button_wrong_start_m (<= 0 = no ramp; e.g. 0.005 = never, past
     # the 4 mm stop) and moves linearly to button_wrong_m over button_wrong_ramp_steps env steps (offset for resumes)
     button_wrong_start_m: float = 0.0
+    # hard travel stop (m) enforced in software every physics substep (pose + velocity), 0 = off. The PhysX prismatic
+    # limit is soft: a hand slam pushed keys to 5.6 mm past the 4 mm stop (v4 logs). Set to the joint upper limit.
+    button_hard_stop_m: float = 0.0
     button_wrong_ramp_steps: int = 0
     button_wrong_offset_steps: int = 0
     button_wrong_penalty: float = 100.0

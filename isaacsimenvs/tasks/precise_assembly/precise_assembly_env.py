@@ -816,6 +816,8 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _apply_action(self) -> None:
         super()._apply_action()
+        if self.cfg.precise_assembly.button_mode and float(self.cfg.precise_assembly.button_hard_stop_m) > 0.0:
+            self._button_hard_stop()
         if self._latch_cbf_on():
             self._latch_cbf_substep()
             return
@@ -824,6 +826,28 @@ class PreciseAssemblyEnv(PlayEnv):
         if float(getattr(self.cfg.precise_assembly, "latch_knob_max_deg_s", 0.0)) > 0.0 and self._latch_on() \
                 and hasattr(self, "latch_open"):
             self._latch_knob_speed_cap()
+
+    def _button_hard_stop(self) -> None:
+        """Every physics substep: any key pressed past button_hard_stop_m along the hole -z is put back at the stop
+        (root pose) and its pressing velocity along the axis removed. Lateral pose / velocity untouched."""
+        stop = float(self.cfg.precise_assembly.button_hard_stop_m)
+        if not hasattr(self, "_button_rest_z"):
+            self._button_update()
+        base = self.hole_pos + self.scene.env_origins
+        up = quat_apply(self.hole_quat_wxyz, torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(self.num_envs, 3))
+        for b, body in enumerate([self.object, *self.distractors]):
+            pos = body.data.root_pos_w
+            z = ((pos - base) * up).sum(-1)
+            over = (self._button_rest_z[b] - z) - stop                  # > 0: past the stop
+            ids = (over > 0.0).nonzero(as_tuple=False).squeeze(-1)
+            if ids.numel() == 0:
+                continue
+            p = pos[ids] + over[ids].unsqueeze(-1) * up[ids]
+            body.write_root_pose_to_sim(torch.cat([p, body.data.root_quat_w[ids]], -1), env_ids=ids)
+            vel = body.data.root_vel_w[ids].clone()
+            vdown = (vel[:, :3] * up[ids]).sum(-1).clamp(max=0.0)
+            vel[:, :3] = vel[:, :3] - vdown.unsqueeze(-1) * up[ids]
+            body.write_root_velocity_to_sim(vel, env_ids=ids)
 
     def _latch_knob_speed_cap(self) -> None:
         """Every physics substep while the latch is closed: the knob may advance at most latch_knob_max_deg_s x sim dt
