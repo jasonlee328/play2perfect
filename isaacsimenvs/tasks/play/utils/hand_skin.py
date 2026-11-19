@@ -145,6 +145,29 @@ class HandSkinSensor:
               f"rays/env, skin {skin * 1e3:g} mm, cast against {len(self.targets)} bodies", flush=True)
 
     @torch.no_grad()
+    def shear(self, skin: torch.Tensor) -> torch.Tensor:
+        """Contact-gated slip speed of each skin link vs the target surface along the target's local-z rotation
+        direction (see TactileCfg.whole_hand_shear). skin = this step's compute() output (N, 21 * G)."""
+        env = self.env
+        if not hasattr(self, "_shear_ids"):
+            bn = list(env.robot.body_names)
+            self._shear_ids = torch.tensor([bn.index(_ALIASES.get(n, (n, None))[0]) for n in HAND_LINKS], device=self.device)
+        ob = env.object.data
+        c, vc, wc = ob.root_pos_w[:, None], ob.root_lin_vel_w[:, None], ob.root_ang_vel_w[:, None]
+        w0, x0, y0, z0 = ob.root_quat_w.unbind(-1)
+        ax = torch.stack([2 * (x0 * z0 + w0 * y0), 2 * (y0 * z0 - w0 * x0), 1 - 2 * (x0 * x0 + y0 * y0)], -1)[:, None]
+        pl = env.robot.data.body_pos_w[:, self._shear_ids]
+        vl = env.robot.data.body_lin_vel_w[:, self._shear_ids]
+        r = pl - c
+        rel = vl - (vc + torch.cross(wc.expand_as(r), r, dim=-1))
+        rad = r - (r * ax).sum(-1, keepdim=True) * ax
+        rad = rad / rad.norm(dim=-1, keepdim=True).clamp_min(1e-6)
+        tang = torch.cross(ax.expand_as(rad), rad, dim=-1)
+        G = skin.shape[-1] // len(HAND_LINKS)
+        on = skin.reshape(skin.shape[0], len(HAND_LINKS), G).amax(-1) > 0.02
+        k = float(getattr(env.cfg.tactile, "whole_hand_shear_scale", 10.0))
+        return (on.float() * (rel * tang).sum(-1) * k).clamp(-1.0, 1.0)
+
     def compute(self) -> torch.Tensor:
         from isaaclab.utils.math import matrix_from_quat
         from isaaclab.utils.warp import raycast_mesh

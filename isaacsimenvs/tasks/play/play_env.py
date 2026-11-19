@@ -50,6 +50,11 @@ class PlayEnv(DirectRLEnv):
                     cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_hand")
                 if cfg.tactile.whole_hand_in_critic and "tactile_hand" not in cfg.obs.state_list:
                     cfg.obs.state_list = (*cfg.obs.state_list, "tactile_hand")
+                if getattr(cfg.tactile, "whole_hand_shear", False):
+                    from .utils.hand_skin import HAND_LINKS
+                    OBS_FIELD_SIZES["tactile_shear"] = len(HAND_LINKS)
+                    if cfg.tactile.in_policy and "tactile_shear" not in cfg.obs.obs_list:
+                        cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_shear")
         # Override obs/state space from configured field lists before
         # DirectRLEnv / rl_games observes the configclass.
         cfg.observation_space = compute_obs_dim(cfg.obs.obs_list)

@@ -581,6 +581,11 @@ class TactileCfg:
     whole_hand_skin_mm: float = 2.0        # virtual skin thickness outside the collision surface
     whole_hand_distractors: bool = True    # also sense the distractors (one channel with the object)
     whole_hand_in_critic: bool = False
+    # A1 11-19 shear / slip channel: policy field tactile_shear = per skin link (21), the link's slip speed vs the target's
+    # surface along the target's local-z rotation direction (m/s x whole_hand_shear_scale, clipped +-1), gated by that
+    # link's skin contact (any taxel > 0.02). Proxy for the shear a real optical sensor measures. Needs whole_hand.
+    whole_hand_shear: bool = False
+    whole_hand_shear_scale: float = 10.0
 
 
 # ----------------------------------------------------------------------------
