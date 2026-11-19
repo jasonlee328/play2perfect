@@ -143,7 +143,9 @@ class WipeTask:
         # actor-obs hook); the palm body origin itself sits ~245 mm from a tip-pinched eraser
         drift = torch.zeros(N, device=env.device)
         if getattr(self, "_palm_p", None) is not None:
-            vp = self._palm_p + quat_apply(self._palm_q, self.off_p)
+            # current palm pose (the hook's cached copy is one policy step old: a fast arm move read as drift)
+            ps = env.robot.data.body_state_w[:, env._palm_body_id, :]
+            vp = ps[:, 0:3] + quat_apply(ps[:, 3:7], self.off_p)
             drift = torch.where(self.need_off, drift, (ep - vp).norm(dim=-1))
         self.drift = drift
         self.fail["dropped"] = (drift > float(self.c.wipe_drop_dist)) | tilt_bad
