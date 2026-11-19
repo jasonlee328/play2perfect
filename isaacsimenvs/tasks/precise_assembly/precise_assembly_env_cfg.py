@@ -132,6 +132,15 @@ class PreciseAssemblyCfg:
     wipe_fail_penalty: float = 200.0
     wipe_force_rew: float = 0.0        # per step with the felt force in the window (privileged shaping)
     wipe_over_rew_scale: float = 0.0   # per N above the window, per step
+    # A16 pad shear cue (touch-side model of a gel fingertip under tangential load): each in-contact pad's 8x8 image is
+    # shifted along the pad surface by (board load on the eraser / pads in contact) x wipe_shear_mm_per_N, capped at
+    # wipe_shear_cap_mm. The ray-cast depth sensor alone cannot see a load parallel to a flat pinched face. 0 = off.
+    wipe_shear_mm_per_N: float = 0.0
+    wipe_shear_cap_mm: float = 4.0
+    # A16 hidden per-episode PD gain scales (stiffness x s, damping x sqrt(s)), arm and hand drawn separately; not in any
+    # obs, so the joint tracking error no longer maps to a known force. (1, 1) = off.
+    kp_scale_range_arm: tuple[float, float] = (1.0, 1.0)
+    kp_scale_range_hand: tuple[float, float] = (1.0, 1.0)
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
     usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
     usb_hold_steps: int = 36           # held_in_hand_at_start window (0.6 s)

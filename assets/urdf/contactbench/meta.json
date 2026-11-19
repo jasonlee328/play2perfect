@@ -10989,10 +10989,10 @@
       63.5
      ],
      "force_window_N": [
-      4.0,
-      12.0
+      3.0,
+      8.0
      ],
-     "fail_force_N": 16.0,
+     "fail_force_N": 12.0,
      "fail_steps": 3,
      "erase_steps": 2,
      "felt_tilt_deg": 25.0,
@@ -11128,10 +11128,10 @@
       63.5
      ],
      "force_window_N": [
-      4.0,
-      12.0
+      3.0,
+      8.0
      ],
-     "fail_force_N": 16.0,
+     "fail_force_N": 12.0,
      "fail_steps": 3,
      "erase_steps": 2,
      "felt_tilt_deg": 25.0,
@@ -11267,10 +11267,10 @@
       63.5
      ],
      "force_window_N": [
-      4.0,
-      12.0
+      3.0,
+      8.0
      ],
-     "fail_force_N": 16.0,
+     "fail_force_N": 12.0,
      "fail_steps": 3,
      "erase_steps": 2,
      "felt_tilt_deg": 25.0,
@@ -11406,10 +11406,10 @@
       63.5
      ],
      "force_window_N": [
-      4.0,
-      12.0
+      3.0,
+      8.0
      ],
-     "fail_force_N": 16.0,
+     "fail_force_N": 12.0,
      "fail_steps": 3,
      "erase_steps": 2,
      "felt_tilt_deg": 25.0,
@@ -11545,10 +11545,10 @@
       63.5
      ],
      "force_window_N": [
-      4.0,
-      12.0
+      3.0,
+      8.0
      ],
-     "fail_force_N": 16.0,
+     "fail_force_N": 12.0,
      "fail_steps": 3,
      "erase_steps": 2,
      "felt_tilt_deg": 25.0,
@@ -11639,10 +11639,10 @@
       63.5
      ],
      "force_window_N": [
-      4.0,
-      12.0
+      3.0,
+      8.0
      ],
-     "fail_force_N": 16.0,
+     "fail_force_N": 12.0,
      "fail_steps": 3,
      "erase_steps": 2,
      "felt_tilt_deg": 25.0,

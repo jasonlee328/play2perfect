@@ -141,7 +141,7 @@ class WipeTask:
         palm = env.robot.data.body_state_w[:, env._palm_body_id, 0:3]
         tilt_bad = ez[:, 2] < self.cos_drop
         self.fail["dropped"] = ((ep - palm).norm(dim=-1) > float(self.c.wipe_drop_dist)) | tilt_bad
-        self.meas = dict(force=F, frac=self.frac, gap_mm=gap * 1e3, felt_cos=ez[:, 2], h_mm=self.h * 1e3,
+        self.meas = dict(shear_mm=getattr(self, 'shear_mm', torch.zeros(N, 5, device=env.device)).amax(-1), force=F, frac=self.frac, gap_mm=gap * 1e3, felt_cos=ez[:, 2], h_mm=self.h * 1e3,
                          F_ep_max=self.F_ep_max, inwin_steps=self.inwin_steps, contact_steps=self.contact_steps)
         self.inwin = inwin
 
@@ -174,6 +174,62 @@ class WipeTask:
         for k in ("reward", "lifted_object", "closest_keypoint_max_dist"):
             if k in obs:
                 obs[k] = torch.zeros_like(obs[k])
+
+    # ------------------------------------------------------------------ touch: pad shear
+    def _shear_setup(self):
+        tac = self.env._tactile
+        res = tac.res
+        nf = int(tac.finger.max()) + 1
+        d = self.env.device
+        self.sh_res, self.sh_nf = res, nf
+        self.sh_pinv, self.sh_nrm = [], []
+        for f in range(nf):
+            m = tac.finger == f
+            loc = tac.taxel[m] - f * res * res
+            cnt = torch.bincount(loc, minlength=res * res).float()
+            cen = torch.zeros(res * res, 3, device=d).index_add_(0, loc, tac.starts[m]) / cnt.clamp_min(1)[:, None]
+            ok = cnt > 0
+            k = torch.arange(res * res, device=d)[ok]
+            X = torch.stack([torch.ones_like(k, dtype=torch.float32), (k // res).float(), (k % res).float()], -1)
+            coef = torch.linalg.lstsq(X, cen[ok]).solution        # (3, 3): c0, d/drow, d/dcol (DP frame, m)
+            A = coef[1:].T                                         # (3, 2)
+            self.sh_pinv.append(torch.linalg.pinv(A))              # (2, 3): DP-frame displacement -> (drow, dcol)
+            n = tac.dirs[m].mean(0); self.sh_nrm.append(n / n.norm())
+        self.sh_pinv = torch.stack(self.sh_pinv); self.sh_nrm = torch.stack(self.sh_nrm)
+        self.sh_body = tac.body_ids
+        self.v_eb_vec = self.v_eb
+
+    def shear_tactile(self, tac_img: torch.Tensor) -> torch.Tensor:
+        """Shift each in-contact pad image along the pad by its share of the board load (gel shear model)."""
+        import torch.nn.functional as Fn
+        env = self.env
+        if not self._views:
+            self._make_views()
+        if not hasattr(self, "sh_pinv"):
+            self._shear_setup()
+        N, res, nf = env.num_envs, self.sh_res, self.sh_nf
+        img = tac_img.view(N, nf, res, res)
+        fv = self.v_eb.get_contact_force_matrix(float(env.physics_dt)).to(env.device).sum(1)   # (N, 3) on the eraser
+        fv = fv * float(self.c.wipe_force_scale)
+        on = img.flatten(2).amax(-1) > 0                                                        # (N, nf) pads in contact
+        share = fv[:, None] / on.sum(-1, keepdim=True).clamp_min(1)[..., None]                  # (N, nf, 3) world
+        bq = env.robot.data.body_quat_w[:, self.sh_body]                                        # (N, nf, 4)
+        t = quat_apply_inverse(bq.reshape(-1, 4), share.reshape(-1, 3)).view(N, nf, 3)          # DP frame
+        t = t - (t * self.sh_nrm[None]).sum(-1, keepdim=True) * self.sh_nrm[None]               # in the pad plane
+        s = t * float(self.c.wipe_shear_mm_per_N) * 1e-3                                         # m
+        sn = s.norm(dim=-1, keepdim=True)
+        cap = float(self.c.wipe_shear_cap_mm) * 1e-3
+        s = s * (cap / sn.clamp_min(1e-9)).clamp(max=1.0)
+        drc = torch.einsum("fij,nfj->nfi", self.sh_pinv, s) * on[..., None].float()             # (N, nf, 2) taxels
+        self.shear_mm = sn.squeeze(-1).clamp(max=cap) * 1e3 * on.float()
+        # I'(r, c) = I(r - dr, c - dc): sample the source at (r - dr, c - dc), align_corners grid in [-1, 1]
+        r = torch.arange(res, device=env.device, dtype=torch.float32)
+        rr, cc = torch.meshgrid(r, r, indexing="ij")
+        src_r = rr[None, None] - drc[..., 0, None, None]; src_c = cc[None, None] - drc[..., 1, None, None]
+        grid = torch.stack([src_c, src_r], -1) / (res - 1) * 2 - 1                              # x = col, y = row
+        out = Fn.grid_sample(img.reshape(N * nf, 1, res, res), grid.reshape(N * nf, res, res, 2),
+                             mode="bilinear", padding_mode="zeros", align_corners=True)
+        return out.view(N, -1)
 
     # ------------------------------------------------------------------ reward
     def reward(self, tr: dict) -> torch.Tensor:
