@@ -1408,6 +1408,12 @@ class PreciseAssemblyEnv(PlayEnv):
         wipe = getattr(self, "_wipe", None)
         if pih_cfg.wipe_task == "gate" and wipe is not None:
             w_rew = wipe.reward(self._termination_reasons)
+            if bool(getattr(pih_cfg, "wipe_ink_scaled_goal_rew", False)):
+                # board waypoints credited by stroke position only (wipe_goal_min_force_N=0): scale the goal bonus and
+                # keypoint reward by the ink erased so far, so flying the stroke in the air earns ~nothing
+                m = torch.where(self._successes >= 2, wipe.frac.float(), torch.ones_like(wipe.frac.float()))
+                gk = self._reward_terms["bonus_rew"] + self._reward_terms["keypoint_rew"]
+                w_rew = w_rew + gk * (m - 1.0)
             reward = reward + w_rew
             self._reward_terms["wipe_reward"] = w_rew
             self._reward_terms["total_reward"] = reward
