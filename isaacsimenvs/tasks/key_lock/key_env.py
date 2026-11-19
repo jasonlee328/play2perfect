@@ -185,6 +185,8 @@ class KeyLockCfg:
     key_pull_target_start_deg: tuple[float, float] = (0.0, 0.0)  # curriculum: target range starts here and widens
     key_pull_target_ramp_steps: int = 0                          # linearly to key_pull_target_range_deg (env steps)
     key_pull_target_offset_steps: int = 0
+    key_progress_over_deg: float = 0.0   # > 0: two-sided potential: clamp(angle/target, 0, 1) - clamp((angle - target -
+                                         # window) / over_deg, 0, 2); reward = scale x its signed change (overshoot costs)
     key_progress_rew: float = 0.0        # potential: scale x increase of clamp(angle / target, 0, 1) (critic knows the
                                          # target; the actor does not) so the hand learns to regrasp and keep turning          # per step the key sits in the hidden window (dense hint to stop there)
     hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
@@ -708,10 +710,17 @@ class KeyLockEnv(PreciseAssemblyEnv):
             winx = self._kp_winany if bool(kl.key_pull_win_any) else win
             self._key_ok = done_pull & winx
             prog = (ang / self._kp_target).clamp(0.0, 1.0)
+            od = float(kl.key_progress_over_deg)
+            if od > 0.0:
+                prog = prog - ((ang - self._kp_target - math.radians(wdeg)) / math.radians(od)).clamp(0.0, 2.0)
             if not hasattr(self, "_kp_prog"):
                 self._kp_prog = prog.clone()
-            self._kp_dprog = (prog - self._kp_prog).clamp(min=0.0)
-            self._kp_prog = torch.maximum(self._kp_prog, prog)
+            if od > 0.0:
+                self._kp_dprog = prog - self._kp_prog            # signed: turning back from an overshoot pays back
+                self._kp_prog = prog.clone()
+            else:
+                self._kp_dprog = (prog - self._kp_prog).clamp(min=0.0)
+                self._kp_prog = torch.maximum(self._kp_prog, prog)
             self.extras["key/progress_mean"] = self._kp_prog.mean()
             self._kp_wrong = done_pull & ~winx
             over = ang > self._kp_target + math.radians(float(kl.key_strip_deg))
