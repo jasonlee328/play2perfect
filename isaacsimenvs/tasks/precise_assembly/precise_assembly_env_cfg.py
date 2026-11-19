@@ -209,6 +209,10 @@ class PreciseAssemblyCfg:
     retr_hold_check: bool = False         # hold rule: releasing the card in the air / away from the place point = fail 'dropped'
     retr_release_max_z: float = 0.015     # m, card centre above the table (hole frame) at release
     retr_release_xy_tol: float = 0.05     # m, card centre from the place point at release
+    retr_release_ramp_steps: float = 0.0  # >0: release limits ramp from *_start to the final values
+    retr_release_offset_steps: float = 0.0
+    retr_release_max_z_start: float = 0.20
+    retr_release_xy_tol_start: float = 0.30
     retr_tol_end: float = 1.0             # deck-neat tolerance multiplier at the end of the ramp
     retr_tol_start: float = 1.0           # deck-neat tolerances x k, k ramps retr_tol_start -> 1 (training curriculum)
     retr_tol_ramp_steps: float = 0.0

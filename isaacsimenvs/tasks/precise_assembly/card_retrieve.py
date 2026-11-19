@@ -165,8 +165,15 @@ class RetrieveTask:
         # higher than retr_release_max_z above the table or farther than retr_release_xy_tol from the place point
         # (a flick / drop) fails the episode as 'dropped'
         place_xy = torch.tensor(list(c.retr_place_xy), device=d)
-        low = pc[:, 2] < float(getattr(c, "retr_release_max_z", 1.0))
-        near = (pc[:, :2] - place_xy).norm(dim=-1) < float(getattr(c, "retr_release_xy_tol", 10.0))
+        zr, xr = float(getattr(c, "retr_release_max_z", 1.0)), float(getattr(c, "retr_release_xy_tol", 10.0))
+        rr = float(getattr(c, "retr_release_ramp_steps", 0.0))
+        if rr > 0:   # curriculum: limits shrink from the *_start values to the final ones
+            a_r = min(1.0, float(env.common_step_counter + getattr(c, "retr_release_offset_steps", 0.0)) / rr)
+            zr = float(c.retr_release_max_z_start) + (zr - float(c.retr_release_max_z_start)) * a_r
+            xr = float(c.retr_release_xy_tol_start) + (xr - float(c.retr_release_xy_tol_start)) * a_r
+        self.rel_lim = (zr, xr)
+        low = pc[:, 2] < zr
+        near = (pc[:, :2] - place_xy).norm(dim=-1) < xr
         self.just_drop = just & ~(low & near)
         if bool(getattr(c, "retr_hold_check", False)):
             self.fail["dropped"] = self.just_drop
