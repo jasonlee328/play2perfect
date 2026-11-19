@@ -404,6 +404,9 @@ class ResetCfg:
     reset_dof_pos_random_interval_arm: float = 0.1
     reset_dof_pos_random_interval_fingers: float = 0.1
     reset_dof_vel_random_interval: float = 0.5
+    # A14: offset (rad, 7 arm joints) added to the default arm pose before the reset noise, e.g. to start the hand
+    # above a raised fixture (empty = none)
+    arm_default_offset: tuple = ()
 
     # Table reset geometry
     table_reset_z: float = 0.38
