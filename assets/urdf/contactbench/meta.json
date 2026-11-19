@@ -9103,6 +9103,113 @@
      ]
     }
    }
+  },
+  "cb_card_retrieve": {
+   "fixture": "card_holder_kit",
+   "object": "card",
+   "object_start_pose": [
+    -0.0009639112385733694,
+    0.0,
+    0.029043806034670314,
+    0.44499671605030977,
+    0.4449967160503101,
+    0.5495251793179634,
+    0.5495251793179634
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      -0.004675007597933425,
+      0.0,
+      0.029043806034670314,
+      0.44499671605030977,
+      0.4449967160503101,
+      0.5495251793179634,
+      0.5495251793179634
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      -0.00343797547814674,
+      0.0,
+      0.029043806034670314,
+      0.44499671605030977,
+      0.4449967160503101,
+      0.5495251793179634,
+      0.5495251793179634
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      -0.0022009433583600546,
+      0.0,
+      0.029043806034670314,
+      0.44499671605030977,
+      0.4449967160503101,
+      0.5495251793179634,
+      0.5495251793179634
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     -0.024873755682615697,
+     0.0,
+     0.14153078011905795,
+     0.44499671605030977,
+     0.4449967160503101,
+     0.5495251793179634,
+     0.5495251793179634
+    ],
+    [
+     0.08,
+     -0.09,
+     0.0006,
+     0.0,
+     1.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim appendix_tasks/retrieve_card_from_deck.py + tasks/card_pick.py",
+    "card_mm": [
+     1.2,
+     85.0,
+     55.0
+    ],
+    "cards": 4,
+    "picked": "front (index 3, most +x)",
+    "deck_lean_deg": 12.0,
+    "deck_x_mm": [
+     -4.675,
+     -3.438,
+     -2.2009,
+     -0.9639
+    ],
+    "deck_z_mm": 29.0438,
+    "deck_pitch_mm": 1.237,
+    "lift_mm": 115.0,
+    "place_xy_mm": [
+     80.0,
+     -90.0
+    ],
+    "mu": {
+     "card": 0.25,
+     "holder": 0.3,
+     "pad": "1.0 official FR3 pad (card_pick.py:380); ours = fingertip 2.55 (A1)"
+    },
+    "checks": {
+     "other_disp_mm": 5.0,
+     "other_tilt_deg": 3.0,
+     "on_table_z_mm": 4.0,
+     "flat_cos": 0.95,
+     "clear_move_mm": 50.0
+    }
+   }
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"

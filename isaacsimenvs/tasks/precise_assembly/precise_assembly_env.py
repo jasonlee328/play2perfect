@@ -388,8 +388,12 @@ class PreciseAssemblyEnv(PlayEnv):
         self._reset_peg_episode(env_ids)
         if self.cfg.precise_assembly.card_task != "off":
             if card is None:
-                from .card_task import CardTask
-                self._card = card = CardTask(self)
+                if self.cfg.precise_assembly.card_task == "retrieve":
+                    from .card_retrieve import RetrieveTask
+                    self._card = card = RetrieveTask(self)
+                else:
+                    from .card_task import CardTask
+                    self._card = card = CardTask(self)
             card.reset(env_ids)
             if getattr(self.cfg.precise_assembly, "card_expert_residual", False) or \
                     getattr(self.cfg.precise_assembly, "card_expert_obs", False):
@@ -1168,7 +1172,7 @@ class PreciseAssemblyEnv(PlayEnv):
         card_fail = {}
         if pih_cfg.card_task != "off" and getattr(self, "_card", None) is not None:
             self._card.update()
-            if pih_cfg.card_task == "gate":
+            if pih_cfg.card_task in ("gate", "retrieve"):
                 max_successes = self._card.success.clone()
                 if pih_cfg.card_terminate_on_fail:
                     card_fail = {k: v & ~max_successes for k, v in self._card.fail.items()}
@@ -1287,6 +1291,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["total_reward"] = reward
 
         card = getattr(self, "_card", None)
+        if pih_cfg.card_task == "retrieve" and card is not None:
+            c_rew = card.reward(self._termination_reasons)
+            reward = reward + c_rew
+            self._reward_terms["card_rew"] = c_rew
+            self._reward_terms["total_reward"] = reward
         if pih_cfg.card_task == "gate" and card is not None:
             tr = self._termination_reasons
             c_rew = pih_cfg.card_success_bonus * tr["max_successes"].float() \

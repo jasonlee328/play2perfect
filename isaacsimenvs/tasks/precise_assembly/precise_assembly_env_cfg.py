@@ -197,6 +197,15 @@ class PreciseAssemblyCfg:
     card_rob_deck_pen_cap: float = 5.0
     card_deck_motion_pen: float = 0.0    # per-step penalty x (deck move / 3 mm + deck rot / 3 deg), capped (A10)
     card_deck_motion_pen_cap: float = 4.0
+    # A10 retrieve (card_task="retrieve", ContactBench task 5 retrieve_card_from_deck.py)
+    retr_other_disp_max: float = 0.005    # OTHER_DISP_MAX (retrieve_card_from_deck.py:53)
+    retr_other_tilt_max: float = 3.0      # OTHER_TILT_MAX (:54)
+    retr_place_xy: tuple = (0.08, -0.09)  # PLACE_XY (:41), receptive frame (m)
+    retr_lift_m: float = 0.04             # card centre rise that counts as lifted out of the deck (shaping / release)
+    retr_path_rew_scale: float = 0.0      # x change of the potential (rise capped at retr_lift_m, then 0.3 - dist to place)
+    retr_release_bonus: float = 0.0       # once, at the release after the lift
+    retr_tip_rew: float = 0.0             # per step before the release: fingertip pads on the card (saturates at 2)
+    retr_press_max: float = 0.0           # fragile: robot -> picked-card force limit while it is in the slot (N); 0 = off
     card_path_floor_z: float = 0.0       # path potential height term floors at this height above the slot floor (m)
     card_lean_ref_rest: bool = False     # path lean term vs the front card's rest lean, not its current lean
     # A10 residual RL on the scripted expert (card_expert.py): joint target = expert target + scale x policy action
