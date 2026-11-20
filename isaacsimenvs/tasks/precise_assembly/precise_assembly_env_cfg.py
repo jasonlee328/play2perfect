@@ -215,7 +215,7 @@ class PreciseAssemblyCfg:
     collect_yaw_range_deg: float = 45.0
     collect_gap_m: float = 0.006
     collect_bin_margin_m: float = 0.03
-    collect_drop_m: float = 0.002
+    collect_drop_m: float = 0.0005
     collect_obs_slots: int = 8                      # collect_obs is padded to this many slots (same obs for all problems)
     collect_clear_steps: int = 10
     collect_palm_speed: float = 0.05

@@ -68,6 +68,8 @@ def setup(env) -> None:
     st["fell"] = torch.zeros(N, dtype=torch.bool, device=dev)
     st["n_in_ep_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["n_held_max"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["prev_pos"] = torch.zeros(N, K, 3, device=dev)
+    st["at_rest"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
     env._collect = st
     print(f"[collect] slots {types}, N range {n_range}, bin rim {st['rim']*1000:.1f} mm, "
           f"inner floor {[round(float(x)*1000, 1) for x in st['inner_floor']]} mm", flush=True)
@@ -122,7 +124,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
     bin_c = env.hole_pos[env_ids, :2]
     bin_h = (st["outer"] + float(c.collect_bin_margin_m)).expand(n, 2)
     x0, x1, y0, y1 = (float(v) for v in c.collect_region)
-    T = 48
+    T = 128
     placed_c = torch.zeros(n, K, 2, device=dev)
     placed_y = torch.zeros(n, K, device=dev)
     placed = torch.zeros(n, K, dtype=torch.bool, device=dev)
@@ -165,6 +167,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
         pose = torch.cat([torch.where(act, pos, ppos) + origins, torch.where(act, q, pq)], 1)
         body.write_root_pose_to_sim(pose, env_ids=env_ids)
         body.write_root_velocity_to_sim(torch.zeros(n, 6, device=dev), env_ids=env_ids)
+        st["prev_pos"][env_ids, k] = pose[:, :3] - origins
         if k == 0:
             env._object_init_z[env_ids] = pose[:, 2] - origins[:, 2]
     st["inbin"][env_ids] = False
@@ -207,7 +210,12 @@ def update(env) -> None:
     st["inbin"] = inbin
     n_in = inbin.sum(1)
     st["n_in_ep_max"] = torch.maximum(st["n_in_ep_max"], n_in)
-    rest = vel.norm(dim=-1) < st["rest_speed"]
+    # at rest = COM speed < 5 mm/s, measured as displacement over the last policy step: PhysX's reported velocity of
+    # bodies resting in a stack reads 1-4 cm/s while they move < 0.1 mm in 2 s (probe 11-20), so it can't be used.
+    step_dt = float(env.physics_dt) * int(env.cfg.decimation)
+    rest = (pos - st["prev_pos"]).norm(dim=-1) / step_dt < st["rest_speed"]
+    st["prev_pos"] = pos.clone()
+    st["at_rest"] = rest
     all_in = (inbin | ~active).all(1)
     all_rest = (rest | ~active).all(1)
     # contact: fingertip pads + whole-hand skin (both ray-cast against every utensil)
