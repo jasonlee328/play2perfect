@@ -1316,7 +1316,13 @@ class PreciseAssemblyEnv(PlayEnv):
             if float(getattr(pih_cfg, "usb_win_thumb_rew_scale", 0.0)) > 0.0:
                 capw = float(getattr(pih_cfg, "usb_win_thumb_cap", 4.0))
                 fw = torch.minimum(usb.meas["f_thumb"], usb.meas["f_index"]).clamp(max=capw) / capw
-                u_rew = u_rew + float(pih_cfg.usb_win_thumb_rew_scale) * fw * usb.win.float()
+                if str(getattr(pih_cfg, "usb_win_thumb_mode", "reward")) == "penalty":
+                    # penalty while the weaker pad is under the cap: hovering in the insert window costs instead of pays
+                    u_rew = u_rew - float(pih_cfg.usb_win_thumb_rew_scale) * (1.0 - fw) * usb.win.float()
+                else:
+                    u_rew = u_rew + float(pih_cfg.usb_win_thumb_rew_scale) * fw * usb.win.float()
+            if float(getattr(pih_cfg, "usb_step_penalty", 0.0)) > 0.0:
+                u_rew = u_rew - float(pih_cfg.usb_step_penalty) * (~usb.released).float()
             if float(getattr(pih_cfg, "usb_seat_fine_rew_scale", 0.0)) > 0.0:
                 # potential on -min(seat err, usb_seat_fine_mm) before the release: pays the last few mm (policies stall ~1.3 mm short)
                 cap_m = float(getattr(pih_cfg, "usb_seat_fine_mm", 3.0)) * 1e-3
