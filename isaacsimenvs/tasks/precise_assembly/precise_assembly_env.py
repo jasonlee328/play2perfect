@@ -1082,7 +1082,8 @@ class PreciseAssemblyEnv(PlayEnv):
         ids = torch.arange(N, device=self.device)
         tol = self._keypoint_success_tolerance_m()
         far = torch.full((N,), -1, dtype=torch.long, device=self.device)
-        for j in range(1, G - 1):
+        last = G if bool(getattr(self.cfg.precise_assembly, "key_goal_skip_final", False)) else G - 1
+        for j in range(1, last):
             g = self._key.goal_world(ids, torch.full((N,), j, dtype=torch.long, device=self.device))
             kr = float(getattr(self.cfg.precise_assembly, "key_goal_rot_deg", 0.0))
             if kr > 0.0:
