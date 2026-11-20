@@ -245,8 +245,9 @@ class CollectManager:
         self.n_active[ids] = act.sum(1).float()
         self.z0[ids] = b["z0"][k].float()
         self.target[ids] = t
-        self.latched[ids, t] = True
-        self.bonus_paid[ids, t] = True
+        lat = b["latched"][k].bool() if "latched" in b else torch.ones(n, dtype=torch.bool, device=dev)
+        self.latched[ids, t] = lat              # pre-grasp entries (part on the table): not latched, lift bonus unpaid
+        self.bonus_paid[ids, t] = lat
         self.from_bank[ids] = True
 
     def snapshot(self, ids: torch.Tensor) -> dict:
