@@ -1001,6 +1001,21 @@
     0.0,
     -0.0
    ]
+  },
+  "cup_stack_inv_n3": {
+   "src": [
+    "cup x 3 inverted (cupgrip_tasks.py)"
+   ],
+   "extents_mm": [
+    68.63,
+    68.63,
+    74.49
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ]
   }
  },
  "problems": {
@@ -8776,6 +8791,171 @@
      100.0
     ]
    ]
+  },
+  "cb_cupgrip": {
+   "object": "cup",
+   "fixture": "cup_stack_inv_n3",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05167100000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      0.0,
+      0.0,
+      0.04698600000000001,
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.111671,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.17167100000000002,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "cups": 5,
+    "loose_cups": 1,
+    "fused_cups": 3,
+    "inverted": true,
+    "step_mm": 4.685
+   },
+   "settled": false
+  },
+  "cb_cupgrip_lowS": {
+   "object": "cup",
+   "fixture": "cup_stack_inv_n3",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05167100000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      0.0,
+      0.0,
+      0.04698600000000001,
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.111671,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.17167100000000002,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "cups": 5,
+    "loose_cups": 1,
+    "fused_cups": 3,
+    "inverted": true,
+    "step_mm": 4.685
+   },
+   "settled": false
+  },
+  "cb_cupgrip_highS": {
+   "object": "cup",
+   "fixture": "cup_stack_inv_n3",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05167100000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      0.0,
+      0.0,
+      0.04698600000000001,
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.111671,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.17167100000000002,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "cups": 5,
+    "loose_cups": 1,
+    "fused_cups": 3,
+    "inverted": true,
+    "step_mm": 4.685
+   },
+   "settled": false
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"
