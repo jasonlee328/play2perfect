@@ -235,6 +235,9 @@ def setup_scene(env) -> None:
             disable_gravity=True,
             articulation_enabled=False,
         ),
+        compliant=((float(assets_cfg.table_compliant_stiffness), float(assets_cfg.table_compliant_damping),
+                    float(assets_cfg.robot_friction))
+                   if float(getattr(assets_cfg, "table_compliant_stiffness", 0.0)) > 0.0 else None),
     )
     _log_scene_step(setup_t0, "converted object/hole/table URDFs")
 
