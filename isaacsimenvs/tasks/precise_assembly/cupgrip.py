@@ -135,7 +135,9 @@ def pre_physics(env) -> None:
     pull = (fz - env.cg_m1 * G).clamp(min=0.0)   # upward pull beyond the cup's weight
     brk = env.cg_stuck & (pull > env.cg_S)
     env.cg_stuck = env.cg_stuck & ~brk
-    restick = ~env.cg_stuck & (rise < float(c.cupgrip_restick_mm) / 1000.0) & (v1.abs() < 0.02)
+    # re-stick only a cup that was set back down: seated, still, and not being pulled (never in the break step)
+    restick = (~env.cg_stuck & ~brk & (rise < float(c.cupgrip_restick_mm) / 1000.0) & (v1.abs() < 0.02)
+               & (pull < 0.25 * env.cg_S))
     env.cg_stuck = env.cg_stuck | restick
     hold = pull + env.cg_m1 * (rise.clamp(min=0.0) / (tau_h * tau_h) + v1.clamp(min=0.0) / tau_h)
     f_ret = torch.where(env.cg_stuck, torch.minimum(hold, env.cg_S).clamp(min=0.0),
