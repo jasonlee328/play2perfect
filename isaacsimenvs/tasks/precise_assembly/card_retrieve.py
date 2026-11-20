@@ -334,6 +334,17 @@ class RetrieveTask:
         in_slot_card = (pc[:, 2] < 0.045) & (pc[:, 0].abs() < SLOT_X + 0.01)
         self.f_press = f_rob_card * in_slot_card.float()
         self.f_press_ep_max = torch.maximum(self.f_press_ep_max, self.f_press)
+        npmax = float(getattr(c, "retr_nonpad_max", 0.0))
+        if npmax > 0.0:   # user 11-20: press with the fingertips only. While card 1 is in the holder, contact force on
+            # it from any other hand / arm link (palm, finger segments) > npmax for retr_nonpad_steps steps = fail
+            if "nonpad" not in self.fail:
+                self.fail["nonpad"] = torch.zeros(env.num_envs, dtype=torch.bool, device=d)
+                self.nonpad_count = torch.zeros(env.num_envs, dtype=torch.long, device=d)
+            fresh = self.step <= 1
+            self.nonpad_count[fresh] = 0
+            self.f_nonpad = (f_rob_card - f_tips.sum(-1)).clamp(min=0.0) * in_slot_card.float()
+            self.nonpad_count = torch.where(self.f_nonpad > npmax, self.nonpad_count + 1, torch.zeros_like(self.nonpad_count))
+            self.fail["nonpad"] = self.nonpad_count >= int(getattr(c, "retr_nonpad_steps", 3))
         if hasattr(self, "lock_F"):
             r = float(getattr(c, "retr_lock_ratio", 1.4)); dw = float(getattr(c, "retr_lock_dwell", 8))
             lr = float(getattr(c, "retr_lock_ramp_steps", 0.0))
