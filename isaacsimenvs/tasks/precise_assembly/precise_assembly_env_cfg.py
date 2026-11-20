@@ -244,6 +244,7 @@ class PreciseAssemblyCfg:
     retr_detent_hold_frac: float = 0.5    # seated and press < this x F before clearing = pawl throws the card back out
     retr_detent_rearm_frac: float = 0.5   # pawl re-arms once the press drops below this x F
     retr_detent_scuff_mm: float = 3.0     # cumulative loaded fingertip skid over the held card = 'scuffed'
+    retr_detent_scuff_mm_start: float = 0.0  # >0: scuff limit ramps from this to retr_detent_scuff_mm with the lock ramp
     retr_press_max: float = 0.0           # fragile: robot -> picked-card force limit while it is in the slot (N); 0 = off
     card_path_floor_z: float = 0.0       # path potential height term floors at this height above the slot floor (m)
     card_lean_ref_rest: bool = False     # path lean term vs the front card's rest lean, not its current lean

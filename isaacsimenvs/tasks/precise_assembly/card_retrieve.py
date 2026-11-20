@@ -152,7 +152,13 @@ class RetrieveTask:
         fr = torch.zeros_like(self.scuff, dtype=torch.bool) if ids is None else torch.zeros_like(self.scuff, dtype=torch.bool).index_fill_(0, ids, True)
         self.scuff += ((dl > 5e-5) & loaded).float().mul(dl).sum(-1) * held * (~fr).float()
         self.tip_prev = loc
-        self.fail["scuffed"] = self.scuff > float(getattr(c, "retr_detent_scuff_mm", 3.0)) * 1e-3
+        lim = float(getattr(c, "retr_detent_scuff_mm", 3.0))
+        lr = float(getattr(c, "retr_lock_ramp_steps", 0.0)); s0 = float(getattr(c, "retr_detent_scuff_mm_start", 0.0))
+        if lr > 0 and s0 > 0:   # curriculum: scuff limit shrinks with the lock ramp
+            a_l = min(1.0, float(env.common_step_counter + getattr(c, "retr_lock_offset_steps", 0.0)) / lr)
+            lim = s0 + (lim - s0) * a_l
+        self.scuff_lim = lim
+        self.fail["scuffed"] = self.scuff > lim * 1e-3
         # card pose: engaged -> held at the engaged pose; just snapped -> placed flat on the deck (seat pose)
         hold_ids = (st == 0).nonzero(as_tuple=False).squeeze(-1)
         if len(hold_ids):
