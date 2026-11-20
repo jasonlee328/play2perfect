@@ -239,6 +239,7 @@ class PreciseAssemblyCfg:
     retr_lock_win_rew: float = 0.0       # per step with the press inside [F, r F] while locked
     retr_lock_unlock_bonus: float = 0.0  # once at unlock
     retr_fric_card_jitter: float = 0.0    # DR: each card's friction = env value + U(-j, j) (needs retr_fric_range)
+    retr_fric_card_mu: tuple = ()        # fixed friction per card, front -> back (card 1, 2, 3, 4); < 0 = keep
     retr_detent: bool = False             # FD4: physical spring-pawl detent instead of the pose lock (card_retrieve._detent)
     retr_detent_snap_m: float = 0.0008    # engaged card stands this far proud of the deck; the snap seats it
     retr_detent_groove_m: float = 0.004   # rise that clears the pawl

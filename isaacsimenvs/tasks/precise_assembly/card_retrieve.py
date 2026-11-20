@@ -249,6 +249,15 @@ class RetrieveTask:
                     m = b.root_physx_view.get_material_properties()
                     m[:, :, 0] = mb[:, None]; m[:, :, 1] = mb[:, None]
                     b.root_physx_view.set_material_properties(m, all_ids)
+            fixed = list(getattr(self.c, "retr_fric_card_mu", ()) or ())
+            if fixed:   # fixed friction per card, front -> back (front card, card 2, card 3, ...); < 0 = leave as is
+                all_ids = torch.arange(env.num_envs)
+                for b, v in zip([env.object] + list(env.distractors)[::-1], fixed):
+                    if float(v) < 0:
+                        continue
+                    m = b.root_physx_view.get_material_properties()
+                    m[:, :, 0] = float(v); m[:, :, 1] = float(v)
+                    b.root_physx_view.set_material_properties(m, all_ids)
             K = len(env.distractors)
             self.deck_ref_p = torch.zeros(K, env.num_envs, 3, device=env.device)
             self.deck_ref_n = torch.zeros(K, env.num_envs, 3, device=env.device)
