@@ -40,6 +40,9 @@ class PreciseAssemblyCfg:
     # round-robin with MultiUsdFileCfg). All problems must share the insertion waypoints and hole_z_offset (true
     # for the fmb_* problems). Overrides `problem` when non-empty. Empty = single problem (legacy).
     multi_problems: tuple[str, ...] = ()
+    # Multi clutter (multi_problems whose problems have distractors, or a one-entry list): the actor's layout fields
+    # are shown as this problem's rest layout ("" = cb_binh_chopstick_n5_lift if registered, else the first problem).
+    multi_canonical_problem: str = ""
     goal_mode: str = "preInsertAndFinal"
 
     hole_x_range: tuple[float, float] = (-0.1875, 0.1875)

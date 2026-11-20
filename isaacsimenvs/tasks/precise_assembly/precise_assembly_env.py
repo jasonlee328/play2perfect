@@ -251,8 +251,7 @@ class PreciseAssemblyEnv(PlayEnv):
         # multi_problems with distractors (e.g. chopstick thickness variants): same fixture, same number of
         # distractors and waypoints; each env gets its own object / distractor assets, start poses and waypoints
         # (problem i % K, see _multi_clutter).
-        self._multi_clutter = len(problem_names) > 1 and any(
-            PROBLEM_REGISTRY[n].distractors for n in problem_names)
+        self._multi_clutter = bool(multi) and any(PROBLEM_REGISTRY[n].distractors for n in problem_names)
         for name in problem_names[1:]:
             other = PROBLEM_REGISTRY[name]
             same = len(other.insert_pose_rel_receptive) == len(problem.insert_pose_rel_receptive) and all(
@@ -335,6 +334,14 @@ class PreciseAssemblyEnv(PlayEnv):
                 tuple(float(v) for v in p.object_start_pose_rel_receptive) for p in P)
             seqs = [(p.final_insert_pose_rel_receptive,) if pih_cfg.goal_mode == "finalGoalOnly"
                     else p.insert_pose_rel_receptive for p in P]
+            cn = str(pih_cfg.multi_canonical_problem) or (
+                "cb_binh_chopstick_n5_lift" if "cb_binh_chopstick_n5_lift" in PROBLEM_REGISTRY else problem_names[0])
+            cp = PROBLEM_REGISTRY[cn]
+            if len(cp.distractors) != len(problem.distractors):
+                raise ValueError(f"multi_canonical_problem {cn!r} has a different number of distractors")
+            self._mc_canon_problem = cn
+            self._mc_canon_rel = ((tuple(float(v) for v in cp.object_start_pose_rel_receptive[:3]),)
+                                  + tuple(tuple(float(v) for v in pose[:3]) for _, pose in cp.distractors))
             self._pih_insert_pose_sequence_multi = tuple(
                 tuple(tuple(float(v) for v in pose) for pose in s) for s in seqs)
         self._obs_distractor_idx = None
@@ -535,15 +542,14 @@ class PreciseAssemblyEnv(PlayEnv):
         # the env's problem vs the canonical problem (the base thickness if present, else problem 0). The actor sees
         # every body shifted by R_hole (canon - env) of the slot it started in (_mc_slot follows swaps), so its
         # layout fields (stick pitch, stick height) do not reveal the thickness.
-        names = list(self._pih_problem_names)
-        ci = names.index("cb_binh_chopstick_n5_lift") if "cb_binh_chopstick_n5_lift" in names else 0
         start = torch.tensor(self._pih_object_start_rel_multi, **f)[:, None, :3]                  # (P, 1, 3)
         dist = torch.tensor(self._pih_distractor_pose_rel_multi, **f)[..., :3]                     # (P, K, 3)
         rel = torch.cat([start, dist], dim=1)                                                       # (P, S, 3)
-        self._mc_delta_rel = (rel[ci].unsqueeze(0) - rel[ai]).transpose(0, 1).contiguous()          # (S, N, 3)
+        canon = torch.tensor(self._mc_canon_rel, **f)                                               # (S, 3)
+        self._mc_delta_rel = (canon.unsqueeze(0) - rel[ai]).transpose(0, 1).contiguous()            # (S, N, 3)
         self._mc_slot = torch.arange(rel.shape[1], device=self.device).unsqueeze(1).repeat(1, self.num_envs)
-        self._mc_canon_problem = names[ci]
-        print(f"[PreciseAssemblyEnv] multi clutter: {list(self._pih_problem_names)}, envs per problem "
+        print(f"[PreciseAssemblyEnv] multi clutter: {list(self._pih_problem_names)} (actor layout = "
+              f"{self._mc_canon_problem}), envs per problem "
               f"{torch.bincount(ai, minlength=len(self._pih_problem_names)).tolist()}", flush=True)
 
     def mc_obs_offset(self) -> torch.Tensor:
