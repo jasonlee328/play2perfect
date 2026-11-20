@@ -49,6 +49,8 @@ def _init(env) -> None:
     env.cg_stuck = torch.ones(n, dtype=torch.bool, device=d)
     env.cg_G = torch.zeros(n, device=d)
     env.cg_low = torch.zeros(n, dtype=torch.long, device=d)
+    env.cg_low_lift = torch.zeros(n, device=d)
+    env.cg_rise_prev = torch.zeros(n, device=d)
     env.cg_free = torch.zeros(n, dtype=torch.long, device=d)
     env.cg_lost = torch.zeros(n, dtype=torch.bool, device=d)
     env.cg_break_count = torch.zeros(n, dtype=torch.long, device=d)
@@ -110,6 +112,8 @@ def reset(env, env_ids: torch.Tensor) -> None:
         env.cg_G[env_ids] = (env.cg_S[env_ids] + w) / float(c.cupgrip_mu_cal)
         env.cg_D[env_ids] = env.cg_r[env_ids] * (env.cg_S[env_ids] + w) / float(c.cupgrip_mu_cal)
     env.cg_low[env_ids] = 0
+    env.cg_low_lift[env_ids] = 0.0
+    env.cg_rise_prev[env_ids] = 0.0
     env.cg_free[env_ids] = 0
     klo, khi = (float(v) for v in c.cupgrip_hand_kp_range)
     k = klo + (khi - klo) * torch.rand(n, device=env.device)
@@ -283,9 +287,19 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
         # modelled "too soft": lifting the nested cup (it rose > 2 mm and moves up) with a squeeze below G_lo
         sq = getattr(env, "hand_force_xy", torch.zeros_like(rise))
         v1 = env.object.data.root_lin_vel_w[:, 2]
-        low = gripping & nested & (rise > 0.002) & (v1 > 0.005) & (sq < env.cg_G)
-        env.cg_low = env.cg_low + low.long()
-        slipped = (env.cg_low >= int(c.cupgrip_slip_steps)) & ~dragged
+        lift_mm = float(getattr(c, "cupgrip_slip_lift_mm", 0.0))
+        if lift_mm > 0.0:
+            # distance rule (11-20): the cup slips once it has been lifted lift_mm in total (any speed) while gripped
+            # with a squeeze below G_lo and still nested; the step rule could be dodged by a fast yank or a slow creep
+            d_rise = (rise - env.cg_rise_prev).clamp(min=0.0)
+            lowd = gripping & nested & (sq < env.cg_G)
+            env.cg_low_lift = env.cg_low_lift + torch.where(lowd, d_rise, torch.zeros_like(d_rise))
+            slipped = (env.cg_low_lift > lift_mm / 1000.0) & ~dragged
+        else:
+            low = gripping & nested & (rise > 0.002) & (v1 > 0.005) & (sq < env.cg_G)
+            env.cg_low = env.cg_low + low.long()
+            slipped = (env.cg_low >= int(c.cupgrip_slip_steps)) & ~dragged
+        env.cg_rise_prev = rise.clone()
     if float(c.cupgrip_slip_mm) <= 0.0:
         slipped = z
     if bool(c.cupgrip_lost_fail):
