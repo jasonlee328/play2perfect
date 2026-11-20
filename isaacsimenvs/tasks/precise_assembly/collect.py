@@ -70,6 +70,7 @@ def setup(env) -> None:
     st["n_held_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["prev_pos"] = torch.zeros(N, K, 3, device=dev)
     st["at_rest"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
+    st["lift_done"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
     env._collect = st
     print(f"[collect] slots {types}, N range {n_range}, bin rim {st['rim']*1000:.1f} mm, "
           f"inner floor {[round(float(x)*1000, 1) for x in st['inner_floor']]} mm", flush=True)
@@ -180,6 +181,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
         if k == 0:
             env._object_init_z[env_ids] = pose[:, 2] - origins[:, 2]
     st["inbin"][env_ids] = False
+    st["lift_done"][env_ids] = False
     st["fresh"][env_ids] = True
     st["clear"][env_ids] = 0
     st["success"][env_ids] = False
@@ -262,6 +264,10 @@ def update(env) -> None:
     release = all_in.float() * (d_act / float(c.collect_release_d)).clamp(0, 1)
     phi = phi + float(c.collect_rew_release) * release
     r = torch.where(st["fresh"], torch.zeros_like(phi), phi - st["prev_phi"])
+    # one-time bonus the first time each utensil is lifted (> 2 cm, out of the bin) in an episode
+    new_lift = lifted & ~st["lift_done"] & ~st["fresh"].unsqueeze(1)
+    st["lift_done"] |= lifted
+    r = r + float(c.collect_lift_bonus) * new_lift.float().sum(1)
     st["prev_phi"] = phi
     st["fresh"][:] = False
     st["rew"] = r

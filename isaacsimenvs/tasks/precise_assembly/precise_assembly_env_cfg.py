@@ -231,6 +231,9 @@ class PreciseAssemblyCfg:
     collect_release_d: float = 0.08
     collect_success_bonus: float = 500.0
     collect_fall_penalty: float = 200.0
+    collect_lift_bonus: float = 0.0                 # one-time per utensil and episode, first lift > 2 cm out of the bin
+    collect_base_reward_scale: float = 0.0          # > 0: also add the play reward terms for slot 0 (fingertip approach,
+                                                    # lift, keypoint toward its in-bin goal) times this scale
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:

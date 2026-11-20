@@ -1303,7 +1303,15 @@ class PreciseAssemblyEnv(PlayEnv):
         succ = t["max_successes"].float() * float(c.collect_success_bonus)
         fell = -t["collect_fell"].float() * float(c.collect_fall_penalty)
         reward = pen + st["rew"] + succ + fell
+        base = torch.zeros_like(reward)
+        if float(c.collect_base_reward_scale) > 0.0:
+            rt = self._reward_terms
+            lift_on = 1.0 if c.force_lift_reward_active else 0.0
+            base = float(c.collect_base_reward_scale) * (rt["fingertip_delta_rew"] + rt["keypoint_rew"]
+                                                         + lift_on * (rt["lifting_rew"] + rt["lift_bonus_rew"]))
+            reward = reward + base
         self._reward_terms = {
+            "collect_base": base,
             "kuka_actions_penalty": self._reward_terms["kuka_actions_penalty"],
             "hand_actions_penalty": self._reward_terms["hand_actions_penalty"],
             "collect_shaped": st["rew"], "collect_success_bonus": succ, "collect_fell_penalty": fell,
