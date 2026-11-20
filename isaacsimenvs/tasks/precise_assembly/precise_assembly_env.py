@@ -350,7 +350,15 @@ class PreciseAssemblyEnv(PlayEnv):
                 raise ValueError(f"precise_assembly.collect=true needs a collect problem, got {problem_name!r}")
             from .collect import obs_size
             OBS_FIELD_SIZES["collect_obs"] = obs_size(int(pih_cfg.collect_obs_slots))
-            for lst in ("obs_list", "state_list"):
+            t = cfg.tactile
+            for lst, pre in (("obs_list", (("tactile", t.enabled and t.in_policy),
+                                            ("tactile_hand", t.enabled and t.whole_hand and t.in_policy))),
+                             ("state_list", (("tactile", t.enabled and t.in_critic),
+                                             ("tactile_hand", t.enabled and t.whole_hand and t.whole_hand_in_critic)))):
+                if pih_cfg.collect_obs_last:   # tactile fields first (PlayEnv then skips them), collect_obs after
+                    for f, on in pre:
+                        if on and f not in getattr(cfg.obs, lst):
+                            setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), f))
                 if "collect_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "collect_obs"))
 
