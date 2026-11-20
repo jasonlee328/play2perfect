@@ -301,6 +301,14 @@ class WipeTask:
                 chk = ((rr2[:, None] + rr2[None, :]) % 2).float().view(1, 1, res * res)
                 m = (iw.float()[:, None] * on.float())[..., None]                                  # (N, nf, 1)
                 out = (out.view(N, nf, res * res) + cue * chk * m).clamp(max=1.0)
+        oc = float(getattr(self.c, "wipe_over_cue", 0.0))
+        if oc > 0.0:
+            # touch-only 'too hard' cue (stripes) on pads in contact while the press is above the hidden window
+            ov = (self.F > self.win_hi).float()
+            rr3 = torch.arange(res, device=env.device)
+            stp = ((rr3[:, None] // 2 + 0 * rr3[None, :]) % 2).float().view(1, 1, res * res)
+            m = (ov[:, None] * on.float())[..., None]
+            out = (out.view(N, nf, res * res) + oc * stp * m).clamp(max=1.0)
         return out.reshape(N, -1)
 
     # ------------------------------------------------------------------ reward
