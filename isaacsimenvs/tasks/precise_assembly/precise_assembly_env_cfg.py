@@ -125,7 +125,7 @@ class PreciseAssemblyCfg:
     usb_pad_force: float = 0.2         # N, a link "carries" the stick
     usb_clear_force: float = 0.05      # N, official released_and_clear contact threshold
     usb_pinch_frac: float = 0.9        # finger_pinch_real: share of pre-release steps with the pinch loaded
-    usb_pinch_mode: str = "mean_force"  # finger_pinch_real: "mean_force" (official, mean pad force >= usb_pinch_mean_n) | "frac"
+    usb_pinch_mode: str = "mean_force"  # finger_pinch_real: "mean_force" (official, mean pad force >= usb_pinch_mean_n) | "frac"  # "off" = no squeeze rule
     usb_pinch_mean_n: float = 3.0      # N per pad (plug_in_usb.py:591)
     usb_pinch_window: str = "insert"   # pad-force window: "insert" (official: hold end -> first seated) | "pre_release"
     usb_pinch_fail_at_seat: bool = False      # TRAINING ONLY: fail ("pinch_weak") at the first seat if the insert-phase pad mean < usb_pinch_mean_n (the push test would fail anyway)

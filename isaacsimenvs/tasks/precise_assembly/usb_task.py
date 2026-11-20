@@ -159,7 +159,7 @@ class UsbTask:
         # the insert window closes at the first seat: the official pinch verdict is fixed from here on
         first_seat = inserted & ~self.ever_ins & ~self.released
         m_th = self.pre_f_th / self.ins_steps.clamp(min=1.0); m_ix = self.pre_f_ix / self.ins_steps.clamp(min=1.0)
-        pinch_ok_now = torch.minimum(m_th, m_ix) >= float(getattr(c, "usb_pinch_mean_n", 3.0))
+        pinch_ok_now = (torch.minimum(m_th, m_ix) >= float(getattr(c, "usb_pinch_mean_n", 3.0))) | (str(getattr(c, "usb_pinch_mode", "mean_force")) == "off")
         self.first_seat, self.seat_pinch_ok, self.win = first_seat, first_seat & pinch_ok_now, win
         if "pinch_weak" in self.fail:
             self.fail["pinch_weak"] |= first_seat & ~pinch_ok_now
@@ -188,7 +188,9 @@ class UsbTask:
             stays = (tip[:, 2] - self.rel_tipz).abs() < c.usb_stay_tol
         no_motion = gain < c.usb_push_gain_tol
         mean_th = self.pre_f_th / self.ins_steps.clamp(min=1.0); mean_ix = self.pre_f_ix / self.ins_steps.clamp(min=1.0)
-        if str(getattr(c, "usb_pinch_mode", "mean_force")) == "frac":   # old A12 rule: pinch loaded on >= usb_pinch_frac of the steps
+        if str(getattr(c, "usb_pinch_mode", "mean_force")) == "off":   # no squeeze rule (the official finger_pinch_real is a QA check of the scripted gripper, not a task-success condition)
+            pinch_real = torch.ones_like(self.hold_ok)
+        elif str(getattr(c, "usb_pinch_mode", "mean_force")) == "frac":   # old A12 rule: pinch loaded on >= usb_pinch_frac of the steps
             pinch_real = self.pre_loaded >= c.usb_pinch_frac * self.pre_steps.clamp(min=1.0)
         else:   # official (plug_in_usb.py:553, 590-592): mean force on EACH pad during the insertion >= 3 N
             pinch_real = torch.minimum(mean_th, mean_ix) >= float(getattr(c, "usb_pinch_mean_n", 3.0))
