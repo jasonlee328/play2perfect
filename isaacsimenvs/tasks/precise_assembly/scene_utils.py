@@ -36,7 +36,7 @@ def _asset_path(path: str | Path) -> str:
     return str(asset_path)
 
 
-def _pih_rigid_object_cfg(prim_path: str, usd_path: str) -> RigidObjectCfg:
+def _pih_rigid_object_cfg(prim_path: str, usd_path: str, init_pos=None) -> RigidObjectCfg:
     """Single-USD RigidObject spawn using `UsdFileCfg` (not `MultiUsdFileCfg`).
 
     Why bypass `MultiUsdFileCfg` even though our list has just one entry:
@@ -47,7 +47,10 @@ def _pih_rigid_object_cfg(prim_path: str, usd_path: str) -> RigidObjectCfg:
     prim_path (so the Articulation/RigidObject discovers all envs) but
     avoids the multi-asset carb branch.
     """
-    return RigidObjectCfg(prim_path=prim_path, spawn=UsdFileCfg(usd_path=usd_path))
+    cfg = RigidObjectCfg(prim_path=prim_path, spawn=UsdFileCfg(usd_path=usd_path))
+    if init_pos is not None:   # spawn pose (env frame) until the first reset writes the real one
+        cfg.init_state = RigidObjectCfg.InitialStateCfg(pos=tuple(float(v) for v in init_pos))
+    return cfg
 
 
 def _rigid_body_prim(stage, root: str):
@@ -253,13 +256,19 @@ def setup_scene(env) -> None:
         env.goal_viz = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths))
     else:
         env.hole = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0]))
-        _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0])
+        # collect mode: every slot body spawns at its own parking spot (3 m up), not all at the env origin, where the
+        # 8+ overlapping parts + ground overflowed the PhysX contact buffer before the first reset (A19 fst2, 94M)
+        _collect = bool(getattr(env.cfg.precise_assembly, "collect_mode", False))
+        _park = lambda k: (0.0, 0.0, float(env.cfg.precise_assembly.collect_park_z) + 0.12 * k) if _collect else None
+        _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0], _park(0))
         if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)):
             _ocfg.spawn.activate_contact_sensors = True   # PhysxContactReportAPI: hand-on-object force (A1)
         env.object = RigidObject(_ocfg)
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
     env.distractors = tuple(
-        RigidObject(_pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd))
+        RigidObject(_pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd,
+                                          (0.0, 0.0, float(env.cfg.precise_assembly.collect_park_z) + 0.12 * (k + 1))
+                                          if bool(getattr(env.cfg.precise_assembly, "collect_mode", False)) else None))
         for k, usd in enumerate(distractor_usd_paths)
     )
     _log_scene_step(setup_t0, f"spawned robot/table/hole/object/goalviz + {len(env.distractors)} distractors")
