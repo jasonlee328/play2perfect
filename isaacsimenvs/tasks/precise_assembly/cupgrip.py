@@ -205,7 +205,9 @@ def pre_physics(env) -> None:
     base = getattr(env, "_object_forces", None)
     if base is not None:
         F1 = F1 + base
-    F1[:, 0, 2] -= f_ret + f2
+    # the drag reaction on the top cup lets proprio feel the carried second cup (a no-touch policy over-squeezed, felt it and
+    # eased off into the window: cgw6 ep800 touch-zeroed 87.5 / twin 59.0) -> cupgrip_drag_reaction=false drops it
+    F1[:, 0, 2] -= f_ret + (f2 if bool(c.cupgrip_drag_reaction) else 0.0 * f2)
     T1 = getattr(env, "_object_torques", None)
     T1 = torch.zeros_like(F1) if T1 is None else T1
     env.object.set_external_force_and_torque(forces=F1, torques=T1, is_global=True)
@@ -316,13 +318,16 @@ def tactile_cue(env, tac: torch.Tensor) -> torch.Tensor:
     nested = env.cg_rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
     zone = (sq >= float(c.cupgrip_contact_N)) & nested & (sq < float(c.cupgrip_cue_ratio) * env.cg_G)
     env.cg_cue = zone
-    if not bool(zone.any()):
-        return tac
     res = int(env.cfg.tactile.resolution)
     t = tac.view(env.num_envs, -1, res, res)
     sh = 1 if int(env.common_step_counter) % 2 == 0 else -1
-    rolled = torch.roll(t, shifts=sh, dims=-2)
-    out = torch.where(zone.view(-1, 1, 1, 1), rolled, t)
+    out = torch.where(zone.view(-1, 1, 1, 1), torch.roll(t, shifts=sh, dims=-2), t)
+    if float(c.cupgrip_over_cue) > 0.0:
+        # TOUCH-ONLY over cue: squeeze above over_cue x D (drag limit near / the second cup coming along) -> pad images
+        # shifted one taxel along their COLUMNS, alternating (distinct from the under cue along rows)
+        over = (sq >= float(c.cupgrip_contact_N)) & (sq > float(c.cupgrip_over_cue) * env.cg_D)
+        env.cg_over = over
+        out = torch.where(over.view(-1, 1, 1, 1), torch.roll(out, shifts=sh, dims=-1), out)
     return out.reshape(tac.shape)
 
 
