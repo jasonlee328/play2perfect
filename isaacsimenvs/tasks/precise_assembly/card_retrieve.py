@@ -533,6 +533,10 @@ class RetrieveTask:
         r = r + float(getattr(c, "retr_setdown_bonus", 0.0)) * self.setdown * (~self.just_drop).float()
         r = r + c.retr_tip_rew * (self.n_tips.clamp(max=2.0) / 2.0) * (~self.released).float()
         r = r - c.card_rob_deck_pen * self.f_rob_deck.clamp(max=c.card_rob_deck_pen_cap)
+        if hasattr(self, "f_nonpad"):   # fingertips-only shaping: dense cost of non-fingertip force on card 1 in the holder
+            r = r - float(getattr(c, "retr_nonpad_pen", 0.0)) * self.f_nonpad.clamp(max=10.0)
+            pad = self.f_tips.sum(-1) * (self.f_nonpad < 0.5).float() * (~self.released).float()
+            r = r + float(getattr(c, "retr_padpress_rew", 0.0)) * pad.clamp(max=5.0) / 5.0
         dm = self.deck_disp / c.retr_other_disp_max + self.deck_tilt / c.retr_other_tilt_max
         r = r - c.card_deck_motion_pen * dm.clamp(max=c.card_deck_motion_pen_cap)
         if c.card_clear_rew_scale > 0.0:
