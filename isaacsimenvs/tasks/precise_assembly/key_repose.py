@@ -40,7 +40,9 @@ class KeyRepose:
         self.final_rot_err = torch.zeros(N, device=dev)  # deg, to the final (full-flip) goal
         self.min_final_rot_err = torch.full((N,), 180.0, device=dev)
         ax = torch.tensor([float(v) for v in getattr(c, "key_flip_axis", (1.0, 0.0, 0.0))], device=dev)
-        self.x_axis = ax / ax.norm()          # flip axis in the object frame (key: long axis x; Allen key: pinch axis z)
+        self.x_axis = ax / ax.norm()
+        pv = getattr(c, "key_pivot_point", None)
+        self.pivot = torch.tensor([float(v) for v in pv], device=dev) if pv else None   # object frame (m)          # flip axis in the object frame (key: long axis x; Allen key: pinch axis z)
         self._step = 0
 
     # ------------------------------------------------------------------ helpers
@@ -77,6 +79,12 @@ class KeyRepose:
         if pre is not None:
             k0 = quat_mul(k0, quat_from_angle_axis(-pre[env_ids], self.x_axis.expand(env_ids.numel(), 3)))
         q_new = quat_mul(k0, r)
+        g = getattr(self, "pivot", None)
+        if g is not None:                       # rotate about the grasp point instead of the object origin (COM)
+            n = env_ids.numel(); gg = g.expand(n, 3)
+            q_b = quat_mul(pq, self.base_q[env_ids])
+            p_ready = p_ready + quat_apply(q_b, gg) - quat_apply(q_ready, gg)
+            p_new = p_new + quat_apply(k0, gg) - quat_apply(q_new, gg)
         p = torch.where(rd.unsqueeze(-1), p_ready, p_new)
         q = torch.where(rd.unsqueeze(-1), q_ready, q_new)
         return torch.cat([p, q], -1)
