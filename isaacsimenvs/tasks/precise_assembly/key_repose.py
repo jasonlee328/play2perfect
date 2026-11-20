@@ -137,7 +137,7 @@ class KeyRepose:
         twf = twf / twf.norm(dim=-1, keepdim=True).clamp_min(1e-9)
         ftw = 2.0 * torch.acos(twf[:, 0].abs().clamp(max=1.0))
         fsw = 2.0 * torch.acos(quat_mul(dqf, quat_conjugate(twf))[:, 0].abs().clamp(max=1.0))
-        phi = -(ftw + float(c.key_shape_swing_w) * fsw)
+        phi = -(ftw + float(c.key_shape_swing_w) * fsw + float(getattr(c, "key_shape_pos_w", 0.0)) * (kp - gf[:, 0:3]).norm(dim=-1))
         if not hasattr(self, "phi_prev"):
             self.phi_prev = phi.clone()
         fresh = self.fresh if hasattr(self, "fresh") else torch.ones_like(self.ready)

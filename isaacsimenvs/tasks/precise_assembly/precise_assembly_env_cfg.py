@@ -131,6 +131,7 @@ class PreciseAssemblyCfg:
     key_drop_penalty: float = 200.0
     key_shape_scale: float = 0.0        # > 0: reward scale x (decrease of final twist + w x swing error, rad) per step
     key_shape_swing_w: float = 1.0
+    key_shape_pos_w: float = 0.0        # per m: position error to the final goal in the shaping potential (rad-equivalent)
     key_waypoint_hold_steps: int = 0    # >0: intermediate flip waypoints need only this many near-goal steps
     key_assist_torque: float = 0.0      # N m > 0: training aid, torque on the key about its own long axis toward the
                                         # current goal twist (+ damping on that spin), fading 1 -> 0 over key_assist_ramp_steps
