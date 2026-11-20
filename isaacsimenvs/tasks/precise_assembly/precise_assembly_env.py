@@ -381,6 +381,9 @@ class PreciseAssemblyEnv(PlayEnv):
                     fields.append("collect_obs_x")
                 else:
                     OBS_FIELD_SIZES["collect_obs"] = 8 * K
+                if cfg.precise_assembly.collect_scoop:
+                    OBS_FIELD_SIZES["collect_group"] = 4
+                    fields.append("collect_group")
                 for lst in ("obs_list", "state_list"):
                     for f in fields:
                         if f not in getattr(cfg.obs, lst):
@@ -1187,9 +1190,10 @@ class PreciseAssemblyEnv(PlayEnv):
         self._is_success[:] = False
         self._successes = col.in_bin.sum(1).long()
         ft_far = col.ft_min_all > 1.5
-        terminated = col.success | col.fell | ft_far
+        terminated = col.success | col.fell | ft_far | col.trip_fail
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {"max_successes": col.success, "fall": col.fell, "hand_far": ft_far,
+                                     "trips": col.trip_fail,
                                      "timeout": truncated & ~terminated}
         return terminated, truncated
 
@@ -1213,6 +1217,8 @@ class PreciseAssemblyEnv(PlayEnv):
         ef["collect_ever_frac"] = col.ever_in_bin.sum(1).float() / col.n_active.clamp_min(1.0)
         ef["collect_lift_frac"] = col.bonus_paid.sum(1).float() / col.n_active.clamp_min(1.0)
         ef["collect_from_bank"] = col.from_bank.float()
+        ef["collect_n_in_hand"] = col.n_in_hand
+        ef["collect_trips"] = col.trips.float()
         self.extras["success_final"] = {"task": col.success.float(), "n_active": col.n_active,
                                         "frac_in_bin": ef["collect_frac_in_bin"]}
         self.extras["collect_n_hi"] = float(col._n_hi_now())

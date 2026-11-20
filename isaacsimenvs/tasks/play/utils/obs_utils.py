@@ -377,6 +377,8 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             obs_clean["collect_obs"], obs_clean["collect_obs_x"] = co[:, :n8], co[:, n8:]
         else:
             obs_clean["collect_obs"] = co
+        if "collect_group" in OBS_FIELD_SIZES:
+            obs_clean["collect_group"] = env._collect.group_obs(palm_pos)
 
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw

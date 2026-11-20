@@ -85,6 +85,12 @@ class CollectManager:
         self.prev_rel = torch.zeros(N, device=self.dev)
         self.prev_carry = torch.zeros(N, device=self.dev)
         self.rterms = {}
+        self.trips = torch.zeros(N, dtype=torch.long, device=self.dev)
+        self.since_dep = torch.full((N,), 999, dtype=torch.long, device=self.dev)
+        self.trip_fail = torch.zeros(N, dtype=torch.bool, device=self.dev)
+        self.prev_hand = torch.zeros(N, self.K, dtype=torch.bool, device=self.dev)
+        self.prev_scoop = torch.zeros(N, device=self.dev)
+        self.n_in_hand = torch.zeros(N, device=self.dev)
         self.park = torch.zeros(self.K, 3, device=self.dev)
         for k in range(self.K):
             self.park[k] = torch.tensor([0.0, 0.0, float(c.collect_park_z) + 0.12 * k], device=self.dev)
@@ -205,6 +211,11 @@ class CollectManager:
         self.prev_in[env_ids] = False
         self.prev_rel[env_ids] = 0.0
         self.prev_carry[env_ids] = 0.0
+        self.trips[env_ids] = 0
+        self.since_dep[env_ids] = 999
+        self.trip_fail[env_ids] = False
+        self.prev_hand[env_ids] = False
+        self.prev_scoop[env_ids] = 0.0
         env._object_init_z[env_ids] = self.z0[env_ids, 0]
         if self.bank is not None:
             self._apply_bank(env_ids)
@@ -276,7 +287,22 @@ class CollectManager:
             body.write_root_velocity_to_sim(torch.zeros(m, 6, device=self.dev), env_ids=ids)
 
     # ------------------------------------------------------------------ target (what the policy's object fields show)
+    def _centroid_w(self):
+        """Mean pose / velocity of the active parts not in the bin (world); the drop point when none are left."""
+        pos = torch.stack([b.data.root_pos_w for b in self.bodies], 1)
+        vel = torch.stack([b.data.root_lin_vel_w for b in self.bodies], 1)
+        out = (self.active & ~self.in_bin).float().unsqueeze(-1)
+        n = out.sum(1)
+        c = (pos * out).sum(1) / n.clamp(min=1.0)
+        v = (vel * out).sum(1) / n.clamp(min=1.0)
+        c = torch.where(n > 0, c, self.drop_point_w())
+        return c, v
+
     def target_state_w(self):
+        if self.c.collect_scoop:
+            c, v = self._centroid_w()
+            q = torch.zeros(c.shape[0], 4, device=self.dev); q[:, 0] = 1.0
+            return c, q, v, torch.zeros_like(v)
         i = self.target
         def g(attr):
             x = torch.stack([getattr(b.data, attr) for b in self.bodies], 1)
@@ -290,7 +316,7 @@ class CollectManager:
 
     def goal_state_w(self):
         # position-only goal: the drop point above the bin, with the target's own orientation
-        return self.drop_point_w(), self.target_state_w()[1]
+        return self.drop_point_w(), self.target_state_w()[1]   # scoop: identity = the virtual object's
 
     # ------------------------------------------------------------------ state
     def _slots(self):
@@ -394,12 +420,60 @@ class CollectManager:
         rel_phi = (self.ft_min_all / 0.05).clamp(0.0, 1.0) * all_in.float()
         r_rel = torch.where(self.fresh, torch.zeros_like(rel_phi), rel_phi - self.prev_rel)
         self.prev_rel = rel_phi
+        if c.collect_scoop:
+            self._scoop_terms(pos, out, all_in, r_rel, d_in, dd, on_table)
+            self.grasped = grasped
+            return
         self.rterms = dict(ft=float(c.collect_w_ftdelta) * r_ft, lift=float(c.collect_w_lift_dense) * r_lift,
                            lift_bonus=float(c.collect_lift_bonus) * bonus_new.float(),
                            carry=float(c.collect_w_carry_v2) * r_carry, bin=float(c.collect_w_bin_v2) * d_in,
                            release=float(c.collect_w_release_v2) * r_rel,
                            hold=float(c.collect_w_hold) * hold, drop=-float(c.collect_drop_penalty) * dropped)
         self.grasped = grasped
+
+    def _scoop_terms(self, pos, out, all_in, r_rel, d_in, dd, on_table) -> None:
+        """Scoop reward: approach the centroid of the parts left, potential per part in the hand (lifted >= 2 cm and
+        within collect_hand_radius of the palm), symmetric carry over every part in the hand, +-bin per part, lift bonus
+        once per part, drop penalty, trip budget (deposits into the bin <= ceil(N / collect_trip_size))."""
+        env, c = self.env, self.c
+        N = env.num_envs
+        palm = env.robot.data.body_state_w[:, env._palm_body_id, 0:3] - env.scene.env_origins
+        cw, _ = self._centroid_w()
+        cen = cw - env.scene.env_origins
+        rise = pos[..., 2] - self.z0
+        near_palm = (pos - palm.unsqueeze(1)).norm(dim=-1) < float(c.collect_hand_radius)
+        in_hand = out & (rise > 0.02) & near_palm
+        n_hand = in_hand.sum(1).float()
+        self.n_in_hand = n_hand
+        app = (palm - cen).norm(dim=-1).clamp(max=0.4)
+        phi = (-float(c.collect_w_scoop_app) * app * (n_hand == 0).float() + float(c.collect_w_inhand) * n_hand
+               + float(c.collect_w_carry_v2) * ((float(c.collect_carry_d0_v2) - dd).clamp(min=0.0) * in_hand.float()).sum(1))
+        r_phi = torch.where(self.fresh, torch.zeros_like(phi), phi - self.prev_scoop)
+        self.prev_scoop = phi
+        new_lift = in_hand & ~self.bonus_paid
+        self.bonus_paid |= in_hand
+        dropped = (self.prev_hand & on_table & ~self.in_bin & self.active).sum(1).float()
+        self.prev_hand = in_hand
+        self.since_dep += 1
+        dep = (d_in > 0) & (self.since_dep > int(c.collect_trip_gap))
+        self.trips += dep.long()
+        self.since_dep = torch.where(d_in > 0, torch.zeros_like(self.since_dep), self.since_dep)
+        budget = torch.ceil(self.n_active / float(c.collect_trip_size)).long()
+        self.trip_fail = (self.trips > budget) & ~all_in if c.collect_trip_size > 0 else torch.zeros_like(self.trip_fail)
+        self.rterms = dict(scoop=r_phi, lift_bonus=float(c.collect_lift_bonus) * new_lift.sum(1).float(),
+                           bin=float(c.collect_w_bin_v2) * d_in, release=float(c.collect_w_release_v2) * r_rel,
+                           drop=-float(c.collect_drop_penalty) * dropped,
+                           trip=-float(c.collect_trip_penalty) * self.trip_fail.float())
+
+    def group_obs(self, palm_pos: torch.Tensor) -> torch.Tensor:
+        """(N, 4): parts left / 10, xy spread of the parts left (m), parts in the hand / 10, palm-to-centroid (m)."""
+        if not hasattr(self, "pos"):
+            self.update()
+        out = (self.active & ~self.in_bin).float()
+        n = out.sum(1).clamp(min=1.0)
+        cen = (self.pos * out.unsqueeze(-1)).sum(1) / n.unsqueeze(-1)
+        spread = (((self.pos[..., :2] - cen[:, None, :2]) ** 2).sum(-1) * out).sum(1).div(n).sqrt()
+        return torch.stack([out.sum(1) / 10.0, spread, self.n_in_hand / 10.0, (palm_pos - cen).norm(dim=-1)], -1)
 
     # ------------------------------------------------------------------ outputs
     def obs(self, palm_pos: torch.Tensor) -> torch.Tensor:
@@ -408,6 +482,11 @@ class CollectManager:
             self.update()
         a = self.active.float().unsqueeze(-1)
         o = torch.cat([(self.pos - palm_pos.unsqueeze(1)) * a, self.rel_bin * a, a, self.in_bin.float().unsqueeze(-1)], -1)
+        if self.c.collect_sort_slots:
+            # nearest-to-palm first (inactive last): the same inputs always hold the closest parts
+            key = torch.where(self.active, (self.pos - palm_pos.unsqueeze(1)).norm(dim=-1), torch.full_like(o[..., 0], 99.0))
+            idx = key.argsort(dim=1)
+            o = torch.gather(o, 1, idx.unsqueeze(-1).expand(-1, -1, o.shape[-1]))
         return o.reshape(N, K * 8)
 
     def reward(self):
@@ -416,4 +495,6 @@ class CollectManager:
         self.fresh[:] = False
         bonus = float(c.collect_success_bonus) * self.success.float()
         fall = -float(c.collect_fall_penalty) * self.fell.float()
+        if c.collect_scoop:
+            fall = fall - float(c.collect_trip_penalty) * 0.0
         return shaped, bonus, fall

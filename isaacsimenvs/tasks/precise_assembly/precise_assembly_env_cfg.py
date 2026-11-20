@@ -230,7 +230,17 @@ class PreciseAssemblyCfg:
     collect_bank_ramp_offset_steps: int = 0
     collect_fall_penalty: float = 300.0
     collect_obs: bool = True                    # field collect_obs (8 per slot) in obs_list + state_list
-    collect_obs_pad: int = 0                    # > 8: fixed slot layout (collect_obs = 8 slots + collect_obs_x)
+    collect_obs_pad: int = 0
+    # scoop mode (user 11-20: several parts per carry): the object obs / goal follow the centroid of the parts left;
+    # field collect_group; reward per part in the hand; trip budget ceil(N / collect_trip_size) deposits
+    collect_scoop: bool = False
+    collect_sort_slots: bool = False
+    collect_hand_radius: float = 0.10
+    collect_w_scoop_app: float = 200.0
+    collect_w_inhand: float = 150.0
+    collect_trip_size: float = 3.0
+    collect_trip_gap: int = 30
+    collect_trip_penalty: float = 500.0                    # > 8: fixed slot layout (collect_obs = 8 slots + collect_obs_x)
     collect_friction: tuple[float, float] = (0.6, 0.5)  # parts + bin (static, dynamic): PLA, official manifest.yaml
 
 
