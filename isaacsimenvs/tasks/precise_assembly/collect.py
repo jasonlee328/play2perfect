@@ -292,6 +292,10 @@ class CollectManager:
         pos = torch.stack([b.data.root_pos_w for b in self.bodies], 1)
         vel = torch.stack([b.data.root_lin_vel_w for b in self.bodies], 1)
         out = (self.active & ~self.in_bin).float().unsqueeze(-1)
+        if self.c.collect_obj_follow_hand:
+            # parts in the hand (if any) define the virtual object: carrying them moves it to the goal
+            ih = self.prev_hand.float().unsqueeze(-1)
+            out = torch.where(ih.sum(1, keepdim=True) > 0, ih, out)
         n = out.sum(1)
         c = (pos * out).sum(1) / n.clamp(min=1.0)
         v = (vel * out).sum(1) / n.clamp(min=1.0)

@@ -236,6 +236,8 @@ class PreciseAssemblyCfg:
     collect_scoop: bool = False
     # success needs only this many parts in the bin (0 = every active part)
     collect_success_min_in: int = 0
+    # scoop: the virtual object = parts in the hand when any are held, else the parts left
+    collect_obj_follow_hand: bool = False
     collect_sort_slots: bool = False
     collect_hand_radius: float = 0.10
     collect_w_scoop_app: float = 200.0
