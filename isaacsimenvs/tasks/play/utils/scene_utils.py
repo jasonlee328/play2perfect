@@ -1429,6 +1429,7 @@ def _bake_usd(
     apply_physx_articulation: bool = False,
     collision_enabled: bool | None = None,
     rest_offset: float | None = None,
+    compliant: tuple[float, float, float] | None = None,
 ) -> str:
     """Copy raw USD into bake_root/baked_subdir and pre-author physics props.
 
@@ -1499,6 +1500,28 @@ def _bake_usd(
                 (ce.GetCollisionEnabledAttr() or ce.CreateCollisionEnabledAttr()).Set(
                     collision_enabled
                 )
+
+    if compliant is not None:
+        # compliant = (stiffness N/m, damping N s/m, friction): one physics material bound to every collision prim
+        from pxr import UsdShade
+        mat_path = root.GetPath().AppendChild("CompliantPhysicsMaterial")
+        mat = UsdShade.Material.Define(stage, mat_path)
+        mp = mat.GetPrim()
+        um = UsdPhysics.MaterialAPI.Apply(mp)
+        um.CreateStaticFrictionAttr().Set(float(compliant[2]))
+        um.CreateDynamicFrictionAttr().Set(float(compliant[2]))
+        um.CreateRestitutionAttr().Set(0.0)
+        pm = PhysxSchema.PhysxMaterialAPI.Apply(mp)
+        pm.CreateCompliantContactStiffnessAttr().Set(float(compliant[0]))
+        pm.CreateCompliantContactDampingAttr().Set(float(compliant[1]))
+        n_bound = 0
+        for prim in Usd.PrimRange(root):
+            if prim.HasAPI(UsdPhysics.CollisionAPI):
+                UsdShade.MaterialBindingAPI.Apply(prim).Bind(
+                    mat, UsdShade.Tokens.strongerThanDescendants, "physics")
+                n_bound += 1
+        print(f"[bake] compliant material k={compliant[0]} c={compliant[1]} mu={compliant[2]} on {n_bound} shapes "
+              f"({baked_subdir})", flush=True)
 
     stage.GetRootLayer().Save()
     return str(baked_usd_path)
@@ -1574,6 +1597,8 @@ def apply_physx_material_properties(env) -> None:
     for name in ("table", "object", "goal_viz", "hole"):
         if not hasattr(env, name):
             continue
+        if name == "table" and float(getattr(assets_cfg, "table_compliant_stiffness", 0.0)) > 0.0:
+            continue   # the baked compliant material already carries the table friction
         view = getattr(env, name).root_physx_view
         materials = view.get_material_properties()
         materials[:] = default
@@ -1713,6 +1738,9 @@ def setup_scene(env) -> None:
             props=dict(
                 kinematic_enabled=True, disable_gravity=True, articulation_enabled=False,
             ),
+            compliant=((float(assets_cfg.table_compliant_stiffness), float(assets_cfg.table_compliant_damping),
+                        float(assets_cfg.robot_friction))
+                       if float(getattr(assets_cfg, "table_compliant_stiffness", 0.0)) > 0.0 else None),
         )]
         # Single (sx, sy) = (1.0, 1.0) for downstream consumers (eval viz).
         env._table_variant_scales = [(1.0, 1.0)]

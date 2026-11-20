@@ -101,6 +101,11 @@ class AssetsCfg:
     finger_tip_friction: float = 1.5
     object_friction: float = 0.5
     table_friction: float = 0.5
+    # A18: compliant (soft) table contact. > 0 authors a PhysX compliant-contact material (stiffness N/m, damping
+    # N s/m, friction = robot_friction) on the table's collision shapes at bake time, and the runtime friction pass
+    # skips the table. A fingertip pressing at a few N then sinks mm into the surface while a 6 g utensil barely sinks.
+    table_compliant_stiffness: float = 0.0
+    table_compliant_damping: float = 0.0
 
 # ----------------------------------------------------------------------------
 # obs
