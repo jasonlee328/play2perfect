@@ -170,6 +170,7 @@ class KeyLockCfg:
     key_pull_n: float = 3.0              # net outward hand force on the key (N)
     key_pull_steps: int = 5
     key_pull_win_any: bool = False
+    key_max_deg_s: float = 0.0           # > 0: pose-level cap on the key's forward turning speed (deg/s)
     key_target_hint: bool = False        # with key_cue_to_latch + latch_hint_obs: latch_hint theta = the hidden target
     key_cue_to_latch: bool = False       # expose the hidden pull window as env.latch_in_window, so the privileged
                                          # actor field latch_cue (precise_assembly.latch_cue_obs) carries it (oracle)       # a pull counts as in-window if the key was in the window at any step of it
@@ -467,7 +468,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
             self._key_stop_hi = torch.as_tensor(np.radians(self._cbf["stop_deg"]), device=self.device, dtype=torch.float32)
             j = self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)]
             self._key_stop_lo = math.radians(float(j.lower_deg if j.lower_deg is not None else -1.0))
-        if not bool(self._key_soft_stop_t.any()):
+        cap = float(self.cfg.key_lock.key_max_deg_s)
+        if not bool(self._key_soft_stop_t.any()) and cap <= 0.0:
             return
         c = self.cfg.precise_assembly
         k = int(c.unlock_joint)
@@ -476,6 +478,16 @@ class KeyLockEnv(PreciseAssemblyEnv):
         over = torch.where(ang > hi, ang - hi,
                            torch.where(ang < self._key_stop_lo, ang - self._key_stop_lo, torch.zeros_like(ang)))
         over = torch.where(self._key_soft_stop_t, over, torch.zeros_like(over))
+        if cap > 0.0:
+            # turning-speed cap (pose level, every substep): forward advance per substep <= cap x physics dt;
+            # the reference follows the key down freely (turning back / reset)
+            if not hasattr(self, "_key_cap_ref") or self._key_cap_ref.shape != ang.shape:
+                self._key_cap_ref = ang.clone()
+            ref = torch.minimum(self._key_cap_ref, ang)
+            allow = ref + math.radians(cap) * float(self.cfg.sim.dt)
+            fast = (ang - allow).clamp(min=0.0)
+            over = torch.where(over > 0, torch.maximum(over, fast), torch.where(over < 0, over, fast))
+            self._key_cap_ref = ang - over
         ids = (over != 0).nonzero(as_tuple=False).squeeze(-1)
         if ids.numel() == 0:
             return
