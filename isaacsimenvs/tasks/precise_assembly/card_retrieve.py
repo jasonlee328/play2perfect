@@ -21,6 +21,7 @@ slot).
 """
 from __future__ import annotations
 
+import math
 import torch
 from isaaclab.utils.math import quat_apply, quat_apply_inverse, quat_mul, quat_conjugate
 
@@ -230,10 +231,19 @@ class RetrieveTask:
             ms = tuple(getattr(self.c, "retr_mass_scale_range", (1.0, 1.0)))
             if ms != (1.0, 1.0):   # DR: per-env card mass scale (all 4 cards), fixed for the env's life
                 all_ids = torch.arange(env.num_envs)
+                u = torch.rand(env.num_envs)
+                if bool(getattr(self.c, "retr_mass_log", False)):   # log-uniform (press window scales with card weight)
+                    lo, hi = math.log(float(ms[0])), math.log(float(ms[1]))
+                    sc = torch.exp(lo + (hi - lo) * u)
+                else:
+                    sc = float(ms[0]) + (float(ms[1]) - float(ms[0])) * u
+                # one scale per env for all cards (11-20); retr_mass_per_card=true = old per-card draws (D1 trained so)
+                self.mass_scale = sc.to(env.device)
                 for b in [env.object] + list(env.distractors):
                     m = b.root_physx_view.get_masses()
-                    sc = float(ms[0]) + (float(ms[1]) - float(ms[0])) * torch.rand(env.num_envs)
-                    b.root_physx_view.set_masses(m * sc[:, None], all_ids)
+                    scb = (float(ms[0]) + (float(ms[1]) - float(ms[0])) * torch.rand(env.num_envs)) \
+                        if bool(getattr(self.c, "retr_mass_per_card", False)) else sc
+                    b.root_physx_view.set_masses(m * scb[:, None], all_ids)
             if vals:   # fragile variant: hidden card friction per env (fixed for the env's life; bucketed = few materials)
                 idx = torch.randperm(env.num_envs) % len(vals) if fr[1] > 0.0 else torch.arange(env.num_envs) % len(vals)
                 mu = torch.tensor(vals, dtype=torch.float32)[idx]
