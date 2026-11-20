@@ -268,6 +268,22 @@ def _state(env):
     return pos, quat, vel
 
 
+def target_state(env, palm_pos: torch.Tensor):
+    """collect_scoop_target: the virtual object the policy's object fields show = the pile of utensils still out of the
+    bin. Position = mean of the out-of-bin active utensils (all active if none left), orientation = that of the
+    out-of-bin utensil nearest the palm, velocity = mean. Env-local frame (like the obs builder's obj_pos)."""
+    st = env._collect
+    pos, quat, vel = _state(env)
+    out = st["active"] & ~st["inbin"]
+    m = torch.where(out.any(1, keepdim=True), out, st["active"]).float()                 # (N, K)
+    w = m / m.sum(1, keepdim=True).clamp_min(1.0)
+    c = (pos * w.unsqueeze(-1)).sum(1)
+    v = (vel * w.unsqueeze(-1)).sum(1)
+    d = (pos - palm_pos.unsqueeze(1)).norm(dim=-1) + (1.0 - m) * 10.0
+    q = torch.gather(quat, 1, d.argmin(1)[:, None, None].expand(-1, 1, 4)).squeeze(1)
+    return c, q, v
+
+
 def update(env) -> None:
     """Per-step: in-bin / rest / contact / success / fell + the shaped reward (stored for _get_rewards)."""
     st, c = env._collect, env.cfg.precise_assembly

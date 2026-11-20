@@ -262,6 +262,12 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     obj_rot = env.object.data.root_quat_w  # wxyz
     obj_linvel = env.object.data.root_lin_vel_w
     obj_angvel = env.object.data.root_ang_vel_w
+    pa_cfg = getattr(env.cfg, "precise_assembly", None)
+    if getattr(pa_cfg, "collect_scoop_target", False) and getattr(env, "_collect", None) is not None:
+        # A18 scooping: the object fields show the pile of utensils still out of the bin as one virtual object
+        from isaacsimenvs.tasks.precise_assembly import collect as _col
+        obj_pos, obj_rot, obj_linvel = _col.target_state(env, palm_pos)
+        obj_angvel = torch.zeros_like(obj_linvel)
     obj_vel = torch.cat([obj_linvel, obj_angvel], dim=-1)
 
     goal_pos = env.goal_viz.data.root_pos_w - env_origins
