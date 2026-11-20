@@ -185,7 +185,11 @@ def pre_physics(env) -> None:
     hand = torch.zeros_like(z1) if hand is None else hand
     env.cg_hand = hand
     nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
-    carrying = fz > 0.5 * env.cg_m1 * G          # the hand holds the cup up (not pressing it down / knocking it)
+    # the hand holds the cup up (not pressing it down / knocking it). 11-20 c: the PhysX contact matrix reports NORMAL forces
+    # only, so a side pinch that lifts the cup by friction read fz ~ 0 and the drag never engaged (twin succeeded at
+    # 1.8 x G_lo squeeze with the second cup left down): also count the cup rising while squeezed
+    v1c = env.object.data.root_lin_vel_w[:, 2]
+    carrying = (fz > 0.5 * env.cg_m1 * G) | ((v1c > 0.01) & (rise > 0.001))
     on = (hand > env.cg_D) & nested & carrying
     if bool(c.cupgrip_detach_rule):
         # user 11-20: once coupled the cups stay together (also above the nest) until the squeeze drops; then the
