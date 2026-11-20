@@ -683,7 +683,8 @@ class PreciseAssemblyEnv(PlayEnv):
             rel = pos - (self.hole_pos + self.scene.env_origins).unsqueeze(0)
             rel = quat_apply_inverse(self.hole_quat_wxyz.unsqueeze(0).expand(K, -1, -1).reshape(-1, 4),
                                      rel.reshape(-1, 3)).reshape(K, -1, 3)
-            lo = torch.tensor([box[0], box[2], -1e9], device=self.device)
+            # optional 6th value = z floor (a stick pushed through the tray floor counts as out of the bin)
+            lo = torch.tensor([box[0], box[2], box[5] if len(box) > 5 else -1e9], device=self.device)
             hi = torch.tensor([box[1], box[3], box[4]], device=self.device)
             out = (torch.clamp(lo - rel, min=0.0) + torch.clamp(rel - hi, min=0.0)).norm(dim=-1)
             self.distractor_disp = out.max(dim=0).values

@@ -125,6 +125,7 @@ class PreciseAssemblyCfg:
     # Clutter "stay in the box" mode: (xmin, xmax, ymin, ymax, zmax) in m, receptive frame. When set, the penalty and
     # termination above use how far the furthest distractor's root is outside this box (0 while inside) instead of
     # its displacement, so neighbours may be pushed around inside the bin but not lifted or dragged out of it.
+    # Optional 6th value zmin: a root below it (pushed through the floor) also counts as outside.
     distractor_box: tuple[float, ...] = ()
     # Start-pose variation for clutter problems: (dx, dy, dz) half-widths in m, receptive frame. At every reset the
     # object and each distractor are shifted independently by U(-d, d) per axis from their receptive-frame poses
