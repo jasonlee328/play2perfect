@@ -329,6 +329,9 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     }
     if getattr(env, "_tactile", None) is not None:
         obs_clean["tactile"] = env._tactile.compute()
+        if getattr(env, "cg_G", None) is not None:   # A21 cupgrip touch-only incipient-slip cue
+            from isaacsimenvs.tasks.precise_assembly import cupgrip as _cgc
+            obs_clean["tactile"] = _cgc.tactile_cue(env, obs_clean["tactile"])
         env._last_tactile = obs_clean["tactile"]  # reused by the student obs this step
         if getattr(env, "_tactile_encoder", None) is not None:
             r = env._tactile_hr_res

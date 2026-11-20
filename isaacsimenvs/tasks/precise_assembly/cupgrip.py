@@ -16,6 +16,12 @@ fused cups below. Per episode (hidden from the actor, sampled at reset):
      read grip force.
 Failures: "dragged" = the second cup rose > cupgrip_drag_fail_mm; "slipped" = while gripping (hand force >=
 cupgrip_contact_N) the palm slid > cupgrip_slip_mm in total up the top cup while the cup was still nested.
+Window mode (cupgrip_mode=window, 11-20 redesign): the physical breakaway (above) leaks to proprio - the hand / arm
+carry up to S + m g while the cup is stuck and the load drops at breakaway, so "squeeze until the pull drops" works
+without touch (probe: joint state AUC 0.92 vs touch 0.72 for "cup lags the rising palm"). In window mode there is no
+retention; the hidden minimum squeeze G_lo (log-U cupgrip_glo_range_N) and D = r G_lo define the window; lifting the
+nested cup with squeeze < G_lo for cupgrip_slip_steps steps = "slipped" (MODEL); touch-only incipient-slip cue
+(tactile_cue) below cupgrip_cue_ratio x G_lo.
 Actor obs (cupgrip_hide_object): object_rot / keypoints_rel_palm / keypoints_rel_goal are computed from the top cup's
 reset pose, so the actor knows where the cup started but not whether it is moving with the hand (only touch tells).
 """
@@ -41,6 +47,8 @@ def _init(env) -> None:
     env.cg_kp = torch.ones(n, device=d)
     env.cg_coupled = torch.zeros(n, dtype=torch.bool, device=d)
     env.cg_stuck = torch.ones(n, dtype=torch.bool, device=d)
+    env.cg_G = torch.zeros(n, device=d)
+    env.cg_low = torch.zeros(n, dtype=torch.long, device=d)
     env.cg_break_count = torch.zeros(n, dtype=torch.long, device=d)
     env.cg_ever_coupled = torch.zeros(n, dtype=torch.bool, device=d)
     env.cg_grasped = torch.zeros(n, dtype=torch.bool, device=d)
@@ -70,6 +78,11 @@ def reset(env, env_ids: torch.Tensor) -> None:
     c = env.cfg.precise_assembly
     n = env_ids.numel()
     lo, hi = (float(v) for v in c.cupgrip_retain_range_N)
+    rs = int(c.cupgrip_retain_ramp_steps)
+    if rs > 0:   # curriculum: the upper bound of S grows from cupgrip_retain_start_hi_N to hi
+        f = min(1.0, (int(env.common_step_counter) + int(c.cupgrip_retain_ramp_offset_steps)) / rs)
+        hi = math.exp(math.log(float(c.cupgrip_retain_start_hi_N)) * (1.0 - f) + math.log(hi) * f)
+    env.cg_S_hi = hi
     u = torch.rand(n, device=env.device)
     env.cg_S[env_ids] = torch.exp(math.log(lo) + u * (math.log(hi) - math.log(lo))) if hi > lo else lo
     rlo, rhi = (float(v) for v in c.cupgrip_drag_ratio_range)
@@ -80,7 +93,17 @@ def reset(env, env_ids: torch.Tensor) -> None:
         r = float(c.cupgrip_drag_ratio_start) * (1.0 - f) + r * f
     env.cg_r[env_ids] = r
     w = env.cg_m1[env_ids] * G
-    env.cg_D[env_ids] = env.cg_r[env_ids] * (env.cg_S[env_ids] + w) / float(c.cupgrip_mu_cal)
+    if str(c.cupgrip_mode) == "window":
+        # modelled grip window: no physical retention (the arm feels only the 15 g cup); hidden minimum squeeze G_lo
+        glo, ghi = (float(v) for v in c.cupgrip_glo_range_N)
+        u2 = torch.rand(n, device=env.device)
+        env.cg_G[env_ids] = torch.exp(math.log(glo) + u2 * (math.log(ghi) - math.log(glo))) if ghi > glo else glo
+        env.cg_S[env_ids] = 0.0
+        env.cg_D[env_ids] = env.cg_r[env_ids] * env.cg_G[env_ids]
+    else:
+        env.cg_G[env_ids] = (env.cg_S[env_ids] + w) / float(c.cupgrip_mu_cal)
+        env.cg_D[env_ids] = env.cg_r[env_ids] * (env.cg_S[env_ids] + w) / float(c.cupgrip_mu_cal)
+    env.cg_low[env_ids] = 0
     klo, khi = (float(v) for v in c.cupgrip_hand_kp_range)
     k = klo + (khi - klo) * torch.rand(n, device=env.device)
     env.cg_kp[env_ids] = k
@@ -229,12 +252,42 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
     env.cg_last_xy2 = (env.distractors[0].data.root_pos_w[:, :2] - env.scene.env_origins[:, :2]
                        - env.cg_obj0[:, :2]).norm(dim=-1)
     slipped = (env.cg_slide > float(c.cupgrip_slip_mm) / 1000.0) & nested & ~dragged
+    if str(c.cupgrip_mode) == "window":
+        # modelled "too soft": lifting the nested cup (it rose > 2 mm and moves up) with a squeeze below G_lo
+        sq = getattr(env, "hand_force_xy", torch.zeros_like(rise))
+        v1 = env.object.data.root_lin_vel_w[:, 2]
+        low = gripping & nested & (rise > 0.002) & (v1 > 0.005) & (sq < env.cg_G)
+        env.cg_low = env.cg_low + low.long()
+        slipped = (env.cg_low >= int(c.cupgrip_slip_steps)) & ~dragged
     if float(c.cupgrip_slip_mm) <= 0.0:
         slipped = z
-    for k, v in (("cupgrip_S_mean", env.cg_S.mean()), ("cupgrip_r_mean", env.cg_r.mean()), ("cupgrip_coupled_frac", env.cg_coupled.float().mean()),
+    for k, v in (("cupgrip_S_mean", env.cg_S.mean()), ("cupgrip_r_mean", env.cg_r.mean()), ("cupgrip_S_hi", torch.tensor(float(getattr(env, "cg_S_hi", 0.0)))), ("cupgrip_coupled_frac", env.cg_coupled.float().mean()),
                  ("cupgrip_rise_max", rise.max()), ("cupgrip_slide_mean", env.cg_slide.mean())):
         env.extras[k] = v
     return dragged, slipped
+
+
+def tactile_cue(env, tac: torch.Tensor) -> torch.Tensor:
+    """cupgrip_cue_ratio > 0 (TOUCH-ONLY cue, modelled incipient slip): while the hand grips the nested top cup with a
+    squeeze below cue_ratio x G_lo, every pad image is shifted by one taxel along its rows, alternating direction
+    each step (micro-slip jitter). (N, 5 * res * res) -> same shape."""
+    c = env.cfg.precise_assembly
+    if not enabled(env) or not hasattr(env, "cg_G") or float(c.cupgrip_cue_ratio) <= 0.0:
+        return tac
+    sq = getattr(env, "hand_force_xy", None)
+    if sq is None:
+        return tac
+    nested = env.cg_rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
+    zone = (sq >= float(c.cupgrip_contact_N)) & nested & (sq < float(c.cupgrip_cue_ratio) * env.cg_G)
+    env.cg_cue = zone
+    if not bool(zone.any()):
+        return tac
+    res = int(env.cfg.tactile.resolution)
+    t = tac.view(env.num_envs, -1, res, res)
+    sh = 1 if int(env.common_step_counter) % 2 == 0 else -1
+    rolled = torch.roll(t, shifts=sh, dims=-2)
+    out = torch.where(zone.view(-1, 1, 1, 1), rolled, t)
+    return out.reshape(tac.shape)
 
 
 def actor_object_override(env, obs: dict, kp_world_fn, palm_pos, goal_kp, kp_offsets) -> None:

@@ -177,6 +177,13 @@ class PreciseAssemblyCfg:
     # A21 cup grip window (cupgrip.py; problem cb_cupgrip). Needs hand_force_sense=true. See cupgrip.py for the model.
     cupgrip: bool = False
     cupgrip_retain_range_N: tuple[float, float] = (0.3, 3.0)   # hidden nest retention S, log-uniform per episode
+    cupgrip_retain_start_hi_N: float = 0.5                     # curriculum start of the S upper bound
+    cupgrip_retain_ramp_steps: int = 0                         # env steps to grow it to the range's hi (0 = off)
+    cupgrip_retain_ramp_offset_steps: int = 0
+    cupgrip_mode: str = "breakaway"                            # breakaway (physical retention) | window (see cupgrip.py)
+    cupgrip_glo_range_N: tuple[float, float] = (0.5, 5.0)      # window mode: hidden minimum squeeze G_lo, log-uniform
+    cupgrip_slip_steps: int = 5                                # window mode: low-squeeze lifting steps = "slipped"
+    cupgrip_cue_ratio: float = 0.0                             # touch-only incipient-slip cue below ratio x G_lo (0 off)
     cupgrip_hold_tau_s: float = 0.05                           # PD hold of a stuck top cup on its seat
     cupgrip_restick_mm: float = 0.3                            # a freed cup set back within this rise re-sticks
     cupgrip_drag_ratio_start: float = 4.0                      # curriculum start of r (drag_ramp_steps > 0)
