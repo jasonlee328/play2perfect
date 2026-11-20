@@ -9475,7 +9475,7 @@
    ],
    "collect_n_range": [
     1,
-    10
+    6
    ],
    "collect_bin": {
     "floor_z": 0.001,
@@ -9943,7 +9943,7 @@
    ],
    "collect_n_range": [
     1,
-    8
+    5
    ],
    "collect_bin": {
     "floor_z": 0.001,
@@ -10060,7 +10060,7 @@
    ],
    "collect_n_range": [
     1,
-    8
+    5
    ],
    "collect_bin": {
     "floor_z": 0.001,
@@ -10177,7 +10177,7 @@
    ],
    "collect_n_range": [
     1,
-    8
+    5
    ],
    "collect_bin": {
     "floor_z": 0.001,
@@ -10294,7 +10294,7 @@
    ],
    "collect_n_range": [
     1,
-    8
+    3
    ],
    "collect_bin": {
     "floor_z": 0.001,
