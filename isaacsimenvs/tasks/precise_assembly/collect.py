@@ -76,6 +76,7 @@ class CollectManager:
         self.success = torch.zeros(N, dtype=torch.bool, device=self.dev)
         self.fell = torch.zeros_like(self.success)
         self.target = torch.zeros(N, dtype=torch.long, device=self.dev)
+        self.from_bank = torch.zeros(N, dtype=torch.bool, device=self.dev)
         self.closest_ft = torch.full((N, 5), 9.0, device=self.dev)
         self.latched = torch.zeros(N, self.K, dtype=torch.bool, device=self.dev)
         self.bonus_paid = torch.zeros_like(self.latched)
@@ -86,6 +87,13 @@ class CollectManager:
         self.park = torch.zeros(self.K, 3, device=self.dev)
         for k in range(self.K):
             self.park[k] = torch.tensor([0.0, 0.0, float(c.collect_park_z) + 0.12 * k], device=self.dev)
+        self.bank = None
+        if c.collect_bank_file:
+            import numpy as np
+            d = np.load(c.collect_bank_file)
+            self.bank = {k: torch.as_tensor(d[k], device=self.dev) for k in d.files}
+            assert self.bank["slot_pos"].shape[1] == self.K, "bank recorded with another slot count"
+            print(f"[collect] start-state bank {c.collect_bank_file}: {self.bank['target'].numel()} states", flush=True)
         print(f"[collect] {self.K} slots, N in [{self.n_lo},{self.n_hi}], radii mm "
               f"{[round(r * 1e3, 1) for r in radii]}", flush=True)
 
@@ -188,6 +196,7 @@ class CollectManager:
         self.success[env_ids] = False
         self.fell[env_ids] = False
         self.target[env_ids] = 0
+        self.from_bank[env_ids] = False
         self.closest_ft[env_ids] = 9.0
         self.latched[env_ids] = False
         self.bonus_paid[env_ids] = False
@@ -195,6 +204,60 @@ class CollectManager:
         self.prev_in[env_ids] = False
         self.prev_rel[env_ids] = 0.0
         env._object_init_z[env_ids] = self.z0[env_ids, 0]
+        if self.bank is not None:
+            self._apply_bank(env_ids)
+
+    def bank_prob(self) -> float:
+        c = self.c
+        p0, p1 = float(c.collect_bank_prob), float(c.collect_bank_prob_final)
+        if c.collect_bank_ramp_steps <= 0:
+            return p0
+        a = min(1.0, float(self.env.common_step_counter + c.collect_bank_ramp_offset_steps) / float(c.collect_bank_ramp_steps))
+        return p0 + a * (p1 - p0)
+
+    def _apply_bank(self, env_ids: torch.Tensor) -> None:
+        """Start a share of the resets from recorded states with the target part already grasped and lifted."""
+        env, b, dev = self.env, self.bank, self.dev
+        ids = env_ids[torch.rand(env_ids.numel(), device=dev) < self.bank_prob()]
+        n = ids.numel()
+        if n == 0:
+            return
+        k = torch.randint(0, b["target"].numel(), (n,), device=dev)
+        origins = env.scene.env_origins[ids]
+        env.robot.write_joint_state_to_sim(b["joint_pos"][k].float(), b["joint_vel"][k].float(), env_ids=ids)
+        env._cur_targets[ids] = b["cur_targets"][k].float()
+        env._prev_targets[ids] = b["prev_targets"][k].float()
+        env.hole_pos[ids] = b["hole_pos"][k].float()
+        env.hole_quat_wxyz[ids] = b["hole_quat"][k].float()
+        env.hole.write_root_pose_to_sim(torch.cat([env.hole_pos[ids] + origins, env.hole_quat_wxyz[ids]], -1), env_ids=ids)
+        act = b["active"][k].bool()
+        for j, body in enumerate(self.bodies):
+            pos = torch.where(act[:, j:j + 1], b["slot_pos"][k, j].float(), self.park[j].expand(n, 3))
+            q = torch.where(act[:, j:j + 1], b["slot_quat"][k, j].float(),
+                            torch.tensor([1.0, 0.0, 0.0, 0.0], device=dev).expand(n, 4))
+            vel = torch.where(act[:, j:j + 1], b["slot_vel"][k, j].float(), torch.zeros(n, 6, device=dev))
+            body.write_root_pose_to_sim(torch.cat([pos + origins, q], -1), env_ids=ids)
+            body.write_root_velocity_to_sim(vel, env_ids=ids)
+        t = b["target"][k].long()
+        self.active[ids] = act
+        self.n_active[ids] = act.sum(1).float()
+        self.z0[ids] = b["z0"][k].float()
+        self.target[ids] = t
+        self.latched[ids, t] = True
+        self.bonus_paid[ids, t] = True
+        self.from_bank[ids] = True
+
+    def snapshot(self, ids: torch.Tensor) -> dict:
+        """State of envs ``ids`` in the bank format (for tools/contactbench/fastener_bank.py)."""
+        env = self.env
+        o = env.scene.env_origins[ids]
+        pos = torch.stack([bd.data.root_pos_w[ids] for bd in self.bodies], 1) - o.unsqueeze(1)
+        quat = torch.stack([bd.data.root_quat_w[ids] for bd in self.bodies], 1)
+        vel = torch.stack([torch.cat([bd.data.root_lin_vel_w[ids], bd.data.root_ang_vel_w[ids]], -1) for bd in self.bodies], 1)
+        return dict(joint_pos=env.robot.data.joint_pos[ids], joint_vel=env.robot.data.joint_vel[ids],
+                    cur_targets=env._cur_targets[ids], prev_targets=env._prev_targets[ids], hole_pos=env.hole_pos[ids],
+                    hole_quat=env.hole_quat_wxyz[ids], slot_pos=pos, slot_quat=quat, slot_vel=vel,
+                    active=self.active[ids], z0=self.z0[ids], target=self.target[ids])
 
     def park_inactive(self) -> None:
         env = self.env

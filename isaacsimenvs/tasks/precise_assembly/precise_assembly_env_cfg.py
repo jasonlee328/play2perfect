@@ -216,6 +216,13 @@ class PreciseAssemblyCfg:
     collect_w_bin_v2: float = 1000.0             # per part entering the bin (minus per part leaving)
     collect_w_release_v2: float = 200.0          # x change of clamp(min fingertip distance / 5 cm) once all are in
     collect_success_bonus: float = 2000.0
+    # start-state bank (tools/contactbench/fastener_bank.py): share collect_bank_prob of resets start from a recorded
+    # state with the target part grasped and lifted (ramps to collect_bank_prob_final over collect_bank_ramp_steps)
+    collect_bank_file: str = ""
+    collect_bank_prob: float = 0.0
+    collect_bank_prob_final: float = 0.0
+    collect_bank_ramp_steps: int = 0
+    collect_bank_ramp_offset_steps: int = 0
     collect_fall_penalty: float = 300.0
     collect_obs: bool = True                    # field collect_obs (8 per slot) in obs_list + state_list
     collect_friction: tuple[float, float] = (0.6, 0.5)  # parts + bin (static, dynamic): PLA, official manifest.yaml
