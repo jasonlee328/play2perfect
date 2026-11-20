@@ -83,6 +83,7 @@ class CollectManager:
         self.closest_drop = torch.full((N, self.K), 9.0, device=self.dev)
         self.prev_in = torch.zeros_like(self.latched)
         self.prev_rel = torch.zeros(N, device=self.dev)
+        self.prev_carry = torch.zeros(N, device=self.dev)
         self.rterms = {}
         self.park = torch.zeros(self.K, 3, device=self.dev)
         for k in range(self.K):
@@ -203,6 +204,7 @@ class CollectManager:
         self.closest_drop[env_ids] = 9.0
         self.prev_in[env_ids] = False
         self.prev_rel[env_ids] = 0.0
+        self.prev_carry[env_ids] = 0.0
         env._object_init_z[env_ids] = self.z0[env_ids, 0]
         if self.bank is not None:
             self._apply_bank(env_ids)
@@ -377,7 +379,14 @@ class CollectManager:
         dd = (pos - drop.unsqueeze(1)).norm(dim=-1)                                  # (N, K)
         carry_on = self.latched & ~self.in_bin & self.active
         self.closest_drop = torch.where(carry_on & (self.closest_drop > 8.0), dd, self.closest_drop)
-        r_carry = ((self.closest_drop - dd).clamp(min=0.0) * carry_on.float()).sum(1)
+        if float(c.collect_carry_d0_v2) > 0.0:
+            # symmetric potential: sum over lifted parts not in the bin of (d0 - distance to the drop point)+; moving away
+            # costs what approaching earns (the progress-only version let the policy hoist the part 70 cm up for free)
+            phi_c = ((float(c.collect_carry_d0_v2) - dd).clamp(min=0.0) * carry_on.float()).sum(1)
+            r_carry = torch.where(self.fresh, torch.zeros_like(phi_c), phi_c - self.prev_carry)
+            self.prev_carry = phi_c
+        else:
+            r_carry = ((self.closest_drop - dd).clamp(min=0.0) * carry_on.float()).sum(1)
         self.closest_drop = torch.where(carry_on, torch.minimum(self.closest_drop, dd), self.closest_drop)
         d_in = self.in_bin.sum(1).float() - self.prev_in.sum(1).float()
         self.prev_in = self.in_bin.clone()
