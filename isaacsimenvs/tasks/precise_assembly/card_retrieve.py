@@ -24,7 +24,7 @@ from __future__ import annotations
 import torch
 from isaaclab.utils.math import quat_apply, quat_apply_inverse, quat_mul, quat_conjugate
 
-from .card_task import _glob, HALF, SLOT_X
+from .card_task import _glob, HALF, SLOT_X, WALL_TOP_Z
 
 SLOT_Y = 0.04325
 
@@ -420,7 +420,24 @@ class RetrieveTask:
         # retr_deck_out_mm > 0 (user 11-20): deck cards may rise partly during the episode as long as they fall back;
         # fail only if one comes fully out (centre risen > out mm). Success still needs the deck neat at the end.
         out_mm = float(getattr(c, "retr_deck_out_mm", 0.0))
-        bad = (self.deck_rise.max(-1).values > out_mm * 1e-3) if out_mm > 0.0 else ~neat
+        if bool(getattr(c, "retr_deck_inslot_only", False)):
+            # user 11-20: every deck card may rise any amount while it stays in the holder. Out of the deck = its
+            # lowest corner above the holder wall top, or off the slot sideways. Success needs all deck cards in.
+            in_deck = torch.ones(env.num_envs, dtype=torch.bool, device=d)
+            ex, ey_, ez_ = (torch.tensor(v, device=d, dtype=torch.float32).expand(env.num_envs, 3)
+                            for v in ((1.0, 0, 0), (0, 1.0, 0), (0, 0, 1.0)))
+            for k, b in enumerate(env.distractors):
+                pk, qk = self._rel_hole(b.data.root_pos_w, b.data.root_quat_w)
+                low = pk[:, 2] - sum(quat_apply(qk, e)[:, 2].abs() * h for e, h in zip((ex, ey_, ez_), HALF))
+                in_deck &= (low < WALL_TOP_Z) & (pk[:, 0].abs() < SLOT_X + 0.01) & (pk[:, 1].abs() < SLOT_Y)
+            self.deck_in = in_deck
+            bad = ~in_deck
+            neat = in_deck
+            end_ok = on_tab & neat & clear
+            self.final_count = torch.where(end_ok, self.final_count + 1, torch.zeros_like(self.final_count))
+            self.success = self.final_count >= c.card_final_steps
+        else:
+            bad = (self.deck_rise.max(-1).values > out_mm * 1e-3) if out_mm > 0.0 else ~neat
         self.deck_over = torch.where(bad, self.deck_over + 1, torch.zeros_like(self.deck_over))
         self.fail["deck_disturbed"] = self.deck_over >= max(1, int(c.card_deck_fail_hold_steps))
         pmax = float(getattr(c, "retr_press_max", 0.0))
