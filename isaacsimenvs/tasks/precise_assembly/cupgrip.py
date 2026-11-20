@@ -13,8 +13,8 @@ fused cups below. Per episode (hidden from the actor, sampled at reset):
      drops below 0.9 D.
   k  hand PD gain scale (cupgrip_hand_kp_range; stiffness x k, damping x sqrt k), so joint tracking error does not
      read grip force.
-Failures: "dragged" = the second cup rose > cupgrip_drag_fail_mm; "slipped" = after the grasp started (hand force
->= cupgrip_contact_N) the palm rose > cupgrip_slip_mm relative to the top cup while the cup was still nested.
+Failures: "dragged" = the second cup rose > cupgrip_drag_fail_mm; "slipped" = while gripping (hand force >=
+cupgrip_contact_N) the palm slid > cupgrip_slip_mm in total up the top cup while the cup was still nested.
 Actor obs (cupgrip_hide_object): object_rot / keypoints_rel_palm / keypoints_rel_goal are computed from the top cup's
 reset pose, so the actor knows where the cup started but not whether it is moving with the hand (only touch tells).
 """
@@ -200,10 +200,14 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
     rise = z1 - env.cg_obj0[:, 2]
     rise2 = env.distractors[0].data.root_pos_w[:, 2] - o[:, 2] - env.cg_z2_0
     rel = _palm_z(env) - z1
-    start = ~env.cg_grasped & (env.hand_force >= float(c.cupgrip_contact_N))
-    env.cg_rel0 = torch.where(start, rel, env.cg_rel0)
-    env.cg_grasped |= start
-    env.cg_slide = torch.where(env.cg_grasped, rel - env.cg_rel0, torch.zeros_like(rel))
+    # slide = palm-vs-cup upward motion accumulated only on steps the hand grips the cup (hand force >= contact_N in
+    # this and the previous step); letting go and moving the hand away does not count. Clamped at 0 from below.
+    gripping = env.hand_force >= float(c.cupgrip_contact_N)
+    both = gripping & env.cg_grasped                 # cg_grasped = gripping on the previous step
+    d_rel = rel - env.cg_rel0                        # cg_rel0 = rel on the previous step
+    env.cg_slide = torch.where(both, (env.cg_slide + d_rel).clamp(min=0.0), env.cg_slide)
+    env.cg_rel0 = rel
+    env.cg_grasped = gripping
     nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
     dragged = rise2 > float(c.cupgrip_drag_fail_mm) / 1000.0
     slipped = (env.cg_slide > float(c.cupgrip_slip_mm) / 1000.0) & nested & ~dragged
