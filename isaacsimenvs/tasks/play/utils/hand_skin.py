@@ -55,7 +55,7 @@ def prim_mesh(root_path: str, env_id: int = 0, keep: tuple[str, ...] | None = No
             elif p != body:
                 it.PruneChildren()
                 continue
-        if (p.IsA(UsdGeom.Mesh) or p.IsA(UsdGeom.Cube)) and (
+        if (p.IsA(UsdGeom.Mesh) or p.IsA(UsdGeom.Cube) or p.IsA(UsdGeom.Sphere)) and (
                 p.HasAPI(UsdPhysics.CollisionAPI) or "collision" in str(p.GetPath()).lower()):
             meshes.append(p)
     body = body or root
@@ -66,7 +66,13 @@ def prim_mesh(root_path: str, env_id: int = 0, keep: tuple[str, ...] | None = No
     cache = UsdGeom.XformCache()
     pts_all, tris_all, n = [], [], 0
     for m in meshes:
-        if m.IsA(UsdGeom.Cube):
+        if m.IsA(UsdGeom.Sphere):  # URDF <sphere> collision (A22 balls): fine icosphere for the ray cast
+            import trimesh
+            ico = trimesh.creation.icosphere(subdivisions=4, radius=float(UsdGeom.Sphere(m).GetRadiusAttr().Get()))
+            pts = np.asarray(ico.vertices, dtype=np.float64)
+            counts = np.full(len(ico.faces), 3)
+            idx = np.asarray(ico.faces).reshape(-1)
+        elif m.IsA(UsdGeom.Cube):
             h = 0.5 * float(UsdGeom.Cube(m).GetSizeAttr().Get())
             pts = h * np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)], dtype=np.float64)
             counts = np.full(6, 4)

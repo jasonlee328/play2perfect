@@ -60,7 +60,7 @@ def _object_mesh(env, env_id: int = 0) -> tuple[np.ndarray, np.ndarray]:
     prims = list(Usd.PrimRange(root, Usd.TraverseInstanceProxies()))
     body = next((p for p in prims if p.HasAPI(UsdPhysics.RigidBodyAPI)), root)
     # Mesh prims, plus Cube prims (URDF <box> collisions, e.g. the tight_insertion L-peg, become UsdGeom.Cube)
-    meshes = [p for p in prims if p.IsA(UsdGeom.Mesh) or p.IsA(UsdGeom.Cube)]
+    meshes = [p for p in prims if p.IsA(UsdGeom.Mesh) or p.IsA(UsdGeom.Cube) or p.IsA(UsdGeom.Sphere)]
     coll = [p for p in meshes if p.HasAPI(UsdPhysics.CollisionAPI) or "collision" in str(p.GetPath()).lower()]
     meshes = coll or meshes
     if not meshes:
@@ -68,7 +68,13 @@ def _object_mesh(env, env_id: int = 0) -> tuple[np.ndarray, np.ndarray]:
     cache = UsdGeom.XformCache()
     pts_all, tris_all, n = [], [], 0
     for m in meshes:
-        if m.IsA(UsdGeom.Cube):
+        if m.IsA(UsdGeom.Sphere):  # URDF <sphere> collision (A22 balls): fine icosphere for the ray cast
+            import trimesh
+            ico = trimesh.creation.icosphere(subdivisions=4, radius=float(UsdGeom.Sphere(m).GetRadiusAttr().Get()))
+            pts = np.asarray(ico.vertices, dtype=np.float64)
+            counts = np.full(len(ico.faces), 3)
+            idx = np.asarray(ico.faces).reshape(-1)
+        elif m.IsA(UsdGeom.Cube):
             h = 0.5 * float(UsdGeom.Cube(m).GetSizeAttr().Get())
             pts = h * np.array([[x, y, z] for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)], dtype=np.float64)
             counts = np.full(6, 4)  # quads, outward winding (vertex k = 4x + 2y + z bits)
