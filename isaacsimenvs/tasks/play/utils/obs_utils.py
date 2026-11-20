@@ -381,6 +381,15 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         else:
             obs_clean["latch_cue"] = torch.zeros(n, 3, device=env.device)
 
+    if "button_cue" in OBS_FIELD_SIZES:
+        n = env.num_envs
+        if hasattr(env, "button_in_click") and hasattr(env, "button_click_x"):
+            reached = env.button_travel_ep_max[0] >= env.button_click_x
+            obs_clean["button_cue"] = torch.stack([env.button_in_click.float(), reached.float(),
+                                                   torch.ones(n, device=env.device)], dim=-1)
+        else:
+            obs_clean["button_cue"] = torch.zeros(n, 3, device=env.device)
+
     if "latch_state" in OBS_FIELD_SIZES and getattr(env, "_pih_joints", ()):
         n = env.num_envs
         if getattr(env, "unlock_angle", None) is not None and hasattr(env, "latch_open") and hasattr(env, "cb_joint_angle"):

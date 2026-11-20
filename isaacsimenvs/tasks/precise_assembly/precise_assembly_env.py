@@ -361,6 +361,10 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if getattr(cfg.precise_assembly, "button_cue_obs", False):
+            OBS_FIELD_SIZES["button_cue"] = 3
+            if "button_cue" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "button_cue")
         if cfg.precise_assembly.latch_hint_obs and int(cfg.precise_assembly.latch_door_joint) >= 0:
             OBS_FIELD_SIZES["latch_hint"] = 2
             if "latch_hint" not in cfg.obs.obs_list:

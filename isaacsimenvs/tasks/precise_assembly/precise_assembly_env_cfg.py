@@ -205,6 +205,10 @@ class PreciseAssemblyCfg:
     button_click_ramp_steps: int = 0
     button_click_ramp_offset_steps: int = 0
     button_click_tactile_mm: float = 1.0
+    # Privileged cue for a cue-on oracle (A15 click4): actor field "button_cue" = [key inside the click window,
+    # episode peak >= x, 1]. Student / twin mask it (P2P_STUDENT_MASK_FIELDS=button_cue). Warm-start with
+    # P2P_NEW_OBS_FIELD=button_cue.
+    button_cue_obs: bool = False
     button_release_m: float = 0.0003
     button_press_start_m: float = 0.0005
     button_feel_bonus: float = 0.0
