@@ -1097,6 +1097,8 @@ class PreciseAssemblyEnv(PlayEnv):
             ) & ~self.retract_phase
         else:
             max_successes = self._successes >= self.env_max_goals
+            if _cupgrip.enabled(self) and bool(pih_cfg.cupgrip_detach_rule) and hasattr(self, "cg_second_seated"):
+                max_successes = max_successes & self.cg_second_seated   # second cup back on its seat
             hand_far = self._curr_fingertip_distances.max(dim=-1).values > 1.5
 
         if pih_cfg.enable_dropped_on_table_term:

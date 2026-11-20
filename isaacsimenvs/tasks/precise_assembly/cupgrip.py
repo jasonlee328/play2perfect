@@ -183,7 +183,12 @@ def pre_physics(env) -> None:
     nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
     carrying = fz > 0.5 * env.cg_m1 * G          # the hand holds the cup up (not pressing it down / knocking it)
     on = (hand > env.cg_D) & nested & carrying
-    off = (hand < 0.9 * env.cg_D) | ~nested
+    if bool(c.cupgrip_detach_rule):
+        # user 11-20: once coupled the cups stay together (also above the nest) until the squeeze drops; then the
+        # second cup falls back under gravity
+        off = hand < 0.9 * env.cg_D
+    else:
+        off = (hand < 0.9 * env.cg_D) | ~nested
     env.cg_coupled = (env.cg_coupled | on) & ~off
     env.cg_ever_coupled |= env.cg_coupled
 
@@ -220,6 +225,15 @@ def pin_substep(env) -> None:
     rise2 = cup2.data.root_pos_w[:, 2] - o[:, 2] - env.cg_z2_0
     v2 = cup2.data.root_lin_vel_w[:, 2]
     pin = ~env.cg_coupled & ((rise2 > 0.0002) | (v2 > 0.0))
+    if bool(env.cfg.precise_assembly.cupgrip_detach_rule):
+        # only stop it rising; above its seat it falls back under gravity (no snap down)
+        up = ~env.cg_coupled & (v2 > 0.0)
+        ids = up.nonzero().reshape(-1)
+        if ids.numel():
+            vel = torch.cat([cup2.data.root_lin_vel_w[ids], cup2.data.root_ang_vel_w[ids]], -1).clone()
+            vel[:, 2] = 0.0
+            cup2.write_root_velocity_to_sim(vel, env_ids=ids)
+        return
     ids = pin.nonzero().reshape(-1)
     if ids.numel():
         pose = torch.cat([cup2.data.root_pos_w[ids], cup2.data.root_quat_w[ids]], -1).clone()
@@ -252,6 +266,10 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
     nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
     # only the modelled squeeze-drag fails (an uncoupled one-substep friction blip is snapped back by the pin)
     dragged = (rise2 > float(c.cupgrip_drag_fail_mm) / 1000.0) & (env.cg_coupled | ~bool(c.cupgrip_pin_second))
+    env.cg_second_seated = rise2 < float(c.cupgrip_settle_mm) / 1000.0
+    if bool(c.cupgrip_detach_rule):
+        # user 11-20: a partial lift of the second cup is fine if it falls back; fail only when it detaches
+        dragged = rise2 > float(c.cupgrip_detach_mm) / 1000.0
     from isaaclab.utils.math import quat_apply
     dn = torch.tensor([0.0, 0.0, -1.0], device=env.device).expand(env.num_envs, 3)
     env.cg_last_rise2 = rise2.clone()

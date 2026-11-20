@@ -188,6 +188,9 @@ class PreciseAssemblyCfg:
     cupgrip_lost_tilt_deg: float = 45.0
     cupgrip_lost_steps: int = 5
     cupgrip_hint_obs: bool = False                             # oracle field cupgrip_hint (G_lo, squeeze / G_lo)
+    cupgrip_detach_rule: bool = False                          # user 11-20: partial second-cup lift OK; fail = detach
+    cupgrip_detach_mm: float = 45.0                            # second cup risen this much = off its nest (~60 mm deep)
+    cupgrip_settle_mm: float = 3.0                             # success needs the second cup back within this of its seat
     cupgrip_hold_tau_s: float = 0.05                           # PD hold of a stuck top cup on its seat
     cupgrip_restick_mm: float = 0.3                            # a freed cup set back within this rise re-sticks
     cupgrip_drag_ratio_start: float = 4.0                      # curriculum start of r (drag_ramp_steps > 0)
