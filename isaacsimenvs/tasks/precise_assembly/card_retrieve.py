@@ -62,6 +62,8 @@ class RetrieveTask:
         links = [_glob(p) for p in env.robot.root_physx_view.link_paths[0]]
         names = list(env.robot.root_physx_view.shared_metatype.link_names)
         self.tip_ids = [names.index(n) for n in ("left_thumb_DP", "left_index_DP", "left_middle_DP", "left_ring_DP", "left_pinky_DP")]
+        from ..play.utils.hand_skin import HAND_LINKS, _ALIASES
+        self.skin_ids = [names.index(_ALIASES.get(n, (n,))[0]) for n in HAND_LINKS]   # whole-hand skin gel force
         sim = env.object._physics_sim_view
         obj = _glob(env.object.root_physx_view.prim_paths[0])
         self.v_rob_card = sim.create_rigid_contact_view(obj, filter_patterns=links)
@@ -284,8 +286,12 @@ class RetrieveTask:
         f_rob_card = F_rc.sum(-1)
         f_tips = F_rc[:, self.tip_ids]
         f_rob_deck = torch.zeros(N, device=self.env.device)
+        F_link = F_rc.clone()
         for v in self.v_rob_deck:
-            f_rob_deck = f_rob_deck + v.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1).sum(-1)
+            F_rd = v.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1)
+            f_rob_deck = f_rob_deck + F_rd.sum(-1)
+            F_link = F_link + F_rd
+        self.env._tactile_link_force = F_link[:, self.skin_ids]   # per skin link, card + deck contact force (N)
         f_rob_hold = torch.zeros(N, device=self.env.device)
         for v in self.v_rob_holder:
             f_rob_hold = f_rob_hold + v.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1).sum(-1)

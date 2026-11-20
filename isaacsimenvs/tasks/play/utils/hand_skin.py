@@ -98,6 +98,7 @@ class HandSkinSensor:
         if len(env._object_urdf_paths) > 1:
             raise NotImplementedError("whole-hand tactile supports a single object asset")
         self.env, self.device = env, env.device
+        self.gel_force_k = float(getattr(tactile_cfg, "gel_force_k", 0.0))
         g, sp = int(tactile_cfg.whole_hand_grid), float(tactile_cfg.whole_hand_spacing_mm)
         skin = float(tactile_cfg.whole_hand_skin_mm) * 1e-3
         rng = np.random.default_rng(0)  # fixed ray layout
@@ -161,6 +162,14 @@ class HandSkinSensor:
                 depth = dj if depth is None else torch.maximum(depth, dj)
             result[c] = torch.zeros(depth.shape[0], self.n_tax, device=self.device).scatter_reduce_(
                 1, self.taxel.expand(depth.shape[0], -1), depth, "amax")
+        # Gel-like force reading (A10, tactile.gel_force_k, off by default): taxels in contact deepen by k x the link's
+        # contact force (env._tactile_link_force, (N, links) N, HAND_LINKS order, set by the task).
+        k = float(getattr(self, "gel_force_k", 0.0))
+        lf = getattr(env, "_tactile_link_force", None)
+        if k > 0.0 and lf is not None:
+            g2 = self.n_tax // len(HAND_LINKS)
+            r = result.view(env.num_envs, len(HAND_LINKS), g2)
+            r += (r > 0).float() * (lf.to(r.dtype).clamp(min=0.0) * k).unsqueeze(-1)
         return _deform_quantize(result) / 255.0
 
 

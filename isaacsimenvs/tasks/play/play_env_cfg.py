@@ -572,6 +572,7 @@ class TactileCfg:
     whole_hand_skin_mm: float = 2.0        # virtual skin thickness outside the collision surface
     whole_hand_distractors: bool = True    # also sense the distractors (one channel with the object)
     whole_hand_in_critic: bool = False
+    whole_hand_in_policy: bool = True    # false: skin computed (env._last_tactile_hand) but not in the policy obs (probes)
 
 
 # ----------------------------------------------------------------------------
