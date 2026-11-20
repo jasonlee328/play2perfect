@@ -902,6 +902,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 tail_idx = subgoal_idx[in_tail] - self._num_prelude_goals
                 hole_q = self.hole_quat_wxyz[tail_ids]
                 insert_pos = self._insert_pos_rel[tail_idx]
+                if bool(getattr(self.cfg.precise_assembly, "wipe_goal_follow_h", False)) and hasattr(self, "_wipe_h_t"):
+                    # A16: the env-side waypoints follow the hidden board height (the actor's goal is built separately
+                    # from stroke x by WipeTask._actor_goal_kp from the nominal waypoints, so nothing leaks)
+                    insert_pos = insert_pos.clone()
+                    insert_pos[:, 2] = insert_pos[:, 2] + self._wipe_h_t[tail_ids]
                 insert_q = self._insert_quat_wxyz[tail_idx]
                 ins_pos_local[in_tail] = (
                     self.hole_pos[tail_ids] + quat_apply(hole_q, insert_pos)
