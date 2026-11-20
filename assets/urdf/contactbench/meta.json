@@ -1004,7 +1004,7 @@
   },
   "cup_stack_inv_n3": {
    "src": [
-    "cup x 3 inverted (cupgrip_tasks.py)"
+    "cup x 3 inverted (cupgrip_tasks.py), collision = top cup only"
    ],
    "extents_mm": [
     68.63,

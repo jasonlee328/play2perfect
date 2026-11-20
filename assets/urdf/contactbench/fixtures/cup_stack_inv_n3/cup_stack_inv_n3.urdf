@@ -29,55 +29,5 @@
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_022.obj" scale="1 1 1"/></geometry></collision>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_023.obj" scale="1 1 1"/></geometry></collision>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_024.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_025.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_026.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_027.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_028.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_029.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_030.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_031.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_032.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_033.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_034.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_035.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_036.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_037.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_038.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_039.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_040.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_041.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_042.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_043.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_044.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_045.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_046.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_047.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_048.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_049.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_050.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_051.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_052.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_053.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_054.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_055.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_056.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_057.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_058.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_059.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_060.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_061.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_062.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_063.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_064.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_065.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_066.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_067.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_068.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_069.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_070.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_071.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_072.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_073.obj" scale="1 1 1"/></geometry></collision>
-    <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_074.obj" scale="1 1 1"/></geometry></collision>
   </link>
 </robot>
