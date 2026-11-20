@@ -171,6 +171,7 @@ class KeyLockCfg:
     key_pull_steps: int = 5
     key_pull_win_any: bool = False
     key_vstop_brake: float = 0.0         # > 0: braked virtual stop at target + window (fraction of over-turn undone per substep)
+    key_vstop_at_deg: float = 6.0        # virtual stop position past the target (inside the +-window)
     key_vstop_ramp_steps: int = 0        # brake fades linearly to 0 over these env steps (+ offset on a resume)
     key_vstop_offset_steps: int = 0
     key_max_deg_s: float = 0.0           # > 0: pose-level cap on the key's forward turning speed (deg/s)
@@ -491,7 +492,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 vb = vb * (1.0 - f)
             self.extras["key/vstop_brake"] = torch.tensor(vb)
             if vb > 0.0:
-                edge = self._kp_target + math.radians(float(self.cfg.key_lock.key_pull_window_deg))
+                edge = self._kp_target + math.radians(float(self.cfg.key_lock.key_vstop_at_deg))
                 vo = vb * (ang - edge).clamp(min=0.0)
                 over = torch.where(over == 0, vo, over)
         if cap > 0.0:
