@@ -183,6 +183,9 @@ class KeyLockCfg:
     key_pull_click_ramp_deg: float = 0.0    # twist mode: felt twist ramps 0 -> full over this many deg below the window
     key_pull_click_mode: str = "shift"   # "shift" = constant outward offset in the window; "vibrate" = +- offset,
                                          # sign flipping every policy step
+    key_pull_goal_by_pull: bool = False  # pull variant: credit the last goal by the in-window pull itself (_key_ok).
+    #   Without it the last goal is the phase-1 clear angle (key >= clear_deg, 87.7 deg on every lock), so a pull only
+    #   counts after the key has passed ~88 deg: targets below ~76 deg could never succeed (found 11-20 from K23p).
     key_pull_rew: float = 0.0            # per step in the window: x clamp(outward force / key_pull_n, 0, 1)
     key_window_rew: float = 0.0
     key_pull_out_pen: float = 0.0        # per step outside the window: x clamp(outward force / key_pull_n, 0, 1)
@@ -556,6 +559,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
     # ---- success condition of the clear goal: the key is past its clear angle ----------------------------------
     def _latch_cbf_success_now(self, door: torch.Tensor) -> torch.Tensor:
         k = int(self.cfg.precise_assembly.unlock_joint)
+        kl = self.cfg.key_lock
+        if bool(kl.key_pull) and bool(kl.key_pull_goal_by_pull):
+            return self._key_ok
         return self.cb_joint_angle[k] >= self.key_clear
 
     def _apply_unlock_goal(self, prev_near_steps: torch.Tensor) -> None:
@@ -901,6 +907,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
         rel = float(kl.release_rew_scale) * (phi - self._key_rel_phi) + float(kl.still_rew_scale) * (sphi - self._key_still_phi)
         self._key_rel_phi, self._key_still_phi = phi, sphi
         back = float(kl.turnback_penalty) * (self.retract_phase & (ang < self.key_clear)).float()
+        if bool(kl.key_pull) and bool(kl.key_pull_goal_by_pull):
+            back = torch.zeros_like(back)
         pinch = float(kl.pinch_rew) * self._key_turning_ok.float() + float(kl.straddle_rew) * self._key_straddle
         if float(kl.pad_contact_rew) > 0.0:
             npads = (self.key_pad_f > float(kl.pad_contact_n)).sum(-1).clamp(max=2).float()
