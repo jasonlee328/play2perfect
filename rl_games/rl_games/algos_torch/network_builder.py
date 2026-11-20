@@ -14,6 +14,24 @@ def _create_initializer(func, **kwargs):
     return lambda v : func(v, **kwargs)
 
 
+# A12: annealed cap on the log-std of the first P2P_SIGMA_CAP_DIMS action dims (the arm). Env vars:
+# P2P_SIGMA_CAP_START / _END (log-std), _EPOCHS (anneal length), _OFFSET (epochs already done, for resumes),
+# _CALLS (actor training forwards per epoch = mini_epochs * minibatches). Off unless P2P_SIGMA_CAP_END is set.
+import os as _os
+_SIGCAP = {"n": 0}
+def _sigma_cap(sigma, training):
+    end = _os.environ.get("P2P_SIGMA_CAP_END")
+    if end is None:
+        return sigma
+    if training:
+        _SIGCAP["n"] += 1
+    calls = float(_os.environ.get("P2P_SIGMA_CAP_CALLS", "4"))
+    ep = _SIGCAP["n"] / calls + float(_os.environ.get("P2P_SIGMA_CAP_OFFSET", "0"))
+    f = min(1.0, ep / max(1.0, float(_os.environ.get("P2P_SIGMA_CAP_EPOCHS", "400"))))
+    cap = float(_os.environ.get("P2P_SIGMA_CAP_START", "1.5")) * (1 - f) + float(end) * f
+    d = int(_os.environ.get("P2P_SIGMA_CAP_DIMS", "7"))
+    return torch.cat([sigma[:, :d].clamp(max=cap), sigma[:, d:]], dim=1)
+
 class NetworkBuilder:
     def __init__(self, **kwargs):
         pass
@@ -408,7 +426,7 @@ class A2CBuilder(NetworkBuilder):
                         sigma = mu * 0.0 + self.sigma_act(self.sigma)
                     elif self.fixed_sigma == 'coef_cond':
                         idxs = (obs_dict['obs'][:,self.sigma_id_idx].reshape(-1,1) == self.sigma_ids).float().argmax(dim=1)
-                        sigma = self.sigma_act(self.sigma[idxs])
+                        sigma = _sigma_cap(self.sigma_act(self.sigma[idxs]), self.training)
                     else:
                         sigma = self.sigma_act(self.sigma(a_out))
 
@@ -468,7 +486,7 @@ class A2CBuilder(NetworkBuilder):
                         sigma = self.sigma_act(self.sigma)
                     elif self.fixed_sigma == 'coef_cond':
                         idxs = (obs_dict['obs'][:,self.sigma_id_idx].reshape(-1,1) == self.sigma_ids).float().argmax(dim=1)
-                        sigma = self.sigma_act(self.sigma[idxs])
+                        sigma = _sigma_cap(self.sigma_act(self.sigma[idxs]), self.training)
                     else:
                         sigma = self.sigma_act(self.sigma(out))
                     if torch.isnan(mu).any() or torch.isinf(mu).any():
