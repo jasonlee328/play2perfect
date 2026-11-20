@@ -43,6 +43,9 @@ class RetrieveTask:
         self.just_rel = z(torch.bool)
         self.rise_max = z()
         self.fail = {k: z(torch.bool) for k in ("deck_disturbed", "broken", "dropped")}
+        if bool(getattr(self.c, "retr_detent", False)):
+            self.fail["scuffed"] = z(torch.bool)
+        self._tip_body_ids = env.robot.find_bodies(["left_thumb_DP", "left_index_DP", "left_middle_DP", "left_ring_DP", "left_pinky_DP"], preserve_order=True)[0]
         self.checks, self.meas = {}, {}
         bi, _ = env.robot.find_bodies("iiwa14_link_7")
         self.i7 = int(bi[0])
@@ -89,6 +92,87 @@ class RetrieveTask:
         N = t.shape[0]
         return (t.view(N, 5, -1) * (1.0 + g * ft)[..., None]).clamp(max=1.0).reshape(N, -1)
 
+    def _detent(self, pc, qc, r, dw):
+        """Fragile press detent (A10 11-19, FD4). The front card's bottom edge sits behind a spring pawl that holds it
+        retr_detent_snap_m proud of the deck. Pressing it with >= F (hidden, logU retr_lock_force_range) for dw steps
+        while the pawl is armed snaps the card past the pawl flat onto the deck ("seated"). Seated, the card can be slid
+        up; it clears the pawl after retr_detent_groove_m of rise ("out", free for the rest of the episode). While seated
+        and not yet out, pressing > r F (over-travel) or < retr_detent_hold_frac F (let go too early) makes the pawl
+        throw the card back out to the engaged spot; the pawl re-arms only once the press drops below
+        retr_detent_rearm_frac F. Engaged = the card is held at its engaged pose (pose-level, emulates the pawl; contacts
+        with the fingers are real). Skidding loaded fingertips across the held card's face scuffs it: cumulative
+        tangential tip slip (> 0.05 mm per step, tip force > 0.5 N) beyond retr_detent_scuff_mm = fail 'scuffed'.
+        Touch cue = the real indentation change at the snap / pop (the card face moves snap_m along its normal)."""
+        env, c, d = self.env, self.c, self.env.device
+        F = self.lock_F
+        snap = float(getattr(c, "retr_detent_snap_m", 0.0008)); groove = float(getattr(c, "retr_detent_groove_m", 0.004))
+        lo = float(getattr(c, "retr_detent_hold_frac", 0.5)); rearm = float(getattr(c, "retr_detent_rearm_frac", 0.5))
+        obj = env.object
+        ids = getattr(self, "_scuff_fresh", None)
+        if ids is not None:   # engaged pose = the rest pose (after the reset write) + snap along the free face normal
+            self.seat_pose[ids, :3] = obj.data.root_pos_w[ids]; self.seat_pose[ids, 3:] = obj.data.root_quat_w[ids]
+            n_w = quat_apply(obj.data.root_quat_w[ids], torch.tensor([0.0, 0.0, 1.0], device=d).expand(len(ids), 3))
+            n_h = quat_apply_inverse(env.hole_quat_wxyz[ids], n_w)
+            n_w = n_w * torch.sign(n_h[:, 0:1])
+            self.out_dir[ids] = n_w
+            self.lock_pose[ids] = self.seat_pose[ids]; self.lock_pose[ids, :3] += snap * n_w
+            self._scuff_fresh = None
+        p = self.f_press
+        st = self.det_state
+        rise = pc[:, 2] - self.ref_p[:, 2]
+        eng = st == 0
+        self.det_armed |= eng & (p < rearm * F)
+        self.det_count = torch.where(eng & self.det_armed & (p >= F), self.det_count + 1, torch.zeros_like(self.det_count))
+        snap_now = eng & (self.det_count >= max(1, int(round(dw))))
+        seated = st == 1
+        pop = seated & ((p > r * F) | (p < lo * F)) & (rise < groove)
+        out = seated & ~pop & (rise >= groove)
+        first_snap = snap_now & (self.n_snap == 0)
+        self.n_snap += snap_now.float(); self.n_pop += pop.float()
+        self.unlock_step[first_snap] = self.step[first_snap].float()
+        first_out = out & self.locked
+        st = torch.where(snap_now, torch.ones_like(st), st)
+        st = torch.where(pop, torch.zeros_like(st), st)
+        st = torch.where(out, torch.full_like(st, 2), st)
+        self.det_armed &= ~pop
+        self.det_state = st
+        self.locked = st != 2
+        self.just_unl = first_out          # unlock bonus once, when the card clears the pawl
+        self.just_pop = pop
+        self.lock_inwin = st == 1          # per-step reward while seated
+        # scuff: loaded fingertips skidding over the card while the pawl holds it
+        tips = env.robot.data.body_pos_w[:, self._tip_body_ids]                       # N x 5 x 3 (world)
+        cq = obj.data.root_quat_w; cp = obj.data.root_pos_w
+        loc = quat_apply_inverse(cq[:, None].expand(-1, 5, -1).reshape(-1, 4), (tips - cp[:, None]).reshape(-1, 3)).reshape(-1, 5, 3)
+        if self.tip_prev is None:
+            self.tip_prev = loc.clone()
+        dl = (loc[..., :2] - self.tip_prev[..., :2]).norm(dim=-1)                     # tangential (card plane)
+        loaded = self.f_tips > 0.5
+        held = (eng | snap_now).float()
+        fr = torch.zeros_like(self.scuff, dtype=torch.bool) if ids is None else torch.zeros_like(self.scuff, dtype=torch.bool).index_fill_(0, ids, True)
+        self.scuff += ((dl > 5e-5) & loaded).float().mul(dl).sum(-1) * held * (~fr).float()
+        self.tip_prev = loc
+        self.fail["scuffed"] = self.scuff > float(getattr(c, "retr_detent_scuff_mm", 3.0)) * 1e-3
+        # card pose: engaged -> held at the engaged pose; just snapped -> placed flat on the deck (seat pose)
+        hold_ids = (st == 0).nonzero(as_tuple=False).squeeze(-1)
+        if len(hold_ids):
+            obj.write_root_pose_to_sim(self.lock_pose[hold_ids], hold_ids)
+            obj.write_root_velocity_to_sim(torch.zeros(len(hold_ids), 6, device=d), hold_ids)
+        sn = snap_now.nonzero(as_tuple=False).squeeze(-1)
+        if len(sn):
+            obj.write_root_pose_to_sim(self.seat_pose[sn], sn)
+            obj.write_root_velocity_to_sim(torch.zeros(len(sn), 6, device=d), sn)
+        # privileged shaping (reward only): press / F capped at 1 while engaged, 1 once seated / out
+        php = torch.where(st == 0, (p / F).clamp(0.0, 1.0), torch.ones_like(p))
+        if not hasattr(self, "phi_press"):
+            self.phi_press = torch.full_like(php, float("nan"))
+        self.dphi_press = (php - self.phi_press).nan_to_num(0.0)
+        self.phi_press = php
+        # card overload (fixed, physical): press > retr_press_max N for card_break_steps while in the slot = broken
+        pmax = float(getattr(c, "retr_press_max", 10.0)) or 10.0
+        self.break_count = torch.where(p > pmax, self.break_count + 1, torch.zeros_like(self.break_count))
+        self.fail["broken"] = self.break_count >= int(c.card_break_steps)
+
     @staticmethod
     def _normal(q):
         return quat_apply(q, torch.tensor([0.0, 0.0, 1.0], device=q.device).expand(q.shape[0], 3))
@@ -112,6 +196,20 @@ class RetrieveTask:
             u = torch.rand(len(env_ids), device=self.env.device)
             self.lock_F[env_ids] = float(lo) * (float(hi) / float(lo)) ** u
             self.locked[env_ids] = True; self.lock_count[env_ids] = 0; self.unlock_step[env_ids] = 0
+            if bool(getattr(self.c, "retr_detent", False)):
+                if not hasattr(self, "det_state"):
+                    N = self.env.num_envs; dv = self.env.device
+                    self.det_state = torch.zeros(N, dtype=torch.long, device=dv)   # 0 engaged, 1 seated (in groove), 2 out
+                    self.det_armed = torch.ones(N, dtype=torch.bool, device=dv)
+                    self.det_count = torch.zeros(N, dtype=torch.long, device=dv)
+                    self.seat_pose = torch.zeros(N, 7, device=dv); self.out_dir = torch.zeros(N, 3, device=dv)
+                    self.n_snap = torch.zeros(N, device=dv); self.n_pop = torch.zeros(N, device=dv)
+                    self.scuff = torch.zeros(N, device=dv); self.tip_prev = None
+                    self.just_pop = torch.zeros(N, dtype=torch.bool, device=dv)
+                self.det_state[env_ids] = 0; self.det_armed[env_ids] = True; self.det_count[env_ids] = 0
+                self.n_snap[env_ids] = 0; self.n_pop[env_ids] = 0; self.scuff[env_ids] = 0
+                self._scuff_fresh = env_ids
+                self.fail["scuffed"][env_ids] = False; self.break_count[env_ids] = 0
             if hasattr(self, "phi_press"):
                 self.phi_press[env_ids] = float("nan")
             self._lock_fresh = env_ids
@@ -199,6 +297,9 @@ class RetrieveTask:
                 ids = self._lock_fresh
                 self.lock_pose[ids, :3] = env.object.data.root_pos_w[ids]; self.lock_pose[ids, 3:] = env.object.data.root_quat_w[ids]
                 self._lock_fresh = None
+            if hasattr(self, "det_state"):
+                self._detent(pc, qc, r, dw)
+        if hasattr(self, "lock_F") and not hasattr(self, "det_state"):
             inwin = (self.f_press >= self.lock_F) & (self.f_press <= r * self.lock_F)
             self.lock_count = torch.where(self.locked & inwin, self.lock_count + 1, torch.zeros_like(self.lock_count))
             unl = self.locked & (self.lock_count >= max(1, int(round(dw))))
@@ -312,6 +413,8 @@ class RetrieveTask:
         mu_m = self.card_mu if hasattr(self, "card_mu") else torch.zeros(env.num_envs, device=d)
         if hasattr(self, "lock_F"):
             lock_m = dict(lock_F=self.lock_F, locked=self.locked.float(), unlock_step=self.unlock_step)
+            if hasattr(self, "det_state"):
+                lock_m.update(det_state=self.det_state.float(), n_snap=self.n_snap, n_pop=self.n_pop, scuff_mm=self.scuff * 1e3)
         else:
             lock_m = {}
         self.meas = dict(**lock_m, card_mu=mu_m, rise_mm=rise * 1e3, rise_max_mm=self.rise_max * 1e3, deck_disp_mm=disp_max * 1e3, deck_tilt_deg=tilt_max,

@@ -367,6 +367,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     obs_noisy["object_vel"] = noisy_obj_vel
     obs_noisy["keypoints_rel_palm"] = keypoints_rel_palm_noisy
     obs_noisy["keypoints_rel_goal"] = keypoints_rel_goal_noisy
+    jpn = float(getattr(dr, "joint_position_obs_noise_std", 0.0))
+    if jpn > 0:   # encoder noise (rad) on the actor's joint_pos obs; joint_pos is normalised to [-1, 1] by the range
+        obs_noisy["joint_pos"] = joint_pos + torch.randn_like(joint_pos) * jpn * 2.0 / (
+            env._joint_upper_canon - env._joint_lower_canon)
     if dr.joint_velocity_obs_noise_std > 0:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
