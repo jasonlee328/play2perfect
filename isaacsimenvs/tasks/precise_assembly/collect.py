@@ -61,6 +61,7 @@ def setup(env) -> None:
     st["active"][:, 0] = True
     st["inbin"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
     st["n_active"] = torch.ones(N, dtype=torch.long, device=dev)
+    st["n_active0"] = torch.ones(N, dtype=torch.long, device=dev)
     st["prev_phi"] = torch.zeros(N, device=dev)
     st["fresh"] = torch.ones(N, dtype=torch.bool, device=dev)
     st["clear"] = torch.zeros(N, dtype=torch.long, device=dev)
@@ -174,6 +175,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
     active = placed                        # a slot that found no free spot is parked (slot 0 always placed)
     st["active"][env_ids] = active
     st["n_active"][env_ids] = active.sum(1)
+    st["n_active0"][env_ids] = active.sum(1)
     origins = env.scene.env_origins[env_ids]
     table_top = env._table_z_per_env[env_ids] + TABLE_HALF_HEIGHT
     z_axis = torch.tensor([0.0, 0.0, 1.0], device=dev).expand(n, 3)
@@ -250,6 +252,7 @@ def _bank_reset(env, env_ids: torch.Tensor) -> None:
             env._object_init_z[sel] = pos[:, 2]
     st["active"][sel] = act
     st["n_active"][sel] = act.sum(1)
+    st["n_active0"][sel] = act.sum(1)
 
 
 def bank_snapshot(env, ids: torch.Tensor) -> dict:
@@ -293,6 +296,15 @@ def update(env) -> None:
     N, K, P = env.num_envs, st["K"], N_PTS
     pos, quat, vel = _state(env)
     active = st["active"]
+    n_gone = torch.zeros(N, dtype=torch.long, device=env.device)
+    if not bool(c.collect_fell_terminal):
+        # user 11-20 (>= 3 of ~10): a utensil knocked off the table just leaves play (one-time penalty), no episode end
+        tt = (env._table_z_per_env + TABLE_HALF_HEIGHT).unsqueeze(1)
+        gone = (pos[..., 2] < tt - 0.05) & active
+        n_gone = gone.sum(1)
+        st["active"] = active & ~gone
+        active = st["active"]
+        st["n_active"] = active.sum(1)
     # lowest point of each utensil, in the bin frame
     q = quat.unsqueeze(2).expand(N, K, P, 4).reshape(-1, 4)
     pts = quat_apply(q, st["pts"].unsqueeze(0).expand(N, K, P, 3).reshape(-1, 3)).view(N, K, P, 3) + pos.unsqueeze(2)
@@ -328,7 +340,7 @@ def update(env) -> None:
     m_in = int(c.collect_success_min_in)
     if m_in > 0:   # user 11-20: success = >= m_in utensils in the bin (those at rest), not all of them
         rest_in = (rest | ~inbin).all(1)
-        enough = n_in >= torch.clamp(st["n_active"], max=m_in)
+        enough = n_in >= torch.clamp(st["n_active0"], max=m_in)   # count at reset: knocking utensils off can't help
         ok = enough & rest_in & ~contact & (palm_v < float(c.collect_palm_speed))
     else:
         ok = all_in & all_rest & ~contact & (palm_v < float(c.collect_palm_speed))
@@ -413,6 +425,7 @@ def update(env) -> None:
         st["trips_over"] = st["trips"] > budget
     st["prev_phi"] = phi
     st["fresh"][:] = False
+    r = r - float(c.collect_fall_penalty) * n_gone.float() * (~st["fresh"]).float()
     st["rew"] = r
     st["n_in"] = n_in
     st["contact"] = contact
