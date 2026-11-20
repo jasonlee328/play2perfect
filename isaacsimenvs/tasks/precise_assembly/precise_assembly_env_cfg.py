@@ -132,6 +132,8 @@ class PreciseAssemblyCfg:
     usb_seat_pinch_bonus: float = 0.0          # paid at the first seat when the insert-phase pinch already passes the official 3 N rule
     usb_win_thumb_rew_scale: float = 0.0       # per step inside the insert window x min(f_thumb, f_index, usb_win_thumb_cap) / cap
     usb_win_thumb_cap: float = 4.0
+    usb_seat_fine_rew_scale: float = 0.0       # potential on -min(seat err, usb_seat_fine_mm) before the release (training shaping)
+    usb_seat_fine_mm: float = 3.0
     usb_tilt_rew_scale: float = 0.0            # potential on -(stick tilt, rad) before the release (training shaping)
     usb_hand_lock_until_seated: bool = False   # hold the hand targets until the stick first seats (relative hand only)
     usb_seat_tol: float = 0.0005       # fully_inserted (plug_in_usb.py:153)

@@ -1317,6 +1317,15 @@ class PreciseAssemblyEnv(PlayEnv):
                 capw = float(getattr(pih_cfg, "usb_win_thumb_cap", 4.0))
                 fw = torch.minimum(usb.meas["f_thumb"], usb.meas["f_index"]).clamp(max=capw) / capw
                 u_rew = u_rew + float(pih_cfg.usb_win_thumb_rew_scale) * fw * usb.win.float()
+            if float(getattr(pih_cfg, "usb_seat_fine_rew_scale", 0.0)) > 0.0:
+                # potential on -min(seat err, usb_seat_fine_mm) before the release: pays the last few mm (policies stall ~1.3 mm short)
+                cap_m = float(getattr(pih_cfg, "usb_seat_fine_mm", 3.0)) * 1e-3
+                phf = -(usb.meas["seat_err_mm"] * 1e-3).clamp(max=cap_m)
+                if not hasattr(usb, "phf_prev"):
+                    usb.phf_prev = phf.clone()
+                d_f = torch.where((usb.step <= 1) | usb.released, torch.zeros_like(phf), phf - usb.phf_prev)
+                usb.phf_prev = phf.clone()
+                u_rew = u_rew + float(pih_cfg.usb_seat_fine_rew_scale) * d_f
             if float(getattr(pih_cfg, "usb_tilt_rew_scale", 0.0)) > 0.0:
                 # potential on -(stick tilt vs the seated axis, rad) before the release: the grasp tilts the stick 3-5 deg,
                 # the mouth allows ~0.175 mm per side (successes ~1.4 deg, failures ~5 deg)
