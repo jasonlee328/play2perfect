@@ -180,6 +180,8 @@ def reset(env, env_ids: torch.Tensor) -> None:
         st["prev_pos"][env_ids, k] = pose[:, :3] - origins
         if k == 0:
             env._object_init_z[env_ids] = pose[:, 2] - origins[:, 2]
+    if c.collect_bank_file and float(c.collect_bank_frac) > 0.0:
+        _bank_reset(env, env_ids)
     st["inbin"][env_ids] = False
     st["lift_done"][env_ids] = False
     st["fresh"][env_ids] = True
@@ -188,6 +190,58 @@ def reset(env, env_ids: torch.Tensor) -> None:
     st["fell"][env_ids] = False
     st["n_in_ep_max"][env_ids] = 0
     st["n_held_max"][env_ids] = 0
+
+
+BANK_KEYS = ("joint_pos", "joint_vel", "cur_targets", "prev_targets", "hole_pos", "hole_quat", "ut_pos", "ut_quat",
+             "active")
+
+
+def _bank_reset(env, env_ids: torch.Tensor) -> None:
+    """collect_bank_file: a share collect_bank_frac of resets start from a recorded state (robot joints + targets, bin
+    pose, every utensil pose, active mask; record_collect_bank.py), e.g. a utensil already held above the table."""
+    st, c, dev = env._collect, env.cfg.precise_assembly, env.device
+    if "bank" not in st:
+        import numpy as np
+        d = np.load(c.collect_bank_file)
+        st["bank"] = {k: torch.as_tensor(d[k], device=dev) for k in BANK_KEYS}
+        if st["bank"]["ut_pos"].shape[1] != st["K"]:
+            raise ValueError(f"collect bank has {st['bank']['ut_pos'].shape[1]} slots, env {st['K']}")
+        print(f"[collect] bank {c.collect_bank_file}: {len(d['active'])} states, share {c.collect_bank_frac}", flush=True)
+    b = st["bank"]
+    sel = env_ids[torch.rand(env_ids.numel(), device=dev) < float(c.collect_bank_frac)]
+    n = sel.numel()
+    if n == 0:
+        return
+    k = torch.randint(0, b["active"].shape[0], (n,), device=dev)
+    origins = env.scene.env_origins[sel]
+    env.hole_pos[sel] = b["hole_pos"][k].float()
+    env.hole_quat_wxyz[sel] = b["hole_quat"][k].float()
+    env.hole.write_root_pose_to_sim(torch.cat([env.hole_pos[sel] + origins, env.hole_quat_wxyz[sel]], 1), env_ids=sel)
+    env.hole.write_root_velocity_to_sim(torch.zeros(n, 6, device=dev), env_ids=sel)
+    env.robot.write_joint_state_to_sim(b["joint_pos"][k].float(), b["joint_vel"][k].float(), env_ids=sel)
+    env._cur_targets[sel] = b["cur_targets"][k].float()
+    env._prev_targets[sel] = b["prev_targets"][k].float()
+    act = b["active"][k].bool()
+    act[:, 0] = True
+    for j, body in enumerate(st["bodies"]):
+        pos = b["ut_pos"][k, j].float()
+        body.write_root_pose_to_sim(torch.cat([pos + origins, b["ut_quat"][k, j].float()], 1), env_ids=sel)
+        body.write_root_velocity_to_sim(torch.zeros(n, 6, device=dev), env_ids=sel)
+        st["prev_pos"][sel, j] = pos
+        if j == 0:
+            env._object_init_z[sel] = pos[:, 2]
+    st["active"][sel] = act
+    st["n_active"][sel] = act.sum(1)
+
+
+def bank_snapshot(env, ids: torch.Tensor) -> dict:
+    """The state of envs ``ids`` in the bank format (all local to the env origin)."""
+    st = env._collect
+    pos, quat, _ = _state(env)
+    return dict(joint_pos=env.robot.data.joint_pos[ids], joint_vel=env.robot.data.joint_vel[ids],
+                cur_targets=env._cur_targets[ids], prev_targets=env._prev_targets[ids],
+                hole_pos=env.hole_pos[ids], hole_quat=env.hole_quat_wxyz[ids], ut_pos=pos[ids], ut_quat=quat[ids],
+                active=st["active"][ids])
 
 
 def _state(env):
@@ -247,6 +301,7 @@ def update(env) -> None:
     out = active & ~inbin
     lifted = (h > 0.02) & out
     st["n_held_max"] = torch.maximum(st["n_held_max"], lifted.sum(1))
+    st["lifted"] = lifted
     # potential
     hn = (h / float(c.collect_lift_h)).clamp(max=1.0)
     d_bin = (pos[..., :2] - env.hole_pos[:, None, :2]).norm(dim=-1)

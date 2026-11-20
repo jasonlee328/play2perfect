@@ -234,6 +234,8 @@ class PreciseAssemblyCfg:
     collect_success_bonus: float = 500.0
     collect_fall_penalty: float = 200.0
     collect_lift_bonus: float = 0.0                 # one-time per utensil and episode, first lift > 2 cm out of the bin
+    collect_bank_file: str = ""                     # start-state bank (record_collect_bank.py); "" = off
+    collect_bank_frac: float = 0.0                  # share of resets that start from the bank
     collect_base_reward_scale: float = 0.0          # > 0: also add the play reward terms for slot 0 (fingertip approach,
                                                     # lift, keypoint toward its in-bin goal) times this scale
 
