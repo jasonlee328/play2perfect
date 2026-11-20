@@ -343,6 +343,11 @@ class RetrieveTask:
             fresh = self.step <= 1
             self.nonpad_count[fresh] = 0
             self.f_nonpad = (f_rob_card - f_tips.sum(-1)).clamp(min=0.0) * in_slot_card.float()
+            np0 = float(getattr(c, "retr_nonpad_max_start", 0.0)); npr = float(getattr(c, "retr_nonpad_ramp_steps", 0.0))
+            if np0 > 0.0 and npr > 0.0:   # curriculum: limit tightens from retr_nonpad_max_start to retr_nonpad_max
+                a_np = min(1.0, float(env.common_step_counter + getattr(c, "retr_nonpad_offset_steps", 0.0)) / npr)
+                npmax = np0 + (npmax - np0) * a_np
+            self.nonpad_lim = npmax
             self.nonpad_count = torch.where(self.f_nonpad > npmax, self.nonpad_count + 1, torch.zeros_like(self.nonpad_count))
             self.fail["nonpad"] = self.nonpad_count >= int(getattr(c, "retr_nonpad_steps", 3))
         if hasattr(self, "lock_F"):

@@ -247,6 +247,9 @@ class PreciseAssemblyCfg:
     finger_compliant_stiffness: float = 0.0   # > 0: soft fingertip links (PhysX compliant contact, N/m): touch depth grows with force
     finger_compliant_damping: float = 0.0
     retr_nonpad_max: float = 0.0        # > 0: fingertips-only press: non-fingertip contact force on card 1 (in holder) > this (N) ...
+    retr_nonpad_max_start: float = 0.0  # curriculum start limit (0 = off), linear to retr_nonpad_max over retr_nonpad_ramp_steps env steps
+    retr_nonpad_ramp_steps: float = 0.0
+    retr_nonpad_offset_steps: float = 0.0
     retr_nonpad_steps: int = 3          # ... for this many steps = fail 'nonpad'
     retr_deck_inslot_only: bool = False # user 11-20: deck cards may rise any amount; fail / success only on "still in the holder" (lowest corner below the wall top, on the slot)
     retr_actor_freeze_mm: float = 0.0    # >0: actor obs show card 1 at its start pose until its centre rose this much
