@@ -109,6 +109,15 @@ def reset(env, env_ids: torch.Tensor) -> None:
     dev, K, n = env.device, st["K"], env_ids.numel()
     if n == 0:
         return
+    # episode-end snapshot (read by evals after the auto-reset)
+    last = st.setdefault("last", {k: torch.zeros(env.num_envs, device=dev) for k in
+                                  ("n_active", "n_in", "n_in_ep_max", "n_held_max", "success")})
+    if "n_in" in st:
+        last["n_active"][env_ids] = st["n_active"][env_ids].float()
+        last["n_in"][env_ids] = st["n_in"][env_ids].float()
+        last["n_in_ep_max"][env_ids] = st["n_in_ep_max"][env_ids].float()
+        last["n_held_max"][env_ids] = st["n_held_max"][env_ids].float()
+        last["success"][env_ids] = st["success"][env_ids].float()
     # number of active utensils
     hi = max(st["n_lo"], min(_n_hi_now(env), K))
     n_act = torch.randint(st["n_lo"], hi + 1, (n,), device=dev)
