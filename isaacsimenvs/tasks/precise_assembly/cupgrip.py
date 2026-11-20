@@ -6,7 +6,8 @@ fused cups below. Per episode (hidden from the actor, sampled at reset):
      seated (breakaway: holds against the hand's upward pull beyond m g up to S, then frees; re-sticks when re-seated).
      Physical consequence: the pads must squeeze hard enough that friction carries S + m g, else the cup slips.
   r  drag ratio, uniform in cupgrip_drag_ratio_range: while the top cup is still nested on the second cup
-     (rise < cupgrip_nest_overlap_mm), a hand squeeze above D = r * (S + m g) / cupgrip_mu_cal (hand_force units, N)
+     (rise < cupgrip_nest_overlap_mm), a hand squeeze (horizontal contact force, N) above D = r (S + m g) / cupgrip_mu_cal
+     while the hand pulls the cup up
      latches a coupling that carries the second cup with the top cup (MODEL, not rigid-body physics: a rigid cup can't
      be squeezed onto the one inside). The coupling force F on the second cup (gravity compensation + PD on the
      nested offset) is applied with -F on the top cup, so the hand carries the extra load. Released when the squeeze
@@ -144,11 +145,14 @@ def pre_physics(env) -> None:
                         torch.zeros_like(z1))
     env.cg_break_count = env.cg_break_count + brk.long()
 
-    hand = getattr(env, "hand_force", None)
+    # squeeze = horizontal contact force of the hand on the top cup; the drag engages only for a squeeze above D while
+    # the hand pulls the cup up (pressing down or knocking the cup does not lift the second cup)
+    hand = getattr(env, "hand_force_xy", None)
     hand = torch.zeros_like(z1) if hand is None else hand
     env.cg_hand = hand
     nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
-    on = (hand > env.cg_D) & nested
+    carrying = fz > 0.5 * env.cg_m1 * G          # the hand holds the cup up (not pressing it down / knocking it)
+    on = (hand > env.cg_D) & nested & carrying
     off = (hand < 0.9 * env.cg_D) | ~nested
     env.cg_coupled = (env.cg_coupled | on) & ~off
     env.cg_ever_coupled |= env.cg_coupled

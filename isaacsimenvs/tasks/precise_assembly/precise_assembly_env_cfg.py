@@ -183,7 +183,7 @@ class PreciseAssemblyCfg:
     cupgrip_drag_ramp_steps: int = 0                           # env steps (common_step_counter) to reach the range
     cupgrip_drag_ramp_offset_steps: int = 0                    # added on resume
     cupgrip_drag_ratio_range: tuple[float, float] = (1.6, 1.6)  # hidden r: drag above D = r (S + m g) / mu_cal
-    cupgrip_mu_cal: float = 1.4                                # hand-force calibration of the slip limit
+    cupgrip_mu_cal: float = 1.4                                # squeeze calibration: pad-on-PLA friction (2.3+0.5)/2
     cupgrip_nest_overlap_mm: float = 55.0                      # top cup still nested on the second below this rise
     cupgrip_couple_tau_s: float = 0.05
     cupgrip_couple_max_N: float = 5.0

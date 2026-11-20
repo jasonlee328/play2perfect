@@ -981,6 +981,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self.hand_force = F.norm(dim=-1).sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
         # A21: net vertical force of the hand on the object (N, + = up), same calibration
         self.hand_force_z = F[..., 2].sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
+        # A21: squeeze = sum over links of the horizontal contact force magnitude (side-grip normals), same calibration
+        self.hand_force_xy = F[..., :2].norm(dim=-1).sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
         over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
