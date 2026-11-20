@@ -71,6 +71,8 @@ def setup(env) -> None:
     st["prev_pos"] = torch.zeros(N, K, 3, device=dev)
     st["at_rest"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
     st["lift_done"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
+    st["pinch_done"] = torch.zeros(N, dtype=torch.bool, device=dev)
+    st["pinch"] = torch.zeros(N, dtype=torch.bool, device=dev)
     env._collect = st
     print(f"[collect] slots {types}, N range {n_range}, bin rim {st['rim']*1000:.1f} mm, "
           f"inner floor {[round(float(x)*1000, 1) for x in st['inner_floor']]} mm", flush=True)
@@ -184,6 +186,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
         _bank_reset(env, env_ids)
     st["inbin"][env_ids] = False
     st["lift_done"][env_ids] = False
+    st["pinch_done"][env_ids] = False
     st["fresh"][env_ids] = True
     st["clear"][env_ids] = 0
     st["success"][env_ids] = False
@@ -315,6 +318,20 @@ def update(env) -> None:
     any_out = out.any(1)
     reach = torch.where(any_out, (1.0 - d_out / float(c.collect_reach_d)).clamp(0, 1), torch.ones_like(d_out))
     phi = phi + float(c.collect_rew_reach) * reach
+    # pinch: thumb pad and another fingertip pad in contact, both tips within collect_pinch_d of the same out-of-bin
+    # utensil's surface points (tactile is ray-cast against every utensil, so the distance check picks the utensil)
+    pinch = torch.zeros(N, dtype=torch.bool, device=env.device)
+    if float(c.collect_rew_pinch) > 0.0 or float(c.collect_pinch_bonus) > 0.0:
+        tt = getattr(env, "_last_tactile", None)
+        if tt is not None:
+            pad = tt.reshape(N, 5, -1).amax(-1) > thr                                                  # (N, 5)
+            dall = (ft[:, :, None, None, :] - pts.unsqueeze(1)).norm(dim=-1).amin(-1)                  # (N, 5, K)
+            near = dall < float(c.collect_pinch_d)
+            th = pad[:, 0:1] & near[:, 0]                                                               # (N, K)
+            oth = (pad[:, 1:].unsqueeze(-1) & near[:, 1:]).any(1)                                        # (N, K)
+            pinch = (th & oth & out).any(1)
+    st["pinch"] = pinch
+    phi = phi + float(c.collect_rew_pinch) * pinch.float()
     d_act = torch.where(active, dft, big).min(1).values
     release = all_in.float() * (d_act / float(c.collect_release_d)).clamp(0, 1)
     phi = phi + float(c.collect_rew_release) * release
@@ -323,6 +340,9 @@ def update(env) -> None:
     new_lift = lifted & ~st["lift_done"] & ~st["fresh"].unsqueeze(1)
     st["lift_done"] |= lifted
     r = r + float(c.collect_lift_bonus) * new_lift.float().sum(1)
+    new_pinch = pinch & ~st["pinch_done"] & ~st["fresh"]
+    st["pinch_done"] |= pinch
+    r = r + float(c.collect_pinch_bonus) * new_pinch.float()
     st["prev_phi"] = phi
     st["fresh"][:] = False
     st["rew"] = r
