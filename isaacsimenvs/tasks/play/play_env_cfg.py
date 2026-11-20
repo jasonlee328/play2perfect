@@ -562,6 +562,7 @@ class TactileCfg:
     map_dir: str = "assets/tactile/sharpa_tacmap"
     # Upper bound on rays per raycast call (envs are processed in chunks).
     max_rays_per_chunk: int = 4_000_000
+    gel_force_k: float = 0.0   # A10: gel-like force reading, taxel depth += k (m/N) x fingertip contact force on contact taxels
     # Experimental whole-hand skin (utils/hand_skin.py): field "tactile_hand" of 21 links x grid^2 taxels, appended
     # after "tactile" (policy obs; critic too with whole_hand_in_critic). Needs enabled=true. A checkpoint trained
     # without it warm-starts with P2P_NEW_OBS_FIELD=tactile_hand. policy_override applies to it as well.

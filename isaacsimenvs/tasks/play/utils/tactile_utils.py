@@ -120,6 +120,7 @@ class TactileSensor:
             raise NotImplementedError("tactile obs does not support object_scale_noise_multiplier_range != (1, 1)")
 
         self.env, self.device, self.res = env, env.device, res
+        self.gel_force_k = float(getattr(tactile_cfg, "gel_force_k", 0.0))   # m per N, 0 = off
         self.meshes, self.asset_env_ids = [], []
         for k in range(n_assets):
             ids = (torch.arange(env.num_envs, device=self.device) if n_assets == 1
@@ -188,6 +189,14 @@ class TactileSensor:
                 depth = torch.where(torch.isfinite(dist) & torch.isfinite(dist2), dist, torch.zeros_like(dist))
                 taxels = torch.zeros(len(depth), len(self.counts), device=self.device).index_add_(1, self.taxel, depth)
                 result[c] = taxels / self.counts
+        # Gel-like force reading (A10 11-20, off by default): taxels in contact deepen by k x the fingertip's contact
+        # force (env._tactile_tip_force, (N, 5) N, FINGERS order, set by the task), like a gel pad that deforms more
+        # under more load. The pure geometric depth is ~constant on a rigid flat face whatever the press.
+        k = float(getattr(self, "gel_force_k", 0.0))
+        tf = getattr(env, "_tactile_tip_force", None)
+        if k > 0.0 and tf is not None:
+            pad = result.view(env.num_envs, len(FINGERS), -1)
+            pad += (pad > 0).float() * (tf.to(pad.dtype).clamp(min=0.0) * k).unsqueeze(-1)
         return _deform_quantize(result) / 255.0
 
 

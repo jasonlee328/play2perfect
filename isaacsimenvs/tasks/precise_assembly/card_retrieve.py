@@ -322,6 +322,7 @@ class RetrieveTask:
             self.frz_on &= (pc[:, 2] - self.ref_p[:, 2]) < float(c.retr_actor_freeze_mm) * 1e-3
         f_rob_card, f_tips, f_rob_deck, f_rob_hold, f_card_env = self._forces()
         self.f_tips = f_tips
+        env._tactile_tip_force = f_tips   # gel-like tactile force reading (tactile.gel_force_k)
         self.f_rob_deck, self.f_rob_card = f_rob_deck, f_rob_card
         # press force on the picked card (robot -> card) while it is still in the slot (centre below the post tops)
         in_slot_card = (pc[:, 2] < 0.045) & (pc[:, 0].abs() < SLOT_X + 0.01)
