@@ -39,7 +39,8 @@ class KeyRepose:
         self.pos_err = torch.zeros(N, device=dev)      # m
         self.final_rot_err = torch.zeros(N, device=dev)  # deg, to the final (full-flip) goal
         self.min_final_rot_err = torch.full((N,), 180.0, device=dev)
-        self.x_axis = torch.tensor([1.0, 0.0, 0.0], device=dev)
+        ax = torch.tensor([float(v) for v in getattr(c, "key_flip_axis", (1.0, 0.0, 0.0))], device=dev)
+        self.x_axis = ax / ax.norm()          # flip axis in the object frame (key: long axis x; Allen key: pinch axis z)
         self._step = 0
 
     # ------------------------------------------------------------------ helpers
@@ -120,10 +121,11 @@ class KeyRepose:
         dq = quat_mul(quat_conjugate(g[:, 3:7]), kq)
         self.rot_err = torch.rad2deg(2.0 * torch.acos(dq[:, 0].abs().clamp(max=1.0)))
         # swing-twist about the key's long axis (object x): twist = flip still missing, swing = the rest
-        tw = torch.stack([dq[:, 0], dq[:, 1], torch.zeros_like(dq[:, 0]), torch.zeros_like(dq[:, 0])], -1)
+        _va = (dq[:, 1:4] * self.x_axis).sum(-1)
+        tw = torch.cat([dq[:, 0:1], _va.unsqueeze(-1) * self.x_axis], -1)
         tw = tw / tw.norm(dim=-1, keepdim=True).clamp_min(1e-9)
         self.twist_err = torch.rad2deg(2.0 * torch.acos(tw[:, 0].abs().clamp(max=1.0)))
-        ts = 2.0 * torch.atan2(tw[:, 1], tw[:, 0])
+        ts = 2.0 * torch.atan2(_va, dq[:, 0])
         self.twist_signed = torch.atan2(torch.sin(ts), torch.cos(ts))   # rad, key-frame x, current goal -> key
         sw = quat_mul(dq, quat_conjugate(tw))
         self.swing_err = torch.rad2deg(2.0 * torch.acos(sw[:, 0].abs().clamp(max=1.0)))
@@ -133,7 +135,7 @@ class KeyRepose:
         self.final_rot_err = torch.rad2deg(2.0 * torch.acos(dqf[:, 0].abs().clamp(max=1.0)))
         self.min_final_rot_err = torch.minimum(self.min_final_rot_err, self.final_rot_err)
         # potential shaping toward the FINAL goal (waypoint switches don't jump): twist about the key x and swing (rest)
-        twf = torch.stack([dqf[:, 0], dqf[:, 1], torch.zeros_like(dqf[:, 0]), torch.zeros_like(dqf[:, 0])], -1)
+        twf = torch.cat([dqf[:, 0:1], ((dqf[:, 1:4] * self.x_axis).sum(-1)).unsqueeze(-1) * self.x_axis], -1)
         twf = twf / twf.norm(dim=-1, keepdim=True).clamp_min(1e-9)
         ftw = 2.0 * torch.acos(twf[:, 0].abs().clamp(max=1.0))
         fsw = 2.0 * torch.acos(quat_mul(dqf, quat_conjugate(twf))[:, 0].abs().clamp(max=1.0))

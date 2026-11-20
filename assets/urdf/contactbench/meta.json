@@ -10941,6 +10941,43 @@
      0.03186
     ]
    }
+  },
+  "cb_repose_allen": {
+   "object": "allen_key",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "ContactBench in-hand repose / grasp transition (videos/in_hand_grasp_transition_allen_key.mp4): Allen key pinched near the bend, long arm horizontal -> long arm pointing down",
+    "task": "in-hand repose: pivot the Allen key about the pinch axis (object z) by 90 deg, goal in the palm frame",
+    "grip_point_key_frame_m": [
+     0.012,
+     -0.0042,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.0413,
+     0.0262
+    ]
+   }
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"

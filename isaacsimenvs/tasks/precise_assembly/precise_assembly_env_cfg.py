@@ -121,6 +121,7 @@ class PreciseAssemblyCfg:
     # A13 key repose (key_repose.py): goal = the key's start pose in the palm frame turned about its long axis
     key_repose: bool = False
     key_flip_deg: tuple = (45.0, 90.0, 135.0, 180.0)   # one goal per angle, in order; last = the task
+    key_flip_axis: tuple = (1.0, 0.0, 0.0)   # object-frame axis of the goal rotation (key: long axis x; Allen key pivot: z)
     key_flip_ramp_steps: int = 0        # > 0: all angles scaled from key_flip_ramp_start to 1 over this many env steps
     key_flip_ramp_start: float = 0.25
     key_flip_ramp_offset_steps: int = 0  # set on a resume (the step counter restarts)
