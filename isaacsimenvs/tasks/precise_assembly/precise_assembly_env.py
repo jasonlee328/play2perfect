@@ -1178,6 +1178,12 @@ class PreciseAssemblyEnv(PlayEnv):
                 tau_fric = kb * z + torch.where(stick, float(pc.turn_thread_bristle_d) * w_f, torch.zeros_like(w_f))
             else:
                 tau_fric = tau_c * torch.tanh(w_f / float(pc.turn_thread_stiction_w))
+        det_t = float(getattr(pc, "turn_vseat_detent_torque", 0.0))
+        if det_t > 0.0 and getattr(self, "turn_vseat", None) is not None:
+            # A9 physical clutch detent: past the hidden seat a periodic torque on the screw (ratchet clicks, mean 0),
+            # det_t sin(count x over-angle); real physics the hand feels through the tool (joints AND pads)
+            ov = torch.clamp(self.turn_angle - self.turn_vseat, min=0.0)
+            tau_fric = tau_fric + det_t * torch.sin(float(getattr(pc, "turn_vseat_detent_count", 36.0)) * ov) * (ov > 0).float()
         k_ax = float(getattr(pc, "turn_thread_axial_k", 0.0))
         f_ax = torch.zeros(n, device=self.device)
         g_comp = bool(getattr(pc, "turn_thread_gravity_comp", False))

@@ -288,6 +288,8 @@ class PreciseAssemblyCfg:
     turn_vseat_tactile: bool = True
     # > 0: past the virtual seat the felt tool is also shifted this far (mm, tool-frame +y) = a touch-only click
     turn_vseat_tactile_pop_mm: float = 0.0
+    turn_vseat_detent_torque: float = 0.0   # A9: physical detent past the hidden seat (N m amplitude)
+    turn_vseat_detent_count: float = 36.0   # clicks per turn (36 = one every 10 deg)
     # > 0: fail `stripped` (-turn_strip_penalty) once the cap is turned more than this past its stop (any mode).
     turn_strip_over_deg: float = 0.0
     # Over-turn curriculum: > 0 = ramp the strip window from turn_strip_over_ramp_start_deg down to turn_strip_over_deg
