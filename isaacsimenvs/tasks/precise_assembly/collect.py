@@ -81,6 +81,9 @@ def setup(env) -> None:
     st["prev_n_in"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["trips_over"] = torch.zeros(N, dtype=torch.bool, device=dev)
     st["multi_max"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["visit_n"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["prev_n_in_max"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["deposit_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     env._collect = st
     print(f"[collect] slots {types}, N range {n_range}, bin rim {st['rim']*1000:.1f} mm, "
           f"inner floor {[round(float(x)*1000, 1) for x in st['inner_floor']]} mm", flush=True)
@@ -201,7 +204,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
     st["fell"][env_ids] = False
     st["n_in_ep_max"][env_ids] = 0
     st["n_held_max"][env_ids] = 0
-    for k in ("trips", "prev_n_in", "multi_max"):
+    for k in ("trips", "prev_n_in", "multi_max", "visit_n", "prev_n_in_max", "deposit_max"):
         st[k][env_ids] = 0
     for k in ("near", "visit_dep", "trips_over"):
         st[k][env_ids] = False
@@ -322,7 +325,13 @@ def update(env) -> None:
         if t is not None:
             contact |= (t.reshape(N, -1) > thr).any(-1)
     palm_v = env.robot.data.body_lin_vel_w[:, env._palm_body_id].norm(dim=-1)
-    ok = all_in & all_rest & ~contact & (palm_v < float(c.collect_palm_speed))
+    m_in = int(c.collect_success_min_in)
+    if m_in > 0:   # user 11-20: success = >= m_in utensils in the bin (those at rest), not all of them
+        rest_in = (rest | ~inbin).all(1)
+        enough = n_in >= torch.clamp(st["n_active"], max=m_in)
+        ok = enough & rest_in & ~contact & (palm_v < float(c.collect_palm_speed))
+    else:
+        ok = all_in & all_rest & ~contact & (palm_v < float(c.collect_palm_speed))
     st["clear"] = torch.where(ok, st["clear"] + 1, torch.zeros_like(st["clear"]))
     st["success"] = st["clear"] >= int(c.collect_clear_steps)
     table_top = (env._table_z_per_env + TABLE_HALF_HEIGHT).unsqueeze(1)
@@ -386,6 +395,16 @@ def update(env) -> None:
     rose = (n_in > st["prev_n_in"]) & ~st["fresh"]
     dep = rose & (~near | ~st["visit_dep"])
     st["trips"] = st["trips"] + dep.long()
+    # deposit-size bonus: the k-th utensil landing in the same bin visit earns (k-1) x collect_deposit_bonus
+    gain_in = (st["n_in_ep_max"] - st["prev_n_in_max"]).clamp(min=0)
+    st["visit_n"] = torch.where(entered | ~near, torch.zeros_like(st["visit_n"]), st["visit_n"])
+    if float(c.collect_deposit_bonus) > 0.0:
+        k0 = st["visit_n"].float()
+        g = gain_in.float()
+        r = r + float(c.collect_deposit_bonus) * (g * k0 + g * (g - 1) / 2) * (~st["fresh"]).float()
+    st["visit_n"] = st["visit_n"] + gain_in
+    st["deposit_max"] = torch.maximum(st["deposit_max"], st["visit_n"] + (gain_in * (~near).long()))
+    st["prev_n_in_max"] = st["n_in_ep_max"].clone()
     st["visit_dep"] = st["visit_dep"] | (rose & near)
     st["near"] = near
     st["prev_n_in"] = n_in

@@ -237,6 +237,8 @@ class PreciseAssemblyCfg:
     collect_pinch_d: float = 0.025                  # fingertip (DP origin) to nearest utensil surface point, pinch test (m)
     collect_pinch_bonus: float = 0.0                # one-time per episode, first pinch
     # scooping (user 11-20: several utensils per carry, never one at a time)
+    collect_success_min_in: int = 0                 # > 0: success = this many in the bin (at rest) + release, not all
+    collect_deposit_bonus: float = 0.0              # k-th utensil into the bin in one visit earns (k-1) x this
     collect_scoop_target: bool = False              # object obs fields = centroid of the out-of-bin utensils (pile)
     collect_per_trip: int = 0                       # > 0: trip budget ceil(N / per_trip); more deposit trips = fail
     collect_trip_near_m: float = 0.15               # palm within this xy distance of the bin centre = one bin visit
