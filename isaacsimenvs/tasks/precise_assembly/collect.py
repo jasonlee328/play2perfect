@@ -354,6 +354,10 @@ class CollectManager:
         out = self.active & ~self.in_bin
         self.ft_min_out = torch.where(out, self.ft_min, torch.full_like(self.ft_min, 9.0)).min(1).values
         all_in = (self.in_bin == self.active).all(1)
+        k_min = int(c.collect_success_min_in)
+        if k_min > 0:
+            # user 11-20: success = at least k parts in the bin (or all, when fewer are active), then let go
+            all_in = self.in_bin.sum(1) >= torch.clamp(self.active.sum(1), max=k_min)
         # at rest = mean speed over the last W policy steps (displacement / time) below collect_rest_speed: PhysX
         # contact velocities of light stacked parts jitter by a few mm/s per step without any net motion
         old = self.pos_hist[self.hist_i].clone()

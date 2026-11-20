@@ -234,6 +234,8 @@ class PreciseAssemblyCfg:
     # scoop mode (user 11-20: several parts per carry): the object obs / goal follow the centroid of the parts left;
     # field collect_group; reward per part in the hand; trip budget ceil(N / collect_trip_size) deposits
     collect_scoop: bool = False
+    # success needs only this many parts in the bin (0 = every active part)
+    collect_success_min_in: int = 0
     collect_sort_slots: bool = False
     collect_hand_radius: float = 0.10
     collect_w_scoop_app: float = 200.0
