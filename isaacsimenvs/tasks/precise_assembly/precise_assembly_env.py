@@ -1056,7 +1056,7 @@ class PreciseAssemblyEnv(PlayEnv):
         if f <= 0.0:
             return
         quat = self.object.data.root_quat_w
-        a = quat_apply(quat, torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3))
+        a = quat_apply(quat, key.x_axis.expand(self.num_envs, 3))   # the task flip axis (object frame) in world
         ts = key.twist_signed
         on = (ts.abs() > math.radians(float(getattr(pc, "key_assist_min_deg", 3.0)))) & ~key.dropped
         wx = (self.object.data.root_ang_vel_w * a).sum(-1)
