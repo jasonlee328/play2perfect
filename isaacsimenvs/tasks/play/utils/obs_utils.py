@@ -274,6 +274,13 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     else:
         noisy_obj_pos, noisy_obj_rot, noisy_obj_vel = obj_pos, obj_rot, obj_vel
 
+    card = getattr(env, "_card", None)
+    if card is not None and hasattr(card, "frz_on"):   # A10: actor sees card 1 frozen at its start pose (critic: true pose)
+        m = card.frz_on.unsqueeze(-1)
+        noisy_obj_pos = torch.where(m, card.frz_pos, noisy_obj_pos)
+        noisy_obj_rot = torch.where(m, card.frz_rot, noisy_obj_rot)
+        noisy_obj_vel = torch.where(m, torch.zeros_like(noisy_obj_vel), noisy_obj_vel)
+
     kp_offsets = env._keypoint_offsets * env._object_scale_multiplier.unsqueeze(1)
     obj_kp = _keypoints_world(obj_pos, obj_rot, kp_offsets)
     goal_kp = _keypoints_world(goal_pos, goal_rot, kp_offsets)

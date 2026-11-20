@@ -297,9 +297,19 @@ class RetrieveTask:
                 self.deck_ref_n[k, ids] = self._normal(qk)[ids]
             pc0, _ = self._rel_hole(env.object.data.root_pos_w, env.object.data.root_quat_w)
             self.ref_p[self._fresh] = pc0[self._fresh]
+            if float(getattr(c, "retr_actor_freeze_mm", 0.0)) > 0:   # actor sees card 1 at its start pose until it clears
+                if not hasattr(self, "frz_pos"):
+                    self.frz_pos = torch.zeros(env.num_envs, 3, device=d); self.frz_rot = torch.zeros(env.num_envs, 4, device=d)
+                    self.frz_on = torch.zeros(env.num_envs, dtype=torch.bool, device=d)
+                ids = self._fresh
+                self.frz_pos[ids] = env.object.data.root_pos_w[ids] - env.scene.env_origins[ids]
+                self.frz_rot[ids] = env.object.data.root_quat_w[ids]
+                self.frz_on[ids] = True
             self._fresh = None
         pc, qc = self._rel_hole(env.object.data.root_pos_w, env.object.data.root_quat_w)
         nc = self._normal(qc)
+        if hasattr(self, "frz_on"):   # unfreeze for good once the card centre is retr_actor_freeze_mm above its start
+            self.frz_on &= (pc[:, 2] - self.ref_p[:, 2]) < float(c.retr_actor_freeze_mm) * 1e-3
         f_rob_card, f_tips, f_rob_deck, f_rob_hold, f_card_env = self._forces()
         self.f_tips = f_tips
         self.f_rob_deck, self.f_rob_card = f_rob_deck, f_rob_card
@@ -407,7 +417,11 @@ class RetrieveTask:
         self.final_count = torch.where(end_ok, self.final_count + 1, torch.zeros_like(self.final_count))
         self.success = self.final_count >= c.card_final_steps
         # fails
-        self.deck_over = torch.where(~neat, self.deck_over + 1, torch.zeros_like(self.deck_over))
+        # retr_deck_out_mm > 0 (user 11-20): deck cards may rise partly during the episode as long as they fall back;
+        # fail only if one comes fully out (centre risen > out mm). Success still needs the deck neat at the end.
+        out_mm = float(getattr(c, "retr_deck_out_mm", 0.0))
+        bad = (self.deck_rise.max(-1).values > out_mm * 1e-3) if out_mm > 0.0 else ~neat
+        self.deck_over = torch.where(bad, self.deck_over + 1, torch.zeros_like(self.deck_over))
         self.fail["deck_disturbed"] = self.deck_over >= max(1, int(c.card_deck_fail_hold_steps))
         pmax = float(getattr(c, "retr_press_max", 0.0))
         if pmax > 0.0 and not hasattr(self, "lock_F"):

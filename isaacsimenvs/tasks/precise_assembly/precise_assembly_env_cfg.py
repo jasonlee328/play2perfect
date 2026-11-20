@@ -162,6 +162,7 @@ class PreciseAssemblyCfg:
     object_max_depenetration_velocity: float = 1000.0  # A10: m/s, object + distractors (1000 = old default; a restored
     #   pinch with pad penetration ejects the 6.9 g card at 1000)
     object_torsional_patch_radius: float = 0.0   # A10: m, PhysX torsional friction patch radius (object + distractors)
+    object_contact_offset: float = 0.0   # A10: m, collision contact offset of object + distractors (0 = play default 2 mm)
     object_rest_offset: float = 0.0   # 0.0 = the play default _REST_OFFSET (a None default rejects float overrides)
 
     # Official-style ("strict") success for the last goal, from the ContactBench sim's retrieve_top_cup_from_stack
@@ -240,6 +241,8 @@ class PreciseAssemblyCfg:
     retr_lock_unlock_bonus: float = 0.0  # once at unlock
     retr_fric_card_jitter: float = 0.0    # DR: each card's friction = env value + U(-j, j) (needs retr_fric_range)
     retr_fric_card_mu: tuple = ()        # fixed friction per card, front -> back (card 1, 2, 3, 4); < 0 = keep
+    retr_deck_out_mm: float = 0.0       # > 0: deck_disturbed only when a deck card rises > this (fully out); partial rises that fall back are OK
+    retr_actor_freeze_mm: float = 0.0    # >0: actor obs show card 1 at its start pose until its centre rose this much
     retr_detent: bool = False             # FD4: physical spring-pawl detent instead of the pose lock (card_retrieve._detent)
     retr_detent_snap_m: float = 0.0008    # engaged card stands this far proud of the deck; the snap seats it
     retr_detent_groove_m: float = 0.004   # rise that clears the pawl

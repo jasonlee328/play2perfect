@@ -1430,6 +1430,7 @@ def _bake_usd(
     collision_enabled: bool | None = None,
     rest_offset: float | None = None,
     torsional_patch_radius: float = 0.0,
+    contact_offset: float | None = None,
 ) -> str:
     """Copy raw USD into bake_root/baked_subdir and pre-author physics props.
 
@@ -1496,7 +1497,7 @@ def _bake_usd(
             _set_usd_attr(prim, attr_name, val, vtypes[vtype_str])
         if prim.HasAPI(UsdPhysics.CollisionAPI):
             px = PhysxSchema.PhysxCollisionAPI(prim) or PhysxSchema.PhysxCollisionAPI.Apply(prim)
-            px.CreateContactOffsetAttr().Set(_CONTACT_OFFSET)
+            px.CreateContactOffsetAttr().Set(_CONTACT_OFFSET if not contact_offset else float(contact_offset))
             px.CreateRestOffsetAttr().Set(_REST_OFFSET if rest_offset is None else float(rest_offset))
             if torsional_patch_radius > 0.0:
                 px.CreateTorsionalPatchRadiusAttr().Set(float(torsional_patch_radius))
