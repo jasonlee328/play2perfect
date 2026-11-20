@@ -170,6 +170,7 @@ class KeyLockCfg:
     key_pull_n: float = 3.0              # net outward hand force on the key (N)
     key_pull_steps: int = 5
     key_pull_win_any: bool = False
+    key_target_hint: bool = False        # with key_cue_to_latch + latch_hint_obs: latch_hint theta = the hidden target
     key_cue_to_latch: bool = False       # expose the hidden pull window as env.latch_in_window, so the privileged
                                          # actor field latch_cue (precise_assembly.latch_cue_obs) carries it (oracle)       # a pull counts as in-window if the key was in the window at any step of it
     key_pull_click_mm: float = 2.0
@@ -695,6 +696,8 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 self._kp_cue_level = torch.where(win, torch.ones_like(below), torch.where(ang < lo_edge, below, torch.zeros_like(below)))
             if bool(kl.key_cue_to_latch):
                 self.latch_in_window = win.clone()
+                if bool(kl.key_target_hint):
+                    self.latch_hint_angle = self._kp_target.clone()   # obs only: latch_hint theta = hidden pull target (oracle)
                 # the key env's reset never runs the base _latch_hint_resample, so the hint mask must be set here
                 # (without it both latch_hint and latch_cue read all zeros: found 11-19 from the K8o checkpoint stats)
                 if not hasattr(self, "latch_hint_on") or self.latch_hint_on.shape[0] != N:

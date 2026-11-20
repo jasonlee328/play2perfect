@@ -368,7 +368,7 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         n = env.num_envs
         if getattr(env, "unlock_angle", None) is not None and hasattr(env, "latch_hint_on"):
             m = env.latch_hint_on.float()
-            th = env.unlock_angle / math.radians(90.0)
+            th = getattr(env, "latch_hint_angle", env.unlock_angle) / math.radians(90.0)
             if not bool(getattr(env.cfg.precise_assembly, "latch_hint_theta", True)):
                 th = torch.zeros_like(th)
             kl = getattr(env.cfg, "key_lock", None)
