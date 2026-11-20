@@ -292,7 +292,9 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
             # distance rule (11-20): the cup slips once it has been lifted lift_mm in total (any speed) while gripped
             # with a squeeze below G_lo and still nested; the step rule could be dodged by a fast yank or a slow creep
             d_rise = (rise - env.cg_rise_prev).clamp(min=0.0)
-            lowd = gripping & nested & (sq < env.cg_G)
+            # 11-20 b: any lift of the nested cup without enough squeeze counts, gripping or not (a 15 g cup lifted on the
+            # fingers under its rim, < cupgrip_contact_N total force, dodged the old gripping-only rule)
+            lowd = nested & (sq < env.cg_G) & (rise > 0.002)
             env.cg_low_lift = env.cg_low_lift + torch.where(lowd, d_rise, torch.zeros_like(d_rise))
             slipped = (env.cg_low_lift > lift_mm / 1000.0) & ~dragged
         else:
