@@ -190,7 +190,12 @@ class WipeTask:
 
     def gate(self, stroke_done: torch.Tensor) -> torch.Tensor:
         """stroke_done = the last waypoint credited this step -> success / incomplete."""
-        ok = stroke_done & (self.frac >= self.succ_frac)
+        enough = self.frac >= self.succ_frac
+        if bool(getattr(self.c, "wipe_success_anytime", False)):
+            # success the moment enough ink is erased (eraser still held: drops / over-force fail first)
+            ok = enough & ~self.fail["dropped"] & ~self.fail["pressed_too_hard"]
+        else:
+            ok = stroke_done & enough
         self.success = ok
         mp = int(getattr(self.c, "wipe_max_passes", 1))
         redo = stroke_done & ~ok & (self.passes + 1 < mp)
