@@ -170,6 +170,9 @@ class KeyLockCfg:
     key_pull_n: float = 3.0              # net outward hand force on the key (N)
     key_pull_steps: int = 5
     key_pull_win_any: bool = False
+    key_vstop_brake: float = 0.0         # > 0: braked virtual stop at target + window (fraction of over-turn undone per substep)
+    key_vstop_ramp_steps: int = 0        # brake fades linearly to 0 over these env steps (+ offset on a resume)
+    key_vstop_offset_steps: int = 0
     key_max_deg_s: float = 0.0           # > 0: pose-level cap on the key's forward turning speed (deg/s)
     key_target_hint: bool = False        # with key_cue_to_latch + latch_hint_obs: latch_hint theta = the hidden target
     key_cue_to_latch: bool = False       # expose the hidden pull window as env.latch_in_window, so the privileged
@@ -469,7 +472,7 @@ class KeyLockEnv(PreciseAssemblyEnv):
             j = self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)]
             self._key_stop_lo = math.radians(float(j.lower_deg if j.lower_deg is not None else -1.0))
         cap = float(self.cfg.key_lock.key_max_deg_s)
-        if not bool(self._key_soft_stop_t.any()) and cap <= 0.0:
+        if not bool(self._key_soft_stop_t.any()) and cap <= 0.0 and float(self.cfg.key_lock.key_vstop_brake) <= 0.0:
             return
         c = self.cfg.precise_assembly
         k = int(c.unlock_joint)
@@ -478,6 +481,19 @@ class KeyLockEnv(PreciseAssemblyEnv):
         over = torch.where(ang > hi, ang - hi,
                            torch.where(ang < self._key_stop_lo, ang - self._key_stop_lo, torch.zeros_like(ang)))
         over = torch.where(self._key_soft_stop_t, over, torch.zeros_like(over))
+        vb = float(self.cfg.key_lock.key_vstop_brake)
+        if vb > 0.0 and hasattr(self, "_kp_target"):
+            # braked virtual stop at the window's upper edge: each substep undoes a fraction b of the over-turn
+            # past target + window (b = 1: a hard stop; ramps to 0 over key_vstop_ramp_steps env steps)
+            rs = int(self.cfg.key_lock.key_vstop_ramp_steps)
+            if rs > 0:
+                f = min(1.0, (int(self.common_step_counter) + int(self.cfg.key_lock.key_vstop_offset_steps)) / float(rs))
+                vb = vb * (1.0 - f)
+            self.extras["key/vstop_brake"] = torch.tensor(vb)
+            if vb > 0.0:
+                edge = self._kp_target + math.radians(float(self.cfg.key_lock.key_pull_window_deg))
+                vo = vb * (ang - edge).clamp(min=0.0)
+                over = torch.where(over == 0, vo, over)
         if cap > 0.0:
             # turning-speed cap (pose level, every substep): forward advance per substep <= cap x physics dt;
             # the reference follows the key down freely (turning back / reset)
