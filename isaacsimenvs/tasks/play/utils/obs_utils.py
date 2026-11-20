@@ -359,6 +359,9 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     obs_noisy["object_vel"] = noisy_obj_vel
     obs_noisy["keypoints_rel_palm"] = keypoints_rel_palm_noisy
     obs_noisy["keypoints_rel_goal"] = keypoints_rel_goal_noisy
+    if getattr(env, "cg_obj0", None) is not None:   # A21 cupgrip: actor sees the top cup's reset pose
+        from isaacsimenvs.tasks.precise_assembly import cupgrip as _cg
+        _cg.actor_object_override(env, obs_noisy, _keypoints_world, palm_pos, noisy_goal_kp, kp_offsets)
     if dr.joint_velocity_obs_noise_std > 0:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std

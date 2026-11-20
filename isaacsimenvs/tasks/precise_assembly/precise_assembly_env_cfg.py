@@ -174,6 +174,27 @@ class PreciseAssemblyCfg:
     strict_neat_step_tol: float = 0.0015
     strict_ref_local: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
+    # A21 cup grip window (cupgrip.py; problem cb_cupgrip). Needs hand_force_sense=true. See cupgrip.py for the model.
+    cupgrip: bool = False
+    cupgrip_retain_range_N: tuple[float, float] = (0.3, 3.0)   # hidden nest retention S, log-uniform per episode
+    cupgrip_hold_tau_s: float = 0.05                           # PD hold of a stuck top cup on its seat
+    cupgrip_restick_mm: float = 0.3                            # a freed cup set back within this rise re-sticks
+    cupgrip_drag_ratio_start: float = 4.0                      # curriculum start of r (drag_ramp_steps > 0)
+    cupgrip_drag_ramp_steps: int = 0                           # env steps (common_step_counter) to reach the range
+    cupgrip_drag_ramp_offset_steps: int = 0                    # added on resume
+    cupgrip_drag_ratio_range: tuple[float, float] = (1.6, 1.6)  # hidden r: drag above D = r (S + m g) / mu_cal
+    cupgrip_mu_cal: float = 1.4                                # hand-force calibration of the slip limit
+    cupgrip_nest_overlap_mm: float = 55.0                      # top cup still nested on the second below this rise
+    cupgrip_couple_tau_s: float = 0.05
+    cupgrip_couple_max_N: float = 5.0
+    cupgrip_drag_fail_mm: float = 5.0                          # second cup risen this much = "dragged"
+    cupgrip_slip_mm: float = 12.0                              # palm slid this far up the top cup = "slipped" (0 off)
+    cupgrip_contact_N: float = 0.3                             # hand force that starts the slide measurement
+    cupgrip_hand_kp_range: tuple[float, float] = (1.0, 1.0)    # hidden hand PD gain scale
+    cupgrip_hide_object: bool = True                           # actor object fields = the top cup's reset pose
+    cupgrip_drag_penalty: float = 200.0
+    cupgrip_slip_penalty: float = 200.0
+
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
     """Return a render-overlay-compatible sim cfg for teacher and student tasks."""

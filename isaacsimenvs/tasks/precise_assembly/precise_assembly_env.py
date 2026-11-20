@@ -35,6 +35,9 @@ from .scene_utils import REPO_ROOT, setup_scene
 TABLE_HALF_HEIGHT = 0.15
 
 
+from . import cupgrip as _cupgrip
+
+
 def _xyzw_to_wxyz(quat: torch.Tensor) -> torch.Tensor:
     return torch.cat([quat[:, 3:4], quat[:, 0:3]], dim=-1)
 
@@ -494,6 +497,7 @@ class PreciseAssemblyEnv(PlayEnv):
 
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
+        _cupgrip.reset(self, env_ids)
 
     def _pose_rel_hole_to_world(self, env_ids: torch.Tensor, pose7) -> torch.Tensor:
         """(n, 7) world pose (pos + quat wxyz) of a receptive-frame pose7 (xyz + quat xyzw) for env_ids."""
@@ -650,6 +654,7 @@ class PreciseAssemblyEnv(PlayEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
         self._apply_joint_detents()
+        _cupgrip.pre_physics(self)
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
@@ -974,6 +979,8 @@ class PreciseAssemblyEnv(PlayEnv):
         # x hand_force_scale: on a flat contact (cup on the table, a1_force_probe --on_table) the force matrix reads
         # 2.000x the true support force (m g + push, 0-10 N, within 0.3%) -> default 0.5
         self.hand_force = F.norm(dim=-1).sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
+        # A21: net vertical force of the hand on the object (N, + = up), same calibration
+        self.hand_force_z = F[..., 2].sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
         over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
@@ -1101,7 +1108,10 @@ class PreciseAssemblyEnv(PlayEnv):
         crushed = torch.zeros_like(fall)
         if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and hasattr(self, "_crush_count"):
             crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed
+        cg_dragged, cg_slipped = _cupgrip.dones(self)
+        cg_dragged &= ~max_successes
+        cg_slipped &= ~max_successes
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | cg_dragged | cg_slipped
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1111,6 +1121,8 @@ class PreciseAssemblyEnv(PlayEnv):
             "dropped": dropped,
             "disturbed": disturbed,
             "crushed": crushed,
+            "dragged": cg_dragged,
+            "slipped": cg_slipped,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1205,6 +1217,13 @@ class PreciseAssemblyEnv(PlayEnv):
             c_pen = float(pih_cfg.crush_penalty) * self._termination_reasons["crushed"].float()
             reward = reward - c_pen
             self._reward_terms["crush_penalty"] = -c_pen
+            self._reward_terms["total_reward"] = reward
+        if _cupgrip.enabled(self) and "dragged" in getattr(self, "_termination_reasons", {}):
+            tr = self._termination_reasons
+            pen = (float(pih_cfg.cupgrip_drag_penalty) * tr["dragged"].float()
+                   + float(pih_cfg.cupgrip_slip_penalty) * tr["slipped"].float())
+            reward = reward - pen
+            self._reward_terms["cupgrip_penalty"] = -pen
             self._reward_terms["total_reward"] = reward
 
         log_step_metrics(self)

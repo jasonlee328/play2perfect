@@ -1,0 +1,211 @@
+"""A21 cup grip window (cfg precise_assembly.cupgrip*): lift only the top cup off an upside-down stack.
+
+Problem cb_cupgrip: object = the top inverted cup, distractor 0 = the loose second cup nested under it, fixture = the
+fused cups below. Per episode (hidden from the actor, sampled at reset):
+  S  nest retention (N), log-uniform in cupgrip_retain_range_N: a downward force on the top cup while it is still
+     seated (breakaway: holds against the hand's upward pull beyond m g up to S, then frees; re-sticks when re-seated).
+     Physical consequence: the pads must squeeze hard enough that friction carries S + m g, else the cup slips.
+  r  drag ratio, uniform in cupgrip_drag_ratio_range: while the top cup is still nested on the second cup
+     (rise < cupgrip_nest_overlap_mm), a hand squeeze above D = r * (S + m g) / cupgrip_mu_cal (hand_force units, N)
+     latches a coupling that carries the second cup with the top cup (MODEL, not rigid-body physics: a rigid cup can't
+     be squeezed onto the one inside). The coupling force F on the second cup (gravity compensation + PD on the
+     nested offset) is applied with -F on the top cup, so the hand carries the extra load. Released when the squeeze
+     drops below 0.9 D.
+  k  hand PD gain scale (cupgrip_hand_kp_range; stiffness x k, damping x sqrt k), so joint tracking error does not
+     read grip force.
+Failures: "dragged" = the second cup rose > cupgrip_drag_fail_mm; "slipped" = after the grasp started (hand force
+>= cupgrip_contact_N) the palm rose > cupgrip_slip_mm relative to the top cup while the cup was still nested.
+Actor obs (cupgrip_hide_object): object_rot / keypoints_rel_palm / keypoints_rel_goal are computed from the top cup's
+reset pose, so the actor knows where the cup started but not whether it is moving with the hand (only touch tells).
+"""
+
+from __future__ import annotations
+
+import math
+
+import torch
+
+G = 9.81
+
+
+def enabled(env) -> bool:
+    return bool(getattr(env.cfg.precise_assembly, "cupgrip", False))
+
+
+def _init(env) -> None:
+    n, d = env.num_envs, env.device
+    env.cg_S = torch.zeros(n, device=d)
+    env.cg_r = torch.ones(n, device=d)
+    env.cg_D = torch.zeros(n, device=d)
+    env.cg_kp = torch.ones(n, device=d)
+    env.cg_coupled = torch.zeros(n, dtype=torch.bool, device=d)
+    env.cg_stuck = torch.ones(n, dtype=torch.bool, device=d)
+    env.cg_break_count = torch.zeros(n, dtype=torch.long, device=d)
+    env.cg_ever_coupled = torch.zeros(n, dtype=torch.bool, device=d)
+    env.cg_grasped = torch.zeros(n, dtype=torch.bool, device=d)
+    env.cg_rel0 = torch.zeros(n, device=d)
+    env.cg_slide = torch.zeros(n, device=d)
+    env.cg_rise = torch.zeros(n, device=d)
+    env.cg_rise2 = torch.zeros(n, device=d)
+    env.cg_obj0 = torch.zeros(n, 7, device=d)
+    env.cg_z2_0 = torch.zeros(n, device=d)
+    env.cg_off = torch.zeros(n, device=d)
+    env.cg_hand = torch.zeros(n, device=d)
+    m = env.object.root_physx_view.get_masses().to(d).sum(-1)
+    env.cg_m1 = m
+    env.cg_m2 = env.distractors[0].root_physx_view.get_masses().to(d).sum(-1)
+    ids, _ = env.robot.find_joints("left_.*")
+    env._cg_hand_ids = torch.as_tensor(ids, device=d, dtype=torch.long)
+    env._cg_kp0 = env.robot.data.default_joint_stiffness[:, env._cg_hand_ids].clone()
+    env._cg_kd0 = env.robot.data.default_joint_damping[:, env._cg_hand_ids].clone()
+
+
+def reset(env, env_ids: torch.Tensor) -> None:
+    """After the object / distractors are placed (end of _reset_peg_episode)."""
+    if not enabled(env):
+        return
+    if not hasattr(env, "cg_S"):
+        _init(env)
+    c = env.cfg.precise_assembly
+    n = env_ids.numel()
+    lo, hi = (float(v) for v in c.cupgrip_retain_range_N)
+    u = torch.rand(n, device=env.device)
+    env.cg_S[env_ids] = torch.exp(math.log(lo) + u * (math.log(hi) - math.log(lo))) if hi > lo else lo
+    rlo, rhi = (float(v) for v in c.cupgrip_drag_ratio_range)
+    r = rlo + (rhi - rlo) * torch.rand(n, device=env.device)
+    steps = int(c.cupgrip_drag_ramp_steps)
+    if steps > 0:   # curriculum: r starts at cupgrip_drag_ratio_start and shrinks linearly to the range
+        f = min(1.0, (int(env.common_step_counter) + int(c.cupgrip_drag_ramp_offset_steps)) / steps)
+        r = float(c.cupgrip_drag_ratio_start) * (1.0 - f) + r * f
+    env.cg_r[env_ids] = r
+    w = env.cg_m1[env_ids] * G
+    env.cg_D[env_ids] = env.cg_r[env_ids] * (env.cg_S[env_ids] + w) / float(c.cupgrip_mu_cal)
+    klo, khi = (float(v) for v in c.cupgrip_hand_kp_range)
+    k = klo + (khi - klo) * torch.rand(n, device=env.device)
+    env.cg_kp[env_ids] = k
+    if not (klo == 1.0 and khi == 1.0):
+        env.robot.write_joint_stiffness_to_sim(env._cg_kp0[env_ids] * k[:, None], joint_ids=env._cg_hand_ids,
+                                               env_ids=env_ids)
+        env.robot.write_joint_damping_to_sim(env._cg_kd0[env_ids] * k.sqrt()[:, None], joint_ids=env._cg_hand_ids,
+                                             env_ids=env_ids)
+    env.cg_coupled[env_ids] = False
+    env.cg_stuck[env_ids] = True
+    env.cg_break_count[env_ids] = 0
+    env.cg_ever_coupled[env_ids] = False
+    env.cg_grasped[env_ids] = False
+    env.cg_slide[env_ids] = 0.0
+    env.cg_rise[env_ids] = 0.0
+    env.cg_rise2[env_ids] = 0.0
+    o = env.scene.env_origins[env_ids]
+    env.cg_obj0[env_ids, :3] = env.object.data.root_pos_w[env_ids] - o
+    env.cg_obj0[env_ids, 3:] = env.object.data.root_quat_w[env_ids]
+    # data buffers may not reflect the write yet: take the commanded reset pose from the problem
+    w0 = env._pose_rel_hole_to_world(env_ids, env._pih_object_start_rel)
+    env.cg_obj0[env_ids, :3] = w0[:, :3] - o
+    env.cg_obj0[env_ids, 3:] = w0[:, 3:]
+    w2 = env._pose_rel_hole_to_world(env_ids, env._pih_distractor_pose_rel[0])
+    env.cg_z2_0[env_ids] = w2[:, 2] - o[:, 2]
+    env.cg_off[env_ids] = env.cg_obj0[env_ids, 2] - env.cg_z2_0[env_ids]
+
+
+def _palm_z(env) -> torch.Tensor:
+    return env.robot.data.body_state_w[:, env._palm_body_id, 2] - env.scene.env_origins[:, 2]
+
+
+def pre_physics(env) -> None:
+    """Every policy step after the action pipeline (which set the object's DR wrench in env._object_forces)."""
+    if not enabled(env) or not hasattr(env, "cg_S"):
+        return
+    c = env.cfg.precise_assembly
+    o = env.scene.env_origins
+    z1 = env.object.data.root_pos_w[:, 2] - o[:, 2]
+    cup2 = env.distractors[0]
+    z2 = cup2.data.root_pos_w[:, 2] - o[:, 2]
+    rise = z1 - env.cg_obj0[:, 2]
+    env.cg_rise = rise
+    env.cg_rise2 = z2 - env.cg_z2_0
+    # Breakaway nest retention: while "stuck" the top cup is held on the stack against any upward pull from the
+    # hand up to S (the downward force cancels the hand's upward contact force of the previous step, plus a PD hold
+    # on any rise); it breaks free once the hand pulls up harder than S. No force at rest (no pressing into the
+    # stack). Re-sticks when it is set back down seated and still.
+    v1 = env.object.data.root_lin_vel_w[:, 2]
+    fz = getattr(env, "hand_force_z", None)
+    fz = torch.zeros_like(z1) if fz is None else fz.clamp(min=0.0)
+    tau_h = float(c.cupgrip_hold_tau_s)
+    pull = (fz - env.cg_m1 * G).clamp(min=0.0)   # upward pull beyond the cup's weight
+    brk = env.cg_stuck & (pull > env.cg_S)
+    env.cg_stuck = env.cg_stuck & ~brk
+    restick = ~env.cg_stuck & (rise < float(c.cupgrip_restick_mm) / 1000.0) & (v1.abs() < 0.02)
+    env.cg_stuck = env.cg_stuck | restick
+    hold = pull + env.cg_m1 * (rise.clamp(min=0.0) / (tau_h * tau_h) + v1.clamp(min=0.0) / tau_h)
+    f_ret = torch.where(env.cg_stuck, torch.minimum(hold, env.cg_S).clamp(min=0.0),
+                        torch.zeros_like(z1))
+    env.cg_break_count = env.cg_break_count + brk.long()
+
+    hand = getattr(env, "hand_force", None)
+    hand = torch.zeros_like(z1) if hand is None else hand
+    env.cg_hand = hand
+    nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
+    on = (hand > env.cg_D) & nested
+    off = (hand < 0.9 * env.cg_D) | ~nested
+    env.cg_coupled = (env.cg_coupled | on) & ~off
+    env.cg_ever_coupled |= env.cg_coupled
+
+    # second cup follows the top cup at its nested offset while coupled
+    tau = float(c.cupgrip_couple_tau_s)
+    v1 = env.object.data.root_lin_vel_w[:, 2]
+    v2 = cup2.data.root_lin_vel_w[:, 2]
+    tgt = z1 - env.cg_off
+    a = (tgt - z2) / (tau * tau) + (v1 - v2) / tau
+    f2 = env.cg_m2 * (G + a)
+    f2 = torch.where(env.cg_coupled, f2.clamp(0.0, float(c.cupgrip_couple_max_N)), torch.zeros_like(f2))
+
+    F1 = torch.zeros(env.num_envs, 1, 3, device=env.device)
+    base = getattr(env, "_object_forces", None)
+    if base is not None:
+        F1 = F1 + base
+    F1[:, 0, 2] -= f_ret + f2
+    T1 = getattr(env, "_object_torques", None)
+    T1 = torch.zeros_like(F1) if T1 is None else T1
+    env.object.set_external_force_and_torque(forces=F1, torques=T1, is_global=True)
+    F2 = torch.zeros(env.num_envs, 1, 3, device=env.device)
+    F2[:, 0, 2] = f2
+    cup2.set_external_force_and_torque(forces=F2, torques=torch.zeros_like(F2), is_global=True)
+
+
+def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
+    """(dragged, slipped) for _get_dones (after _hand_force_update)."""
+    z = torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+    if not enabled(env) or not hasattr(env, "cg_S"):
+        return z, z
+    c = env.cfg.precise_assembly
+    o = env.scene.env_origins
+    z1 = env.object.data.root_pos_w[:, 2] - o[:, 2]
+    rise = z1 - env.cg_obj0[:, 2]
+    rise2 = env.distractors[0].data.root_pos_w[:, 2] - o[:, 2] - env.cg_z2_0
+    rel = _palm_z(env) - z1
+    start = ~env.cg_grasped & (env.hand_force >= float(c.cupgrip_contact_N))
+    env.cg_rel0 = torch.where(start, rel, env.cg_rel0)
+    env.cg_grasped |= start
+    env.cg_slide = torch.where(env.cg_grasped, rel - env.cg_rel0, torch.zeros_like(rel))
+    nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
+    dragged = rise2 > float(c.cupgrip_drag_fail_mm) / 1000.0
+    slipped = (env.cg_slide > float(c.cupgrip_slip_mm) / 1000.0) & nested & ~dragged
+    if float(c.cupgrip_slip_mm) <= 0.0:
+        slipped = z
+    for k, v in (("cupgrip_S_mean", env.cg_S.mean()), ("cupgrip_r_mean", env.cg_r.mean()), ("cupgrip_coupled_frac", env.cg_coupled.float().mean()),
+                 ("cupgrip_rise_max", rise.max()), ("cupgrip_slide_mean", env.cg_slide.mean())):
+        env.extras[k] = v
+    return dragged, slipped
+
+
+def actor_object_override(env, obs: dict, kp_world_fn, palm_pos, goal_kp, kp_offsets) -> None:
+    """cupgrip_hide_object: actor object fields from the top cup's reset pose (in place on the noisy obs dict)."""
+    if not enabled(env) or not bool(env.cfg.precise_assembly.cupgrip_hide_object) or not hasattr(env, "cg_obj0"):
+        return
+    from isaaclab.utils.math import convert_quat
+    p0, q0 = env.cg_obj0[:, :3], env.cg_obj0[:, 3:]
+    kp0 = kp_world_fn(p0, q0, kp_offsets)
+    obs["object_rot"] = convert_quat(q0, to="xyzw")
+    obs["keypoints_rel_palm"] = kp0 - palm_pos.unsqueeze(1)
+    obs["keypoints_rel_goal"] = kp0 - goal_kp
