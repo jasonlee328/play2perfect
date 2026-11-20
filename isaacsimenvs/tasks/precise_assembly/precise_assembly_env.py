@@ -1040,6 +1040,33 @@ class PreciseAssemblyEnv(PlayEnv):
             self._skip_cand[jump] = -1
             self._skip_steps[jump] = 0
 
+    def _key_goal_skip(self, allow: torch.Tensor) -> None:
+        """A13 key_goal_skip: if the key is within the goal tolerance of a later intermediate waypoint j (never the
+        last goal), set _successes = j, crediting every waypoint before j; j itself still needs its normal near-goal
+        steps. A flat key can't rest at 45-75 deg in a pinch, it flops through in a few steps."""
+        N = self.num_envs
+        G = self._key.flip.numel()
+        kp = (self._keypoint_offsets_fixed if self.cfg.reward.fixed_size_keypoint_reward else self._keypoint_offsets)
+        K = kp.shape[1]
+        obj_kp = _keypoints_world(self.object.data.root_pos_w, self.object.data.root_quat_w, kp)          # (N, K, 3)
+        ids = torch.arange(N, device=self.device)
+        tol = self._keypoint_success_tolerance_m()
+        far = torch.full((N,), -1, dtype=torch.long, device=self.device)
+        for j in range(1, G - 1):
+            g = self._key.goal_world(ids, torch.full((N,), j, dtype=torch.long, device=self.device))
+            gk = _keypoints_world(g[:, 0:3], g[:, 3:7], kp)
+            d = (obj_kp - gk).norm(dim=-1).max(dim=-1).values
+            ok = (d <= tol) & (self._successes < j) & (self._successes < self.env_max_goals) & ~self.is_random_goal_env
+            far = torch.where(ok, torch.full_like(far, j), far)
+        jump = (far >= 0) & allow
+        if jump.any():
+            self._successes[jump] = far[jump]
+            self.episode_length_buf[jump] = 0
+            jid = jump.nonzero(as_tuple=False).squeeze(-1)
+            self._clear_goal_trackers(jid)
+            self._write_goal_pose(jid, is_first_goal=False)
+        self.extras["key_goal_skips"] = jump.float().mean()
+
     def _hand_force_update(self) -> None:
         """hand_force_sense: sum over robot links of |contact force on the object| (N), physical (PhysX contact report)."""
         if not bool(getattr(self.cfg.precise_assembly, "hand_force_sense", False)):
@@ -1080,6 +1107,8 @@ class PreciseAssemblyEnv(PlayEnv):
             # needs termination.success_steps (a flat key cannot rest at 45 deg in a pinch)
             inter = (self._successes + 1 < self.env_max_goals) & ~self.is_random_goal_env
             is_success = torch.where(inter, self._near_goal_steps >= hold_wp, is_success)
+        if bool(getattr(pih_cfg, "key_goal_skip", False)) and getattr(self, "_key", None) is not None:
+            self._key_goal_skip(~is_success)
         if pih_cfg.enable_retract:
             is_success &= ~self.retract_phase
         is_success = self._apply_strict_success(is_success)
