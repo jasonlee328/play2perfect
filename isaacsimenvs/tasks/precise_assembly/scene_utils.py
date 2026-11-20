@@ -176,21 +176,29 @@ def setup_scene(env) -> None:
             ),
         ))
 
+    # distractor_usd_paths[k] = one USD per problem for slot k (multi clutter: round-robin like the object, so
+    # env i's distractors are problem i % P's), else a single USD.
+    mc_urdfs = getattr(env, "_pih_distractor_urdf_abs_multi", None) if getattr(env, "_multi_clutter", False) else None
+    slot_urdfs = list(mc_urdfs) if mc_urdfs else [(u,) for u in (getattr(env, "_pih_distractor_urdf_abs", ()) or ())]
     distractor_usd_paths = []
-    for k, d_urdf in enumerate(getattr(env, "_pih_distractor_urdf_abs", ()) or ()):
-        distractor_usd_paths.append(_bake_usd(
-            _convert_urdf_to_usd(_asset_path(d_urdf), usd_work_dir / f"distractor_{k}", fix_base=False),
-            bake_root,
-            f"distractor_{k}",
-            props=dict(
-                kinematic_enabled=False,
-                disable_gravity=False,
-                max_depenetration_velocity=1000.0,
-                rb_solver_position_iterations=4,
-                rb_solver_velocity_iterations=0,
-                articulation_enabled=False,
-            ),
-        ))
+    for k, urdfs in enumerate(slot_urdfs):
+        paths = []
+        for j, d_urdf in enumerate(urdfs):
+            sfx = f"_{j}" if len(urdfs) > 1 else ""
+            paths.append(_bake_usd(
+                _convert_urdf_to_usd(_asset_path(d_urdf), usd_work_dir / f"distractor_{k}{sfx}", fix_base=False),
+                bake_root,
+                f"distractor_{k}{sfx}",
+                props=dict(
+                    kinematic_enabled=False,
+                    disable_gravity=False,
+                    max_depenetration_velocity=1000.0,
+                    rb_solver_position_iterations=4,
+                    rb_solver_velocity_iterations=0,
+                    articulation_enabled=False,
+                ),
+            ))
+        distractor_usd_paths.append(paths)
 
     robot_usd_path = _bake_usd(
         _convert_urdf_to_usd(
@@ -248,7 +256,8 @@ def setup_scene(env) -> None:
         env.object = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0]))
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
     env.distractors = tuple(
-        RigidObject(_pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd))
+        RigidObject(build_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd) if len(usd) > 1
+                    else _pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd[0]))
         for k, usd in enumerate(distractor_usd_paths)
     )
     _log_scene_step(setup_t0, f"spawned robot/table/hole/object/goalviz + {len(env.distractors)} distractors")

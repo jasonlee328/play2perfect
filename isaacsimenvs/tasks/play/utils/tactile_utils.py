@@ -134,11 +134,15 @@ class TactileSensor:
         # taxel; one channel, so the target and its neighbours feel the same). Single object asset only.
         self.extra = []
         if getattr(tactile_cfg, "fingertip_distractors", False) and getattr(env, "distractors", ()):
-            if n_assets > 1:
-                raise NotImplementedError("tactile.fingertip_distractors needs a single object asset")
+            if n_assets > 1 and not getattr(env, "_multi_clutter", False):
+                raise NotImplementedError("tactile.fingertip_distractors needs a single object asset or multi clutter")
             from isaacsimenvs.tasks.play.utils.hand_skin import prim_mesh
+            # multi clutter: env i's distractors are problem i % P's (same round-robin as the object), so one mesh
+            # per (distractor, asset), taken from an env holding that asset.
             for d in env.distractors:
-                self.extra.append((d, convert_to_warp_mesh(*prim_mesh(d.cfg.prim_path), device=self.device)))
+                self.extra.append((d, [(convert_to_warp_mesh(*prim_mesh(d.cfg.prim_path, int(ids[0])),
+                                                             device=self.device), ids)
+                                       for ids in self.asset_env_ids]))
 
         self.body_ids = [env.robot.find_bodies(f"left_{f}_DP")[0][0] for f in FINGERS]
         map_dir = Path(tactile_cfg.map_dir)
@@ -176,8 +180,8 @@ class TactileSensor:
         env = self.env
         result = self._cast(env.object, list(zip(self.meshes, self.asset_env_ids)))
         all_ids = torch.arange(env.num_envs, device=self.device)
-        for body, mesh in self.extra:
-            result = torch.maximum(result, self._cast(body, [(mesh, all_ids)]))
+        for body, mesh_ids in self.extra:
+            result = torch.maximum(result, self._cast(body, mesh_ids))
         return _deform_quantize(result) / 255.0
 
     def _cast(self, obj, mesh_ids) -> torch.Tensor:

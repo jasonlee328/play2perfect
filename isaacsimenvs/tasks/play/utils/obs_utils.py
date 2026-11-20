@@ -385,6 +385,21 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             x = obs_noisy["distractor_obs"].view(env.num_envs, -1, 6).clone()       # [d - palm, d - obj] per stick
             x[..., :3] += off.unsqueeze(1)
             obs_noisy["distractor_obs"] = x.view(obs_noisy["distractor_obs"].shape)
+    if getattr(env, "_multi_clutter", False):
+        # multi clutter (e.g. stick thicknesses): actor sees the canonical problem's layout (see mc_obs_offset)
+        mo = env.mc_obs_offset()                                                       # (S, N, 3)
+        if "keypoints_rel_palm" in obs_noisy:
+            x = obs_noisy["keypoints_rel_palm"]
+            obs_noisy["keypoints_rel_palm"] = (x.view(env.num_envs, -1, 3) + mo[0].unsqueeze(1)).view(x.shape)
+        if "distractor_obs" in obs_noisy:
+            idx = getattr(env, "_obs_distractor_idx", None)
+            sel = torch.as_tensor([1 + i for i in (idx if idx is not None else range(mo.shape[0] - 1))],
+                                  device=env.device)
+            md = mo[sel].transpose(0, 1)                                               # (N, K, 3)
+            x = obs_noisy["distractor_obs"].view(env.num_envs, -1, 6).clone()
+            x[..., :3] += md
+            x[..., 3:] += md - mo[0].unsqueeze(1)
+            obs_noisy["distractor_obs"] = x.view(obs_noisy["distractor_obs"].shape)
     blind = tuple(getattr(pa, "blind_fields", ())) if pa is not None else ()
     if blind:
         ramp = int(getattr(pa, "blind_ramp_steps", 0))

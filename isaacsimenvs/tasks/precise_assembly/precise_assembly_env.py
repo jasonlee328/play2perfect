@@ -120,6 +120,8 @@ class PreciseAssemblyEnv(PlayEnv):
         )
         self._insert_pos_rel = insert_poses[:, 0:3].contiguous()
         self._insert_quat_wxyz = _xyzw_to_wxyz(insert_poses[:, 3:7]).contiguous()
+        if getattr(self, "_multi_clutter", False):
+            self._mc_tables()
 
         self.hole_pos = torch.zeros(
             self.num_envs, 3, dtype=torch.float32, device=self.device
@@ -246,14 +248,25 @@ class PreciseAssemblyEnv(PlayEnv):
                 )
         problem_name = problem_names[0] if len(problem_names) == 1 else "+".join(problem_names)
         problem = PROBLEM_REGISTRY[problem_names[0]]
+        # multi_problems with distractors (e.g. chopstick thickness variants): same fixture, same number of
+        # distractors and waypoints; each env gets its own object / distractor assets, start poses and waypoints
+        # (problem i % K, see _multi_clutter).
+        self._multi_clutter = len(problem_names) > 1 and any(
+            PROBLEM_REGISTRY[n].distractors for n in problem_names)
         for name in problem_names[1:]:
             other = PROBLEM_REGISTRY[name]
             same = len(other.insert_pose_rel_receptive) == len(problem.insert_pose_rel_receptive) and all(
-                abs(a - b) < 1e-9
+                abs(a - b) < (5e-3 if self._multi_clutter else 1e-9)
                 for pa, pb in zip(other.insert_pose_rel_receptive, problem.insert_pose_rel_receptive)
                 for a, b in zip(pa, pb)
             ) and abs(other.hole_z_offset - problem.hole_z_offset) < 1e-9 and (
                 other.prelude_lift_offset == problem.prelude_lift_offset)
+            if self._multi_clutter:
+                same = same and (other.receptive_urdf == problem.receptive_urdf
+                                 and len(other.distractors) == len(problem.distractors)
+                                 and bool(other.object_start_pose_rel_receptive)
+                                 == bool(problem.object_start_pose_rel_receptive)
+                                 and not other.joints and not problem.joints)
             if not same:
                 raise ValueError(
                     f"multi_problems must share insertion waypoints / hole_z_offset: {name!r} differs from "
@@ -305,13 +318,25 @@ class PreciseAssemblyEnv(PlayEnv):
         )
 
         # Clutter: distractor bodies + an optional object start pose, both in the receptive frame (single problem).
-        if len(problem_names) > 1 and any(
-                PROBLEM_REGISTRY[n].distractors or PROBLEM_REGISTRY[n].object_start_pose_rel_receptive
-                for n in problem_names):
-            raise ValueError("distractors / object_start_pose_rel_receptive need a single problem")
+        if len(problem_names) > 1 and not self._multi_clutter and any(
+                PROBLEM_REGISTRY[n].object_start_pose_rel_receptive for n in problem_names):
+            raise ValueError("object_start_pose_rel_receptive with several problems needs distractors (multi clutter)")
         self._pih_distractor_urdf_abs = tuple(str(_resolve_asset_path(u)) for u, _ in problem.distractors)
         self._pih_distractor_pose_rel = tuple(tuple(float(v) for v in pose) for _, pose in problem.distractors)
         self._pih_object_start_rel = tuple(float(v) for v in problem.object_start_pose_rel_receptive)
+        if self._multi_clutter:
+            P = [PROBLEM_REGISTRY[n] for n in problem_names]
+            # per problem: distractor slot k asset, distractor poses (K, 7), object start pose (7,), waypoints (G, 7)
+            self._pih_distractor_urdf_abs_multi = tuple(
+                tuple(str(_resolve_asset_path(p.distractors[k][0])) for p in P) for k in range(len(problem.distractors)))
+            self._pih_distractor_pose_rel_multi = tuple(
+                tuple(tuple(float(v) for v in pose) for _, pose in p.distractors) for p in P)
+            self._pih_object_start_rel_multi = tuple(
+                tuple(float(v) for v in p.object_start_pose_rel_receptive) for p in P)
+            seqs = [(p.final_insert_pose_rel_receptive,) if pih_cfg.goal_mode == "finalGoalOnly"
+                    else p.insert_pose_rel_receptive for p in P]
+            self._pih_insert_pose_sequence_multi = tuple(
+                tuple(tuple(float(v) for v in pose) for pose in s) for s in seqs)
         self._obs_distractor_idx = None
         if cfg.precise_assembly.obs_distractors and self._pih_distractor_urdf_abs:
             n_d = len(self._pih_distractor_urdf_abs)
@@ -494,13 +519,52 @@ class PreciseAssemblyEnv(PlayEnv):
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
 
+    def _mc_tables(self) -> None:
+        """multi clutter: per-env tables (problem = the env's object asset index), built once."""
+        if hasattr(self, "_object_start_rel_env"):
+            return
+        ai = self._object_asset_index_per_env
+        f = dict(dtype=torch.float32, device=self.device)
+        wp = torch.tensor(self._pih_insert_pose_sequence_multi, **f)[ai]                       # (N, G, 7)
+        self._insert_pos_rel_env = wp[..., 0:3].contiguous()
+        self._insert_quat_wxyz_env = _xyzw_to_wxyz(wp[..., 3:7].reshape(-1, 4)).reshape(wp.shape[0], -1, 4)
+        self._object_start_rel_env = torch.tensor(self._pih_object_start_rel_multi, **f)[ai]       # (N, 7)
+        self._distractor_pose_rel_env = torch.tensor(
+            self._pih_distractor_pose_rel_multi, **f)[ai].transpose(0, 1).contiguous()            # (K, N, 7)
+        # Actor-obs canonicalisation: rest positions (hole frame) of every slot (0 = object, 1.. = distractors) in
+        # the env's problem vs the canonical problem (the base thickness if present, else problem 0). The actor sees
+        # every body shifted by R_hole (canon - env) of the slot it started in (_mc_slot follows swaps), so its
+        # layout fields (stick pitch, stick height) do not reveal the thickness.
+        names = list(self._pih_problem_names)
+        ci = names.index("cb_binh_chopstick_n5_lift") if "cb_binh_chopstick_n5_lift" in names else 0
+        start = torch.tensor(self._pih_object_start_rel_multi, **f)[:, None, :3]                  # (P, 1, 3)
+        dist = torch.tensor(self._pih_distractor_pose_rel_multi, **f)[..., :3]                     # (P, K, 3)
+        rel = torch.cat([start, dist], dim=1)                                                       # (P, S, 3)
+        self._mc_delta_rel = (rel[ci].unsqueeze(0) - rel[ai]).transpose(0, 1).contiguous()          # (S, N, 3)
+        self._mc_slot = torch.arange(rel.shape[1], device=self.device).unsqueeze(1).repeat(1, self.num_envs)
+        self._mc_canon_problem = names[ci]
+        print(f"[PreciseAssemblyEnv] multi clutter: {list(self._pih_problem_names)}, envs per problem "
+              f"{torch.bincount(ai, minlength=len(self._pih_problem_names)).tolist()}", flush=True)
+
+    def mc_obs_offset(self) -> torch.Tensor:
+        """(S, N, 3) world-frame shift for the actor's view of body b (0 = object, 1.. = distractors)."""
+        self._mc_tables()
+        d = torch.gather(self._mc_delta_rel, 0, self._mc_slot.unsqueeze(-1).expand(-1, -1, 3))       # (S, N, 3)
+        S = d.shape[0]
+        return quat_apply(self.hole_quat_wxyz.unsqueeze(0).expand(S, -1, -1).reshape(-1, 4),
+                          d.reshape(-1, 3)).reshape(S, -1, 3)
+
     def _pose_rel_hole_to_world(self, env_ids: torch.Tensor, pose7, shift: torch.Tensor | None = None) -> torch.Tensor:
         """(n, 7) world pose (pos + quat wxyz) of a receptive-frame pose7 (xyz + quat xyzw) for env_ids."""
         n = env_ids.numel()
-        p = torch.tensor(pose7[:3], device=self.device, dtype=torch.float32).expand(n, 3)
+        if torch.is_tensor(pose7) and pose7.dim() == 2:   # per-env (n, 7) poses (multi clutter)
+            p = pose7[:, :3]
+            q = _xyzw_to_wxyz(pose7[:, 3:7])
+        else:
+            p = torch.tensor(pose7[:3], device=self.device, dtype=torch.float32).expand(n, 3)
+            q = _xyzw_to_wxyz(torch.tensor([pose7[3:7]], device=self.device, dtype=torch.float32)).expand(n, 4)
         if shift is not None:                      # (n, 3) receptive-frame offset (start_shift_m)
             p = p + shift
-        q = _xyzw_to_wxyz(torch.tensor([pose7[3:7]], device=self.device, dtype=torch.float32)).expand(n, 4)
         hq = self.hole_quat_wxyz[env_ids]
         pos = self.hole_pos[env_ids] + quat_apply(hq, p) + self.scene.env_origins[env_ids]
         return torch.cat([pos, quat_mul(hq, q)], dim=-1)
@@ -517,7 +581,13 @@ class PreciseAssemblyEnv(PlayEnv):
             self.distractor_disp_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_moved_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_rise = torch.zeros(self.num_envs, device=self.device)
+        mc = getattr(self, "_multi_clutter", False)
+        if mc:
+            self._mc_tables()
+            self._mc_slot[:, env_ids] = torch.arange(self._mc_slot.shape[0], device=self.device).unsqueeze(1)
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
+            if mc:
+                pose = self._distractor_pose_rel_env[k, env_ids]
             w = self._pose_rel_hole_to_world(env_ids, pose, self._start_shift[k + 1, env_ids])
             body.write_root_pose_to_sim(w, env_ids=env_ids)
             body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
@@ -574,6 +644,9 @@ class PreciseAssemblyEnv(PlayEnv):
             d.write_root_state_to_sim(s_obj, env_ids=ids)
             old_rest, new_rest = self._object_rest_pos[ids].clone(), self._distractor_reset_pos[kk, ids].clone()
             self._object_rest_pos[ids], self._distractor_reset_pos[kk, ids] = new_rest, old_rest
+            if getattr(self, "_multi_clutter", False):
+                so, sd = self._mc_slot[0, ids].clone(), self._mc_slot[kk + 1, ids].clone()
+                self._mc_slot[0, ids], self._mc_slot[kk + 1, ids] = sd, so
             hq = self.hole_quat_wxyz[ids]
             self._start_shift[0, ids] += quat_apply_inverse(hq, new_rest - old_rest)   # goals follow the object
             self._object_init_z[ids] = new_rest[:, 2] - self.scene.env_origins[ids, 2]
@@ -653,7 +726,11 @@ class PreciseAssemblyEnv(PlayEnv):
         self._apply_joint_detents()
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
-        w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel, self._start_shift[0, env_ids])
+        pose = self._pih_object_start_rel
+        if getattr(self, "_multi_clutter", False):
+            self._mc_tables()
+            pose = self._object_start_rel_env[env_ids]
+        w = self._pose_rel_hole_to_world(env_ids, pose, self._start_shift[0, env_ids])
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
@@ -749,10 +826,15 @@ class PreciseAssemblyEnv(PlayEnv):
                 tail_ids = ins_ids[in_tail]
                 tail_idx = subgoal_idx[in_tail] - self._num_prelude_goals
                 hole_q = self.hole_quat_wxyz[tail_ids]
-                insert_pos = self._insert_pos_rel[tail_idx]
+                if getattr(self, "_multi_clutter", False):   # per-env waypoints (problem of the env)
+                    self._mc_tables()
+                    insert_pos = self._insert_pos_rel_env[tail_ids, tail_idx]
+                    insert_q = self._insert_quat_wxyz_env[tail_ids, tail_idx]
+                else:
+                    insert_pos = self._insert_pos_rel[tail_idx]
+                    insert_q = self._insert_quat_wxyz[tail_idx]
                 if hasattr(self, "_start_shift"):     # start_shift_m: the goals move with the object
                     insert_pos = insert_pos + self._start_shift[0, tail_ids]
-                insert_q = self._insert_quat_wxyz[tail_idx]
                 ins_pos_local[in_tail] = (
                     self.hole_pos[tail_ids] + quat_apply(hole_q, insert_pos)
                 )
