@@ -10,7 +10,7 @@ them. The registry is then filtered down to the four problems released here
 
 from dataclasses import dataclass
 from math import sqrt
-from typing import Dict, Tuple
+from typing import Optional, Dict, Tuple
 
 
 Pose7 = Tuple[float, float, float, float, float, float, float]
@@ -129,6 +129,10 @@ class Problem:
     object_start_pose_rel_receptive: Tuple[float, ...] = ()
     # Revolute joints to the fixture (JointSpec), e.g. a dial knob (body "object") or a screw (a distractor).
     joints: Tuple["JointSpec", ...] = ()
+    # Collect tasks (precise_assembly.collect_mode): default (min, max) number of active slots and the bin cavity
+    # {floor_z, rim_z, half_floor [x, y], half_rim [x, y]} in the receptive frame (m).
+    collect_n_range: Tuple[int, ...] = ()
+    collect_bin: Optional[dict] = None
 
     def __post_init__(self) -> None:
         poses = self._normalize_pose_sequence(self.insert_pose_rel_receptive)

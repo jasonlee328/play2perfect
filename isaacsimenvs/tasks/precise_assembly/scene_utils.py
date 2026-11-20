@@ -135,6 +135,8 @@ def setup_scene(env) -> None:
     multi = len(obj_urdfs) > 1
     pa_cfg = env.cfg.precise_assembly
     obj_iters = int(getattr(pa_cfg, "object_solver_position_iterations", 4))
+    depen = float(getattr(pa_cfg, "object_max_depenetration_velocity", 1000.0))
+    obj_viters = int(getattr(pa_cfg, "object_solver_velocity_iterations", 0))
     rest = getattr(pa_cfg, "object_rest_offset", None)  # None = the play default (_REST_OFFSET)
     object_usd_paths, goalviz_usd_paths, hole_usd_paths = [], [], []
     for k, (obj_urdf, hole_urdf) in enumerate(zip(obj_urdfs, hole_urdfs)):
@@ -147,9 +149,9 @@ def setup_scene(env) -> None:
             props=dict(
                 kinematic_enabled=False,
                 disable_gravity=False,
-                max_depenetration_velocity=1000.0,
+                max_depenetration_velocity=depen,
                 rb_solver_position_iterations=obj_iters,
-                rb_solver_velocity_iterations=0,
+                rb_solver_velocity_iterations=obj_viters,
                 articulation_enabled=False,
             ),
             rest_offset=rest,
@@ -190,9 +192,9 @@ def setup_scene(env) -> None:
             props=dict(
                 kinematic_enabled=False,
                 disable_gravity=False,
-                max_depenetration_velocity=1000.0,
+                max_depenetration_velocity=depen,
                 rb_solver_position_iterations=obj_iters,
-                rb_solver_velocity_iterations=0,
+                rb_solver_velocity_iterations=obj_viters,
                 articulation_enabled=False,
             ),
             rest_offset=rest,

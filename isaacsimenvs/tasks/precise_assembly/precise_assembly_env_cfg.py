@@ -160,6 +160,10 @@ class PreciseAssemblyCfg:
     # rest offset (m, may be negative) of the object, distractor and receptive shapes (None: play scene_utils
     # _REST_OFFSET = 0). A pair rests at the sum of its two shapes' rest offsets.
     object_solver_position_iterations: int = 4
+    # max depenetration velocity (m/s) of the object and distractor bodies (1000 = the old baked value; the official
+    # ContactBench manifest uses 0.5 for every part)
+    object_max_depenetration_velocity: float = 1000.0
+    object_solver_velocity_iterations: int = 0   # official ContactBench manifest: 2
     object_rest_offset: float = 0.0   # 0.0 = the play default _REST_OFFSET (a None default rejects float overrides)
 
     # Official-style ("strict") success for the last goal, from the ContactBench sim's retrieve_top_cup_from_stack
@@ -173,6 +177,38 @@ class PreciseAssemblyCfg:
     strict_neat_axis_tol: float = 0.002
     strict_neat_step_tol: float = 0.0015
     strict_ref_local: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+    # Collect mode (A19, ContactBench task 8 "collect fasteners"; see collect.py): every slot body (object +
+    # distractors) must end up in the receptive bin, at rest, with the hand off and still. Problem.collect_n_range /
+    # collect_bin give the defaults; collect_n_range here overrides the count range (N active slots per reset).
+    collect_mode: bool = False
+    collect_n_range: tuple[int, ...] = ()
+    collect_n_curriculum_steps: int = 0         # env steps to ramp the max count from collect_n_start_max to the top
+    collect_n_start_max: int = 1
+    collect_n_curriculum_offset_steps: int = 0  # added to common_step_counter (set on resume)
+    collect_region_x: tuple[float, float] = (-0.20, 0.20)   # scatter region, env frame (table 475 x 400 at 0,0)
+    collect_region_y: tuple[float, float] = (-0.16, 0.16)
+    collect_spread_range: tuple[float, float] = (0.04, 0.20)  # half-size of the per-episode scatter patch (m)
+    collect_gap: float = 0.005                  # min gap between bounding spheres at reset
+    collect_bin_clear: float = 0.02             # min gap between a part and the bin's rim footprint at reset
+    collect_park_z: float = 3.0                 # inactive slots parked this high above the env origin
+    collect_bin_margin: float = 0.001           # COM must be this far inside the inner floor footprint
+    collect_rest_speed: float = 0.005           # official AT_REST (retrieve_utensil_from_bin.py)
+    collect_rest_window: int = 10               # policy steps over which the rest speed is averaged
+    collect_release_dist: float = 0.03          # every fingertip at least this far from every part COM
+    collect_hand_still_speed: float = 0.05      # palm speed (m/s) for "robot stopped"
+    collect_success_steps: int = 10
+    collect_lift_h: float = 0.06
+    collect_carry_d0: float = 0.30
+    collect_w_lift: float = 20.0
+    collect_w_carry: float = 60.0
+    collect_w_bin: float = 150.0
+    collect_w_approach: float = 100.0
+    collect_w_release: float = 50.0
+    collect_success_bonus: float = 1000.0
+    collect_fall_penalty: float = 200.0
+    collect_obs: bool = True                    # field collect_obs (8 per slot) in obs_list + state_list
+    collect_friction: tuple[float, float] = (0.6, 0.5)  # parts + bin (static, dynamic): PLA, official manifest.yaml
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:

@@ -115,6 +115,19 @@ class PreciseAssemblyEnv(PlayEnv):
             })
             self._teacher_actor_obs_dim = actor_dim
 
+        self._collect = None
+        if self._collect_cfg is not None:
+            from .collect import CollectManager
+
+            self._collect = CollectManager(self, *self._collect_cfg)
+            fs, fd = (float(v) for v in cfg.precise_assembly.collect_friction)
+            ids = torch.arange(self.num_envs, dtype=torch.int64, device="cpu")
+            for body in [self.object, self.hole, *getattr(self, "distractors", ())]:
+                view = body.root_physx_view
+                mats = view.get_material_properties()
+                mats[..., 0], mats[..., 1], mats[..., 2] = fs, fd, 0.0
+                view.set_material_properties(mats, ids)
+
         insert_poses = torch.as_tensor(
             self._pih_insert_pose_sequence, dtype=torch.float32, device=self.device
         )
@@ -325,6 +338,17 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        self._collect_cfg = None
+        if cfg.precise_assembly.collect_mode:
+            if not problem.collect_bin:
+                raise ValueError(f"collect_mode needs a problem with collect_bin ({problem_name!r} has none)")
+            self._collect_cfg = (tuple(problem.collect_n_range) or (1, 1 + len(problem.distractors)),
+                                 dict(problem.collect_bin))
+            if cfg.precise_assembly.collect_obs:
+                OBS_FIELD_SIZES["collect_obs"] = 8 * (1 + len(problem.distractors))
+                for lst in ("obs_list", "state_list"):
+                    if "collect_obs" not in getattr(cfg.obs, lst):
+                        setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "collect_obs"))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
@@ -494,6 +518,8 @@ class PreciseAssemblyEnv(PlayEnv):
 
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
+        if getattr(self, "_collect", None) is not None:
+            self._collect.reset(env_ids)
 
     def _pose_rel_hole_to_world(self, env_ids: torch.Tensor, pose7) -> torch.Tensor:
         """(n, 7) world pose (pos + quat wxyz) of a receptive-frame pose7 (xyz + quat xyzw) for env_ids."""
@@ -650,6 +676,8 @@ class PreciseAssemblyEnv(PlayEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
         self._apply_joint_detents()
+        if getattr(self, "_collect", None) is not None:
+            self._collect.park_inactive()
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
@@ -984,6 +1012,8 @@ class PreciseAssemblyEnv(PlayEnv):
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
         compute_intermediate_values(self)
+        if getattr(self, "_collect", None) is not None:
+            return self._collect_dones()
 
         pih_cfg = self.cfg.precise_assembly
         if pih_cfg.allow_goal_skip:
@@ -1115,7 +1145,43 @@ class PreciseAssemblyEnv(PlayEnv):
         }
         return terminated, truncated
 
+    def _collect_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
+        col = self._collect
+        col.update()
+        self._is_success[:] = False
+        self._successes = col.in_bin.sum(1).long()
+        ft_far = col.ft_min_all > 1.5
+        terminated = col.success | col.fell | ft_far
+        truncated = self.episode_length_buf >= self.max_episode_length
+        self._termination_reasons = {"max_successes": col.success, "fall": col.fell, "hand_far": ft_far,
+                                     "timeout": truncated & ~terminated}
+        return terminated, truncated
+
+    def _collect_rewards(self) -> torch.Tensor:
+        from isaacsimenvs.tasks.play.utils.reward_utils import action_penalty
+
+        col, rc = self._collect, self.cfg.reward
+        shaped, bonus, fall = col.reward()
+        kuka, hand = action_penalty(self.robot.data.joint_vel, self._arm_joint_ids, self._hand_joint_ids,
+                                    rc.kuka_actions_penalty_scale, rc.hand_actions_penalty_scale)
+        reward = shaped + bonus + fall + kuka + hand
+        self._reward_terms = {"collect_shaped": shaped, "collect_bonus": bonus, "collect_fall": fall,
+                              "kuka_actions_penalty": kuka, "hand_actions_penalty": hand, "total_reward": reward}
+        log_step_metrics(self)
+        ef = self.extras.setdefault("episode_final", {})
+        ef["collect_n_active"] = col.n_active
+        ef["collect_n_in_bin"] = col.in_bin.sum(1).float()
+        ef["collect_frac_in_bin"] = col.in_bin.sum(1).float() / col.n_active.clamp_min(1.0)
+        ef["collect_all_in"] = col.all_in.float()
+        ef["collect_ever_frac"] = col.ever_in_bin.sum(1).float() / col.n_active.clamp_min(1.0)
+        self.extras["success_final"] = {"task": col.success.float(), "n_active": col.n_active,
+                                        "frac_in_bin": ef["collect_frac_in_bin"]}
+        self.extras["collect_n_hi"] = float(col._n_hi_now())
+        return reward
+
     def _get_rewards(self) -> torch.Tensor:
+        if getattr(self, "_collect", None) is not None:
+            return self._collect_rewards()
         reward = compute_rewards(self)
         pih_cfg = self.cfg.precise_assembly
 

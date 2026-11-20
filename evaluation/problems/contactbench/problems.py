@@ -50,6 +50,8 @@ def _register_all() -> None:
                 object_start_pose_rel_receptive=tuple(p.get("object_start_pose", ())),
                 joints=tuple(JointSpec(**{**jd, "anchor": tuple(jd["anchor"]), "axis": tuple(jd["axis"])})
                              for jd in p.get("joints", ())),
+                collect_n_range=tuple(p.get("collect_n_range", ())),
+                collect_bin=p.get("collect_bin"),
                 insert_pose_rel_receptive=tuple(tuple(w) for w in p["waypoints"]) if "waypoints" in p else
                 make_pre_insert_sequence(tuple(p["seated_pose"]),
                                          pre_insert_offset=p.get("pre_insert_offset", PRE_INSERT_OFFSET)),

@@ -637,6 +637,447 @@
    "collision": "coacd 24",
    "mass_g_density620": 0.22,
    "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
+  },
+  "fst_nut": {
+   "src": "kit/nut/nut.stl",
+   "extents_mm": [
+    17.59,
+    15.5,
+    7.02
+   ],
+   "mass_g": 0.954,
+   "mass_model": "print (official catalog.py:216)",
+   "com_src_mm": [
+    0.021,
+    -0.0,
+    3.498
+   ],
+   "object_scale": [
+    0.4397,
+    0.3875,
+    0.1756
+   ],
+   "collision": "coacd 10",
+   "bbox_corners_m": [
+    [
+     -0.008815,
+     -0.00775,
+     -0.003511
+    ],
+    [
+     -0.008815,
+     -0.00775,
+     0.003511
+    ],
+    [
+     -0.008815,
+     0.00775,
+     -0.003511
+    ],
+    [
+     -0.008815,
+     0.00775,
+     0.003511
+    ],
+    [
+     0.008774,
+     -0.00775,
+     -0.003511
+    ],
+    [
+     0.008774,
+     -0.00775,
+     0.003511
+    ],
+    [
+     0.008774,
+     0.00775,
+     -0.003511
+    ],
+    [
+     0.008774,
+     0.00775,
+     0.003511
+    ]
+   ]
+  },
+  "fst_screw65": {
+   "src": "kit/screw/screw_6.5_rev.stl",
+   "extents_mm": [
+    23.5,
+    15.0,
+    14.99
+   ],
+   "mass_g": 1.592,
+   "mass_model": "print (official catalog.py:216)",
+   "com_src_mm": [
+    4.049,
+    0.001,
+    -0.019
+   ],
+   "object_scale": [
+    0.5875,
+    0.3749,
+    0.3749
+   ],
+   "collision": "coacd 10",
+   "bbox_corners_m": [
+    [
+     -0.014549,
+     -0.0075,
+     -0.007481
+    ],
+    [
+     -0.014549,
+     -0.0075,
+     0.007514
+    ],
+    [
+     -0.014549,
+     0.007498,
+     -0.007481
+    ],
+    [
+     -0.014549,
+     0.007498,
+     0.007514
+    ],
+    [
+     0.008951,
+     -0.0075,
+     -0.007481
+    ],
+    [
+     0.008951,
+     -0.0075,
+     0.007514
+    ],
+    [
+     0.008951,
+     0.007498,
+     -0.007481
+    ],
+    [
+     0.008951,
+     0.007498,
+     0.007514
+    ]
+   ]
+  },
+  "fst_screw75": {
+   "src": "kit/screw/screw_7.5_rev.stl",
+   "extents_mm": [
+    25.85,
+    15.0,
+    14.99
+   ],
+   "mass_g": 1.703,
+   "mass_model": "print (official catalog.py:216)",
+   "com_src_mm": [
+    3.083,
+    0.001,
+    -0.018
+   ],
+   "object_scale": [
+    0.6463,
+    0.3749,
+    0.3749
+   ],
+   "collision": "coacd 10",
+   "bbox_corners_m": [
+    [
+     -0.015933,
+     -0.0075,
+     -0.007482
+    ],
+    [
+     -0.015933,
+     -0.0075,
+     0.007512
+    ],
+    [
+     -0.015933,
+     0.007498,
+     -0.007482
+    ],
+    [
+     -0.015933,
+     0.007498,
+     0.007512
+    ],
+    [
+     0.009917,
+     -0.0075,
+     -0.007482
+    ],
+    [
+     0.009917,
+     -0.0075,
+     0.007512
+    ],
+    [
+     0.009917,
+     0.007498,
+     -0.007482
+    ],
+    [
+     0.009917,
+     0.007498,
+     0.007512
+    ]
+   ]
+  },
+  "fst_bolt7": {
+   "src": "kit/bolt/bolt_7_rev.stl",
+   "extents_mm": [
+    24.75,
+    17.58,
+    15.5
+   ],
+   "mass_g": 1.773,
+   "mass_model": "print (official catalog.py:216)",
+   "com_src_mm": [
+    6.497,
+    0.002,
+    -0.006
+   ],
+   "object_scale": [
+    0.6188,
+    0.4394,
+    0.3875
+   ],
+   "collision": "coacd 10",
+   "bbox_corners_m": [
+    [
+     -0.016247,
+     -0.008791,
+     -0.007744
+    ],
+    [
+     -0.016247,
+     -0.008791,
+     0.007756
+    ],
+    [
+     -0.016247,
+     0.008787,
+     -0.007744
+    ],
+    [
+     -0.016247,
+     0.008787,
+     0.007756
+    ],
+    [
+     0.008503,
+     -0.008791,
+     -0.007744
+    ],
+    [
+     0.008503,
+     -0.008791,
+     0.007756
+    ],
+    [
+     0.008503,
+     0.008787,
+     -0.007744
+    ],
+    [
+     0.008503,
+     0.008787,
+     0.007756
+    ]
+   ]
+  },
+  "fst_bolt8": {
+   "src": "kit/bolt/bolt_8_rev.stl",
+   "extents_mm": [
+    27.1,
+    17.58,
+    15.5
+   ],
+   "mass_g": 1.884,
+   "mass_model": "print (official catalog.py:216)",
+   "com_src_mm": [
+    5.602,
+    0.002,
+    -0.005
+   ],
+   "object_scale": [
+    0.6775,
+    0.4394,
+    0.3875
+   ],
+   "collision": "coacd 10",
+   "bbox_corners_m": [
+    [
+     -0.017702,
+     -0.008791,
+     -0.007745
+    ],
+    [
+     -0.017702,
+     -0.008791,
+     0.007755
+    ],
+    [
+     -0.017702,
+     0.008787,
+     -0.007745
+    ],
+    [
+     -0.017702,
+     0.008787,
+     0.007755
+    ],
+    [
+     0.009398,
+     -0.008791,
+     -0.007745
+    ],
+    [
+     0.009398,
+     -0.008791,
+     0.007755
+    ],
+    [
+     0.009398,
+     0.008787,
+     -0.007745
+    ],
+    [
+     0.009398,
+     0.008787,
+     0.007755
+    ]
+   ]
+  },
+  "fst_bolt9": {
+   "src": "kit/bolt/bolt_9_rev.stl",
+   "extents_mm": [
+    29.45,
+    17.58,
+    15.5
+   ],
+   "mass_g": 1.996,
+   "mass_model": "print (official catalog.py:216)",
+   "com_src_mm": [
+    4.68,
+    0.002,
+    -0.005
+   ],
+   "object_scale": [
+    0.7362,
+    0.4394,
+    0.3875
+   ],
+   "collision": "coacd 10",
+   "bbox_corners_m": [
+    [
+     -0.01913,
+     -0.008791,
+     -0.007745
+    ],
+    [
+     -0.01913,
+     -0.008791,
+     0.007755
+    ],
+    [
+     -0.01913,
+     0.008787,
+     -0.007745
+    ],
+    [
+     -0.01913,
+     0.008787,
+     0.007755
+    ],
+    [
+     0.01032,
+     -0.008791,
+     -0.007745
+    ],
+    [
+     0.01032,
+     -0.008791,
+     0.007755
+    ],
+    [
+     0.01032,
+     0.008787,
+     -0.007745
+    ],
+    [
+     0.01032,
+     0.008787,
+     0.007755
+    ]
+   ]
+  },
+  "fst_boltlong": {
+   "src": "kit/bolt/bolt_long.stl",
+   "extents_mm": [
+    42.95,
+    17.58,
+    15.5
+   ],
+   "mass_g": 2.598,
+   "mass_model": "print (official catalog.py:216)",
+   "com_src_mm": [
+    -0.845,
+    -0.002,
+    -0.003
+   ],
+   "object_scale": [
+    1.0738,
+    0.4394,
+    0.3875
+   ],
+   "collision": "coacd 10",
+   "bbox_corners_m": [
+    [
+     -0.027105,
+     -0.008786,
+     -0.007747
+    ],
+    [
+     -0.027105,
+     -0.008786,
+     0.007753
+    ],
+    [
+     -0.027105,
+     0.008791,
+     -0.007747
+    ],
+    [
+     -0.027105,
+     0.008791,
+     0.007753
+    ],
+    [
+     0.015845,
+     -0.008786,
+     -0.007747
+    ],
+    [
+     0.015845,
+     -0.008786,
+     0.007753
+    ],
+    [
+     0.015845,
+     0.008791,
+     -0.007747
+    ],
+    [
+     0.015845,
+     0.008791,
+     0.007753
+    ]
+   ]
   }
  },
  "fixtures": {
@@ -1001,6 +1442,20 @@
     0.0,
     -0.0
    ]
+  },
+  "fastener_bin_box": {
+   "src": "kit/fastener-bin/fastener_bin.stl",
+   "extents_mm": [
+    56.47,
+    40.73,
+    46.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "collision": "5 convex pieces"
   }
  },
  "problems": {
@@ -8776,6 +9231,1788 @@
      100.0
     ]
    ]
+  },
+  "cb_fasteners": {
+   "object": "fst_nut",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    8,
+    8
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_mixed": {
+   "object": "fst_nut",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      0.02500000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      0.06000000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    10
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_nut": {
+   "object": "fst_nut",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    8
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_screw65": {
+   "object": "fst_screw65",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    8
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_screw75": {
+   "object": "fst_screw75",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    8
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_bolt7": {
+   "object": "fst_bolt7",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    8
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_bolt8": {
+   "object": "fst_bolt8",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    8
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_bolt9": {
+   "object": "fst_bolt9",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    8
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_boltlong": {
+   "object": "fst_boltlong",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    8
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_n1": {
+   "object": "fst_nut",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      0.02500000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      0.06000000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    1
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_n3": {
+   "object": "fst_nut",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      0.02500000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      0.06000000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    3,
+    3
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_n5": {
+   "object": "fst_nut",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      0.02500000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      0.06000000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    5,
+    5
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_n8": {
+   "object": "fst_nut",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      0.02500000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      0.06000000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    8,
+    8
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_n10": {
+   "object": "fst_nut",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt7/fst_bolt7.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt8/fst_bolt8.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_bolt9/fst_bolt9.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_boltlong/fst_boltlong.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut/fst_nut.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw65/fst_screw65.urdf",
+     [
+      0.02500000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_screw75/fst_screw75.urdf",
+     [
+      0.06000000000000001,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    10,
+    10
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"
