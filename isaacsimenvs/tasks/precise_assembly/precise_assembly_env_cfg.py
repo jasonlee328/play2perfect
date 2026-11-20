@@ -244,6 +244,8 @@ class PreciseAssemblyCfg:
     retr_deck_out_mm: float = 0.0       # > 0: deck_disturbed only when a deck card rises > this (fully out); partial rises that fall back are OK
     retr_mass_log: bool = False         # retr_mass_scale_range sampled log-uniform (one scale per env, all cards)
     retr_mass_per_card: bool = False    # old behaviour: each card its own uniform scale
+    finger_compliant_stiffness: float = 0.0   # > 0: soft fingertip links (PhysX compliant contact, N/m): touch depth grows with force
+    finger_compliant_damping: float = 0.0
     retr_nonpad_max: float = 0.0        # > 0: fingertips-only press: non-fingertip contact force on card 1 (in holder) > this (N) ...
     retr_nonpad_steps: int = 3          # ... for this many steps = fail 'nonpad'
     retr_deck_inslot_only: bool = False # user 11-20: deck cards may rise any amount; fail / success only on "still in the holder" (lowest corner below the wall top, on the slot)
