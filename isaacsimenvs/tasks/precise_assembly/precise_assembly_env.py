@@ -1327,7 +1327,8 @@ class PreciseAssemblyEnv(PlayEnv):
                 phc = usb.meas["palm_from_release"].clamp(max=float(getattr(pih_cfg, "usb_clear_pot_cap", 0.06)))
                 if not hasattr(usb, "phc_prev"):
                     usb.phc_prev = phc.clone()
-                d_c = torch.where((usb.step <= 1) | ~usb.released, torch.zeros_like(phc), phc - usb.phc_prev)
+                # only while the stick is seated: moving away after an unseated release must not pay (usb39 learned to let go early)
+                d_c = torch.where((usb.step <= 1) | ~usb.released | ~usb.inserted, torch.zeros_like(phc), phc - usb.phc_prev)
                 usb.phc_prev = phc.clone()
                 u_rew = u_rew + float(pih_cfg.usb_clear_pot_scale) * d_c
             if float(getattr(pih_cfg, "usb_step_penalty", 0.0)) > 0.0:
