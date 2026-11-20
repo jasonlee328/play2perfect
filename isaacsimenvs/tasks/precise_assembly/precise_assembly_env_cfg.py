@@ -205,8 +205,18 @@ class PreciseAssemblyCfg:
     collect_w_bin: float = 150.0
     collect_w_approach: float = 100.0
     collect_w_release: float = 50.0
-    collect_success_bonus: float = 1000.0
-    collect_fall_penalty: float = 200.0
+    # v2 reward (play2perfect-calibrated terms on a sticky current target = nearest part not yet in the bin)
+    collect_drop_z: float = 0.076                # drop point above the bin floor centre (rim + 3 cm)
+    collect_grasp_dist: float = 0.03             # >= 2 fingertips this close to the target = grasped
+    collect_lift_th: float = 0.04
+    collect_w_ftdelta: float = 50.0              # x sum over fingertips of closest-distance improvement (m)
+    collect_w_lift_dense: float = 20.0           # x rise (<= lift_th) per step while grasped, before the lift latch
+    collect_lift_bonus: float = 300.0            # once per part
+    collect_w_carry_v2: float = 200.0            # x improvement of a lifted part's distance to the drop point (m)
+    collect_w_bin_v2: float = 1000.0             # per part entering the bin (minus per part leaving)
+    collect_w_release_v2: float = 200.0          # x change of clamp(min fingertip distance / 5 cm) once all are in
+    collect_success_bonus: float = 2000.0
+    collect_fall_penalty: float = 300.0
     collect_obs: bool = True                    # field collect_obs (8 per slot) in obs_list + state_list
     collect_friction: tuple[float, float] = (0.6, 0.5)  # parts + bin (static, dynamic): PLA, official manifest.yaml
 

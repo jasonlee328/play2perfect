@@ -1165,7 +1165,8 @@ class PreciseAssemblyEnv(PlayEnv):
         kuka, hand = action_penalty(self.robot.data.joint_vel, self._arm_joint_ids, self._hand_joint_ids,
                                     rc.kuka_actions_penalty_scale, rc.hand_actions_penalty_scale)
         reward = shaped + bonus + fall + kuka + hand
-        self._reward_terms = {"collect_shaped": shaped, "collect_bonus": bonus, "collect_fall": fall,
+        self._reward_terms = {**{f"collect_{k}": v for k, v in col.rterms.items()},
+                              "collect_shaped": shaped, "collect_bonus": bonus, "collect_fall": fall,
                               "kuka_actions_penalty": kuka, "hand_actions_penalty": hand, "total_reward": reward}
         log_step_metrics(self)
         ef = self.extras.setdefault("episode_final", {})
@@ -1174,6 +1175,7 @@ class PreciseAssemblyEnv(PlayEnv):
         ef["collect_frac_in_bin"] = col.in_bin.sum(1).float() / col.n_active.clamp_min(1.0)
         ef["collect_all_in"] = col.all_in.float()
         ef["collect_ever_frac"] = col.ever_in_bin.sum(1).float() / col.n_active.clamp_min(1.0)
+        ef["collect_lift_frac"] = col.bonus_paid.sum(1).float() / col.n_active.clamp_min(1.0)
         self.extras["success_final"] = {"task": col.success.float(), "n_active": col.n_active,
                                         "frac_in_bin": ef["collect_frac_in_bin"]}
         self.extras["collect_n_hi"] = float(col._n_hi_now())

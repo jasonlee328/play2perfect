@@ -75,6 +75,14 @@ class CollectManager:
         self.hist_i = 0
         self.success = torch.zeros(N, dtype=torch.bool, device=self.dev)
         self.fell = torch.zeros_like(self.success)
+        self.target = torch.zeros(N, dtype=torch.long, device=self.dev)
+        self.closest_ft = torch.full((N, 5), 9.0, device=self.dev)
+        self.latched = torch.zeros(N, self.K, dtype=torch.bool, device=self.dev)
+        self.bonus_paid = torch.zeros_like(self.latched)
+        self.closest_drop = torch.full((N, self.K), 9.0, device=self.dev)
+        self.prev_in = torch.zeros_like(self.latched)
+        self.prev_rel = torch.zeros(N, device=self.dev)
+        self.rterms = {}
         self.park = torch.zeros(self.K, 3, device=self.dev)
         for k in range(self.K):
             self.park[k] = torch.tensor([0.0, 0.0, float(c.collect_park_z) + 0.12 * k], device=self.dev)
@@ -179,6 +187,13 @@ class CollectManager:
         self.fresh[env_ids] = True
         self.success[env_ids] = False
         self.fell[env_ids] = False
+        self.target[env_ids] = 0
+        self.closest_ft[env_ids] = 9.0
+        self.latched[env_ids] = False
+        self.bonus_paid[env_ids] = False
+        self.closest_drop[env_ids] = 9.0
+        self.prev_in[env_ids] = False
+        self.prev_rel[env_ids] = 0.0
         env._object_init_z[env_ids] = self.z0[env_ids, 0]
 
     def park_inactive(self) -> None:
@@ -193,6 +208,23 @@ class CollectManager:
             pose[:, 3] = 1.0
             body.write_root_pose_to_sim(pose, env_ids=ids)
             body.write_root_velocity_to_sim(torch.zeros(m, 6, device=self.dev), env_ids=ids)
+
+    # ------------------------------------------------------------------ target (what the policy's object fields show)
+    def target_state_w(self):
+        i = self.target
+        def g(attr):
+            x = torch.stack([getattr(b.data, attr) for b in self.bodies], 1)
+            return x[torch.arange(x.shape[0], device=self.dev), i]
+        return g("root_pos_w"), g("root_quat_w"), g("root_lin_vel_w"), g("root_ang_vel_w")
+
+    def drop_point_w(self):
+        env = self.env
+        off = torch.tensor([0.0, 0.0, float(self.c.collect_drop_z)], device=self.dev).expand(env.num_envs, 3)
+        return env.hole_pos + env.scene.env_origins + quat_apply(env.hole_quat_wxyz, off)
+
+    def goal_state_w(self):
+        # position-only goal: the drop point above the bin, with the target's own orientation
+        return self.drop_point_w(), self.target_state_w()[1]
 
     # ------------------------------------------------------------------ state
     def _slots(self):
@@ -250,16 +282,48 @@ class CollectManager:
         self.ok_steps = torch.where(ok, self.ok_steps + 1, torch.zeros_like(self.ok_steps))
         self.success = self.ok_steps >= int(c.collect_success_steps)
         self.all_in = all_in
-        # potential
-        h = ((pos[..., 2] - self.z0) / float(c.collect_lift_h)).clamp(0.0, 1.0)
-        dxy = (pos[..., :2] - env.hole_pos[:, :2].unsqueeze(1)).norm(dim=-1)
-        carry = (1.0 - dxy / float(c.collect_carry_d0)).clamp(0.0, 1.0)
-        phi_k = torch.where(self.in_bin, torch.full_like(h, float(c.collect_w_bin)),
-                            float(c.collect_w_lift) * h + float(c.collect_w_carry) * h * carry)
-        phi = (phi_k * self.active.float()).sum(1)
-        phi = phi - float(c.collect_w_approach) * self.ft_min_out.clamp(max=0.3) * (~all_in).float()
-        phi = phi + float(c.collect_w_release) * (self.ft_min_all / 0.05).clamp(0.0, 1.0) * all_in.float()
-        self.phi = phi
+        # current target: sticky until it is in the bin (or inactive); then the nearest part not yet in the bin
+        cand = out
+        N = env.num_envs
+        ar = torch.arange(N, device=self.dev)
+        keep = cand[ar, self.target]
+        near = torch.where(cand, self.ft_min, torch.full_like(self.ft_min, 99.0)).argmin(1)
+        new_t = torch.where(keep | ~cand.any(1), self.target, near)
+        changed = new_t != self.target
+        self.target = new_t
+        ftd = d[ar, :, self.target]                                                  # (N, 5) fingertips -> target
+        self.closest_ft = torch.where(changed.unsqueeze(1) | (self.closest_ft > 8.0), ftd, self.closest_ft)
+        r_ft = (self.closest_ft - ftd).clamp(min=0.0).sum(1)
+        self.closest_ft = torch.minimum(self.closest_ft, ftd)
+        rise = pos[ar, self.target, 2] - self.z0[ar, self.target]
+        grasped = (ftd < float(c.collect_grasp_dist)).sum(1) >= 2
+        lat_t = self.latched[ar, self.target]
+        r_ft = r_ft * (~lat_t).float()
+        r_lift = rise.clamp(0.0, float(c.collect_lift_th)) * grasped.float() * (~lat_t).float()
+        newly = (rise > float(c.collect_lift_th)) & grasped & ~lat_t
+        self.latched[ar, self.target] |= newly
+        bonus_new = newly & ~self.bonus_paid[ar, self.target]
+        self.bonus_paid[ar, self.target] |= newly
+        # a latched part back on the table (not in the bin) unlatches: it can be re-approached / re-lifted, but the lift
+        # bonus is once per part and carry pays only progress past its best distance (no farming)
+        on_table = (pos[..., 2] - self.z0 < 0.01) & ~self.in_bin
+        self.latched &= ~on_table
+        drop = self.drop_point_w() - env.scene.env_origins
+        dd = (pos - drop.unsqueeze(1)).norm(dim=-1)                                  # (N, K)
+        carry_on = self.latched & ~self.in_bin & self.active
+        self.closest_drop = torch.where(carry_on & (self.closest_drop > 8.0), dd, self.closest_drop)
+        r_carry = ((self.closest_drop - dd).clamp(min=0.0) * carry_on.float()).sum(1)
+        self.closest_drop = torch.where(carry_on, torch.minimum(self.closest_drop, dd), self.closest_drop)
+        d_in = self.in_bin.sum(1).float() - self.prev_in.sum(1).float()
+        self.prev_in = self.in_bin.clone()
+        rel_phi = (self.ft_min_all / 0.05).clamp(0.0, 1.0) * all_in.float()
+        r_rel = torch.where(self.fresh, torch.zeros_like(rel_phi), rel_phi - self.prev_rel)
+        self.prev_rel = rel_phi
+        self.rterms = dict(ft=float(c.collect_w_ftdelta) * r_ft, lift=float(c.collect_w_lift_dense) * r_lift,
+                           lift_bonus=float(c.collect_lift_bonus) * bonus_new.float(),
+                           carry=float(c.collect_w_carry_v2) * r_carry, bin=float(c.collect_w_bin_v2) * d_in,
+                           release=float(c.collect_w_release_v2) * r_rel)
+        self.grasped = grasped
 
     # ------------------------------------------------------------------ outputs
     def obs(self, palm_pos: torch.Tensor) -> torch.Tensor:
@@ -270,11 +334,10 @@ class CollectManager:
         o = torch.cat([(self.pos - palm_pos.unsqueeze(1)) * a, self.rel_bin * a, a, self.in_bin.float().unsqueeze(-1)], -1)
         return o.reshape(N, K * 8)
 
-    def reward(self) -> torch.Tensor:
+    def reward(self):
         c = self.c
-        r = torch.where(self.fresh, torch.zeros_like(self.phi), self.phi - self.prev_phi)
-        self.prev_phi = self.phi.clone()
+        shaped = sum(self.rterms.values()) * (~self.fresh).float()
         self.fresh[:] = False
         bonus = float(c.collect_success_bonus) * self.success.float()
         fall = -float(c.collect_fall_penalty) * self.fell.float()
-        return r, bonus, fall
+        return shaped, bonus, fall

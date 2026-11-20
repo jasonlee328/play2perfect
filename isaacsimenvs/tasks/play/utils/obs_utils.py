@@ -150,6 +150,23 @@ def _canonical_joint_obs(env) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 # ----------------------------------------------------------------------------
 
 
+def _object_state_w(env):
+    """(pos_w, quat_w, linvel_w, angvel_w) of the object the policy observes: env.object, or in collect mode the current
+    target part (precise_assembly collect.py)."""
+    col = getattr(env, "_collect", None)
+    if col is not None:
+        return col.target_state_w()
+    d = env.object.data
+    return d.root_pos_w, d.root_quat_w, d.root_lin_vel_w, d.root_ang_vel_w
+
+
+def _goal_state_w(env):
+    col = getattr(env, "_collect", None)
+    if col is not None:
+        return col.goal_state_w()
+    return env.goal_viz.data.root_pos_w, env.goal_viz.data.root_quat_w
+
+
 def compute_intermediate_values(env) -> None:
     """Update shared geometric state for rewards and terminations."""
     from .reward_utils import update_near_goal_steps  # local import to avoid cycle
@@ -158,10 +175,10 @@ def compute_intermediate_values(env) -> None:
     term_cfg = env.cfg.termination
     env_origins = env.scene.env_origins
 
-    obj_pos = env.object.data.root_pos_w - env_origins
-    obj_rot = env.object.data.root_quat_w
-    goal_pos = env.goal_viz.data.root_pos_w - env_origins
-    goal_rot = env.goal_viz.data.root_quat_w
+    _op, obj_rot, _, _ = _object_state_w(env)
+    obj_pos = _op - env_origins
+    _gp, goal_rot = _goal_state_w(env)
+    goal_pos = _gp - env_origins
 
     ft_state = env.robot.data.body_state_w[:, env._fingertip_body_ids, :]
     ft_pos = ft_state[:, :, 0:3] - env_origins.unsqueeze(1)
@@ -258,14 +275,12 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         (env.num_envs, NUM_FINGERTIPS),
     )
 
-    obj_pos = env.object.data.root_pos_w - env_origins
-    obj_rot = env.object.data.root_quat_w  # wxyz
-    obj_linvel = env.object.data.root_lin_vel_w
-    obj_angvel = env.object.data.root_ang_vel_w
+    _op, obj_rot, obj_linvel, obj_angvel = _object_state_w(env)  # wxyz
+    obj_pos = _op - env_origins
     obj_vel = torch.cat([obj_linvel, obj_angvel], dim=-1)
 
-    goal_pos = env.goal_viz.data.root_pos_w - env_origins
-    goal_rot = env.goal_viz.data.root_quat_w  # wxyz
+    _gp, goal_rot = _goal_state_w(env)  # wxyz
+    goal_pos = _gp - env_origins
 
     if dr.use_object_state_delay_noise:
         noisy_obj_pos, noisy_obj_rot, noisy_obj_vel = _apply_object_state_dr(
