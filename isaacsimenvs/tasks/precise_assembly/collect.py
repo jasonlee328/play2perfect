@@ -95,6 +95,14 @@ class CollectManager:
         env, c, n, dev = self.env, self.c, env_ids.numel(), self.dev
         if n == 0:
             return
+        # last-episode summary (read by evals: the auto-reset runs before the step returns)
+        if not hasattr(self, "last"):
+            z = torch.zeros(self.env.num_envs, device=dev)
+            self.last = {"n_active": z.clone(), "n_in_bin": z.clone(), "ever_in_bin": z.clone(), "success": z.clone()}
+        self.last["n_active"][env_ids] = self.active[env_ids].sum(1).float()
+        self.last["n_in_bin"][env_ids] = self.in_bin[env_ids].sum(1).float()
+        self.last["ever_in_bin"][env_ids] = self.ever_in_bin[env_ids].sum(1).float()
+        self.last["success"][env_ids] = self.success[env_ids].float()
         hi = self._n_hi_now()
         n_act = torch.randint(self.n_lo, hi + 1, (n,), device=dev)
         perm = torch.rand(n, self.K - 1, device=dev).argsort(dim=1)  # random subset of slots 1..K-1
