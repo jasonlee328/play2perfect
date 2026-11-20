@@ -49,6 +49,8 @@ def _init(env) -> None:
     env.cg_stuck = torch.ones(n, dtype=torch.bool, device=d)
     env.cg_G = torch.zeros(n, device=d)
     env.cg_low = torch.zeros(n, dtype=torch.long, device=d)
+    env.cg_free = torch.zeros(n, dtype=torch.long, device=d)
+    env.cg_lost = torch.zeros(n, dtype=torch.bool, device=d)
     env.cg_break_count = torch.zeros(n, dtype=torch.long, device=d)
     env.cg_ever_coupled = torch.zeros(n, dtype=torch.bool, device=d)
     env.cg_grasped = torch.zeros(n, dtype=torch.bool, device=d)
@@ -108,6 +110,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
         env.cg_G[env_ids] = (env.cg_S[env_ids] + w) / float(c.cupgrip_mu_cal)
         env.cg_D[env_ids] = env.cg_r[env_ids] * (env.cg_S[env_ids] + w) / float(c.cupgrip_mu_cal)
     env.cg_low[env_ids] = 0
+    env.cg_free[env_ids] = 0
     klo, khi = (float(v) for v in c.cupgrip_hand_kp_range)
     k = klo + (khi - klo) * torch.rand(n, device=env.device)
     env.cg_kp[env_ids] = k
@@ -265,6 +268,17 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
         slipped = (env.cg_low >= int(c.cupgrip_slip_steps)) & ~dragged
     if float(c.cupgrip_slip_mm) <= 0.0:
         slipped = z
+    if bool(c.cupgrip_lost_fail):
+        # lost the cup = "slipped" too: tilted > lost_tilt_deg, or off its seat (rise > 3 mm) with no grip for
+        # lost_steps steps in a row (a tossed / knocked-off cup; the lift bonus must not pay for a flick)
+        from isaaclab.utils.math import quat_apply
+        dn = torch.tensor([0.0, 0.0, -1.0], device=env.device).expand(env.num_envs, 3)
+        tilt = torch.rad2deg(torch.acos(quat_apply(env.object.data.root_quat_w, dn)[:, 2].clamp(-1, 1)))
+        free = (rise > 0.003) & ~gripping
+        env.cg_free = torch.where(free, env.cg_free + 1, torch.zeros_like(env.cg_free))
+        lost = (tilt > float(c.cupgrip_lost_tilt_deg)) | (env.cg_free >= int(c.cupgrip_lost_steps))
+        env.cg_lost = lost & ~dragged
+        slipped = slipped | env.cg_lost
     for k, v in (("cupgrip_S_mean", env.cg_S.mean()), ("cupgrip_r_mean", env.cg_r.mean()), ("cupgrip_S_hi", torch.tensor(float(getattr(env, "cg_S_hi", 0.0)))), ("cupgrip_coupled_frac", env.cg_coupled.float().mean()),
                  ("cupgrip_rise_max", rise.max()), ("cupgrip_slide_mean", env.cg_slide.mean())):
         env.extras[k] = v
