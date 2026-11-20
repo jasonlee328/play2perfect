@@ -1317,6 +1317,15 @@ class PreciseAssemblyEnv(PlayEnv):
                 capw = float(getattr(pih_cfg, "usb_win_thumb_cap", 4.0))
                 fw = torch.minimum(usb.meas["f_thumb"], usb.meas["f_index"]).clamp(max=capw) / capw
                 u_rew = u_rew + float(pih_cfg.usb_win_thumb_rew_scale) * fw * usb.win.float()
+            if float(getattr(pih_cfg, "usb_tilt_rew_scale", 0.0)) > 0.0:
+                # potential on -(stick tilt vs the seated axis, rad) before the release: the grasp tilts the stick 3-5 deg,
+                # the mouth allows ~0.175 mm per side (successes ~1.4 deg, failures ~5 deg)
+                pht = -torch.deg2rad(usb.meas["tilt_deg"])
+                if not hasattr(usb, "pht_prev"):
+                    usb.pht_prev = pht.clone()
+                d_t = torch.where((usb.step <= 1) | usb.released, torch.zeros_like(pht), pht - usb.pht_prev)
+                usb.pht_prev = pht.clone()
+                u_rew = u_rew + float(pih_cfg.usb_tilt_rew_scale) * d_t
             if float(getattr(pih_cfg, "usb_lat_rew_scale", 0.0)) > 0.0:
                 # potential on -(lateral tip error) before the release: pays centring the plug over the 0.175 mm/side mouth
                 phl = -usb.meas["lat_mm"] * 1e-3
