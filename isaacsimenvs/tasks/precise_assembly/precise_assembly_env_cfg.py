@@ -187,6 +187,7 @@ class PreciseAssemblyCfg:
     cupgrip_nest_overlap_mm: float = 55.0                      # top cup still nested on the second below this rise
     cupgrip_couple_tau_s: float = 0.05
     cupgrip_couple_max_N: float = 5.0
+    cupgrip_pin_second: bool = True                            # second cup can't rise unless the drag coupling is on
     cupgrip_drag_fail_mm: float = 5.0                          # second cup risen this much = "dragged"
     cupgrip_slip_mm: float = 12.0                              # palm slid this far up the top cup = "slipped" (0 off)
     cupgrip_contact_N: float = 0.3                             # hand force that starts the slide measurement

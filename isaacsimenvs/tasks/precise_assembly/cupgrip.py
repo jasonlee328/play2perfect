@@ -162,6 +162,20 @@ def pre_physics(env) -> None:
     f2 = env.cg_m2 * (G + a)
     f2 = torch.where(env.cg_coupled, f2.clamp(0.0, float(c.cupgrip_couple_max_N)), torch.zeros_like(f2))
 
+    # Second cup pinned on its seat unless the drag coupling is on (its own nest stickiness is far stronger than the
+    # wall friction a squeezed top cup exerts; the squeeze-drag path is the model above). Upward motion only.
+    if bool(c.cupgrip_pin_second):
+        rise2 = z2 - env.cg_z2_0
+        pin = ~env.cg_coupled & ((rise2 > 0.0002) | (v2 > 0.0))
+        ids = pin.nonzero().reshape(-1)
+        if ids.numel():
+            pose = torch.cat([cup2.data.root_pos_w[ids], cup2.data.root_quat_w[ids]], -1).clone()
+            pose[:, 2] = torch.minimum(pose[:, 2], env.cg_z2_0[ids] + o[ids, 2])
+            vel = torch.cat([cup2.data.root_lin_vel_w[ids], cup2.data.root_ang_vel_w[ids]], -1).clone()
+            vel[:, 2] = vel[:, 2].clamp(max=0.0)
+            cup2.write_root_pose_to_sim(pose, env_ids=ids)
+            cup2.write_root_velocity_to_sim(vel, env_ids=ids)
+
     F1 = torch.zeros(env.num_envs, 1, 3, device=env.device)
     base = getattr(env, "_object_forces", None)
     if base is not None:
