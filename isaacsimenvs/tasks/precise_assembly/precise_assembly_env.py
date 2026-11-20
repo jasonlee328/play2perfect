@@ -651,6 +651,10 @@ class PreciseAssemblyEnv(PlayEnv):
             torque = (tau.unsqueeze(-1) * axis_w).unsqueeze(1)
             body.set_external_force_and_torque(torch.zeros_like(torque), torque, is_global=True)
 
+    def _apply_action(self) -> None:
+        super()._apply_action()
+        _cupgrip.pin_substep(self)
+
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
         self._apply_joint_detents()
@@ -979,8 +983,9 @@ class PreciseAssemblyEnv(PlayEnv):
         # x hand_force_scale: on a flat contact (cup on the table, a1_force_probe --on_table) the force matrix reads
         # 2.000x the true support force (m g + push, 0-10 N, within 0.3%) -> default 0.5
         self.hand_force = F.norm(dim=-1).sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
-        # A21: net vertical force of the hand on the object (N, + = up), same calibration
-        self.hand_force_z = F[..., 2].sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
+        # A21: net vertical force of the hand on the object (N, + = up), same calibration. The force matrix is the
+        # force ON the filter bodies (the hand): while the hand carries the cup it reads -m g (checked 11-20, diag_cg4b)
+        self.hand_force_z = -F[..., 2].sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
         # A21: squeeze = sum over links of the horizontal contact force magnitude (side-grip normals), same calibration
         self.hand_force_xy = F[..., :2].norm(dim=-1).sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)

@@ -166,20 +166,6 @@ def pre_physics(env) -> None:
     f2 = env.cg_m2 * (G + a)
     f2 = torch.where(env.cg_coupled, f2.clamp(0.0, float(c.cupgrip_couple_max_N)), torch.zeros_like(f2))
 
-    # Second cup pinned on its seat unless the drag coupling is on (its own nest stickiness is far stronger than the
-    # wall friction a squeezed top cup exerts; the squeeze-drag path is the model above). Upward motion only.
-    if bool(c.cupgrip_pin_second):
-        rise2 = z2 - env.cg_z2_0
-        pin = ~env.cg_coupled & ((rise2 > 0.0002) | (v2 > 0.0))
-        ids = pin.nonzero().reshape(-1)
-        if ids.numel():
-            pose = torch.cat([cup2.data.root_pos_w[ids], cup2.data.root_quat_w[ids]], -1).clone()
-            pose[:, 2] = torch.minimum(pose[:, 2], env.cg_z2_0[ids] + o[ids, 2])
-            vel = torch.cat([cup2.data.root_lin_vel_w[ids], cup2.data.root_ang_vel_w[ids]], -1).clone()
-            vel[:, 2] = vel[:, 2].clamp(max=0.0)
-            cup2.write_root_pose_to_sim(pose, env_ids=ids)
-            cup2.write_root_velocity_to_sim(vel, env_ids=ids)
-
     F1 = torch.zeros(env.num_envs, 1, 3, device=env.device)
     base = getattr(env, "_object_forces", None)
     if base is not None:
@@ -191,6 +177,27 @@ def pre_physics(env) -> None:
     F2 = torch.zeros(env.num_envs, 1, 3, device=env.device)
     F2[:, 0, 2] = f2
     cup2.set_external_force_and_torque(forces=F2, torques=torch.zeros_like(F2), is_global=True)
+
+
+def pin_substep(env) -> None:
+    """Every physics substep (_apply_action): the second cup can't rise on its seat unless the drag coupling is on
+    (its own nest stickiness is far stronger than the wall friction a squeezed top cup exerts; the squeeze-drag path
+    is the model in pre_physics). Upward motion only."""
+    if not enabled(env) or not hasattr(env, "cg_S") or not bool(env.cfg.precise_assembly.cupgrip_pin_second):
+        return
+    o = env.scene.env_origins
+    cup2 = env.distractors[0]
+    rise2 = cup2.data.root_pos_w[:, 2] - o[:, 2] - env.cg_z2_0
+    v2 = cup2.data.root_lin_vel_w[:, 2]
+    pin = ~env.cg_coupled & ((rise2 > 0.0002) | (v2 > 0.0))
+    ids = pin.nonzero().reshape(-1)
+    if ids.numel():
+        pose = torch.cat([cup2.data.root_pos_w[ids], cup2.data.root_quat_w[ids]], -1).clone()
+        pose[:, 2] = torch.minimum(pose[:, 2], env.cg_z2_0[ids] + o[ids, 2])
+        vel = torch.cat([cup2.data.root_lin_vel_w[ids], cup2.data.root_ang_vel_w[ids]], -1).clone()
+        vel[:, 2] = vel[:, 2].clamp(max=0.0)
+        cup2.write_root_pose_to_sim(pose, env_ids=ids)
+        cup2.write_root_velocity_to_sim(vel, env_ids=ids)
 
 
 def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
@@ -213,7 +220,14 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
     env.cg_rel0 = rel
     env.cg_grasped = gripping
     nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
-    dragged = rise2 > float(c.cupgrip_drag_fail_mm) / 1000.0
+    # only the modelled squeeze-drag fails (an uncoupled one-substep friction blip is snapped back by the pin)
+    dragged = (rise2 > float(c.cupgrip_drag_fail_mm) / 1000.0) & (env.cg_coupled | ~bool(c.cupgrip_pin_second))
+    from isaaclab.utils.math import quat_apply
+    dn = torch.tensor([0.0, 0.0, -1.0], device=env.device).expand(env.num_envs, 3)
+    env.cg_last_rise2 = rise2.clone()
+    env.cg_last_tilt2 = torch.rad2deg(torch.acos(quat_apply(env.distractors[0].data.root_quat_w, dn)[:, 2].clamp(-1, 1)))
+    env.cg_last_xy2 = (env.distractors[0].data.root_pos_w[:, :2] - env.scene.env_origins[:, :2]
+                       - env.cg_obj0[:, :2]).norm(dim=-1)
     slipped = (env.cg_slide > float(c.cupgrip_slip_mm) / 1000.0) & nested & ~dragged
     if float(c.cupgrip_slip_mm) <= 0.0:
         slipped = z
