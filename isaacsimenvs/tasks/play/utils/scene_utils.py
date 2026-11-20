@@ -1569,7 +1569,10 @@ def apply_physx_material_properties(env) -> None:
             robot_materials[:, ft_indices, 0] = per_env_ft.unsqueeze(-1)
             robot_materials[:, ft_indices, 1] = per_env_ft.unsqueeze(-1)
 
-    robot_view.set_material_properties(robot_materials, env_ids)
+    if getattr(env, "_finger_compliant", False):
+        print("[materials] robot friction pass skipped: compliant fingertips bound in USD (A10)", flush=True)
+    else:
+        robot_view.set_material_properties(robot_materials, env_ids)
 
     for name in ("table", "object", "goal_viz", "hole"):
         if not hasattr(env, name):

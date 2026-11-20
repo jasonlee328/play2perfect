@@ -213,6 +213,8 @@ class PreciseAssemblyCfg:
     cupgrip_hide_object: bool = True                           # actor object fields = the top cup's reset pose
     cupgrip_drag_penalty: float = 200.0
     cupgrip_slip_penalty: float = 200.0
+    finger_compliant_stiffness: float = 0.0   # > 0: soft fingertip links (PhysX compliant contact, N/m): touch depth grows with force
+    finger_compliant_damping: float = 0.0
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
