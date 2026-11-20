@@ -73,6 +73,14 @@ def setup(env) -> None:
     st["lift_done"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
     st["pinch_done"] = torch.zeros(N, dtype=torch.bool, device=dev)
     st["pinch"] = torch.zeros(N, dtype=torch.bool, device=dev)
+    # scooping: trips = deposit events (in-bin count rises; one per hand visit to the bin, every rise while the hand
+    # is away also counts); over budget = fail "collect_trips"
+    st["trips"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["near"] = torch.zeros(N, dtype=torch.bool, device=dev)
+    st["visit_dep"] = torch.zeros(N, dtype=torch.bool, device=dev)
+    st["prev_n_in"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["trips_over"] = torch.zeros(N, dtype=torch.bool, device=dev)
+    st["multi_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     env._collect = st
     print(f"[collect] slots {types}, N range {n_range}, bin rim {st['rim']*1000:.1f} mm, "
           f"inner floor {[round(float(x)*1000, 1) for x in st['inner_floor']]} mm", flush=True)
@@ -193,6 +201,10 @@ def reset(env, env_ids: torch.Tensor) -> None:
     st["fell"][env_ids] = False
     st["n_in_ep_max"][env_ids] = 0
     st["n_held_max"][env_ids] = 0
+    for k in ("trips", "prev_n_in", "multi_max"):
+        st[k][env_ids] = 0
+    for k in ("near", "visit_dep", "trips_over"):
+        st[k][env_ids] = False
 
 
 BANK_KEYS = ("joint_pos", "joint_vel", "cur_targets", "prev_targets", "hole_pos", "hole_quat", "ut_pos", "ut_quat",
@@ -335,6 +347,7 @@ def update(env) -> None:
     d_act = torch.where(active, dft, big).min(1).values
     release = all_in.float() * (d_act / float(c.collect_release_d)).clamp(0, 1)
     phi = phi + float(c.collect_rew_release) * release
+    phi = phi + float(c.collect_rew_multi) * (lifted.sum(1) - 1).clamp(min=0).float()   # scooping: carried together
     r = torch.where(st["fresh"], torch.zeros_like(phi), phi - st["prev_phi"])
     # one-time bonus the first time each utensil is lifted (> 2 cm, out of the bin) in an episode
     new_lift = lifted & ~st["lift_done"] & ~st["fresh"].unsqueeze(1)
@@ -343,6 +356,26 @@ def update(env) -> None:
     new_pinch = pinch & ~st["pinch_done"] & ~st["fresh"]
     st["pinch_done"] |= pinch
     r = r + float(c.collect_pinch_bonus) * new_pinch.float()
+    # scooping: one-time bonus per new simultaneous-carry maximum (2nd, 3rd ... utensil held at once)
+    n_lift = lifted.sum(1)
+    new_max = torch.maximum(st["multi_max"], n_lift)
+    gain = (new_max.clamp(min=1) - st["multi_max"].clamp(min=1)).clamp(min=0)
+    r = r + float(c.collect_multi_bonus) * gain.float() * (~st["fresh"]).float()
+    st["multi_max"] = new_max
+    # trips
+    palm = env.robot.data.body_pos_w[:, env._palm_body_id] - env.scene.env_origins
+    near = (palm[:, :2] - env.hole_pos[:, :2]).norm(dim=-1) < float(c.collect_trip_near_m)
+    entered = near & ~st["near"]
+    st["visit_dep"] = st["visit_dep"] & ~entered
+    rose = (n_in > st["prev_n_in"]) & ~st["fresh"]
+    dep = rose & (~near | ~st["visit_dep"])
+    st["trips"] = st["trips"] + dep.long()
+    st["visit_dep"] = st["visit_dep"] | (rose & near)
+    st["near"] = near
+    st["prev_n_in"] = n_in
+    if int(c.collect_per_trip) > 0:
+        budget = (st["n_active"] + int(c.collect_per_trip) - 1) // int(c.collect_per_trip)
+        st["trips_over"] = st["trips"] > budget
     st["prev_phi"] = phi
     st["fresh"][:] = False
     st["rew"] = r

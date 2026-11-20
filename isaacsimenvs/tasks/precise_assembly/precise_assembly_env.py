@@ -1190,7 +1190,11 @@ class PreciseAssemblyEnv(PlayEnv):
         if pih_cfg.collect:
             max_successes = self._collect["success"].clone()
             collect_fell = self._collect["fell"] & ~max_successes
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | collect_fell
+        collect_trips = torch.zeros_like(fall)
+        if pih_cfg.collect:
+            collect_trips = self._collect["trips_over"] & ~max_successes & ~collect_fell
+        terminated = (fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | collect_fell
+                      | collect_trips)
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1201,6 +1205,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "disturbed": disturbed,
             "crushed": crushed,
             "collect_fell": collect_fell,
+            "collect_trips": collect_trips,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1310,6 +1315,7 @@ class PreciseAssemblyEnv(PlayEnv):
         pen = self._reward_terms["kuka_actions_penalty"] + self._reward_terms["hand_actions_penalty"]
         succ = t["max_successes"].float() * float(c.collect_success_bonus)
         fell = -t["collect_fell"].float() * float(c.collect_fall_penalty)
+        fell = fell - t["collect_trips"].float() * float(c.collect_trip_penalty)
         reward = pen + st["rew"] + succ + fell
         base = torch.zeros_like(reward)
         if float(c.collect_base_reward_scale) > 0.0:
@@ -1357,7 +1363,9 @@ class PreciseAssemblyEnv(PlayEnv):
                         "frac_in": st["n_in"].float() / st["n_active"].clamp_min(1).float(),
                         "n_in_ep_max": st["n_in_ep_max"].float(), "n_held_max": st["n_held_max"].float(),
                         "pinched": st["pinch_done"].float(),
-                        "fell": self._termination_reasons["collect_fell"].float()}
+                        "fell": self._termination_reasons["collect_fell"].float(),
+                        "trips": st["trips"].float(), "multi_max": st["multi_max"].float(),
+                        "trips_over": self._termination_reasons["collect_trips"].float()}
         else:
             sf_extra = {}
         sf = {"task": task, "all_goals": all_goals, "any_goal": (self._successes >= 1).float(),

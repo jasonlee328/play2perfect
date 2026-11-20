@@ -236,6 +236,12 @@ class PreciseAssemblyCfg:
     collect_rew_pinch: float = 0.0                  # potential while thumb + another pad touch the same out-of-bin utensil
     collect_pinch_d: float = 0.025                  # fingertip (DP origin) to nearest utensil surface point, pinch test (m)
     collect_pinch_bonus: float = 0.0                # one-time per episode, first pinch
+    # scooping (user 11-20: several utensils per carry, never one at a time)
+    collect_per_trip: int = 0                       # > 0: trip budget ceil(N / per_trip); more deposit trips = fail
+    collect_trip_near_m: float = 0.15               # palm within this xy distance of the bin centre = one bin visit
+    collect_rew_multi: float = 0.0                  # potential per utensil carried beyond the first, at the same time
+    collect_multi_bonus: float = 0.0                # one-time bonus per new simultaneous-carry maximum above 1
+    collect_trip_penalty: float = 200.0             # terminal penalty for going over the trip budget
     collect_lift_bonus: float = 0.0                 # one-time per utensil and episode, first lift > 2 cm out of the bin
     collect_bank_file: str = ""                     # start-state bank (record_collect_bank.py); "" = off
     collect_bank_frac: float = 0.0                  # share of resets that start from the bank
