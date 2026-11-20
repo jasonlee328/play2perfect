@@ -228,6 +228,7 @@ class PreciseAssemblyCfg:
     collect_bank_ramp_offset_steps: int = 0
     collect_fall_penalty: float = 300.0
     collect_obs: bool = True                    # field collect_obs (8 per slot) in obs_list + state_list
+    collect_obs_pad: int = 0                    # > 8: fixed slot layout (collect_obs = 8 slots + collect_obs_x)
     collect_friction: tuple[float, float] = (0.6, 0.5)  # parts + bin (static, dynamic): PLA, official manifest.yaml
 
 

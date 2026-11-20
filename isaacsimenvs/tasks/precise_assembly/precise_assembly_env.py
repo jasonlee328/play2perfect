@@ -345,10 +345,23 @@ class PreciseAssemblyEnv(PlayEnv):
             self._collect_cfg = (tuple(problem.collect_n_range) or (1, 1 + len(problem.distractors)),
                                  dict(problem.collect_bin))
             if cfg.precise_assembly.collect_obs:
-                OBS_FIELD_SIZES["collect_obs"] = 8 * (1 + len(problem.distractors))
+                K = 1 + len(problem.distractors)
+                pad = int(cfg.precise_assembly.collect_obs_pad)
+                fields = ["collect_obs"]
+                if pad > 0:
+                    # fixed layout for every problem: collect_obs = slots 0-7 (64), collect_obs_x = slots 8..pad-1
+                    # (zeros where a problem has fewer slots); a separate trailing field so 8-slot checkpoints warm-start
+                    if K > pad:
+                        raise ValueError(f"collect_obs_pad {pad} < {K} slots")
+                    OBS_FIELD_SIZES["collect_obs"] = 8 * 8
+                    OBS_FIELD_SIZES["collect_obs_x"] = 8 * (pad - 8)
+                    fields.append("collect_obs_x")
+                else:
+                    OBS_FIELD_SIZES["collect_obs"] = 8 * K
                 for lst in ("obs_list", "state_list"):
-                    if "collect_obs" not in getattr(cfg.obs, lst):
-                        setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "collect_obs"))
+                    for f in fields:
+                        if f not in getattr(cfg.obs, lst):
+                            setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), f))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)

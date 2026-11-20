@@ -370,7 +370,13 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
     if "collect_obs" in OBS_FIELD_SIZES and getattr(env, "_collect", None) is not None:
-        obs_clean["collect_obs"] = env._collect.obs(palm_pos)
+        co = env._collect.obs(palm_pos)
+        if "collect_obs_x" in OBS_FIELD_SIZES:
+            n8, nx = OBS_FIELD_SIZES["collect_obs"], OBS_FIELD_SIZES["collect_obs_x"]
+            co = torch.nn.functional.pad(co, (0, n8 + nx - co.shape[1]))
+            obs_clean["collect_obs"], obs_clean["collect_obs_x"] = co[:, :n8], co[:, n8:]
+        else:
+            obs_clean["collect_obs"] = co
 
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
