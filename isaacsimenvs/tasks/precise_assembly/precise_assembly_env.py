@@ -75,6 +75,17 @@ class PreciseAssemblyEnv(PlayEnv):
 
         super().__init__(cfg, render_mode, **kwargs)
 
+        # A21 eval-only (OOD physics): override the object's mass (inertia scaled alike), as A12's object_mass_kg
+        m_scale = float(getattr(cfg.precise_assembly, "object_mass_scale", 1.0))
+        if m_scale != 1.0:
+            view = self.object.root_physx_view
+            ids = torch.arange(self.num_envs, dtype=torch.int32)
+            m0 = view.get_masses().clone(); i0 = view.get_inertias().clone()
+            view.set_masses(m0 * m_scale, ids); view.set_inertias(i0 * m_scale, ids)
+            if hasattr(self, "cg_m1"):
+                self.cg_m1 = self.cg_m1 * m_scale
+            print(f"[PreciseAssemblyEnv] object mass {float(m0[0].sum()) * 1e3:.2f} g x{m_scale}", flush=True)
+
         # When student_obs is enabled, the env exposes three obs groups via
         # `_get_observations`: "policy" = student obs (image+proprio, what
         # the depth-CNN reads), "critic" = state_list (privileged), and

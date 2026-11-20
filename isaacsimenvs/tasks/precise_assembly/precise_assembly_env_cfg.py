@@ -184,6 +184,7 @@ class PreciseAssemblyCfg:
     cupgrip_glo_range_N: tuple[float, float] = (0.5, 5.0)      # window mode: hidden minimum squeeze G_lo, log-uniform
     cupgrip_slip_steps: int = 5                                # window mode: low-squeeze lifting steps = "slipped"
     cupgrip_slip_lift_mm: float = 0.0                          # >0: window-mode slip by lift distance under low squeeze (any speed)
+    object_mass_scale: float = 1.0                             # eval-only OOD physics: object mass x scale (inertia alike)
     cupgrip_cue_ratio: float = 0.0                             # touch-only incipient-slip cue below ratio x G_lo (0 off)
     cupgrip_lost_fail: bool = False                            # tossed / knocked-off / tilted top cup = "slipped"
     cupgrip_lost_tilt_deg: float = 45.0
