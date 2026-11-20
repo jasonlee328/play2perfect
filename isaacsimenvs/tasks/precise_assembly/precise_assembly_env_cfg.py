@@ -215,6 +215,8 @@ class PreciseAssemblyCfg:
     collect_w_carry_v2: float = 200.0            # x improvement of a lifted part's distance to the drop point (m)
     collect_w_bin_v2: float = 1000.0             # per part entering the bin (minus per part leaving)
     collect_w_release_v2: float = 200.0          # x change of clamp(min fingertip distance / 5 cm) once all are in
+    collect_w_hold: float = 0.0                 # per step while the lifted target is grasped and not yet in the bin
+    collect_drop_penalty: float = 0.0           # per lifted part that falls back onto the table
     collect_success_bonus: float = 2000.0
     # start-state bank (tools/contactbench/fastener_bank.py): share collect_bank_prob of resets start from a recorded
     # state with the target part grasped and lifted (ramps to collect_bank_prob_final over collect_bank_ramp_steps)

@@ -370,7 +370,9 @@ class CollectManager:
         # a latched part back on the table (not in the bin) unlatches: it can be re-approached / re-lifted, but the lift
         # bonus is once per part and carry pays only progress past its best distance (no farming)
         on_table = (pos[..., 2] - self.z0 < 0.01) & ~self.in_bin
+        dropped = (self.latched & on_table & self.active).sum(1).float()     # lifted parts fallen back to the table
         self.latched &= ~on_table
+        hold = (self.latched[ar, self.target] & grasped & ~self.in_bin[ar, self.target]).float()
         drop = self.drop_point_w() - env.scene.env_origins
         dd = (pos - drop.unsqueeze(1)).norm(dim=-1)                                  # (N, K)
         carry_on = self.latched & ~self.in_bin & self.active
@@ -385,7 +387,8 @@ class CollectManager:
         self.rterms = dict(ft=float(c.collect_w_ftdelta) * r_ft, lift=float(c.collect_w_lift_dense) * r_lift,
                            lift_bonus=float(c.collect_lift_bonus) * bonus_new.float(),
                            carry=float(c.collect_w_carry_v2) * r_carry, bin=float(c.collect_w_bin_v2) * d_in,
-                           release=float(c.collect_w_release_v2) * r_rel)
+                           release=float(c.collect_w_release_v2) * r_rel,
+                           hold=float(c.collect_w_hold) * hold, drop=-float(c.collect_drop_penalty) * dropped)
         self.grasped = grasped
 
     # ------------------------------------------------------------------ outputs
