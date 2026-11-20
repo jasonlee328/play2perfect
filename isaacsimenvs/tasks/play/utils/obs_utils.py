@@ -359,6 +359,14 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             elif override != "none":
                 raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
 
+    if "wipe_hint" in OBS_FIELD_SIZES:
+        w = getattr(env, "_wipe", None)
+        if w is not None and hasattr(w, "inwin"):
+            obs_clean["wipe_hint"] = torch.stack([w.win_lo / 10.0, w.win_hi / 10.0, (w.F / 10.0).clamp(max=2.0),
+                                                  w.inwin.float()], dim=-1)
+        else:
+            obs_clean["wipe_hint"] = torch.zeros(env.num_envs, 4, device=env.device)
+
     if "distractor_obs" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
         idx = getattr(env, "_obs_distractor_idx", None)
         bodies = env.distractors if idx is None else [env.distractors[i] for i in idx]

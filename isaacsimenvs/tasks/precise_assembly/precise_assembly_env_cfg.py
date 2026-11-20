@@ -139,6 +139,7 @@ class PreciseAssemblyCfg:
     wipe_window_lo_range_N: tuple = ()      # hidden per-episode force window low edge U(lo, hi) N; () = fixed window
     wipe_window_width_N: float = 1.5         # width of the hidden per-episode window
     wipe_inwin_cue: float = 0.0              # touch-only in-window texture (checkerboard amplitude on pads in contact)
+    wipe_hint_obs: bool = False              # privileged oracle actor/critic field wipe_hint = [win_lo/10, win_hi/10, F/10, in-window]
     wipe_ink_scaled_goal_rew: bool = False   # board goal bonus + keypoint reward x ink fraction erased so far
     wipe_curr_offset_steps: int = 0
     wipe_curr_fail_F_start: float = 30.0
