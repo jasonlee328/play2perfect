@@ -354,6 +354,12 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "collect_obs" in OBS_FIELD_SIZES and hasattr(env, "_collect"):
+        from isaacsimenvs.tasks.precise_assembly.collect import obs as _collect_obs
+        obs_clean["collect_obs"] = _collect_obs(env, palm_pos)
+    elif "collect_obs" in OBS_FIELD_SIZES:
+        obs_clean["collect_obs"] = torch.zeros(env.num_envs, OBS_FIELD_SIZES["collect_obs"], device=env.device)
+
     if "fixture_pose_rel_palm" in OBS_FIELD_SIZES and hasattr(env, "hole_pos"):
         obs_clean["fixture_pose_rel_palm"] = torch.cat([env.hole_pos - palm_pos, env.hole_quat_wxyz], dim=-1)
 

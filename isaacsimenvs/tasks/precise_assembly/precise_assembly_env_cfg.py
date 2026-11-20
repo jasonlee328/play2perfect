@@ -193,6 +193,45 @@ class PreciseAssemblyCfg:
     strict_neat_step_tol: float = 0.0015
     strict_ref_local: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
+    # Bin / fixture yaw centre (deg): yaw ~ hole_yaw_center_deg + U(-hole_yaw_range_deg, +hole_yaw_range_deg).
+    hole_yaw_center_deg: float = 0.0
+    # Table URDF override ("" = assets/urdf/table_narrow.urdf, 475 x 400 mm). collect uses table_collect.urdf (650 x 500).
+    table_urdf: str = ""
+
+    # A18 collect utensils (ContactBench task 7; tools/contactbench/collect_tasks.py, isaacsimenvs/tasks/precise_assembly
+    # /collect.py). Slot 0 = the object, slots 1.. = distractors (problem.collect_json gives types / bin / rest poses).
+    # Each reset: N ~ U{lo..hi} active utensils (slot 0 always), placed flat (rest pose) at random non-overlapping poses
+    # in collect_region (table frame, m, centre xy), yaw ~ center +- range; the rest parked under the table. Success
+    # (official task-2 rules): every active utensil's lowest point inside the bin's inner footprint and <= 10 mm above
+    # the rim, all at rest (< 5 mm/s), no hand contact (pads + whole-hand skin) and palm slower than collect_palm_speed
+    # for collect_clear_steps consecutive steps.
+    collect: bool = False
+    collect_n_range: tuple[int, ...] = ()            # () = the problem's n_range
+    collect_n_curriculum_steps: int = 0             # > 0: max N ramps from collect_n_start_max to hi over these steps
+    collect_n_curriculum_offset_steps: int = 0
+    collect_n_start_max: int = 1
+    collect_region: tuple[float, float, float, float] = (-0.27, 0.0, -0.10, 0.18)
+    collect_yaw_center_deg: float = 90.0
+    collect_yaw_range_deg: float = 45.0
+    collect_gap_m: float = 0.006
+    collect_bin_margin_m: float = 0.03
+    collect_drop_m: float = 0.002
+    collect_obs_slots: int = 8                      # collect_obs is padded to this many slots (same obs for all problems)
+    collect_clear_steps: int = 10
+    collect_palm_speed: float = 0.05
+    collect_contact_thresh: float = 0.0
+    collect_rew_in: float = 100.0                   # potential per utensil in the bin
+    collect_rew_lift: float = 20.0                  # potential for raising an out-of-bin utensil (up to collect_lift_h)
+    collect_rew_carry: float = 40.0                 # potential for bringing a lifted (> 2 cm) utensil over the bin
+    collect_rew_reach: float = 20.0                 # potential for a fingertip near the nearest out-of-bin utensil
+    collect_rew_release: float = 50.0               # potential for fingertips away from the utensils once all are in
+    collect_lift_h: float = 0.08
+    collect_carry_d: float = 0.4
+    collect_reach_d: float = 0.3
+    collect_release_d: float = 0.08
+    collect_success_bonus: float = 500.0
+    collect_fall_penalty: float = 200.0
+
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:
     """Return a render-overlay-compatible sim cfg for teacher and student tasks."""

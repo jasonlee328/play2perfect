@@ -129,6 +129,9 @@ class Problem:
     object_start_pose_rel_receptive: Tuple[float, ...] = ()
     # Revolute joints to the fixture (JointSpec), e.g. a dial knob (body "object") or a screw (a distractor).
     joints: Tuple["JointSpec", ...] = ()
+    # A18 collect-utensils task (tools/contactbench/collect_tasks.py): JSON with slot types, active-count range, bin
+    # inner footprint and per-type rest pose / point sample. Empty = not a collect problem.
+    collect_json: str = ""
 
     def __post_init__(self) -> None:
         poses = self._normalize_pose_sequence(self.insert_pose_rel_receptive)

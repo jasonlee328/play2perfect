@@ -344,7 +344,15 @@ class PreciseAssemblyEnv(PlayEnv):
         cfg.assets.object_urdf = self._pih_object_urdf_abs
         cfg.assets.receptive_urdf = self._pih_receptive_urdf_abs
         cfg.assets.object_scale = self._pih_object_scale
-        cfg.assets.table_urdf = "assets/urdf/table_narrow.urdf"
+        cfg.assets.table_urdf = str(pih_cfg.table_urdf) if pih_cfg.table_urdf else "assets/urdf/table_narrow.urdf"
+        if pih_cfg.collect:
+            if not problem.collect_json:
+                raise ValueError(f"precise_assembly.collect=true needs a collect problem, got {problem_name!r}")
+            from .collect import obs_size
+            OBS_FIELD_SIZES["collect_obs"] = obs_size(int(pih_cfg.collect_obs_slots))
+            for lst in ("obs_list", "state_list"):
+                if "collect_obs" not in getattr(cfg.obs, lst):
+                    setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "collect_obs"))
 
         random_max = int(pih_cfg.random_goal_max_successes)
         if random_goal_fraction > 0.0:
@@ -415,10 +423,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self.hole_pos[rg_ids, 2] = -1.0
 
         yaw_range_deg = float(pih_cfg.hole_yaw_range_deg)
-        if yaw_range_deg > 0.0:
-            yaw = (
+        yaw_center_deg = float(pih_cfg.hole_yaw_center_deg)
+        if yaw_range_deg > 0.0 or yaw_center_deg != 0.0:
+            yaw = ((
                 torch.rand(n, device=self.device) * 2.0 - 1.0
-            ) * yaw_range_deg * (math.pi / 180.0)
+            ) * yaw_range_deg + yaw_center_deg) * (math.pi / 180.0)
             z_axis = torch.tensor(
                 [0.0, 0.0, 1.0], device=self.device, dtype=torch.float32
             ).expand(n, -1)
@@ -496,6 +505,10 @@ class PreciseAssemblyEnv(PlayEnv):
 
         if pih_cfg.start_state_file and insertion_mask.any():
             self._apply_start_states(env_ids[insertion_mask])
+
+        if pih_cfg.collect:
+            from . import collect as _collect
+            _collect.reset(self, env_ids)
 
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
@@ -1047,6 +1060,12 @@ class PreciseAssemblyEnv(PlayEnv):
         if pih_cfg.allow_goal_skip:
             self._apply_goal_skip()
         is_success = self._is_success.clone()
+        if pih_cfg.collect:
+            from . import collect as _collect
+            if not hasattr(self, "_collect"):
+                _collect.setup(self)
+            _collect.update(self)
+            is_success = torch.zeros_like(is_success)   # the goal-pose machinery is unused; success = collect rule
         if pih_cfg.enable_retract:
             is_success &= ~self.retract_phase
         is_success = self._apply_strict_success(is_success)
@@ -1159,7 +1178,11 @@ class PreciseAssemblyEnv(PlayEnv):
         crushed = torch.zeros_like(fall)
         if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and hasattr(self, "_crush_count"):
             crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed
+        collect_fell = torch.zeros_like(fall)
+        if pih_cfg.collect:
+            max_successes = self._collect["success"].clone()
+            collect_fell = self._collect["fell"] & ~max_successes
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | collect_fell
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1169,6 +1192,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "dropped": dropped,
             "disturbed": disturbed,
             "crushed": crushed,
+            "collect_fell": collect_fell,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1176,6 +1200,8 @@ class PreciseAssemblyEnv(PlayEnv):
     def _get_rewards(self) -> torch.Tensor:
         reward = compute_rewards(self)
         pih_cfg = self.cfg.precise_assembly
+        if pih_cfg.collect:
+            return self._collect_rewards()
 
         mean_rg_eps = 0.0
         if self.is_random_goal_env.any():
@@ -1269,6 +1295,29 @@ class PreciseAssemblyEnv(PlayEnv):
         self._log_peg_metrics()
         return reward
 
+    def _collect_rewards(self) -> torch.Tensor:
+        """collect: action penalties + potential-shaped collect reward + success bonus - fell penalty."""
+        c, st = self.cfg.precise_assembly, self._collect
+        t = self._termination_reasons
+        pen = self._reward_terms["kuka_actions_penalty"] + self._reward_terms["hand_actions_penalty"]
+        succ = t["max_successes"].float() * float(c.collect_success_bonus)
+        fell = -t["collect_fell"].float() * float(c.collect_fall_penalty)
+        reward = pen + st["rew"] + succ + fell
+        self._reward_terms = {
+            "kuka_actions_penalty": self._reward_terms["kuka_actions_penalty"],
+            "hand_actions_penalty": self._reward_terms["hand_actions_penalty"],
+            "collect_shaped": st["rew"], "collect_success_bonus": succ, "collect_fell_penalty": fell,
+            "total_reward": reward,
+        }
+        self.extras["collect_n_active"] = st["n_active"].float().mean()
+        self.extras["collect_frac_in"] = (st["n_in"].float() / st["n_active"].clamp_min(1).float()).mean()
+        self.extras["collect_contact"] = st["contact"].float().mean()
+        from .collect import _n_hi_now
+        self.extras["collect_n_hi"] = float(_n_hi_now(self))
+        log_step_metrics(self)
+        self._log_peg_metrics()
+        return reward
+
     def _log_peg_metrics(self) -> None:
         success_ratio = self._successes.float() / self.env_max_goals.clamp_min(1).float()
         all_goals_hit = self._successes >= self.env_max_goals
@@ -1284,9 +1333,19 @@ class PreciseAssemblyEnv(PlayEnv):
         # and the release check when retract is on); any_goal = reached at least one goal ("succeeded once").
         all_goals = all_goals_hit.float()
         task = (self.retract_succeeded.float() if self.cfg.precise_assembly.enable_retract else all_goals)
+        if self.cfg.precise_assembly.collect and hasattr(self, "_collect"):
+            st = self._collect
+            task = st["success"].float()
+            all_goals = task
+            sf_extra = {"n_active": st["n_active"].float(), "n_in": st["n_in"].float(),
+                        "frac_in": st["n_in"].float() / st["n_active"].clamp_min(1).float(),
+                        "n_in_ep_max": st["n_in_ep_max"].float(), "n_held_max": st["n_held_max"].float(),
+                        "fell": self._termination_reasons["collect_fell"].float()}
+        else:
+            sf_extra = {}
         sf = {"task": task, "all_goals": all_goals, "any_goal": (self._successes >= 1).float(),
               "goals_reached": self._successes.float(), "goals_total": self.env_max_goals.float(),
-              "goals_frac": success_ratio}
+              "goals_frac": success_ratio, **sf_extra}
         if hasattr(self, "distractor_disp_ep_max"):
             sf["neighbours_moved_cm"] = self.distractor_moved_ep_max * 100.0
             sf["neighbours_out_of_box_cm"] = self.distractor_disp_ep_max * 100.0
