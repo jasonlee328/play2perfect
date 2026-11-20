@@ -239,9 +239,15 @@ class RetrieveTask:
                 mu = torch.tensor(vals, dtype=torch.float32)[idx]
                 self.card_mu = mu.to(env.device)
                 all_ids = torch.arange(env.num_envs)
+                jit = float(getattr(self.c, "retr_fric_card_jitter", 0.0))
+                self.card_mu_each = []
                 for b in [env.object] + list(env.distractors):
+                    # per-card jitter (DR): each card gets its own friction around the env's value, so neighbouring
+                    # cards can stick to each other more than to the next one (double-pull when pressed too hard)
+                    mb = (mu + (2 * torch.rand(env.num_envs) - 1) * jit).clamp(min=0.02) if jit > 0 else mu
+                    self.card_mu_each.append(mb.to(env.device))
                     m = b.root_physx_view.get_material_properties()
-                    m[:, :, 0] = mu[:, None]; m[:, :, 1] = mu[:, None]
+                    m[:, :, 0] = mb[:, None]; m[:, :, 1] = mb[:, None]
                     b.root_physx_view.set_material_properties(m, all_ids)
             K = len(env.distractors)
             self.deck_ref_p = torch.zeros(K, env.num_envs, 3, device=env.device)
@@ -251,6 +257,7 @@ class RetrieveTask:
             q = torch.tensor([[pose[6], pose[3], pose[4], pose[5]]], device=env.device)
             self.deck_ref_n[k, env_ids] = self._normal(q)[0]
         self._fresh = env_ids if getattr(self, "_fresh", None) is None else torch.cat([self._fresh, env_ids])
+        self._rise_fresh = env_ids if getattr(self, "_rise_fresh", None) is None else torch.cat([self._rise_fresh, env_ids])
 
     def _forces(self):
         N = self.env.num_envs
@@ -373,6 +380,14 @@ class RetrieveTask:
             neat &= (disp < c.retr_other_disp_max * tol_k) & (tilt < c.retr_other_tilt_max * tol_k) & in_slot
             disp_max = torch.maximum(disp_max, disp); tilt_max = torch.maximum(tilt_max, tilt)
         self.deck_disp, self.deck_tilt = disp_max, tilt_max
+        rises = [(self._rel_hole(b.data.root_pos_w, b.data.root_quat_w)[0][:, 2] - self.deck_ref_p[k][:, 2]) for k, b in enumerate(env.distractors)]
+        self.deck_rise = torch.stack(rises, -1)   # N x K (m), per deck card
+        if not hasattr(self, "deck_rise_ep") or self.deck_rise_ep.shape != self.deck_rise.shape:
+            self.deck_rise_ep = torch.zeros_like(self.deck_rise)
+        fr = getattr(self, "_rise_fresh", None)
+        if fr is not None:
+            self.deck_rise_ep[fr] = 0.0; self._rise_fresh = None
+        self.deck_rise_ep = torch.maximum(self.deck_rise_ep, self.deck_rise)
         flat = nc[:, 2].abs() > 0.95
         on_table = pc[:, 2] < 0.004
         outside = pc[:, 0] > 0.0
@@ -425,7 +440,9 @@ class RetrieveTask:
             lock_m = {}
         self.meas = dict(**lock_m, card_mu=mu_m, rise_mm=rise * 1e3, rise_max_mm=self.rise_max * 1e3, deck_disp_mm=disp_max * 1e3, deck_tilt_deg=tilt_max,
                          card_z_mm=pc[:, 2] * 1e3, card_x_mm=pc[:, 0] * 1e3, flat_cos=nc[:, 2].abs(), f_press=self.f_press,
-                         f_press_ep_max=self.f_press_ep_max, f_rob_deck=f_rob_deck, f_card_env=f_card_env,
+                         f_press_ep_max=self.f_press_ep_max, deck_rise_max_mm=self.deck_rise_ep.max(-1).values * 1e3,
+                         **({f"mu_card{k}": m for k, m in enumerate(self.card_mu_each)} if hasattr(self, "card_mu_each") else {}),
+                         **{f"deck_rise{k}_mm": self.deck_rise_ep[:, k] * 1e3 for k in range(self.deck_rise.shape[1])}, f_rob_deck=f_rob_deck, f_card_env=f_card_env,
                          palm_from_release=moved * self.released.float(), reach_dist_mm=self.reach_dist * 1e3, lifted=self.lifted.float(), released=self.released.float())
 
     def reward(self, tr):
