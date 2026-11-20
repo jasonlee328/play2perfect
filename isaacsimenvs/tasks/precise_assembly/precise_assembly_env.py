@@ -1321,6 +1321,15 @@ class PreciseAssemblyEnv(PlayEnv):
                     u_rew = u_rew - float(pih_cfg.usb_win_thumb_rew_scale) * (1.0 - fw) * usb.win.float()
                 else:
                     u_rew = u_rew + float(pih_cfg.usb_win_thumb_rew_scale) * fw * usb.win.float()
+            if float(getattr(pih_cfg, "usb_clear_pot_scale", 0.0)) > 0.0:
+                # potential on the palm's distance from its release point (capped): pays moving away past the 40 mm
+                # released_and_clear line once, cannot be farmed by hovering
+                phc = usb.meas["palm_from_release"].clamp(max=float(getattr(pih_cfg, "usb_clear_pot_cap", 0.06)))
+                if not hasattr(usb, "phc_prev"):
+                    usb.phc_prev = phc.clone()
+                d_c = torch.where((usb.step <= 1) | ~usb.released, torch.zeros_like(phc), phc - usb.phc_prev)
+                usb.phc_prev = phc.clone()
+                u_rew = u_rew + float(pih_cfg.usb_clear_pot_scale) * d_c
             if float(getattr(pih_cfg, "usb_step_penalty", 0.0)) > 0.0:
                 u_rew = u_rew - float(pih_cfg.usb_step_penalty) * (~usb.released).float()
             if float(getattr(pih_cfg, "usb_seat_fine_rew_scale", 0.0)) > 0.0:
