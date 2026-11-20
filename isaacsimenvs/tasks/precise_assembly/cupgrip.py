@@ -96,6 +96,10 @@ def reset(env, env_ids: torch.Tensor) -> None:
     if str(c.cupgrip_mode) == "window":
         # modelled grip window: no physical retention (the arm feels only the 15 g cup); hidden minimum squeeze G_lo
         glo, ghi = (float(v) for v in c.cupgrip_glo_range_N)
+        if rs > 0:   # same curriculum knobs as S: the G_lo upper bound grows from cupgrip_retain_start_hi_N to ghi
+            fg = min(1.0, (int(env.common_step_counter) + int(c.cupgrip_retain_ramp_offset_steps)) / rs)
+            ghi = math.exp(math.log(float(c.cupgrip_retain_start_hi_N)) * (1.0 - fg) + math.log(ghi) * fg)
+            env.cg_S_hi = ghi
         u2 = torch.rand(n, device=env.device)
         env.cg_G[env_ids] = torch.exp(math.log(glo) + u2 * (math.log(ghi) - math.log(glo))) if ghi > glo else glo
         env.cg_S[env_ids] = 0.0
