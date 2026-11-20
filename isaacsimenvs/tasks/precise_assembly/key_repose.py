@@ -123,6 +123,8 @@ class KeyRepose:
         tw = torch.stack([dq[:, 0], dq[:, 1], torch.zeros_like(dq[:, 0]), torch.zeros_like(dq[:, 0])], -1)
         tw = tw / tw.norm(dim=-1, keepdim=True).clamp_min(1e-9)
         self.twist_err = torch.rad2deg(2.0 * torch.acos(tw[:, 0].abs().clamp(max=1.0)))
+        ts = 2.0 * torch.atan2(tw[:, 1], tw[:, 0])
+        self.twist_signed = torch.atan2(torch.sin(ts), torch.cos(ts))   # rad, key-frame x, current goal -> key
         sw = quat_mul(dq, quat_conjugate(tw))
         self.swing_err = torch.rad2deg(2.0 * torch.acos(sw[:, 0].abs().clamp(max=1.0)))
         last = torch.full_like(k, self.flip.numel() - 1)

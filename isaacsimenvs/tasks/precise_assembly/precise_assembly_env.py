@@ -715,6 +715,7 @@ class PreciseAssemblyEnv(PlayEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
         self._apply_joint_detents()
+        self._key_assist()
         if getattr(self, "_usb", None) is not None:
             self._usb._set_push()   # after the wrench-DR write (it overwrites the object's external force)
 
@@ -1039,6 +1040,37 @@ class PreciseAssemblyEnv(PlayEnv):
             self._is_success[jump] = True
             self._skip_cand[jump] = -1
             self._skip_steps[jump] = 0
+
+    def _key_assist(self) -> None:
+        """A13 curriculum (training aid, evals run with it off): torque on the key about its own long axis (object +x)
+        toward the current goal's twist, k sign(-twist) - d w_x, scaled by f = 1 -> 0 over key_assist_ramp_steps."""
+        pc = self.cfg.precise_assembly
+        k0 = float(getattr(pc, "key_assist_torque", 0.0))
+        key = getattr(self, "_key", None)
+        if k0 <= 0.0 or key is None or not hasattr(key, "twist_signed"):
+            return
+        ramp = float(getattr(pc, "key_assist_ramp_steps", 0))
+        step = float(self.common_step_counter) + float(getattr(pc, "key_assist_offset_steps", 0))
+        f = max(0.0, 1.0 - step / ramp) if ramp > 0.0 else 1.0
+        self.extras["key_assist_frac"] = torch.tensor(f, device=self.device)
+        if f <= 0.0:
+            return
+        quat = self.object.data.root_quat_w
+        a = quat_apply(quat, torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3))
+        ts = key.twist_signed
+        on = (ts.abs() > math.radians(float(getattr(pc, "key_assist_min_deg", 3.0)))) & ~key.dropped
+        wx = (self.object.data.root_ang_vel_w * a).sum(-1)
+        tau_mag = f * (k0 * (-torch.sign(ts)) * on.float() - float(getattr(pc, "key_assist_damp", 0.002)) * wx)
+        tau = (tau_mag.unsqueeze(-1) * a).unsqueeze(1)
+        fw = getattr(self, "_object_forces", None)
+        tw = getattr(self, "_object_torques", None)
+        zero = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        f_w = zero if fw is None else fw.reshape(self.num_envs, -1, 3)
+        t_w = (zero if tw is None else tw.reshape(self.num_envs, -1, 3)) + tau
+        q_b = quat.unsqueeze(1)
+        self.object.set_external_force_and_torque(quat_apply_inverse(q_b.expand(-1, f_w.shape[1], 4), f_w),
+                                                  quat_apply_inverse(q_b.expand(-1, t_w.shape[1], 4), t_w),
+                                                  is_global=False)
 
     def _key_goal_skip(self, allow: torch.Tensor) -> None:
         """A13 key_goal_skip: if the key is within the goal tolerance of a later intermediate waypoint j (never the

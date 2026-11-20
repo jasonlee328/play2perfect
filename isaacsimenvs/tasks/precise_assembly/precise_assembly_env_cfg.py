@@ -132,6 +132,12 @@ class PreciseAssemblyCfg:
     key_shape_scale: float = 0.0        # > 0: reward scale x (decrease of final twist + w x swing error, rad) per step
     key_shape_swing_w: float = 1.0
     key_waypoint_hold_steps: int = 0    # >0: intermediate flip waypoints need only this many near-goal steps
+    key_assist_torque: float = 0.0      # N m > 0: training aid, torque on the key about its own long axis toward the
+                                        # current goal twist (+ damping on that spin), fading 1 -> 0 over key_assist_ramp_steps
+    key_assist_damp: float = 0.002      # N m s on the spin about the long axis
+    key_assist_ramp_steps: int = 0      # 0 = never fades
+    key_assist_offset_steps: int = 0    # set on a resume (the step counter restarts)
+    key_assist_min_deg: float = 3.0     # no assist torque while |twist error to the current goal| < this
     key_goal_skip: bool = False         # credit every waypoint before a LATER intermediate one the key is already
                                         # within tolerance of (a flat key flops through 45-75 deg); the last goal is never skipped
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
