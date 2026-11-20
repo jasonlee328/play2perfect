@@ -62,6 +62,8 @@ class WipeTask:
         self.erased = torch.zeros(N, self.C, device=d, dtype=torch.bool)
         self.frac = z(); self.new_erased = z()
         self.over_count = z(torch.long)
+        self.passes = z(torch.long)
+        self.need_back = z(torch.bool)
         self.F = z(); self.F_ep_max = z(); self.inwin_steps = z(); self.contact_steps = z()
         self.success = z(torch.bool); self.over_ever = z(torch.bool)
         self.fail = {k: z(torch.bool) for k in ("pressed_too_hard", "dropped", "incomplete")}
@@ -106,6 +108,8 @@ class WipeTask:
                   self.contact_steps):
             t[env_ids] = 0
         self.success[env_ids] = False; self.over_ever[env_ids] = False
+        self.passes[env_ids] = 0
+        self.need_back[env_ids] = False
         if hasattr(self, "a_idx"):
             self.a_idx[env_ids] = 0
         for v in self.fail.values():
@@ -180,7 +184,21 @@ class WipeTask:
         """stroke_done = the last waypoint credited this step -> success / incomplete."""
         ok = stroke_done & (self.frac >= self.succ_frac)
         self.success = ok
-        self.fail["incomplete"] = stroke_done & ~ok
+        mp = int(getattr(self.c, "wipe_max_passes", 1))
+        redo = stroke_done & ~ok & (self.passes + 1 < mp)
+        if redo.any():
+            # another pass: goal back to the first board waypoint (lead-in stays credited); erased ink is kept
+            env = self.env
+            ids = redo.nonzero(as_tuple=False).squeeze(-1)
+            env._successes[ids] = 1
+            self.passes[ids] += 1
+            if hasattr(self, "a_idx"):
+                self.a_idx[ids] = 1
+            self.need_back[ids] = True
+            env.episode_length_buf[ids] = 0
+            env._clear_goal_trackers(ids)
+            env._write_goal_pose(ids, is_first_goal=False)
+        self.fail["incomplete"] = stroke_done & ~ok & ~redo
         return ok
 
     # ------------------------------------------------------------------ actor obs
@@ -229,7 +247,15 @@ class WipeTask:
         # board waypoints are passed in order: count the leading run of passed ones
         run = torch.cumprod(passed, dim=1).sum(dim=1)
         cand = torch.where(started, 1 + run, torch.zeros_like(run)).clamp(max=n - 1)
-        self.a_idx = torch.maximum(self.a_idx, cand)
+        # multi-pass: after a restart the actor goal stays at the first board waypoint until the eraser is back there
+        nb = getattr(self, "need_back", None)
+        if nb is not None and nb.any():
+            nb &= ~(rel[:, 0] <= xs[1] + mg)
+            one = torch.ones_like(cand)
+            cand = torch.where(nb, one, cand)
+            self.a_idx = torch.where(nb, one, torch.maximum(self.a_idx, cand))
+        else:
+            self.a_idx = torch.maximum(self.a_idx, cand)
         gpos = hp + quat_apply(hq, env._insert_pos_rel[self.a_idx])
         gq = quat_mul(hq, env._insert_quat_wxyz[self.a_idx])
         return keypoints_world(gpos, gq, kp_offsets)

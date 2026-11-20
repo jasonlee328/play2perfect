@@ -140,6 +140,7 @@ class PreciseAssemblyCfg:
     wipe_window_width_N: float = 1.5         # width of the hidden per-episode window
     wipe_inwin_cue: float = 0.0              # touch-only in-window texture (checkerboard amplitude on pads in contact)
     wipe_over_cue: float = 0.0             # touch-only above-window stripe texture amplitude on pads in contact
+    wipe_max_passes: int = 1              # > 1: an incomplete stroke restarts at the first board waypoint (ink kept)
     wipe_hint_obs: bool = False              # privileged oracle actor/critic field wipe_hint = [win_lo/10, win_hi/10, F/10, in-window]
     wipe_ink_scaled_goal_rew: bool = False   # board goal bonus + keypoint reward x ink fraction erased so far
     wipe_curr_offset_steps: int = 0
