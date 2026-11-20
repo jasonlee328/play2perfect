@@ -419,6 +419,10 @@ class PreciseAssemblyEnv(PlayEnv):
             self._button_off_np = home[slots] - home[None, :, :]        # (N, B, 3)
             print(f"[PreciseAssemblyEnv] button_mode: {B} keys, target slot counts "
                   f"{np.bincount(tgt, minlength=B).tolist()}", flush=True)
+            ks = [float(v) for v in (pih_cfg.button_k_scale_values or [])]
+            self._button_k_scale_np = (np.array([ks[i % len(ks)] for i in range(n_env)]) if ks else np.ones(n_env))
+            if ks:
+                print(f"[PreciseAssemblyEnv] button k scale per env (hidden): values {ks}", flush=True)
         self._unlock_deg_np = None
         if pih_cfg.unlock_angle_range_deg or pih_cfg.unlock_angle_values_deg:
             import numpy as np
@@ -668,6 +672,22 @@ class PreciseAssemblyEnv(PlayEnv):
         c = self.cfg.precise_assembly
         self._button_update()
         pressed = self.button_travel[0] >= float(c.button_actuate_m)
+        if not hasattr(self, "_button_ks_t"):
+            import numpy as np
+            j0 = self._pih_joints[0]
+            self._button_ks_t = torch.as_tensor(getattr(self, "_button_k_scale_np", None) if getattr(
+                self, "_button_k_scale_np", None) is not None else np.ones(self.num_envs), device=self.device,
+                dtype=torch.float32)
+            self._button_k0, self._button_pre0 = float(j0.stiffness), float(j0.preload)
+        tr0 = self.button_travel[0]
+        self.button_force = torch.where(tr0 > 1e-4, self._button_ks_t * (self._button_pre0 + self._button_k0 * tr0),
+                                        torch.zeros_like(tr0))
+        self.extras["button_force_N"] = self.button_force.mean()
+        if float(c.button_break_ratio) > 0.0:
+            f_act = self._button_ks_t * (self._button_pre0 + self._button_k0 * float(c.button_actuate_m))
+            self.button_crushed = self.button_force > float(c.button_break_ratio) * f_act
+            self.button_wrong = self.button_wrong | self.button_crushed
+            self.extras["button_crushed_frac"] = self.button_crushed.float().mean()
         if c.button_require_pad:
             pressed = pressed & self._button_pad_on_target()
         at_last = (self._successes == self.env_max_goals - 1) & ~self.is_random_goal_env
@@ -2054,6 +2074,10 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["total_reward"] = reward
 
         if pih_cfg.button_mode and hasattr(self, "button_travel"):
+            if float(pih_cfg.button_force_pen) > 0.0 and hasattr(self, "button_force"):
+                fpen = float(pih_cfg.button_force_pen) * self.button_force
+                reward = reward - fpen
+                self._reward_terms["button_force_penalty"] = -fpen
             if float(pih_cfg.button_wrong_penalty) > 0.0:
                 wpen = float(pih_cfg.button_wrong_penalty) * self._termination_reasons["wrong_key"].float()
                 reward = reward - wpen

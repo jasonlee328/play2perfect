@@ -146,8 +146,10 @@ def _create_fixture_joints(env) -> None:
                     jp.CreateLowerLimitAttr(float(j.lower_m))
                 if j.upper_m is not None:
                     jp.CreateUpperLimitAttr(float(j.upper_m))
-                kk = float(j.stiffness) * float(getattr(env, "_button_k_scale", 1.0))
-                pre = float(j.preload) * float(getattr(env, "_button_k_scale", 1.0))
+                ksn = getattr(env, "_button_k_scale_np", None)
+                ksc = float(ksn[i]) if ksn is not None and j.body == "object" else 1.0
+                kk = float(j.stiffness) * ksc
+                pre = float(j.preload) * ksc
                 if kk or j.damping:
                     drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "linear")
                     drive.CreateTypeAttr("force")

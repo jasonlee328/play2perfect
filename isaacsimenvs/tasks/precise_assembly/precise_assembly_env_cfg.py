@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import field
+
 from isaaclab.sim import SimulationCfg
 from isaaclab.utils import configclass
 
@@ -194,6 +196,12 @@ class PreciseAssemblyCfg:
     # graded dead-key penalty per step: button_dead_pen_scale x sum over dead keys of max(0, travel - from) / 1 mm
     button_dead_pen_scale: float = 0.0
     button_dead_pen_from_m: float = 0.0005
+    # A15 force test: hidden per-env key stiffness (env i gets button_k_scale_values[i % K]; scales spring k and preload).
+    # Key force F = s (preload + k travel) while pressed. button_force_pen: per-step penalty x F (N). button_break_ratio
+    # > 0: F > ratio x the env's force at button_actuate_m = termination via wrong_key ("crushed"; button_wrong_penalty).
+    button_k_scale_values: list = field(default_factory=list)
+    button_force_pen: float = 0.0
+    button_break_ratio: float = 0.0
     # PhysX position iterations of the object body (0 = 4, the default). A jointed knob's end stop is soft under the
     # hand's grip at 4 (the screw teacher pushed it 3-7 deg past the limit).
     object_position_iterations: int = 0
