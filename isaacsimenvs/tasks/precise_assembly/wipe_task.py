@@ -91,6 +91,14 @@ class WipeTask:
         self._views = False
 
     def _sample_win(self, env_ids):
+        ho = tuple(getattr(self.c, "wipe_window_holdout_N", ()) or ())
+        if len(ho) == 2:
+            # train range minus a held-out band [a, b) of low edges (interior hold-out)
+            a, b = float(ho[0]), float(ho[1]); w = b - a
+            u = self.lo_rng[0] + (self.lo_rng[1] - w - self.lo_rng[0]) * torch.rand(len(env_ids), device=self.win_lo.device)
+            lo = u + w * (u >= a).float()
+            self.win_lo[env_ids] = lo; self.win_hi[env_ids] = lo + self.win_w
+            return
         lo = self.lo_rng[0] + (self.lo_rng[1] - self.lo_rng[0]) * torch.rand(len(env_ids), device=self.win_lo.device)
         self.win_lo[env_ids] = lo; self.win_hi[env_ids] = lo + self.win_w
 
