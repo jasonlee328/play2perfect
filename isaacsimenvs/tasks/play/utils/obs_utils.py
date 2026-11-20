@@ -351,6 +351,13 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             elif override != "none":
                 raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
 
+    if "cupgrip_hint" in OBS_FIELD_SIZES:
+        G = getattr(env, "cg_G", None)
+        if G is None:
+            obs_clean["cupgrip_hint"] = torch.zeros(env.num_envs, 2, device=env.device)
+        else:
+            sq = getattr(env, "hand_force_xy", torch.zeros_like(G))
+            obs_clean["cupgrip_hint"] = torch.stack([G / 6.0, (sq / G.clamp(min=1e-3)).clamp(0.0, 3.0) / 3.0], -1)
     if "distractor_obs" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
         idx = getattr(env, "_obs_distractor_idx", None)
         bodies = env.distractors if idx is None else [env.distractors[i] for i in idx]

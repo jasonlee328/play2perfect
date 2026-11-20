@@ -328,6 +328,12 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if bool(getattr(cfg.precise_assembly, "cupgrip_hint_obs", False)):
+            # A21 oracle: [G_lo / 6 N, squeeze / G_lo clipped to 3, / 3] in actor + critic (privileged; for DS distillation)
+            OBS_FIELD_SIZES["cupgrip_hint"] = 2
+            for lst in ("obs_list", "state_list"):
+                if "cupgrip_hint" not in getattr(cfg.obs, lst):
+                    setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "cupgrip_hint"))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
