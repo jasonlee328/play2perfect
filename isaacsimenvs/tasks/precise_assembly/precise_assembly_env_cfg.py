@@ -138,6 +138,8 @@ class PreciseAssemblyCfg:
     key_assist_ramp_steps: int = 0      # 0 = never fades
     key_assist_offset_steps: int = 0    # set on a resume (the step counter restarts)
     key_assist_min_deg: float = 3.0     # no assist torque while |twist error to the current goal| < this
+    key_goal_rot_deg: float = 0.0       # > 0: near-goal = key rotation error <= this AND position error <= key_goal_pos_m
+    key_goal_pos_m: float = 0.015       # (separate checks, the brief's success definition) instead of the keypoint test
     key_goal_skip: bool = False         # credit every waypoint before a LATER intermediate one the key is already
                                         # within tolerance of (a flat key flops through 45-75 deg); the last goal is never skipped
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)

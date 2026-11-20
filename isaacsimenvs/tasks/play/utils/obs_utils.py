@@ -196,6 +196,11 @@ def compute_intermediate_values(env) -> None:
     else:
         tol = env._current_success_tolerance * rew_cfg.keypoint_scale
     env._near_goal = env._keypoints_max_dist <= tol
+    _pc = getattr(env.cfg, "precise_assembly", None)
+    _kr = float(getattr(_pc, "key_goal_rot_deg", 0.0)) if _pc is not None else 0.0
+    if _kr > 0.0 and getattr(env, "_key", None) is not None:
+        # A13: the task's own definition (orientation error and position error checked separately)
+        env._near_goal = (env._key.rot_err <= _kr) & (env._key.pos_err <= float(getattr(_pc, "key_goal_pos_m", 0.015)))
     env._near_goal_steps = update_near_goal_steps(
         near_goal=env._near_goal,
         near_goal_steps=env._near_goal_steps,

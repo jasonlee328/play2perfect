@@ -1084,9 +1084,16 @@ class PreciseAssemblyEnv(PlayEnv):
         far = torch.full((N,), -1, dtype=torch.long, device=self.device)
         for j in range(1, G - 1):
             g = self._key.goal_world(ids, torch.full((N,), j, dtype=torch.long, device=self.device))
-            gk = _keypoints_world(g[:, 0:3], g[:, 3:7], kp)
-            d = (obj_kp - gk).norm(dim=-1).max(dim=-1).values
-            ok = (d <= tol) & (self._successes < j) & (self._successes < self.env_max_goals) & ~self.is_random_goal_env
+            kr = float(getattr(self.cfg.precise_assembly, "key_goal_rot_deg", 0.0))
+            if kr > 0.0:
+                dq = quat_mul(quat_conjugate(g[:, 3:7]), self.object.data.root_quat_w)
+                rot = torch.rad2deg(2.0 * torch.acos(dq[:, 0].abs().clamp(max=1.0)))
+                near = (rot <= kr) & ((self.object.data.root_pos_w - g[:, 0:3]).norm(dim=-1)
+                                      <= float(getattr(self.cfg.precise_assembly, "key_goal_pos_m", 0.015)))
+            else:
+                gk = _keypoints_world(g[:, 0:3], g[:, 3:7], kp)
+                near = (obj_kp - gk).norm(dim=-1).max(dim=-1).values <= tol
+            ok = near & (self._successes < j) & (self._successes < self.env_max_goals) & ~self.is_random_goal_env
             far = torch.where(ok, torch.full_like(far, j), far)
         jump = (far >= 0) & allow
         if jump.any():
