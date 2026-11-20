@@ -128,6 +128,10 @@ class PreciseAssemblyCfg:
     usb_pinch_mode: str = "mean_force"  # finger_pinch_real: "mean_force" (official, mean pad force >= usb_pinch_mean_n) | "frac"
     usb_pinch_mean_n: float = 3.0      # N per pad (plug_in_usb.py:591)
     usb_pinch_window: str = "insert"   # pad-force window: "insert" (official: hold end -> first seated) | "pre_release"
+    usb_pinch_fail_at_seat: bool = False      # TRAINING ONLY: fail ("pinch_weak") at the first seat if the insert-phase pad mean < usb_pinch_mean_n (the push test would fail anyway)
+    usb_seat_pinch_bonus: float = 0.0          # paid at the first seat when the insert-phase pinch already passes the official 3 N rule
+    usb_win_thumb_rew_scale: float = 0.0       # per step inside the insert window x min(f_thumb, f_index, usb_win_thumb_cap) / cap
+    usb_win_thumb_cap: float = 4.0
     usb_hand_lock_until_seated: bool = False   # hold the hand targets until the stick first seats (relative hand only)
     usb_seat_tol: float = 0.0005       # fully_inserted (plug_in_usb.py:153)
     usb_release_steps: int = 3

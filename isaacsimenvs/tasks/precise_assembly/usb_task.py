@@ -50,6 +50,9 @@ class UsbTask:
         self.success = z(torch.bool); self.just_rel_seated = z(torch.bool)
         self.ref_p = torch.zeros(N, 3, device=d)
         self.fail = {k: z(torch.bool) for k in ("released_unseated", "push_failed")}
+        if bool(getattr(self.c, "usb_pinch_fail_at_seat", False)):   # training-only early fail (same outcome as the push test)
+            self.fail["pinch_weak"] = z(torch.bool)
+        self.win = z(torch.bool); self.first_seat = z(torch.bool); self.seat_pinch_ok = z(torch.bool)
         self.checks, self.meas = {}, {}
         self._views = False
         bi, _ = env.robot.find_bodies("iiwa14_link_7")
@@ -153,6 +156,13 @@ class UsbTask:
         self.ins_steps += win.float()
         self.pre_f_th += win.float() * F_rs[:, self.i_th]; self.pre_f_ix += win.float() * F_rs[:, self.i_ix]
 
+        # the insert window closes at the first seat: the official pinch verdict is fixed from here on
+        first_seat = inserted & ~self.ever_ins & ~self.released
+        m_th = self.pre_f_th / self.ins_steps.clamp(min=1.0); m_ix = self.pre_f_ix / self.ins_steps.clamp(min=1.0)
+        pinch_ok_now = torch.minimum(m_th, m_ix) >= float(getattr(c, "usb_pinch_mean_n", 3.0))
+        self.first_seat, self.seat_pinch_ok, self.win = first_seat, first_seat & pinch_ok_now, win
+        if "pinch_weak" in self.fail:
+            self.fail["pinch_weak"] |= first_seat & ~pinch_ok_now
         self.ever_ins |= inserted
         free = ~touching
         self.nocontact = torch.where(free, self.nocontact + 1, torch.zeros_like(self.nocontact))

@@ -1311,6 +1311,12 @@ class PreciseAssemblyEnv(PlayEnv):
                 cap = float(getattr(pih_cfg, "usb_pad_rew_cap", 5.0))
                 fmin = torch.minimum(usb.meas["f_thumb"], usb.meas["f_index"]).clamp(max=cap) / cap
                 u_rew = u_rew + float(pih_cfg.usb_pad_rew_scale) * fmin * (~usb.released).float()
+            if float(getattr(pih_cfg, "usb_seat_pinch_bonus", 0.0)) > 0.0:
+                u_rew = u_rew + float(pih_cfg.usb_seat_pinch_bonus) * usb.seat_pinch_ok.float()
+            if float(getattr(pih_cfg, "usb_win_thumb_rew_scale", 0.0)) > 0.0:
+                capw = float(getattr(pih_cfg, "usb_win_thumb_cap", 4.0))
+                fw = torch.minimum(usb.meas["f_thumb"], usb.meas["f_index"]).clamp(max=capw) / capw
+                u_rew = u_rew + float(pih_cfg.usb_win_thumb_rew_scale) * fw * usb.win.float()
             if float(getattr(pih_cfg, "usb_lat_rew_scale", 0.0)) > 0.0:
                 # potential on -(lateral tip error) before the release: pays centring the plug over the 0.175 mm/side mouth
                 phl = -usb.meas["lat_mm"] * 1e-3
