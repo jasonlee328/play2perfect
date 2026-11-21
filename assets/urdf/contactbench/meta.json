@@ -10029,7 +10029,7 @@
    ],
    "distractors": [
     [
-     "urdf/contactbench/objects/spikyball_spiky/spikyball_spiky.urdf",
+     "urdf/contactbench/objects/spikyball_smooth/spikyball_smooth.urdf",
      [
       0.03,
       0.03,
@@ -11149,7 +11149,7 @@
    ],
    "distractors": [
     [
-     "urdf/contactbench/objects/spikyball_spiky_flat/spikyball_spiky_flat.urdf",
+     "urdf/contactbench/objects/spikyball_smooth/spikyball_smooth.urdf",
      [
       0.03,
       0.03,
@@ -11429,7 +11429,7 @@
    ],
    "distractors": [
     [
-     "urdf/contactbench/objects/spikyball_spiky_cf/spikyball_spiky_cf.urdf",
+     "urdf/contactbench/objects/spikyball_smooth_cf/spikyball_smooth_cf.urdf",
      [
       0.03,
       0.03,
@@ -11709,7 +11709,7 @@
    ],
    "distractors": [
     [
-     "urdf/contactbench/objects/spikyball_spiky_cd/spikyball_spiky_cd.urdf",
+     "urdf/contactbench/objects/spikyball_smooth_cd/spikyball_smooth_cd.urdf",
      [
       0.03,
       0.03,
@@ -13389,7 +13389,7 @@
    ],
    "distractors": [
     [
-     "urdf/contactbench/objects/spikyball_spiky_lw3/spikyball_spiky_lw3.urdf",
+     "urdf/contactbench/objects/spikyball_smooth_lw3/spikyball_smooth_lw3.urdf",
      [
       0.03,
       0.03,
