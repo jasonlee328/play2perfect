@@ -349,7 +349,20 @@ class CollectManager:
         self.in_bin = inside_xy & (top < self.rim_z) & (bottom > -0.005) & self.active
         self.ever_in_bin |= self.in_bin
         table_top = (env._table_z_per_env + TABLE_HALF_HEIGHT).unsqueeze(1)
-        self.fell = ((pos[..., 2] < table_top - 0.03) & self.active).any(1)
+        on_floor = (pos[..., 2] < table_top - 0.03) & self.active
+        if bool(getattr(self.c, "collect_fall_terminate", True)):
+            self.fell = on_floor.any(1)
+            self.n_fell_new = torch.zeros_like(self.fell, dtype=torch.float32)
+        else:
+            # training option: a part knocked to the floor costs the fall penalty once and is dropped from the task
+            # (inactive); the episode goes on. Shaping skips this step (fresh) so its potential terms don't jump.
+            self.fell = torch.zeros_like(self.fell)
+            self.n_fell_new = on_floor.sum(1).float()
+            hit = on_floor.any(1)
+            if bool(hit.any()):
+                self.active &= ~on_floor
+                self.in_bin &= self.active
+                self.fresh |= hit
         ft = env.robot.data.body_state_w[:, env._fingertip_body_ids, 0:3] - env.scene.env_origins.unsqueeze(1)
         d = (ft.unsqueeze(2) - pos.unsqueeze(1)).norm(dim=-1)                      # (N, 5, K)
         d = torch.where(self.active.unsqueeze(1), d, torch.full_like(d, 9.0))
@@ -526,7 +539,7 @@ class CollectManager:
         shaped = sum(self.rterms.values()) * (~self.fresh).float()
         self.fresh[:] = False
         bonus = float(c.collect_success_bonus) * self.success.float()
-        fall = -float(c.collect_fall_penalty) * self.fell.float()
+        fall = -float(c.collect_fall_penalty) * (self.fell.float() + getattr(self, 'n_fell_new', 0.0))
         if c.collect_scoop:
             fall = fall - float(c.collect_trip_penalty) * 0.0
         return shaped, bonus, fall
