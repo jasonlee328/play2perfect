@@ -456,6 +456,10 @@ class CollectManager:
         cen = cw - env.scene.env_origins
         rise = pos[..., 2] - self.z0
         near_palm = (pos - palm.unsqueeze(1)).norm(dim=-1) < float(c.collect_hand_radius)
+        if c.collect_inhand_ft:
+            # a fingertip pinch holds the part ~10-15 cm from the palm body: also count a lifted part within
+            # collect_grasp_dist of any fingertip (else the in-hand / carry potentials never fire for pinches)
+            near_palm = near_palm | (self.ft_min < float(c.collect_grasp_dist))
         in_hand = out & (rise > 0.02) & near_palm
         n_hand = in_hand.sum(1).float()
         self.n_in_hand = n_hand
