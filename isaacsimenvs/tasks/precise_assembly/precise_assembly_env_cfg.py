@@ -248,6 +248,9 @@ class PreciseAssemblyCfg:
     collect_hand_radius: float = 0.10
     collect_bin_keeps_potential: bool = False  # in-bin parts keep the full in-hand + carry potential
     collect_fall_terminate: bool = True         # False (training): a part on the floor costs collect_fall_penalty once, becomes inactive, episode continues
+    collect_lift_only: bool = False             # scoop-only task (user 11-21): no bin; success = k parts held up
+    collect_lift_only_h: float = 0.05           # lift height (m) above each part's start for 'held'
+    collect_w_lift_h: float = 2000.0            # height potential per held part (per m, capped at collect_lift_only_h)
     collect_target_nearest: bool = False        # object / approach target = part nearest the fingertips (not the centroid)
     collect_inhand_ft: bool = False             # in-hand also = lifted part within collect_grasp_dist of a fingertip
     collect_w_scoop_app: float = 200.0

@@ -91,6 +91,8 @@ class CollectManager:
         self.prev_hand = torch.zeros(N, self.K, dtype=torch.bool, device=self.dev)
         self.prev_scoop = torch.zeros(N, device=self.dev)
         self.n_in_hand = torch.zeros(N, device=self.dev)
+        self.n_held = torch.zeros(N, device=self.dev)
+        self.held_max = torch.zeros(N, device=self.dev)
         self.park = torch.zeros(self.K, 3, device=self.dev)
         for k in range(self.K):
             self.park[k] = torch.tensor([0.0, 0.0, float(c.collect_park_z) + 0.12 * k], device=self.dev)
@@ -126,6 +128,12 @@ class CollectManager:
         self.last["n_in_bin"][env_ids] = self.in_bin[env_ids].sum(1).float()
         self.last["ever_in_bin"][env_ids] = self.ever_in_bin[env_ids].sum(1).float()
         self.last["success"][env_ids] = self.success[env_ids].float()
+        self.last.setdefault("held_max", torch.zeros(self.env.num_envs, device=dev))
+        self.last.setdefault("n_held", torch.zeros(self.env.num_envs, device=dev))
+        self.last["held_max"][env_ids] = self.held_max[env_ids]
+        self.last["n_held"][env_ids] = self.n_held[env_ids]
+        self.held_max[env_ids] = 0.0
+        self.n_held[env_ids] = 0.0
         hi = self._n_hi_now()
         n_act = torch.randint(self.n_lo, hi + 1, (n,), device=dev)
         perm = torch.rand(n, self.K - 1, device=dev).argsort(dim=1)  # random subset of slots 1..K-1
@@ -407,6 +415,19 @@ class CollectManager:
         palm_v = env.robot.data.body_state_w[:, env._palm_body_id, 7:10].norm(dim=-1)
         ok = all_in & rest & no_touch & (self.ft_min_all > float(c.collect_release_dist)) & \
             (palm_v < float(c.collect_hand_still_speed))
+        if bool(getattr(c, "collect_lift_only", False)):
+            # user 11-21 (scoop-only task, no bin): success = at least k parts held >= collect_lift_only_h above where
+            # they started, all in the hand (within collect_grasp_dist of a fingertip or collect_hand_radius of the
+            # palm), for collect_success_steps steps. Score = parts held.
+            palm_p = env.robot.data.body_state_w[:, env._palm_body_id, 0:3] - env.scene.env_origins
+            near = ((pos - palm_p.unsqueeze(1)).norm(dim=-1) < float(c.collect_hand_radius)) | \
+                (self.ft_min < float(c.collect_grasp_dist))
+            held = self.active & (pos[..., 2] - self.z0 > float(c.collect_lift_only_h)) & near
+            self.n_held = held.sum(1).float()
+            self.held_max = torch.maximum(self.held_max, self.n_held)
+            k_need = torch.clamp(self.active.sum(1), max=max(k_min, 1)).float()
+            ok = self.n_held >= k_need
+            all_in = torch.zeros_like(ok)
         self.ok_steps = torch.where(ok, self.ok_steps + 1, torch.zeros_like(self.ok_steps))
         self.success = self.ok_steps >= int(c.collect_success_steps)
         self.all_in = all_in
@@ -496,7 +517,11 @@ class CollectManager:
             down = (1.0 - quat_apply(pq, nl)[:, 2]) * 0.5
             over = (self.rel_bin[..., :2].abs() < self.half_floor.unsqueeze(0).unsqueeze(0) + 0.01).all(-1)
             pour = (in_hand & over).sum(1).float() * down
-        phi = (-float(c.collect_w_scoop_app) * app * (n_hand == 0).float() + float(c.collect_w_inhand) * n_hand
+        lift_h = torch.zeros(N, device=self.dev)
+        if bool(getattr(c, "collect_lift_only", False)):
+            # height potential per part in the hand (up to collect_lift_only_h): lifting more parts higher pays more
+            lift_h = (rise.clamp(0.0, float(c.collect_lift_only_h)) * in_hand.float()).sum(1) * float(c.collect_w_lift_h)
+        phi = (lift_h - float(c.collect_w_scoop_app) * app * (n_hand == 0).float() + float(c.collect_w_inhand) * n_hand
                + float(c.collect_w_pour) * pour
                + float(c.collect_w_carry_v2) * ((float(c.collect_carry_d0_v2) - dd).clamp(min=0.0) * in_hand.float()).sum(1))
         if bool(getattr(c, "collect_bin_keeps_potential", False)):
