@@ -30,6 +30,12 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 
+def _obj_lin_damp(env):
+    """A22 diagnostic: precise_assembly.object_linear_damping (object + distractors; < 0 = USD default)."""
+    v = float(getattr(env.cfg.precise_assembly, "object_linear_damping", -1.0))
+    return v if v >= 0 else None
+
+
 def _obj_ang_damp(env):
     """A22: precise_assembly.object_angular_damping (object + distractors; < 0 = USD default)."""
     v = float(getattr(env.cfg.precise_assembly, "object_angular_damping", -1.0))
@@ -155,6 +161,7 @@ def setup_scene(env) -> None:
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
                 angular_damping=_obj_ang_damp(env),
+                linear_damping=_obj_lin_damp(env),
             ),
         ))
         goalviz_usd_paths.append(_bake_usd(
@@ -204,6 +211,8 @@ def setup_scene(env) -> None:
                     rb_solver_velocity_iterations=0,
                     articulation_enabled=False,
                     angular_damping=_obj_ang_damp(env),
+                    linear_damping=_obj_lin_damp(env),
+                linear_damping=_obj_lin_damp(env),
                 ),
             ))
         distractor_usd_paths.append(paths)
