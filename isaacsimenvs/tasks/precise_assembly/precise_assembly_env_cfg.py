@@ -141,6 +141,10 @@ class PreciseAssemblyCfg:
     key_assist_ramp_steps: int = 0      # 0 = never fades
     key_assist_offset_steps: int = 0    # set on a resume (the step counter restarts)
     key_assist_min_deg: float = 3.0     # no assist torque while |twist error to the current goal| < this
+    key_hold_assist_k: float = 0.0      # N/m > 0: training aid, spring on the key COM toward its palm-frame base
+                                        # position (fades with key_assist_ramp_steps like the torque); evals run it off
+    key_hold_assist_d: float = 0.5      # N s/m damping of that spring (world linear velocity)
+    key_hold_assist_max_m: float = 0.03 # spring error clamp
     key_goal_rot_deg: float = 0.0       # > 0: near-goal = key rotation error <= this AND position error <= key_goal_pos_m
     key_goal_pos_m: float = 0.015       # (separate checks, the brief's success definition) instead of the keypoint test
     start_state_adaptive: bool = False   # A13: sample start-bank angle bins by 4p(1-p) of their success (frontier curriculum)

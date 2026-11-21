@@ -1084,8 +1084,9 @@ class PreciseAssemblyEnv(PlayEnv):
         toward the current goal's twist, k sign(-twist) - d w_x, scaled by f = 1 -> 0 over key_assist_ramp_steps."""
         pc = self.cfg.precise_assembly
         k0 = float(getattr(pc, "key_assist_torque", 0.0))
+        kh = float(getattr(pc, "key_hold_assist_k", 0.0))
         key = getattr(self, "_key", None)
-        if k0 <= 0.0 or key is None or not hasattr(key, "twist_signed"):
+        if (k0 <= 0.0 and kh <= 0.0) or key is None or not hasattr(key, "twist_signed"):
             return
         ramp = float(getattr(pc, "key_assist_ramp_steps", 0))
         step = float(self.common_step_counter) + float(getattr(pc, "key_assist_offset_steps", 0))
@@ -1098,12 +1099,29 @@ class PreciseAssemblyEnv(PlayEnv):
         ts = key.twist_signed
         on = (ts.abs() > math.radians(float(getattr(pc, "key_assist_min_deg", 3.0)))) & ~key.dropped
         wx = (self.object.data.root_ang_vel_w * a).sum(-1)
-        tau_mag = f * (k0 * (-torch.sign(ts)) * on.float() - float(getattr(pc, "key_assist_damp", 0.002)) * wx)
+        if k0 > 0.0:
+            tau_mag = f * (k0 * (-torch.sign(ts)) * on.float() - float(getattr(pc, "key_assist_damp", 0.002)) * wx)
+        else:
+            tau_mag = torch.zeros_like(wx)
         tau = (tau_mag.unsqueeze(-1) * a).unsqueeze(1)
+        hold = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        if kh > 0.0:
+            # "third hand": spring + damper pulling the key COM to its episode base position in the palm frame, so
+            # fingers can regrasp without dropping it (rotation is still up to the fingers)
+            pp, pq = key._palm()
+            target = pp + quat_apply(pq, key.base_p)
+            err = target - self.object.data.root_pos_w
+            emax = float(getattr(pc, "key_hold_assist_max_m", 0.03))
+            n = err.norm(dim=-1, keepdim=True)
+            err = err * (emax / n.clamp_min(emax)).clamp(max=1.0)
+            fh = f * (kh * err - float(getattr(pc, "key_hold_assist_d", 0.5)) * self.object.data.root_lin_vel_w)
+            fh = fh * (~key.dropped).float().unsqueeze(-1)
+            hold = fh.unsqueeze(1)
+            self.extras["key_hold_assist_n"] = fh.norm(dim=-1).mean()
         fw = getattr(self, "_object_forces", None)
         tw = getattr(self, "_object_torques", None)
         zero = torch.zeros(self.num_envs, 1, 3, device=self.device)
-        f_w = zero if fw is None else fw.reshape(self.num_envs, -1, 3)
+        f_w = (zero if fw is None else fw.reshape(self.num_envs, -1, 3)) + hold
         t_w = (zero if tw is None else tw.reshape(self.num_envs, -1, 3)) + tau
         self.object.set_external_force_and_torque(f_w, t_w, is_global=True)
         self.extras["key_assist_tau"] = tau_mag.abs().mean()
