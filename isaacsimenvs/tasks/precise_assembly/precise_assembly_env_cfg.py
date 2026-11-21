@@ -236,6 +236,9 @@ class PreciseAssemblyCfg:
     collect_scoop: bool = False
     # success needs only this many parts in the bin (0 = every active part)
     collect_success_min_in: int = 0
+    collect_success_min_in_start: int = 0
+    collect_success_min_in_ramp_steps: int = 0
+    collect_success_min_in_ramp_offset_steps: int = 0
     # scoop: the virtual object = parts in the hand when any are held, else the parts left
     collect_obj_follow_hand: bool = False
     # pour shaping (potential): parts in the hand over the bin x palm facing down; palm normal in the palm body frame

@@ -359,6 +359,12 @@ class CollectManager:
         self.ft_min_out = torch.where(out, self.ft_min, torch.full_like(self.ft_min, 9.0)).min(1).values
         all_in = (self.in_bin == self.active).all(1)
         k_min = int(c.collect_success_min_in)
+        if k_min > 0 and int(c.collect_success_min_in_start) > 0 and c.collect_success_min_in_ramp_steps > 0:
+            # curriculum: required count ramps collect_success_min_in_start -> collect_success_min_in
+            fr = min(1.0, float(env.common_step_counter + c.collect_success_min_in_ramp_offset_steps)
+                     / float(c.collect_success_min_in_ramp_steps))
+            k0 = int(c.collect_success_min_in_start)
+            k_min = int(round(k0 + fr * (k_min - k0)))
         if k_min > 0:
             # user 11-20: success = at least k parts in the bin (or all, when fewer are active), then let go
             all_in = self.in_bin.sum(1) >= torch.clamp(self.active.sum(1), max=k_min)
