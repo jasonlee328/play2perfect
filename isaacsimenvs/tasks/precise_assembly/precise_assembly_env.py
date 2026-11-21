@@ -1367,6 +1367,23 @@ class PreciseAssemblyEnv(PlayEnv):
                 d_phi = torch.where(fresh | usb.released, torch.zeros_like(phi), phi - usb.phi_prev)
                 usb.phi_prev = phi.clone()
                 u_rew = u_rew + pih_cfg.usb_seat_rew_scale * d_phi
+            if bool(getattr(pih_cfg, "usb_fail_refund", False)):
+                # refund every shaping term (seat / fine-seat / lateral / clear potentials, release bonus, step terms) when the
+                # episode ends in a failure: shaping must never make 'seat sloppily, let go, fail' profitable
+                term = pih_cfg.usb_success_bonus * tr["max_successes"].float()
+                failed = torch.zeros_like(term, dtype=torch.bool)
+                for k, v in tr.items():
+                    if k.startswith("usb_"):
+                        term = term - pih_cfg.usb_fail_penalty * v.float(); failed |= v.bool()
+                for k in ("fall", "timeout", "time_out"):
+                    if k in tr:
+                        failed |= tr[k].bool()
+                shp = u_rew - term
+                if not hasattr(usb, "shape_sum"):
+                    usb.shape_sum = torch.zeros_like(shp)
+                usb.shape_sum = torch.where(usb.step <= 1, torch.zeros_like(shp), usb.shape_sum) + shp
+                u_rew = u_rew - failed.float() * usb.shape_sum
+                usb.shape_sum = torch.where(failed | tr["max_successes"].bool(), torch.zeros_like(shp), usb.shape_sum)
             reward = reward + u_rew
             self._reward_terms["usb_reward"] = u_rew
             self._reward_terms["total_reward"] = reward
