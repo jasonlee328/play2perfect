@@ -253,6 +253,7 @@ class PreciseAssemblyCfg:
     collect_scoop_mode: bool = False                # True: success = >= collect_success_min_in utensils held >= collect_scoop_h
                                                     # up (hand touching) for collect_clear_steps steps; no bin needed
     collect_scoop_h: float = 0.10
+    collect_scoop_contact_mem: int = 10             # hand counts as touching if it touched utensils within this many steps
     collect_rew_scoop: float = 0.0                  # potential per utensil held >= collect_scoop_h up (hand touching)
     collect_success_min_in: int = 0                 # > 0: success = this many in the bin (at rest) + release, not all
     collect_deposit_bonus: float = 0.0              # k-th utensil into the bin in one visit earns (k-1) x this

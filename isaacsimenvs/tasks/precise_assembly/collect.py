@@ -75,6 +75,7 @@ def setup(env) -> None:
     st["n_in_ep_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["n_held_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["scoop_max"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["since_contact"] = torch.full((N,), 10 ** 6, dtype=torch.long, device=dev)
     st["n_scoop"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["prev_pos"] = torch.zeros(N, K, 3, device=dev)
     st["at_rest"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
@@ -218,6 +219,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
     st["n_in_ep_max"][env_ids] = 0
     st["n_held_max"][env_ids] = 0
     st["scoop_max"][env_ids] = 0
+    st["since_contact"][env_ids] = 10 ** 6
     st["place_ep_max"][env_ids] = 0.0
     for k in ("trips", "prev_n_in", "multi_max", "visit_n", "prev_n_in_max", "deposit_max"):
         st[k][env_ids] = 0
@@ -436,7 +438,12 @@ def update(env) -> None:
     # is >= collect_scoop_h above its rest height while the hand touches utensils (pads / skin; a knife 10 cm up is
     # either in the hand or resting on knives that are). Success = >= collect_success_min_in held for
     # collect_clear_steps consecutive steps.
-    held_s = active & (h >= float(c.collect_scoop_h)) & contact.unsqueeze(1)
+    # tactile readings of knives resting on finger sides sit at the threshold and flicker on/off every step (scoop
+    # check 11-21: median contact run 1 step while the knife stayed up), so "touching" = contact within the last
+    # collect_scoop_contact_mem steps
+    st["since_contact"] = torch.where(contact, torch.zeros_like(st["since_contact"]), st["since_contact"] + 1)
+    touch_recent = st["since_contact"] <= int(c.collect_scoop_contact_mem)
+    held_s = active & (h >= float(c.collect_scoop_h)) & touch_recent.unsqueeze(1)
     n_scoop = held_s.sum(1)
     st["n_scoop"] = n_scoop
     st["scoop_max"] = torch.maximum(st["scoop_max"], n_scoop)
