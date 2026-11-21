@@ -439,8 +439,16 @@ def update(env) -> None:
         along = (1.0 - com_b[..., 0].abs() / float(c.collect_place_along_d)).clamp(0, 1)
         across = (1.0 - com_b[..., 1].abs() / float(c.collect_place_across_d)).clamp(0, 1)
         low_t = (1.0 - (zb - st["rim"]).clamp(min=0.0) / float(c.collect_place_h)).clamp(0, 1)
-        place = align * along * across * low_t * lifted.float()
-        st["place_ep_max"] = torch.maximum(st["place_ep_max"], place.max(1).values)
+        if str(c.collect_place_mode) == "sum":
+            # each factor pulls on its own (the product had ~0 gradient while any factor was small); gated on being
+            # within collect_carry_d of the bin so it can't pay away from it
+            near_g = (1.0 - d_bin / float(c.collect_carry_d)).clamp(0, 1)
+            place = 0.25 * (align + along + across + low_t) * near_g * lifted.float()
+            full = align * along * across * low_t * lifted.float()
+        else:
+            place = align * along * across * low_t * lifted.float()
+            full = place
+        st["place_ep_max"] = torch.maximum(st["place_ep_max"], full.max(1).values)
         phi = phi + float(c.collect_rew_place) * place.sum(1)
     # pinch: thumb pad and another fingertip pad in contact, both tips within collect_pinch_d of the same out-of-bin
     # utensil's surface points (tactile is ray-cast against every utensil, so the distance check picks the utensil)

@@ -228,6 +228,7 @@ class PreciseAssemblyCfg:
     collect_rew_reach: float = 20.0                 # potential for a fingertip near the nearest out-of-bin utensil
     collect_rew_release: float = 50.0               # potential for fingertips away from the utensils once all are in
     collect_rew_place: float = 0.0                  # potential per held utensil lined up over the slot (align x along x across x low)
+    collect_place_mode: str = "product"             # product | sum (sum of the 4 factors x near-bin gate: each pulls on its own)
     collect_place_align_pow: float = 8.0            # |cos yaw error| ** pow (10 deg 0.89, 25 deg 0.46, 45 deg 0.06)
     collect_place_along_d: float = 0.10             # COM offset along the bin axis where the term reaches 0
     collect_place_across_d: float = 0.04            # COM offset across the bin where the term reaches 0
