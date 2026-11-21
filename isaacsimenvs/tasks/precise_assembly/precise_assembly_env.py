@@ -647,6 +647,26 @@ class PreciseAssemblyEnv(PlayEnv):
         if g:
             half = torch.tensor((tuple(g) + (0.0, 0.0, 0.0))[:3], device=self.device, dtype=torch.float32)
             self._start_shift[:, env_ids] += ((torch.rand(env_ids.numel(), 3, device=self.device) * 2 - 1) * half).unsqueeze(0)
+        B = float(self.cfg.precise_assembly.stick_spread_m)
+        if B > 0:
+            # stick_spread_m: every stick (object + distractors) gets a fresh sideways (receptive y) position in
+            # [-B, B]: sorted, at least stick_spread_min_pitch_m apart (same for every thickness, so the spacing does
+            # not reveal it), free space split U-randomly (Dirichlet(1)) over the N+1 gaps.
+            S, n = n_dist + 1, env_ids.numel()
+            mp = float(self.cfg.precise_assembly.stick_spread_min_pitch_m)
+            slack = 2 * B - (S - 1) * mp
+            if slack <= 0:
+                raise ValueError(f"stick_spread_m {B} too small for {S} sticks at pitch {mp}")
+            nom_l = [self._pih_object_start_rel[1]] + [pp[1] for pp in self._pih_distractor_pose_rel]
+            e = -torch.log(torch.rand(n, S + 1, device=self.device).clamp_min(1e-12))
+            g = e / e.sum(dim=1, keepdim=True) * slack                                   # (n, S+1)
+            y = -B + torch.cumsum(g[:, :S], dim=1) + torch.arange(S, device=self.device) * mp   # (n, S) sorted
+            # slots keep their row order (slot s = s-th stick from -y in the problem), so obs_distractors_k's
+            # nearest-neighbour slots stay the target's row neighbours.
+            order = torch.tensor(sorted(range(S), key=lambda i: nom_l[i]), device=self.device)
+            y = y[:, torch.argsort(order)]                                                # slot s -> y[:, s]
+            nom = torch.tensor(nom_l, device=self.device, dtype=torch.float32)            # (S,) nominal y
+            self._start_shift[:, env_ids, 1] = (y - nom.unsqueeze(0)).transpose(0, 1)
 
     def _swap_lifted_distractor(self) -> None:
         """swap_lifted_distractor: make a lifted distractor the object (identical bodies, see the cfg)."""

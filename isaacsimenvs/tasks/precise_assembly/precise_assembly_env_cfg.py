@@ -134,6 +134,11 @@ class PreciseAssemblyCfg:
     # Same as start_shift_m but ONE offset per env shared by the object and every distractor (moves the whole row,
     # e.g. sideways in the tray: (0, 0.006, 0)); added to the independent start_shift_m offsets.
     start_shift_group_m: tuple[float, ...] = ()
+    # stick_spread_m > 0: per episode, re-draw every stick's sideways position (receptive y) in [-B, B], sorted,
+    # >= stick_spread_min_pitch_m apart (thickness-independent), random gaps, row order kept (replaces the y part of
+    # start_shift_m / start_shift_group_m). For single-row stick trays (cb_binh_chopstick_n10s_lift*).
+    stick_spread_m: float = 0.0
+    stick_spread_min_pitch_m: float = 0.0085
     # "Any one of identical objects" tasks (blind chopstick search): > 0 = once a distractor has risen this far (m)
     # above its reset pose while the object is still within 5 mm of its own, the two swap states (pose, velocity and
     # reset pose; the goals move to the new object), so lifting any one stick is lifting "the object". Identical
