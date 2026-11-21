@@ -1365,7 +1365,7 @@ class PreciseAssemblyEnv(PlayEnv):
                         "pinched": st["pinch_done"].float(),
                         "fell": self._termination_reasons["collect_fell"].float(),
                         "trips": st["trips"].float(), "multi_max": st["multi_max"].float(),
-                        "deposit_max": st["deposit_max"].float(),
+                        "deposit_max": st["deposit_max"].float(), "place_max": st["place_ep_max"],
                         "trips_over": self._termination_reasons["collect_trips"].float()}
         else:
             sf_extra = {}

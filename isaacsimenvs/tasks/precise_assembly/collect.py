@@ -44,12 +44,17 @@ def setup(env) -> None:
         idx = torch.linspace(0, len(p) - 1, N_PTS).round().long()
         pts.append(p[idx])
     b = spec["bin"]
+    # long axis of each type in its body frame (first principal axis of its surface points), for collect_rew_place
+    long_ax = []
+    for p in pts:
+        pc = p - p.mean(0)
+        long_ax.append(torch.linalg.svd(pc, full_matrices=False).Vh[0])
     n_range = tuple(int(v) for v in (c.collect_n_range or spec["n_range"]))
     st = dict(
         bodies=bodies, K=K, types=types,
         rest_q=torch.tensor(rest_q, device=dev), rest_z=torch.tensor(rest_z, device=dev),
         half=torch.tensor(half, device=dev), cxy=torch.tensor(cxy, device=dev),
-        pts=torch.stack(pts).to(dev),
+        pts=torch.stack(pts).to(dev), long_ax=torch.stack(long_ax).to(dev),
         rim=float(b["rim"]), floor=float(b["floor"]),
         inner_floor=torch.tensor(b["inner_floor"], device=dev), inner_rim=torch.tensor(b["inner_rim"], device=dev),
         outer=torch.tensor(b["outer"], device=dev),
@@ -85,6 +90,7 @@ def setup(env) -> None:
     st["visit_n"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["prev_n_in_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["deposit_max"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["place_ep_max"] = torch.zeros(N, device=dev)
     env._collect = st
     print(f"[collect] slots {types}, N range {n_range}, bin rim {st['rim']*1000:.1f} mm, "
           f"inner floor {[round(float(x)*1000, 1) for x in st['inner_floor']]} mm", flush=True)
@@ -208,6 +214,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
     st["fell"][env_ids] = False
     st["n_in_ep_max"][env_ids] = 0
     st["n_held_max"][env_ids] = 0
+    st["place_ep_max"][env_ids] = 0.0
     for k in ("trips", "prev_n_in", "multi_max", "visit_n", "prev_n_in_max", "deposit_max"):
         st[k][env_ids] = 0
     for k in ("near", "visit_dep", "trips_over"):
@@ -421,6 +428,20 @@ def update(env) -> None:
     any_out = out.any(1)
     reach = torch.where(any_out, (1.0 - d_out / float(c.collect_reach_d)).clamp(0, 1), torch.ones_like(d_out))
     phi = phi + float(c.collect_rew_reach) * reach
+    # place (A18 11-21): a held utensil lined up with the slot = long axis along the bin's long axis, centre over the
+    # slot, low above the rim. Knives (197 mm) fit the 213 x 50 mm trough only within ~10 deg; the carry term alone
+    # brought them near the bin at any yaw (bank_s7_overbin: median yaw error 25 deg, 35 mm off sideways).
+    if float(c.collect_rew_place) > 0.0:
+        lax = quat_apply(quat.reshape(-1, 4), st["long_ax"].unsqueeze(0).expand(N, K, 3).reshape(-1, 3)).view(N, K, 3)
+        lax_b = quat_apply_inverse(hq, lax.reshape(-1, 3)).view(N, K, 3)
+        align = (lax_b[..., 0].abs() / lax_b[..., :2].norm(dim=-1).clamp_min(1e-6)) ** float(c.collect_place_align_pow)
+        com_b = quat_apply_inverse(hq, (pos - env.hole_pos.unsqueeze(1)).reshape(-1, 3)).view(N, K, 3)
+        along = (1.0 - com_b[..., 0].abs() / float(c.collect_place_along_d)).clamp(0, 1)
+        across = (1.0 - com_b[..., 1].abs() / float(c.collect_place_across_d)).clamp(0, 1)
+        low_t = (1.0 - (zb - st["rim"]).clamp(min=0.0) / float(c.collect_place_h)).clamp(0, 1)
+        place = align * along * across * low_t * lifted.float()
+        st["place_ep_max"] = torch.maximum(st["place_ep_max"], place.max(1).values)
+        phi = phi + float(c.collect_rew_place) * place.sum(1)
     # pinch: thumb pad and another fingertip pad in contact, both tips within collect_pinch_d of the same out-of-bin
     # utensil's surface points (tactile is ray-cast against every utensil, so the distance check picks the utensil)
     pinch = torch.zeros(N, dtype=torch.bool, device=env.device)
