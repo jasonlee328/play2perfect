@@ -138,6 +138,17 @@ class PreciseAssemblyCfg:
     # >= stick_spread_min_pitch_m apart (thickness-independent), random gaps, row order kept (replaces the y part of
     # start_shift_m / start_shift_group_m). For single-row stick trays (cb_binh_chopstick_n10s_lift*).
     stick_spread_m: float = 0.0
+    # multi_lift: "lift as many sticks as you can" (user 11-21). A stick (object or distractor) counts as held when it
+    # is >= multi_lift_rise_m above its own rest height and within multi_lift_hand_m of the palm centre for
+    # multi_lift_hold_steps steps running. Reward per step: multi_lift_hold_rew x held count, plus
+    # multi_lift_new_bonus x (rise of the episode's best held count). Goal success no longer ends the episode
+    # (runs to timeout); metric = the episode's best held count (env.multi_lift_last_ep_max at reset).
+    multi_lift: bool = False
+    multi_lift_rise_m: float = 0.05
+    multi_lift_hand_m: float = 0.15
+    multi_lift_hold_steps: int = 10
+    multi_lift_hold_rew: float = 0.5
+    multi_lift_new_bonus: float = 200.0
     stick_spread_min_pitch_m: float = 0.0085
     # "Any one of identical objects" tasks (blind chopstick search): > 0 = once a distractor has risen this far (m)
     # above its reset pose while the object is still within 5 mm of its own, the two swap states (pose, velocity and

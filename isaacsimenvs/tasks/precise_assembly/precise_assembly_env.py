@@ -618,6 +618,17 @@ class PreciseAssemblyEnv(PlayEnv):
             body.write_root_pose_to_sim(w, env_ids=env_ids)
             body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
             self._distractor_reset_pos[k, env_ids] = w[:, :3]
+        if self.cfg.precise_assembly.multi_lift:
+            S = len(dists) + 1
+            if not hasattr(self, "_ml_streak"):
+                self._ml_streak = torch.zeros(S, self.num_envs, dtype=torch.long, device=self.device)
+                self.multi_lift_count = torch.zeros(self.num_envs, device=self.device)
+                self.multi_lift_ep_max = torch.zeros(self.num_envs, device=self.device)
+                self.multi_lift_last_ep_max = torch.full((self.num_envs,), -1.0, device=self.device)
+            self.multi_lift_last_ep_max[env_ids] = self.multi_lift_ep_max[env_ids]
+            self._ml_streak[:, env_ids] = 0
+            self.multi_lift_count[env_ids] = 0.0
+            self.multi_lift_ep_max[env_ids] = 0.0
         self.distractor_disp[env_ids] = 0.0
         self.distractor_disp_ep_max[env_ids] = 0.0
         self.distractor_moved_ep_max[env_ids] = 0.0
@@ -667,6 +678,25 @@ class PreciseAssemblyEnv(PlayEnv):
             y = y[:, torch.argsort(order)]                                                # slot s -> y[:, s]
             nom = torch.tensor(nom_l, device=self.device, dtype=torch.float32)            # (S,) nominal y
             self._start_shift[:, env_ids, 1] = (y - nom.unsqueeze(0)).transpose(0, 1)
+
+    def _update_multi_lift(self) -> None:
+        """multi_lift: held count = sticks >= rise above their rest height, near the palm, for hold_steps running."""
+        c = self.cfg.precise_assembly
+        if not hasattr(self, "_ml_streak") or not hasattr(self, "_object_rest_pos"):
+            return
+        dists = getattr(self, "distractors", ())
+        pos = torch.stack([self.object.data.root_pos_w] + [b.data.root_pos_w for b in dists])       # (S, N, 3)
+        rest = torch.cat([self._object_rest_pos.unsqueeze(0), self._distractor_reset_pos], dim=0)    # (S, N, 3)
+        st = self.robot.data.body_state_w[:, self._palm_body_id, :]
+        from isaacsimenvs.tasks.play.utils.obs_utils import PALM_CENTER_OFFSET, _apply_local_offset
+        palm = _apply_local_offset(st[:, 0:3], st[:, 3:7], PALM_CENTER_OFFSET, (self.num_envs,))     # (N, 3) world
+        up = (pos[..., 2] - rest[..., 2] >= c.multi_lift_rise_m) & \
+             ((pos - palm.unsqueeze(0)).norm(dim=-1) <= c.multi_lift_hand_m)
+        self._ml_streak = torch.where(up, self._ml_streak + 1, torch.zeros_like(self._ml_streak))
+        prev_max = self.multi_lift_ep_max.clone()
+        self.multi_lift_count = (self._ml_streak >= int(c.multi_lift_hold_steps)).float().sum(dim=0)
+        self.multi_lift_ep_max = torch.maximum(self.multi_lift_ep_max, self.multi_lift_count)
+        self._ml_new = self.multi_lift_ep_max - prev_max
 
     def _swap_lifted_distractor(self) -> None:
         """swap_lifted_distractor: make a lifted distractor the object (identical bodies, see the cfg)."""
@@ -1203,6 +1233,9 @@ class PreciseAssemblyEnv(PlayEnv):
 
         retract_fail = self.retract_failed if pih_cfg.enable_retract else torch.zeros_like(fall)
         self._update_distractor_disp()
+        if pih_cfg.multi_lift:
+            self._update_multi_lift()
+            max_successes = torch.zeros_like(max_successes)          # run to timeout; metric = best held count
         self._update_joint_angles()
         if pih_cfg.terminate_on_disturb and hasattr(self, "distractor_disp"):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
@@ -1308,6 +1341,16 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
 
+        if pih_cfg.multi_lift and hasattr(self, "multi_lift_count"):
+            ml = pih_cfg.multi_lift_hold_rew * self.multi_lift_count + pih_cfg.multi_lift_new_bonus * getattr(
+                self, "_ml_new", torch.zeros_like(self.multi_lift_count))
+            reward = reward + ml
+            self._reward_terms["multi_lift_rew"] = ml
+            self._reward_terms["total_reward"] = reward
+            self.extras["multi_lift_count_mean"] = self.multi_lift_count.mean()
+            done_m = self.multi_lift_last_ep_max >= 0
+            if done_m.any():
+                self.extras["multi_lift_last_ep_max_mean"] = self.multi_lift_last_ep_max[done_m].mean()
         log_step_metrics(self)
         self._log_peg_metrics()
         return reward
