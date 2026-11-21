@@ -195,6 +195,7 @@ class PreciseAssemblyCfg:
     cupgrip_detach_mm: float = 45.0                            # second cup risen this much = off its nest (~60 mm deep)
     cupgrip_table_drop_mm: float = 0.0                         # >0: fail only if the second cup falls this far below its seat (onto the table); replaces the detach fail
     cupgrip_table_hit: bool = False                            # fail the moment the second cup touches the table (replaces the detach fail)
+    cupgrip_rise2_penalty: float = 0.0   # A21 11-21: per-step reward penalty per cm of second-cup rise (shaping only)
     cupgrip_squeeze_tips_only: bool = False   # A21 11-21: window squeeze = fingertip (DP, pad) links only
     cupgrip_settle_mm: float = 3.0                             # success needs the second cup back within this of its seat
     cupgrip_drag_reaction: bool = True                         # apply -F of the drag coupling to the top cup (felt by proprio)

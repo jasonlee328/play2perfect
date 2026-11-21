@@ -1303,6 +1303,16 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["cupgrip_window_rew"] = r
             self._reward_terms["total_reward"] = reward
 
+        rp = float(getattr(pih_cfg, "cupgrip_rise2_penalty", 0.0))
+        if _cupgrip.enabled(self) and rp > 0.0 and hasattr(self, "cg_z2_0"):
+            # A21 11-21 shaping only (success / fail rules unchanged): per step, rp x the second cup's rise above its
+            # seat in cm (capped at 5 cm), so "lift both cups and drop the second back" costs reward
+            rise2 = (self.distractors[0].data.root_pos_w[:, 2] - self.scene.env_origins[:, 2] - self.cg_z2_0).clamp(0.0, 0.05)
+            r2 = -rp * rise2 * 100.0
+            reward = reward + r2
+            self._reward_terms["cupgrip_rise2_pen"] = r2
+            self._reward_terms["total_reward"] = reward
+
         log_step_metrics(self)
         self._log_peg_metrics()
         return reward
