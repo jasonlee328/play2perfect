@@ -372,14 +372,18 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     jstd = float(getattr(dr, "joint_position_obs_noise_std", 0.0))
     jb = float(getattr(dr, "joint_position_obs_bias", 0.0))
     if (jstd > 0 or jb > 0) and "joint_pos" in obs_noisy:
+        jr = int(getattr(dr, "joint_position_obs_noise_ramp_steps", 0))
+        if jr > 0:   # ramp std and bias 0 -> full over jr env steps (+ offset so a resume does not replay it)
+            g = min(1.0, float(env.common_step_counter + int(getattr(dr, "joint_position_obs_noise_offset_steps", 0))) / jr)
+            jstd, jb = jstd * g, jb * g
         jp = obs_noisy["joint_pos"]
         if jb > 0:
             if getattr(env, "_jpos_obs_bias", None) is None or env._jpos_obs_bias.shape != jp.shape:
-                env._jpos_obs_bias = (torch.rand_like(jp) * 2 - 1) * jb
+                env._jpos_obs_bias = torch.rand_like(jp) * 2 - 1
             new_ep = env.episode_length_buf <= 1
             if bool(new_ep.any()):
-                env._jpos_obs_bias[new_ep] = (torch.rand_like(jp[new_ep]) * 2 - 1) * jb
-            jp = jp + env._jpos_obs_bias
+                env._jpos_obs_bias[new_ep] = torch.rand_like(jp[new_ep]) * 2 - 1
+            jp = jp + env._jpos_obs_bias * jb
         if jstd > 0:
             jp = jp + torch.randn_like(jp) * jstd
         obs_noisy["joint_pos"] = jp
