@@ -212,7 +212,6 @@ def setup_scene(env) -> None:
                     articulation_enabled=False,
                     angular_damping=_obj_ang_damp(env),
                     linear_damping=_obj_lin_damp(env),
-                linear_damping=_obj_lin_damp(env),
                 ),
             ))
         distractor_usd_paths.append(paths)
