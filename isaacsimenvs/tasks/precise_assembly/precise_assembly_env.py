@@ -71,6 +71,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self._configure_problem(cfg)
 
         super().__init__(cfg, render_mode, **kwargs)
+        self._apply_asset_frictions()
 
         # When student_obs is enabled, the env exposes three obs groups via
         # `_get_observations`: "policy" = student obs (image+proprio, what
@@ -602,6 +603,33 @@ class PreciseAssemblyEnv(PlayEnv):
         self.distractor_disp_ep_max[env_ids] = 0.0
         self.distractor_moved_ep_max[env_ids] = 0.0
         self.distractor_rise[env_ids] = 0.0
+
+    def _apply_asset_frictions(self) -> None:
+        """A22 precise_assembly.asset_frictions: [[urdf substring, mu], ...] = static + dynamic friction of every shape
+        of the object / distractor bodies whose asset URDF path contains the substring (per env, multi clutter aware).
+        PhysX averages the two materials' coefficients at a contact (fingertip pads 1.5 by default)."""
+        rules = [(str(r[0]), float(r[1])) for r in (self.cfg.precise_assembly.asset_frictions or ())]
+        if not rules:
+            return
+        ai = getattr(self, "_object_asset_index_per_env", torch.zeros(self.num_envs, dtype=torch.long)).cpu()
+        mc = getattr(self, "_multi_clutter", False)
+        bodies = [(self.object, [self._pih_object_urdf_abs_list[int(a)] for a in ai])]
+        for k, d in enumerate(getattr(self, "distractors", ())):
+            urdfs = ([self._pih_distractor_urdf_abs_multi[k][int(a)] for a in ai] if mc
+                     else [self._pih_distractor_urdf_abs[k]] * self.num_envs)
+            bodies.append((d, urdfs))
+        env_ids = torch.arange(self.num_envs, dtype=torch.int64, device="cpu")
+        report = {}
+        for body, urdfs in bodies:
+            view = body.root_physx_view
+            mat = view.get_material_properties()
+            for i, u in enumerate(urdfs):
+                for sub, mu in rules:
+                    if sub in u:
+                        mat[i, :, 0] = mu; mat[i, :, 1] = mu
+                        report[sub] = report.get(sub, 0) + 1
+            view.set_material_properties(mat, env_ids)
+        print(f"[PreciseAssemblyEnv] asset_frictions {rules}: bodies set {report}", flush=True)
 
     def _twin_mask(self) -> torch.Tensor:
         """(K, N) bool: distractor k of env n uses the env's object asset (identical body, A22 twins)."""

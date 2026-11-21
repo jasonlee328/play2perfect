@@ -151,6 +151,8 @@ class PreciseAssemblyCfg:
     wrong_ball_penalty: float = 0.0
     # A22: PhysX angular damping of the object and every distractor (rolling resistance, e.g. balls in a foam tray); < 0 = default.
     object_angular_damping: float = -1.0
+    # A22: [[urdf path substring, friction], ...] static + dynamic friction for matching object / distractor assets.
+    asset_frictions: tuple = ()
     # Privileged-free teacher obs: field "fixture_pose_rel_palm" (fixture position relative to the palm + its
     # quaternion wxyz, 7), added to obs_list and state_list.
     obs_fixture: bool = False
