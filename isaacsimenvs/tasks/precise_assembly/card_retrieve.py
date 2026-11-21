@@ -264,11 +264,18 @@ class RetrieveTask:
             fixed = list(getattr(self.c, "retr_fric_card_mu", ()) or ())
             if fixed:   # fixed friction per card, front -> back (front card, card 2, card 3, ...); < 0 = leave as is
                 all_ids = torch.arange(env.num_envs)
+                jf = float(getattr(self.c, "retr_fric_fixed_jitter", 0.0))
+                self.card_mu_fixed = []
                 for b, v in zip([env.object] + list(env.distractors)[::-1], fixed):
                     if float(v) < 0:
                         continue
+                    # retr_fric_fixed_jitter j > 0: hidden per-episode-env jitter, each card's friction = v + U(-j, j)
+                    # (pair friction = average, so mu12 - mu23 = (mu1 - mu3) / 2 moves the too-hard edge per env)
+                    mv = (float(v) + (2 * torch.rand(env.num_envs) - 1) * jf).clamp(min=0.02) if jf > 0 \
+                        else torch.full((env.num_envs,), float(v))
+                    self.card_mu_fixed.append(mv.to(env.device))
                     m = b.root_physx_view.get_material_properties()
-                    m[:, :, 0] = float(v); m[:, :, 1] = float(v)
+                    m[:, :, 0] = mv[:, None]; m[:, :, 1] = mv[:, None]
                     b.root_physx_view.set_material_properties(m, all_ids)
             K = len(env.distractors)
             self.deck_ref_p = torch.zeros(K, env.num_envs, 3, device=env.device)

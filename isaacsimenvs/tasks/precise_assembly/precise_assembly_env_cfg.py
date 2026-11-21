@@ -241,6 +241,7 @@ class PreciseAssemblyCfg:
     retr_lock_win_rew: float = 0.0       # per step with the press inside [F, r F] while locked
     retr_lock_unlock_bonus: float = 0.0  # once at unlock
     retr_fric_card_jitter: float = 0.0    # DR: each card's friction = env value + U(-j, j) (needs retr_fric_range)
+    retr_fric_fixed_jitter: float = 0.0  # with retr_fric_card_mu: each card v + U(-j, j) per env (hidden, fixed for the env life)
     retr_fric_card_mu: tuple = ()        # fixed friction per card, front -> back (card 1, 2, 3, 4); < 0 = keep
     retr_deck_out_mm: float = 0.0       # > 0: deck_disturbed only when a deck card rises > this (fully out); partial rises that fall back are OK
     retr_mass_log: bool = False         # retr_mass_scale_range sampled log-uniform (one scale per env, all cards)
