@@ -435,6 +435,9 @@ class PreciseAssemblyEnv(PlayEnv):
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
+        if hasattr(self, "_search_prev"):
+            self._search_prev[env_ids] = float("nan")
+            self._search_touched[env_ids] = False
         super()._reset_idx(env_ids)
         self._reset_hand_kp(env_ids)
         self._reset_peg_episode(env_ids)
@@ -1412,6 +1415,30 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
+
+        if (pih_cfg.search_reach_scale > 0.0 or pih_cfg.search_touch_bonus > 0.0) and getattr(self, "distractors", ()):
+            # A22 search reward: (1) potential on the closest fingertip-to-ball surface distance over ALL balls
+            # (going in to any ball pays, not only the hidden target), (2) a one-time bonus the first time a
+            # fingertip touches each ball this episode. Neither tells which ball is the target.
+            o = self.scene.env_origins.unsqueeze(1)
+            balls = torch.cat([self.object.data.root_pos_w.unsqueeze(1),
+                               torch.stack([d.data.root_pos_w for d in self.distractors], dim=1)], dim=1) - o
+            ft = self.robot.data.body_state_w[:, self._fingertip_body_ids, 0:3] - o
+            gap = (torch.cdist(ft, balls) - pih_cfg.search_ball_radius).clamp(min=0.0).min(dim=1).values  # (N, B)
+            pot = -gap.min(dim=1).values
+            if not hasattr(self, "_search_prev"):
+                self._search_prev = torch.full((self.num_envs,), float("nan"), device=self.device)
+                self._search_touched = torch.zeros(self.num_envs, balls.shape[1], dtype=torch.bool, device=self.device)
+            reach = torch.nan_to_num(pot - self._search_prev, nan=0.0) * pih_cfg.search_reach_scale
+            self._search_prev = pot
+            new = (gap < pih_cfg.search_touch_dist) & ~self._search_touched
+            self._search_touched |= new
+            touch = new.float().sum(1) * pih_cfg.search_touch_bonus
+            reward = reward + reach + touch
+            self._reward_terms["search_reach_rew"] = reach
+            self._reward_terms["search_touch_rew"] = touch
+            self._reward_terms["total_reward"] = reward
+            self.extras["search_balls_touched"] = self._search_touched.float().sum(1).mean()
 
         log_step_metrics(self)
         self._log_peg_metrics()

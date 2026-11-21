@@ -186,6 +186,12 @@ class PreciseAssemblyCfg:
     # obs_balls_sorted: field balls_rel_palm = object + every distractor position rel. palm, sorted by angle about
     # the fixture centre (identity-free under slot_shuffle; A22 spiky balls: actor sees where balls are, not which).
     obs_balls_sorted: bool = False
+    # A22 search reward: search_reach_scale x (decrease of the closest fingertip-to-ANY-ball surface gap, m) per step,
+    # + search_touch_bonus once per ball the first time a fingertip comes within search_touch_dist of its surface.
+    search_reach_scale: float = 0.0
+    search_touch_bonus: float = 0.0
+    search_touch_dist: float = 0.008
+    search_ball_radius: float = 0.024
     obs_distractors: bool = False
     # > 0: feed only the obs_distractors_k distractors whose reset pose is nearest the object's start (kept in
     # problem order), so a policy trained with k neighbours can run on a layout with more. 0 = all of them.
