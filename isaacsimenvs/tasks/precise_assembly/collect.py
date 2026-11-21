@@ -74,6 +74,8 @@ def setup(env) -> None:
     st["fell"] = torch.zeros(N, dtype=torch.bool, device=dev)
     st["n_in_ep_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["n_held_max"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["scoop_max"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["n_scoop"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["prev_pos"] = torch.zeros(N, K, 3, device=dev)
     st["at_rest"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
     st["lift_done"] = torch.zeros(N, K, dtype=torch.bool, device=dev)
@@ -132,12 +134,13 @@ def reset(env, env_ids: torch.Tensor) -> None:
         return
     # episode-end snapshot (read by evals after the auto-reset)
     last = st.setdefault("last", {k: torch.zeros(env.num_envs, device=dev) for k in
-                                  ("n_active", "n_in", "n_in_ep_max", "n_held_max", "success")})
+                                  ("n_active", "n_in", "n_in_ep_max", "n_held_max", "scoop_max", "success")})
     if "n_in" in st:
         last["n_active"][env_ids] = st["n_active"][env_ids].float()
         last["n_in"][env_ids] = st["n_in"][env_ids].float()
         last["n_in_ep_max"][env_ids] = st["n_in_ep_max"][env_ids].float()
         last["n_held_max"][env_ids] = st["n_held_max"][env_ids].float()
+        last["scoop_max"][env_ids] = st["scoop_max"][env_ids].float()
         last["success"][env_ids] = st["success"][env_ids].float()
     # number of active utensils
     hi = max(st["n_lo"], min(_n_hi_now(env), K))
@@ -214,6 +217,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
     st["fell"][env_ids] = False
     st["n_in_ep_max"][env_ids] = 0
     st["n_held_max"][env_ids] = 0
+    st["scoop_max"][env_ids] = 0
     st["place_ep_max"][env_ids] = 0.0
     for k in ("trips", "prev_n_in", "multi_max", "visit_n", "prev_n_in_max", "deposit_max"):
         st[k][env_ids] = 0
@@ -428,6 +432,18 @@ def update(env) -> None:
     lifted = (h > 0.02) & out
     st["n_held_max"] = torch.maximum(st["n_held_max"], lifted.sum(1))
     st["lifted"] = lifted
+    # scoop mode (A18 user 11-21: pick up as many knives as possible at once, no bin): a utensil is held when its COM
+    # is >= collect_scoop_h above its rest height while the hand touches utensils (pads / skin; a knife 10 cm up is
+    # either in the hand or resting on knives that are). Success = >= collect_success_min_in held for
+    # collect_clear_steps consecutive steps.
+    held_s = active & (h >= float(c.collect_scoop_h)) & contact.unsqueeze(1)
+    n_scoop = held_s.sum(1)
+    st["n_scoop"] = n_scoop
+    st["scoop_max"] = torch.maximum(st["scoop_max"], n_scoop)
+    if bool(c.collect_scoop_mode):
+        ok_s = n_scoop >= max(1, int(c.collect_success_min_in))
+        st["clear"] = torch.where(ok_s, st["clear"] + 1, torch.zeros_like(st["clear"]))
+        st["success"] = st["clear"] >= int(c.collect_clear_steps)
     # potential
     hn = (h / float(c.collect_lift_h)).clamp(max=1.0)
     d_bin = (pos[..., :2] - env.hole_pos[:, None, :2]).norm(dim=-1)
@@ -490,6 +506,7 @@ def update(env) -> None:
     release = all_in.float() * (d_act / float(c.collect_release_d)).clamp(0, 1)
     phi = phi + float(c.collect_rew_release) * release
     phi = phi + float(c.collect_rew_multi) * (lifted.sum(1) - 1).clamp(min=0).float()   # scooping: carried together
+    phi = phi + float(c.collect_rew_scoop) * n_scoop.float()   # scoop mode: per utensil held high
     r = torch.where(st["fresh"], torch.zeros_like(phi), phi - st["prev_phi"])
     # one-time bonus the first time each utensil is lifted (> 2 cm, out of the bin) in an episode
     new_lift = lifted & ~st["lift_done"] & ~st["fresh"].unsqueeze(1)

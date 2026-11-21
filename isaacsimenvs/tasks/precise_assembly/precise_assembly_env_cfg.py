@@ -250,6 +250,10 @@ class PreciseAssemblyCfg:
     collect_pinch_bonus: float = 0.0                # one-time per episode, first pinch
     # scooping (user 11-20: several utensils per carry, never one at a time)
     collect_fell_terminal: bool = True              # False: a utensil off the table leaves play (penalty), no end
+    collect_scoop_mode: bool = False                # True: success = >= collect_success_min_in utensils held >= collect_scoop_h
+                                                    # up (hand touching) for collect_clear_steps steps; no bin needed
+    collect_scoop_h: float = 0.10
+    collect_rew_scoop: float = 0.0                  # potential per utensil held >= collect_scoop_h up (hand touching)
     collect_success_min_in: int = 0                 # > 0: success = this many in the bin (at rest) + release, not all
     collect_deposit_bonus: float = 0.0              # k-th utensil into the bin in one visit earns (k-1) x this
     collect_scoop_target: bool = False              # object obs fields = centroid of the out-of-bin utensils (pile)

@@ -1361,7 +1361,7 @@ class PreciseAssemblyEnv(PlayEnv):
             all_goals = task
             sf_extra = {"n_active": st["n_active"].float(), "n_in": st["n_in"].float(),
                         "frac_in": st["n_in"].float() / st["n_active"].clamp_min(1).float(),
-                        "n_in_ep_max": st["n_in_ep_max"].float(), "n_held_max": st["n_held_max"].float(),
+                        "n_in_ep_max": st["n_in_ep_max"].float(), "n_held_max": st["n_held_max"].float(), "scoop_max": st["scoop_max"].float(),
                         "pinched": st["pinch_done"].float(),
                         "fell": self._termination_reasons["collect_fell"].float(),
                         "trips": st["trips"].float(), "multi_max": st["multi_max"].float(),
