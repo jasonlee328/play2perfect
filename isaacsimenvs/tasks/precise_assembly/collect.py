@@ -443,7 +443,18 @@ def update(env) -> None:
     # collect_scoop_contact_mem steps
     st["since_contact"] = torch.where(contact, torch.zeros_like(st["since_contact"]), st["since_contact"] + 1)
     touch_recent = st["since_contact"] <= int(c.collect_scoop_contact_mem)
-    held_s = active & (h >= float(c.collect_scoop_h)) & touch_recent.unsqueeze(1)
+    if float(c.collect_scoop_hand_d) > 0.0:
+        # geometric "in the hand" (scoop check v3: tactile on knives held against finger sides reads ~never): some
+        # surface point of the utensil within collect_scoop_hand_d of a fingertip or the palm, and COM slower than
+        # collect_scoop_max_v (a knife 10 cm up for 30 steps at low speed is not falling or thrown)
+        o = env.scene.env_origins.unsqueeze(1)
+        hp = torch.cat([env.robot.data.body_state_w[:, env._fingertip_body_ids, 0:3],
+                        env.robot.data.body_state_w[:, env._palm_body_id, 0:3].unsqueeze(1)], 1) - o      # (N, 6, 3)
+        dh = (pts.unsqueeze(2) - hp[:, None, :, None, :]).norm(dim=-1).amin(dim=(2, 3))                 # (N, K)
+        near_hand = (dh < float(c.collect_scoop_hand_d)) & (vel.norm(dim=-1) < float(c.collect_scoop_max_v))
+        held_s = active & (h >= float(c.collect_scoop_h)) & near_hand
+    else:
+        held_s = active & (h >= float(c.collect_scoop_h)) & touch_recent.unsqueeze(1)
     n_scoop = held_s.sum(1)
     st["n_scoop"] = n_scoop
     st["scoop_max"] = torch.maximum(st["scoop_max"], n_scoop)
