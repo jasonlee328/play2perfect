@@ -195,6 +195,8 @@ def reset(env, env_ids: torch.Tensor) -> None:
         st["prev_pos"][env_ids, k] = pose[:, :3] - origins
         if k == 0:
             env._object_init_z[env_ids] = pose[:, 2] - origins[:, 2]
+    if float(c.collect_prefill_frac) > 0.0 and int(c.collect_prefill_max) > 0:
+        _prefill(env, env_ids, active, bin_yaw)
     if c.collect_bank_file and float(c.collect_bank_frac) > 0.0:
         _bank_reset(env, env_ids)
     st["inbin"][env_ids] = False
@@ -210,6 +212,57 @@ def reset(env, env_ids: torch.Tensor) -> None:
         st[k][env_ids] = 0
     for k in ("near", "visit_dep", "trips_over"):
         st[k][env_ids] = False
+
+
+def _prefill(env, env_ids, active, bin_yaw) -> None:
+    """Reverse curriculum on the count (A18 11-21): a share collect_prefill_frac of resets start with p ~ U{1..pmax}
+    active utensils already lying in the bin (dropped flat from just above the floor, side by side, then stacked), so
+    fewer deposits reach collect_success_min_in. pmax ramps from collect_prefill_max to 0 over
+    collect_prefill_ramp_steps env steps (0 = no ramp; offset collect_prefill_offset_steps)."""
+    st, c, dev = env._collect, env.cfg.precise_assembly, env.device
+    pmax = int(c.collect_prefill_max)
+    steps = int(c.collect_prefill_ramp_steps)
+    if steps > 0:
+        a = min(1.0, float(env.common_step_counter + int(c.collect_prefill_offset_steps)) / steps)
+        pmax = int(math.floor(pmax * (1.0 - a) + 0.5))
+    if pmax <= 0:
+        return
+    n = env_ids.numel()
+    use = torch.rand(n, device=dev) < float(c.collect_prefill_frac)
+    p = torch.randint(1, pmax + 1, (n,), device=dev) * use.long()
+    if int(p.max()) == 0:
+        return
+    K = st["K"]
+    r = torch.rand(n, K, device=dev) + (~active).float() * 2.0            # inactive slots sort last
+    rank = r.argsort(dim=1).argsort(dim=1)
+    take = (rank < p.unsqueeze(1)) & active
+    origins = env.scene.env_origins[env_ids]
+    hp = env.hole_pos[env_ids]
+    z_axis = torch.tensor([0.0, 0.0, 1.0], device=dev).expand(n, 3)
+    hw = float(st["inner_floor"][1])
+    for k, body in enumerate(st["bodies"]):
+        m = take[:, k]
+        if not bool(m.any()):
+            continue
+        idx = rank[:, k].float()                                           # 0, 1, ... within the env
+        side = torch.where(idx % 2 == 0, -1.0, 1.0)
+        lat = side * max(hw - float(st["half"][k][1]) - 0.002, 0.0)
+        layer = torch.floor(idx / 2)
+        yaw = bin_yaw + math.pi * (torch.rand(n, device=dev) < 0.5).float()
+        qz = quat_from_angle_axis(yaw, z_axis)
+        q = quat_mul(qz, st["rest_q"][k].expand(n, 4))
+        qb = quat_from_angle_axis(bin_yaw, z_axis)
+        cpos = hp + quat_apply(qb, torch.stack([torch.zeros(n, device=dev), lat, torch.zeros(n, device=dev)], 1))
+        off = quat_apply(qz, torch.cat([st["cxy"][k], torch.zeros(1, device=dev)]).expand(n, 3))
+        z = hp[:, 2] + st["floor"] + st["rest_z"][k] + 0.004 + 0.014 * layer
+        pos = torch.cat([cpos[:, :2], z.unsqueeze(1)], 1) - off
+        pose = torch.cat([pos + origins, q], 1)
+        ids = env_ids[m]
+        body.write_root_pose_to_sim(pose[m], env_ids=ids)
+        body.write_root_velocity_to_sim(torch.zeros(int(m.sum()), 6, device=dev), env_ids=ids)
+        st["prev_pos"][ids, k] = pos[m]
+        if k == 0:
+            env._object_init_z[ids] = pos[m, 2]
 
 
 BANK_KEYS = ("joint_pos", "joint_vel", "cur_targets", "prev_targets", "hole_pos", "hole_quat", "ut_pos", "ut_quat",
