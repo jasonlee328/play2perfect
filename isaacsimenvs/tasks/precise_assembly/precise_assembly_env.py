@@ -1218,6 +1218,8 @@ class PreciseAssemblyEnv(PlayEnv):
         ef["collect_lift_frac"] = col.bonus_paid.sum(1).float() / col.n_active.clamp_min(1.0)
         ef["collect_from_bank"] = col.from_bank.float()
         ef["collect_n_in_hand"] = col.n_in_hand
+        ef["collect_n_held"] = col.n_held
+        ef["collect_held_max"] = col.held_max
         ef["collect_trips"] = col.trips.float()
         self.extras["success_final"] = {"task": col.success.float(), "n_active": col.n_active,
                                         "frac_in_bin": ef["collect_frac_in_bin"]}
