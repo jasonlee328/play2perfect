@@ -488,6 +488,12 @@ class CollectManager:
         phi = (-float(c.collect_w_scoop_app) * app * (n_hand == 0).float() + float(c.collect_w_inhand) * n_hand
                + float(c.collect_w_pour) * pour
                + float(c.collect_w_carry_v2) * ((float(c.collect_carry_d0_v2) - dd).clamp(min=0.0) * in_hand.float()).sum(1))
+        if bool(getattr(c, "collect_bin_keeps_potential", False)):
+            # a part in the bin keeps the full in-hand + carry (+ pour) potential, so letting go over the bin is not a
+            # loss (else holding a part above the bin forever is worth more than the in-bin bonus)
+            nb = (self.in_bin & self.active).sum(1).float()
+            phi = phi + nb * (float(c.collect_w_inhand) + float(c.collect_w_carry_v2) * float(c.collect_carry_d0_v2)
+                              + float(c.collect_w_pour))
         r_phi = torch.where(self.fresh, torch.zeros_like(phi), phi - self.prev_scoop)
         self.prev_scoop = phi
         if c.collect_release_free:
