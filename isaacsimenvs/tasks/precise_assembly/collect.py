@@ -448,8 +448,11 @@ def update(env) -> None:
         # surface point of the utensil within collect_scoop_hand_d of a fingertip or the palm, and COM slower than
         # collect_scoop_max_v (a knife 10 cm up for 30 steps at low speed is not falling or thrown)
         o = env.scene.env_origins.unsqueeze(1)
-        hp = torch.cat([env.robot.data.body_state_w[:, env._fingertip_body_ids, 0:3],
-                        env.robot.data.body_state_w[:, env._palm_body_id, 0:3].unsqueeze(1)], 1) - o      # (N, 6, 3)
+        if "hand_body_ids" not in st:   # every hand link (iiwa links 0-6 excluded; the palm is merged into link 7)
+            nm = env.robot.body_names
+            st["hand_body_ids"] = [i for i, n in enumerate(nm)
+                                   if not (n.startswith("iiwa14_link_") and n != "iiwa14_link_7")]
+        hp = env.robot.data.body_state_w[:, st["hand_body_ids"], 0:3] - o                               # (N, B, 3)
         dh = (pts.unsqueeze(2) - hp[:, None, :, None, :]).norm(dim=-1).amin(dim=(2, 3))                 # (N, K)
         near_hand = (dh < float(c.collect_scoop_hand_d)) & (vel.norm(dim=-1) < float(c.collect_scoop_max_v))
         held_s = active & (h >= float(c.collect_scoop_h)) & near_hand
