@@ -363,7 +363,8 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         ang = torch.atan2(b[..., 1] - c[..., 1], b[..., 0] - c[..., 0])
         order = torch.argsort(ang, dim=1)
         b = torch.gather(b, 1, order.unsqueeze(-1).expand(-1, -1, 3))
-        obs_clean["balls_rel_palm"] = (b - palm_pos.unsqueeze(1)).reshape(env.num_envs, -1)
+        # xy only: a spiky ball rests 0.85 mm lower than a smooth one (domes), so z would leak which is which
+        obs_clean["balls_rel_palm"] = (b - palm_pos.unsqueeze(1))[..., :2].reshape(env.num_envs, -1)
 
     if "fixture_pose_rel_palm" in OBS_FIELD_SIZES and hasattr(env, "hole_pos"):
         fpos = env.hole_pos + getattr(env, "_fixture_obs_noise", 0.0)      # fixture_obs_noise_m (per episode)

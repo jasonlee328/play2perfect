@@ -359,7 +359,7 @@ class PreciseAssemblyEnv(PlayEnv):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
         if cfg.precise_assembly.obs_balls_sorted and self._pih_distractor_urdf_abs:
-            OBS_FIELD_SIZES["balls_rel_palm"] = 3 * (len(self._pih_distractor_urdf_abs) + 1)
+            OBS_FIELD_SIZES["balls_rel_palm"] = 2 * (len(self._pih_distractor_urdf_abs) + 1)
             for lst in ("obs_list", "state_list"):
                 if "balls_rel_palm" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "balls_rel_palm"))
