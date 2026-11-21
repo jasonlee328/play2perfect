@@ -603,6 +603,32 @@ class PreciseAssemblyEnv(PlayEnv):
         self.distractor_moved_ep_max[env_ids] = 0.0
         self.distractor_rise[env_ids] = 0.0
 
+    def _twin_mask(self) -> torch.Tensor:
+        """(K, N) bool: distractor k of env n uses the env's object asset (identical body, A22 twins)."""
+        if not hasattr(self, "_twin_mask_t"):
+            K = len(getattr(self, "distractors", ()))
+            if getattr(self, "_multi_clutter", False):
+                P = len(self._pih_problem_names)
+                m = torch.tensor([[self._pih_distractor_urdf_abs_multi[k][p] == self._pih_object_urdf_abs_list[p]
+                                   for p in range(P)] for k in range(K)], device=self.device, dtype=torch.bool)
+                self._twin_mask_t = m[:, self._object_asset_index_per_env]
+            else:
+                m = torch.tensor([u == self._pih_object_urdf_abs for u in self._pih_distractor_urdf_abs],
+                                 device=self.device, dtype=torch.bool)
+                self._twin_mask_t = m.unsqueeze(1).expand(K, self.num_envs).clone()
+        return self._twin_mask_t
+
+    def _slot_rest_rel(self, env_ids: torch.Tensor) -> torch.Tensor:
+        """(S, n, 3) receptive-frame rest positions of slot 0 (object) and the distractors for env_ids."""
+        if getattr(self, "_multi_clutter", False):
+            self._mc_tables()
+            obj = self._object_start_rel_env[env_ids, :3].unsqueeze(0)
+            dist = self._distractor_pose_rel_env[:, env_ids, :3]
+            return torch.cat([obj, dist], 0)
+        f = dict(device=self.device, dtype=torch.float32)
+        rel = [self._pih_object_start_rel[:3]] + [p[:3] for p in self._pih_distractor_pose_rel]
+        return torch.tensor(rel, **f).unsqueeze(1).expand(-1, env_ids.numel(), -1)
+
     def _sample_start_shift(self, env_ids: torch.Tensor, n_dist: int) -> None:
         """start_shift_m: fresh U(-d, d) receptive-frame offsets for the object (row 0) and each distractor."""
         if not hasattr(self, "_start_shift"):
@@ -613,6 +639,15 @@ class PreciseAssemblyEnv(PlayEnv):
             self._start_shift[:, env_ids] = (torch.rand(n_dist + 1, env_ids.numel(), 3, device=self.device) * 2 - 1) * half
         else:
             self._start_shift[:, env_ids] = 0.0
+        if self.cfg.precise_assembly.slot_shuffle and n_dist > 0 and self._pih_object_start_rel:
+            rel = self._slot_rest_rel(env_ids)                                   # (S, n, 3)
+            S, n = rel.shape[0], rel.shape[1]
+            perm = torch.argsort(torch.rand(S, n, device=self.device), dim=0)    # body b -> slot perm[b]
+            tgt = torch.gather(rel, 0, perm.unsqueeze(-1).expand(-1, -1, 3))
+            self._start_shift[:, env_ids] += tgt - rel
+            if not hasattr(self, "slot_of_body"):
+                self.slot_of_body = torch.zeros(S, self.num_envs, dtype=torch.long, device=self.device)
+            self.slot_of_body[:, env_ids] = perm
         fn = tuple(self.cfg.precise_assembly.fixture_obs_noise_m)
         if not hasattr(self, "_fixture_obs_noise"):
             self._fixture_obs_noise = torch.zeros(self.num_envs, 3, device=self.device)
@@ -636,6 +671,8 @@ class PreciseAssemblyEnv(PlayEnv):
             return
         pos = torch.stack([b.data.root_pos_w for b in dists])                      # (K, N, 3)
         rise = pos[..., 2] - self._distractor_reset_pos[..., 2]
+        if self.cfg.precise_assembly.swap_twins_only:
+            rise = torch.where(self._twin_mask(), rise, torch.full_like(rise, -1e9))
         top, k = rise.max(dim=0)
         obj_rise = self.object.data.root_pos_w[:, 2] - self._object_rest_pos[:, 2]
         swap = (top > thr) & (obj_rise < 0.005)
@@ -1168,7 +1205,12 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
+        wrong = torch.zeros_like(fall)
+        if pih_cfg.wrong_ball_rise > 0.0 and getattr(self, "distractors", ()) and hasattr(self, "_distractor_reset_pos"):
+            pos = torch.stack([b.data.root_pos_w for b in self.distractors])
+            rise = pos[..., 2] - self._distractor_reset_pos[..., 2]
+            wrong = ((rise > pih_cfg.wrong_ball_rise) & ~self._twin_mask()).any(0) & ~max_successes
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | wrong
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1177,6 +1219,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "hand_far": hand_far,
             "dropped": dropped,
             "disturbed": disturbed,
+            "wrong_ball": wrong,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1259,6 +1302,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 reward = reward - lift_pen
                 self._reward_terms["distractor_lift_penalty"] = -lift_pen
                 self._reward_terms["total_reward"] = reward
+            if pih_cfg.wrong_ball_penalty > 0.0 and "wrong_ball" in self._termination_reasons:
+                wpen = pih_cfg.wrong_ball_penalty * self._termination_reasons["wrong_ball"].float()
+                reward = reward - wpen
+                self._reward_terms["wrong_ball_penalty"] = -wpen
+                self._reward_terms["total_reward"] = reward
             if pih_cfg.distractor_disturb_terminal_penalty > 0.0 and "disturbed" in self._termination_reasons:
                 term_pen = pih_cfg.distractor_disturb_terminal_penalty * self._termination_reasons["disturbed"].float()
                 reward = reward - term_pen
@@ -1293,6 +1341,8 @@ class PreciseAssemblyEnv(PlayEnv):
         if hasattr(self, "distractor_disp_ep_max"):
             sf["neighbours_moved_cm"] = self.distractor_moved_ep_max * 100.0
             sf["neighbours_out_of_box_cm"] = self.distractor_disp_ep_max * 100.0
+            sf["ended_wrong_ball"] = self._termination_reasons["wrong_ball"].float() \
+                if "wrong_ball" in self._termination_reasons else torch.zeros_like(task)
             sf["ended_disturbed"] = self._termination_reasons["disturbed"].float() \
                 if "disturbed" in self._termination_reasons else torch.zeros_like(task)
         self.extras["success_final"] = {k: v.detach().clone() for k, v in sf.items()}

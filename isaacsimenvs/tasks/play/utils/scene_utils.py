@@ -141,6 +141,8 @@ _PHYSICS_SPECS: dict[str, tuple[str, str, str]] = {
     "max_depenetration_velocity": ("rb", "physxRigidBody:maxDepenetrationVelocity", "Float"),
     "rb_solver_position_iterations": ("rb", "physxRigidBody:solverPositionIterationCount", "Int"),
     "rb_solver_velocity_iterations": ("rb", "physxRigidBody:solverVelocityIterationCount", "Int"),
+    "angular_damping": ("rb", "physxRigidBody:angularDamping", "Float"),
+    "linear_damping": ("rb", "physxRigidBody:linearDamping", "Float"),
     "articulation_enabled": ("art", "physics:articulationEnabled", "Bool"),
     "enabled_self_collisions": ("art", "physxArticulation:enabledSelfCollisions", "Bool"),
     "solver_position_iterations": ("art", "physxArticulation:solverPositionIterationCount", "Int"),

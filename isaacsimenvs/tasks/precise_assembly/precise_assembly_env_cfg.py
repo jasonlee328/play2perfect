@@ -139,6 +139,18 @@ class PreciseAssemblyCfg:
     # reset pose; the goals move to the new object), so lifting any one stick is lifting "the object". Identical
     # bodies only (same asset), so the swap is invisible to physics, cameras and touch.
     swap_lifted_distractor: float = 0.0
+    # A22 hidden-identity tasks (spiky balls): swap only with distractors that use the object's own asset ("twins").
+    swap_twins_only: bool = False
+    # A22: at every reset the object and all distractors get a random permutation of their slots (receptive-frame
+    # rest positions; slots must hold the same pose up to translation, e.g. identical tray pockets). Hidden from the
+    # actor unless an obs field shows body positions in fixed order (don't use obs_distractors with it).
+    slot_shuffle: bool = False
+    # A22 wrong object: a NON-twin distractor (different asset than the object) rising more than this (m) above its
+    # reset pose ends the episode (termination "wrong_ball", reward -= wrong_ball_penalty). 0 = off.
+    wrong_ball_rise: float = 0.0
+    wrong_ball_penalty: float = 0.0
+    # A22: PhysX angular damping of the object and every distractor (rolling resistance, e.g. balls in a foam tray); < 0 = default.
+    object_angular_damping: float = -1.0
     # Privileged-free teacher obs: field "fixture_pose_rel_palm" (fixture position relative to the palm + its
     # quaternion wxyz, 7), added to obs_list and state_list.
     obs_fixture: bool = False

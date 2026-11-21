@@ -29,6 +29,12 @@ from isaacsimenvs.tasks.play.utils.scene_utils import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
+
+def _obj_ang_damp(env):
+    """A22: precise_assembly.object_angular_damping (object + distractors; < 0 = USD default)."""
+    v = float(getattr(env.cfg.precise_assembly, "object_angular_damping", -1.0))
+    return v if v >= 0 else None
+
 def _asset_path(path: str | Path) -> str:
     asset_path = Path(path)
     if not asset_path.is_absolute():
@@ -148,6 +154,7 @@ def setup_scene(env) -> None:
                 rb_solver_position_iterations=4,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
+                angular_damping=_obj_ang_damp(env),
             ),
         ))
         goalviz_usd_paths.append(_bake_usd(
@@ -196,6 +203,7 @@ def setup_scene(env) -> None:
                     rb_solver_position_iterations=4,
                     rb_solver_velocity_iterations=0,
                     articulation_enabled=False,
+                    angular_damping=_obj_ang_damp(env),
                 ),
             ))
         distractor_usd_paths.append(paths)
