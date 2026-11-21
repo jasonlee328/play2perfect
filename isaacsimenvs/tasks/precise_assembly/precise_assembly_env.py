@@ -1038,6 +1038,16 @@ class PreciseAssemblyEnv(PlayEnv):
         self.hand_force_z = -F[..., 2].sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
         # A21: squeeze = sum over links of the horizontal contact force magnitude (side-grip normals), same calibration
         self.hand_force_xy = F[..., :2].norm(dim=-1).sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
+        # A21 11-21: squeeze through the 5 fingertip (DP) links only = the links that carry TacMap pads
+        if getattr(self, "_hf_tip_idx", None) is None:
+            paths = list(self.robot.root_physx_view.link_paths[0])
+            self._hf_tip_idx = torch.tensor([i for i, q in enumerate(paths) if q.rstrip("/").endswith("_DP")],
+                                            dtype=torch.long, device=self.device)
+        self.hand_force_xy_tip = F[:, self._hf_tip_idx, :2].norm(dim=-1).sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
+        if bool(getattr(self.cfg.precise_assembly, "cupgrip_squeeze_tips_only", False)):
+            # squeeze that counts for the window rules = fingertip-pad force only (force through finger sides / palm
+            # does not hold the cup in the window)
+            self.hand_force_xy = self.hand_force_xy_tip
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
         over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
