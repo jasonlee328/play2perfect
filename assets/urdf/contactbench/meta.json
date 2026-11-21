@@ -911,6 +911,36 @@
     0.6
    ],
    "collision": "sphere + 150 frustums"
+  },
+  "spikyball_smooth_dim": {
+   "src": "generated",
+   "extents_mm": [
+    48.0,
+    48.0,
+    48.0
+   ],
+   "mass_g": 30.0,
+   "object_scale": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "collision": "sphere"
+  },
+  "spikyball_spiky_dim": {
+   "src": "generated",
+   "extents_mm": [
+    48.0,
+    48.0,
+    48.0
+   ],
+   "mass_g": 30.0,
+   "object_scale": [
+    0.6,
+    0.6,
+    0.6
+   ],
+   "collision": "sphere + 120 frustums"
   }
  },
  "fixtures": {
@@ -11425,6 +11455,286 @@
    "distractors": [
     [
      "urdf/contactbench/objects/spikyball_spiky_cd/spikyball_spiky_cd.urdf",
+     [
+      0.03,
+      0.03,
+      0.029481070055099805,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     -0.03,
+     -0.03,
+     0.12948107005509982,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "probe": "smooth target"
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_spikyball_2of4_dim": {
+   "object": "spikyball_spiky_dim",
+   "fixture": "spikyball_tray",
+   "object_start_pose": [
+    -0.03,
+    -0.03,
+    0.029481070055099805,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/spikyball_spiky_dim/spikyball_spiky_dim.urdf",
+     [
+      0.03,
+      -0.03,
+      0.029481070055099805,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/spikyball_smooth_dim/spikyball_smooth_dim.urdf",
+     [
+      -0.03,
+      0.03,
+      0.029481070055099805,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/spikyball_smooth_dim/spikyball_smooth_dim.urdf",
+     [
+      0.03,
+      0.03,
+      0.029481070055099805,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     -0.03,
+     -0.03,
+     0.12948107005509982,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "spiky": 2,
+    "smooth": 2,
+    "target": "any spiky",
+    "pockets": [
+     [
+      -30.0,
+      -30.0
+     ],
+     [
+      30.0,
+      -30.0
+     ],
+     [
+      -30.0,
+      30.0
+     ],
+     [
+      30.0,
+      30.0
+     ]
+    ]
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_spikyball_1of4_dim": {
+   "object": "spikyball_spiky_dim",
+   "fixture": "spikyball_tray",
+   "object_start_pose": [
+    -0.03,
+    -0.03,
+    0.029481070055099805,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/spikyball_smooth_dim/spikyball_smooth_dim.urdf",
+     [
+      0.03,
+      -0.03,
+      0.029481070055099805,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/spikyball_smooth_dim/spikyball_smooth_dim.urdf",
+     [
+      -0.03,
+      0.03,
+      0.029481070055099805,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/spikyball_smooth_dim/spikyball_smooth_dim.urdf",
+     [
+      0.03,
+      0.03,
+      0.029481070055099805,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     -0.03,
+     -0.03,
+     0.12948107005509982,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "spiky": 1,
+    "smooth": 3,
+    "target": "the spiky",
+    "pockets": [
+     [
+      -30.0,
+      -30.0
+     ],
+     [
+      30.0,
+      -30.0
+     ],
+     [
+      -30.0,
+      30.0
+     ],
+     [
+      30.0,
+      30.0
+     ]
+    ]
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_spikyball_probe_spiky_dim": {
+   "object": "spikyball_spiky_dim",
+   "fixture": "spikyball_tray",
+   "object_start_pose": [
+    -0.03,
+    -0.03,
+    0.029481070055099805,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/spikyball_smooth_dim/spikyball_smooth_dim.urdf",
+     [
+      0.03,
+      0.03,
+      0.029481070055099805,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     -0.03,
+     -0.03,
+     0.12948107005509982,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "probe": "spiky target"
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_spikyball_probe_smooth_dim": {
+   "object": "spikyball_smooth_dim",
+   "fixture": "spikyball_tray",
+   "object_start_pose": [
+    -0.03,
+    -0.03,
+    0.029481070055099805,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/spikyball_spiky_dim/spikyball_spiky_dim.urdf",
      [
       0.03,
       0.03,
