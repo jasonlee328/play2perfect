@@ -367,6 +367,22 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
+    # Joint-position obs noise (actor only; critic uses obs_clean): per-step Gaussian std + a per-episode bias
+    # U(+-b) per joint, so the actor can't read contact force exactly from (joint_pos - target).
+    jstd = float(getattr(dr, "joint_position_obs_noise_std", 0.0))
+    jb = float(getattr(dr, "joint_position_obs_bias", 0.0))
+    if (jstd > 0 or jb > 0) and "joint_pos" in obs_noisy:
+        jp = obs_noisy["joint_pos"]
+        if jb > 0:
+            if getattr(env, "_jpos_obs_bias", None) is None or env._jpos_obs_bias.shape != jp.shape:
+                env._jpos_obs_bias = (torch.rand_like(jp) * 2 - 1) * jb
+            new_ep = env.episode_length_buf <= 1
+            if bool(new_ep.any()):
+                env._jpos_obs_bias[new_ep] = (torch.rand_like(jp[new_ep]) * 2 - 1) * jb
+            jp = jp + env._jpos_obs_bias
+        if jstd > 0:
+            jp = jp + torch.randn_like(jp) * jstd
+        obs_noisy["joint_pos"] = jp
 
     # Blind teacher (precise_assembly.blind_fields): these actor-obs fields are zeroed (the critic keeps them) in the
     # first a(t) * num_envs envs, a(t) ramping 0 -> 1 over blind_ramp_steps env steps (0 = all envs from the start).
