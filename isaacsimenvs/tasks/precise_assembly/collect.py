@@ -230,6 +230,7 @@ def _prefill(env, env_ids, active, bin_yaw) -> None:
     n = env_ids.numel()
     use = torch.rand(n, device=dev) < float(c.collect_prefill_frac)
     p = torch.randint(1, pmax + 1, (n,), device=dev) * use.long()
+    p = torch.minimum(p, (active.sum(1) - 1).clamp(min=0))       # never prefill every utensil (blind success)
     if int(p.max()) == 0:
         return
     K = st["K"]
