@@ -200,6 +200,7 @@ class PreciseAssemblyCfg:
     card_deck_motion_pen_cap: float = 4.0
     # A10 retrieve (card_task="retrieve", ContactBench task 5 retrieve_card_from_deck.py)
     retr_other_disp_max: float = 0.005    # OTHER_DISP_MAX (retrieve_card_from_deck.py:53)
+    retr_hint_obs: bool = False                                # A10 oracle field card_hint (weight scale, press / window)
     retr_other_tilt_max: float = 3.0      # OTHER_TILT_MAX (:54)
     retr_place_xy: tuple = (0.08, -0.09)  # PLACE_XY (:41), receptive frame (m)
     retr_lift_m: float = 0.04             # card centre rise that counts as lifted out of the deck (shaping / release)

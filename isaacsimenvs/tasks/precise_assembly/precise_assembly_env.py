@@ -331,6 +331,12 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "card_expert_phase" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "card_expert_phase"))
+        if bool(getattr(cfg.precise_assembly, "retr_hint_obs", False)):
+            # A10 oracle: card_hint = [card weight scale, press / window centre] in actor + critic (for DS distillation)
+            OBS_FIELD_SIZES["card_hint"] = 2
+            for lst in ("obs_list", "state_list"):
+                if "card_hint" not in getattr(cfg.obs, lst):
+                    setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "card_hint"))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)

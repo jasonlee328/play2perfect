@@ -358,6 +358,17 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             elif override != "none":
                 raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
 
+    if "card_hint" in OBS_FIELD_SIZES:
+        # A10 oracle: [log card-weight scale / log 64, press on card 1 / (0.19 N x scale) clipped to 3, / 3]
+        card = getattr(env, "_card", None)
+        ms = getattr(card, "mass_scale", None) if card is not None else None
+        if ms is None:
+            ms = torch.ones(env.num_envs, device=env.device)
+        fp = getattr(card, "f_press", None) if card is not None else None
+        if fp is None:
+            fp = torch.zeros(env.num_envs, device=env.device)
+        obs_clean["card_hint"] = torch.stack([ms.log() / math.log(64.0),
+                                              (fp / (0.19 * ms)).clamp(0.0, 3.0) / 3.0], -1)
     if "distractor_obs" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
         idx = getattr(env, "_obs_distractor_idx", None)
         bodies = env.distractors if idx is None else [env.distractors[i] for i in idx]
