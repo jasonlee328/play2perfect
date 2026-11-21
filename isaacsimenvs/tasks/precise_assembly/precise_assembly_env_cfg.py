@@ -149,6 +149,8 @@ class PreciseAssemblyCfg:
     # reset pose ends the episode (termination "wrong_ball", reward -= wrong_ball_penalty). 0 = off.
     wrong_ball_rise: float = 0.0
     wrong_ball_penalty: float = 0.0
+    # A22: reward -= this when the episode ends because the object fell below 0.1 m (off the table). 0 = off.
+    fall_terminal_penalty: float = 0.0
     # A22: PhysX angular damping of the object and every distractor (rolling resistance, e.g. balls in a foam tray); < 0 = default.
     object_angular_damping: float = -1.0
     finger_compliant_stiffness: float = 0.0   # A10 38dddcc: > 0 = soft fingertip links (PhysX compliant contact, N/m)

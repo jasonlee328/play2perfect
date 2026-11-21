@@ -1389,6 +1389,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 reward = reward - lift_pen
                 self._reward_terms["distractor_lift_penalty"] = -lift_pen
                 self._reward_terms["total_reward"] = reward
+            if getattr(pih_cfg, "fall_terminal_penalty", 0.0) > 0.0 and "fall" in self._termination_reasons:
+                fpen = pih_cfg.fall_terminal_penalty * self._termination_reasons["fall"].float()
+                reward = reward - fpen
+                self._reward_terms["fall_penalty"] = -fpen
+                self._reward_terms["total_reward"] = reward
             if pih_cfg.wrong_ball_penalty > 0.0 and "wrong_ball" in self._termination_reasons:
                 wpen = pih_cfg.wrong_ball_penalty * self._termination_reasons["wrong_ball"].float()
                 reward = reward - wpen
