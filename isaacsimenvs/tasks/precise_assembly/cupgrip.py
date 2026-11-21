@@ -298,6 +298,11 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
     if bool(c.cupgrip_detach_rule):
         # user 11-20: a partial lift of the second cup is fine if it falls back; fail only when it detaches
         dragged = rise2 > float(c.cupgrip_detach_mm) / 1000.0
+        tdrop = float(getattr(c, "cupgrip_table_drop_mm", 0.0))
+        if tdrop > 0.0:
+            # user 11-21: lifting the second cup along is fine; fail only when it ends up on the table, i.e. its
+            # centre falls more than tdrop mm below its seat on the stack (it can only get there by falling off)
+            dragged = rise2 < -tdrop / 1000.0
     from isaaclab.utils.math import quat_apply
     dn = torch.tensor([0.0, 0.0, -1.0], device=env.device).expand(env.num_envs, 3)
     env.cg_last_rise2 = rise2.clone()
