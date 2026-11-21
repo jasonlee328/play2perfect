@@ -197,6 +197,10 @@ def pre_physics(env) -> None:
         off = hand < 0.9 * env.cg_D
     else:
         off = (hand < 0.9 * env.cg_D) | ~nested
+    if bool(getattr(c, "cupgrip_sticky_drag", False)):
+        # user 11-21: wedged cups do not come apart when the grip loosens: once the squeeze dragged the second cup along,
+        # it stays stuck to the top cup for the rest of the episode (no 'lift both, drop one back')
+        off = torch.zeros_like(off)
     env.cg_coupled = (env.cg_coupled | on) & ~off
     env.cg_ever_coupled |= env.cg_coupled
 
