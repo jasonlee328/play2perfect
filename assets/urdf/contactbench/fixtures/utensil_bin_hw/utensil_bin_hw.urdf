@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!-- Wide chopstick tray: utensil_bin_h with side walls 25.0 mm further out per side (FoundationTouch
+     tools/contactbench/make_tray_wide.py); collision = exact boxes, visual = printed mesh scaled y x1.8784. -->
+<robot name="cb_utensil_bin_hw">
+  <material name="c"><color rgba="0.92 0.92 0.90 1.0"/></material>
+  <link name="receptive">
+    <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="utensil_bin_hw.obj" scale="1 1.878426 1"/></geometry><material name="c"/></visual>
+    <collision><origin xyz="0.000000 0.000000 -0.009250" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.225487 0.112008 0.021500"/></geometry></collision>
+    <collision><origin xyz="0.000000 0.052461 0.010650" rpy="-0.050058 0.000000 0.000000"/><geometry><box size="0.225487 0.004000 0.061577"/></geometry></collision>
+    <collision><origin xyz="0.108821 0.000000 0.010625" rpy="0.000000 0.062319 0.000000"/><geometry><box size="0.004000 0.112008 0.061620"/></geometry></collision>
+    <collision><origin xyz="0.000000 -0.052461 0.010650" rpy="0.050058 0.000000 0.000000"/><geometry><box size="0.225487 0.004000 0.061577"/></geometry></collision>
+    <collision><origin xyz="-0.108821 0.000000 0.010625" rpy="0.000000 -0.062319 0.000000"/><geometry><box size="0.004000 0.112008 0.061620"/></geometry></collision>
+  </link>
+</robot>
