@@ -296,6 +296,15 @@ class CollectManager:
             # parts in the hand (if any) define the virtual object: carrying them moves it to the goal
             ih = self.prev_hand.float().unsqueeze(-1)
             out = torch.where(ih.sum(1, keepdim=True) > 0, ih, out)
+        if bool(getattr(self.c, "collect_target_nearest", False)) and hasattr(self, "ft_min"):
+            # scattered parts: the centroid of all parts left is empty table, so target the part nearest the
+            # fingertips (parts in the hand still win above)
+            o1 = out[..., 0] > 0
+            near = torch.where(o1, self.ft_min, torch.full_like(self.ft_min, 99.0)).argmin(1)
+            one = torch.nn.functional.one_hot(near, out.shape[1]).float().unsqueeze(-1)
+            ih_any = (self.prev_hand.float().sum(1, keepdim=True) > 0).unsqueeze(-1) if self.c.collect_obj_follow_hand \
+                else torch.zeros_like(out[:, :1])
+            out = torch.where(ih_any > 0, out, one * (o1.any(1, keepdim=True).unsqueeze(-1).float()))
         n = out.sum(1)
         c = (pos * out).sum(1) / n.clamp(min=1.0)
         v = (vel * out).sum(1) / n.clamp(min=1.0)
@@ -477,6 +486,8 @@ class CollectManager:
         n_hand = in_hand.sum(1).float()
         self.n_in_hand = n_hand
         app = (palm - cen).norm(dim=-1).clamp(max=0.4)
+        if bool(getattr(c, "collect_target_nearest", False)):
+            app = self.ft_min_out.clamp(max=0.4)          # nearest fingertip to the nearest part still out
         pour = torch.zeros(N, device=self.dev)
         if float(c.collect_w_pour) > 0.0:
             # pour shaping: parts in the hand over the bin opening x how far the palm faces down (0 up .. 1 down)
