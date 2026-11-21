@@ -454,7 +454,16 @@ class CollectManager:
         n_hand = in_hand.sum(1).float()
         self.n_in_hand = n_hand
         app = (palm - cen).norm(dim=-1).clamp(max=0.4)
+        pour = torch.zeros(N, device=self.dev)
+        if float(c.collect_w_pour) > 0.0:
+            # pour shaping: parts in the hand over the bin opening x how far the palm faces down (0 up .. 1 down)
+            pq = env.robot.data.body_state_w[:, env._palm_body_id, 3:7]
+            nl = torch.tensor(list(c.collect_palm_normal_local), device=self.dev).expand(N, 3)
+            down = (1.0 - quat_apply(pq, nl)[:, 2]) * 0.5
+            over = (self.rel_bin[..., :2].abs() < self.half_floor.unsqueeze(0).unsqueeze(0) + 0.01).all(-1)
+            pour = (in_hand & over).sum(1).float() * down
         phi = (-float(c.collect_w_scoop_app) * app * (n_hand == 0).float() + float(c.collect_w_inhand) * n_hand
+               + float(c.collect_w_pour) * pour
                + float(c.collect_w_carry_v2) * ((float(c.collect_carry_d0_v2) - dd).clamp(min=0.0) * in_hand.float()).sum(1))
         r_phi = torch.where(self.fresh, torch.zeros_like(phi), phi - self.prev_scoop)
         self.prev_scoop = phi

@@ -238,6 +238,9 @@ class PreciseAssemblyCfg:
     collect_success_min_in: int = 0
     # scoop: the virtual object = parts in the hand when any are held, else the parts left
     collect_obj_follow_hand: bool = False
+    # pour shaping (potential): parts in the hand over the bin x palm facing down; palm normal in the palm body frame
+    collect_w_pour: float = 0.0
+    collect_palm_normal_local: tuple = (0.75, -0.66, 0.0)
     collect_sort_slots: bool = False
     collect_hand_radius: float = 0.10
     collect_w_scoop_app: float = 200.0
