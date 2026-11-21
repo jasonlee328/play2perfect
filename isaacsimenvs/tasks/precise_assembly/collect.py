@@ -162,8 +162,8 @@ def reset(env, env_ids: torch.Tensor) -> None:
     for k in range(K):
         cc = torch.stack([torch.empty(n, T, device=dev).uniform_(x0, x1),
                           torch.empty(n, T, device=dev).uniform_(y0, y1)], -1)       # footprint centres
-        yy = (math.radians(c.collect_yaw_center_deg)
-              + torch.empty(n, T, device=dev).uniform_(-1, 1) * math.radians(c.collect_yaw_range_deg))
+        yc = bin_yaw[:, None] if bool(c.collect_yaw_rel_bin) else math.radians(c.collect_yaw_center_deg)
+        yy = yc + torch.empty(n, T, device=dev).uniform_(-1, 1) * math.radians(_yaw_range_now(env))
         yy = yy + math.pi * (torch.rand(n, T, device=dev) < 0.5).float()            # either end first
         hk = (st["half"][k] + gap).expand(n, T, 2)
         bad = _rect_overlap(cc, yy, hk, bin_c[:, None].expand(n, T, 2), bin_yaw[:, None].expand(n, T),
@@ -219,6 +219,19 @@ def reset(env, env_ids: torch.Tensor) -> None:
         st[k][env_ids] = 0
     for k in ("near", "visit_dep", "trips_over"):
         st[k][env_ids] = False
+
+
+def _yaw_range_now(env) -> float:
+    """Utensil start yaw half-range (deg). collect_yaw_start_range_deg >= 0 ramps it to collect_yaw_range_deg over
+    collect_yaw_ramp_steps env steps (A18 11-21 curriculum: start with knives lying almost along the slot)."""
+    c = env.cfg.precise_assembly
+    hi = float(c.collect_yaw_range_deg)
+    lo = float(c.collect_yaw_start_range_deg)
+    steps = int(c.collect_yaw_ramp_steps)
+    if lo < 0.0 or steps <= 0:
+        return hi
+    a = min(1.0, float(env.common_step_counter + int(c.collect_yaw_offset_steps)) / steps)
+    return lo + (hi - lo) * a
 
 
 def _prefill(env, env_ids, active, bin_yaw) -> None:
@@ -419,6 +432,15 @@ def update(env) -> None:
     hn = (h / float(c.collect_lift_h)).clamp(max=1.0)
     d_bin = (pos[..., :2] - env.hole_pos[:, None, :2]).norm(dim=-1)
     carry = (1.0 - d_bin / float(c.collect_carry_d)).clamp(0, 1) * lifted.float()
+    if float(c.collect_carry_align_pow) > 0.0:
+        # A18 11-21: the carry potential only pays in full for a utensil lined up with the slot (it saturated ~0.9 at
+        # 35 mm from the bin at any yaw, so hovering beside the bin with a crossed knife earned almost everything)
+        hq0 = env.hole_quat_wxyz.unsqueeze(1).expand(N, K, 4).reshape(-1, 4)
+        lx = quat_apply(quat.reshape(-1, 4), st["long_ax"].unsqueeze(0).expand(N, K, 3).reshape(-1, 3))
+        lx = quat_apply_inverse(hq0, lx).view(N, K, 3)
+        ca = (lx[..., 0].abs() / lx[..., :2].norm(dim=-1).clamp_min(1e-6)) ** float(c.collect_carry_align_pow)
+        fl = float(c.collect_carry_align_floor)
+        carry = carry * (fl + (1.0 - fl) * ca)
     phi = (float(c.collect_rew_in) * inbin.float()
            + out.float() * (float(c.collect_rew_lift) * hn + float(c.collect_rew_carry) * carry)).sum(1)
     ft = env.robot.data.body_state_w[:, env._fingertip_body_ids, 0:3] - env.scene.env_origins.unsqueeze(1)   # (N,5,3)

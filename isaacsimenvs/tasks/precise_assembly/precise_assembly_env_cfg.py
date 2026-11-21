@@ -213,6 +213,10 @@ class PreciseAssemblyCfg:
     collect_region: tuple[float, float, float, float] = (-0.27, 0.0, -0.10, 0.18)
     collect_yaw_center_deg: float = 90.0
     collect_yaw_range_deg: float = 45.0
+    collect_yaw_rel_bin: bool = False               # True: start yaw centre = the bin's yaw (else collect_yaw_center_deg)
+    collect_yaw_start_range_deg: float = -1.0       # >= 0: start half-range, ramps to collect_yaw_range_deg
+    collect_yaw_ramp_steps: int = 0
+    collect_yaw_offset_steps: int = 0
     collect_gap_m: float = 0.006
     collect_bin_margin_m: float = 0.03
     collect_drop_m: float = 0.0005
@@ -235,6 +239,8 @@ class PreciseAssemblyCfg:
     collect_place_h: float = 0.12                   # lowest point height above the rim where the term reaches 0
     collect_lift_h: float = 0.08
     collect_carry_d: float = 0.4
+    collect_carry_align_pow: float = 0.0            # > 0: carry potential x (floor + (1-floor) |cos yaw err to slot|^pow)
+    collect_carry_align_floor: float = 0.3
     collect_reach_d: float = 0.3
     collect_release_d: float = 0.08
     collect_success_bonus: float = 500.0
