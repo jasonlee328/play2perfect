@@ -135,6 +135,7 @@ class PreciseAssemblyCfg:
     usb_win_thumb_mode: str = "reward"         # "reward" (+scale x pad fraction, farmable by hovering) | "penalty" (-scale x missing fraction)
     usb_clear_pot_scale: float = 0.0           # potential on the palm's distance from the release point (capped at usb_clear_pot_cap)
     usb_clear_pot_cap: float = 0.06
+    usb_seat_mode: str = "3d"                  # "3d" = max(centre, tip) 3D distance (old A12, stricter) | "axial" = official stick height above the seat
     usb_fail_refund: bool = False              # refund all shaping collected in an episode that ends in a failure
     usb_step_penalty: float = 0.0              # per step before the release (discourages hovering)
     usb_seat_fine_rew_scale: float = 0.0       # potential on -min(seat err, usb_seat_fine_mm) before the release (training shaping)

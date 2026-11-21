@@ -131,6 +131,10 @@ class UsbTask:
         tip = pc + quat_apply(qc, self.tip_local.expand(N, 3))
         seat_err = torch.maximum((pc - self.seat_p).norm(dim=-1),
                                  (tip - torch.tensor([0.0, 0.0, TIP_SEAT_Z], device=env.device)).norm(dim=-1))
+        if str(getattr(c, "usb_seat_mode", "3d")) == "axial":
+            # official (plug_in_usb.py:318-320, 546, 565): fully_inserted = |stick height above its seat| < 0.5 mm, along the
+            # slot axis only (tilt / lateral offset not counted)
+            seat_err = (pc - self.seat_p)[:, 2].abs()
         inserted = seat_err < c.usb_seat_tol
         lat = tip[:, :2].norm(dim=-1)                                   # plug tip off the slot axis (m)
         ax_s = quat_apply(qc, torch.tensor([0.0, 0.0, 1.0], device=env.device).expand(N, 3))
