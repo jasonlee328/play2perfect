@@ -255,6 +255,7 @@ class PreciseAssemblyCfg:
     retr_padpress_rew: float = 0.0      # per-step reward for fingertip-only force on card 1 (min(F, 5 N) / 5), before release
     retr_nonpad_steps: int = 3          # ... for this many steps = fail 'nonpad'
     retr_deck_inslot_only: bool = False # user 11-20: deck cards may rise any amount; fail / success only on "still in the holder" (lowest corner below the wall top, on the slot)
+    retr_deck_table_only: bool = False  # user 11-20: with retr_deck_inslot_only, fail / block success only when another card lies on the table (not merely out of the holder)
     retr_actor_freeze_mm: float = 0.0    # >0: actor obs show card 1 at its start pose until its centre rose this much
     retr_detent: bool = False             # FD4: physical spring-pawl detent instead of the pose lock (card_retrieve._detent)
     retr_detent_snap_m: float = 0.0008    # engaged card stands this far proud of the deck; the snap seats it

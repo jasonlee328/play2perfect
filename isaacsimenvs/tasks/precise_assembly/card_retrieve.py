@@ -466,6 +466,18 @@ class RetrieveTask:
             self.deck_in = in_deck
             bad = ~in_deck
             neat = in_deck
+            if bool(getattr(c, "retr_deck_table_only", False)):
+                # user 11-20 (later): a deck card may leave the holder; fail only once one lies on the table
+                # (lowest corner within 3 mm of the table top, outside the holder footprint). Success needs none there.
+                on_tbl = torch.zeros(env.num_envs, dtype=torch.bool, device=d)
+                for k, b in enumerate(env.distractors):
+                    pk, qk = self._rel_hole(b.data.root_pos_w, b.data.root_quat_w)
+                    low = pk[:, 2] - sum(quat_apply(qk, e)[:, 2].abs() * h for e, h in zip((ex, ey_, ez_), HALF))
+                    outside_h = (pk[:, 0].abs() > SLOT_X + 0.01) | (pk[:, 1].abs() > SLOT_Y)
+                    on_tbl |= (low < 0.003) & outside_h
+                self.deck_on_table = on_tbl
+                bad = on_tbl
+                neat = ~on_tbl
             end_ok = on_tab & neat & clear
             self.final_count = torch.where(end_ok, self.final_count + 1, torch.zeros_like(self.final_count))
             self.success = self.final_count >= c.card_final_steps
