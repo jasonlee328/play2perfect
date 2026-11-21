@@ -189,6 +189,7 @@ class PreciseAssemblyCfg:
     cupgrip_lost_fail: bool = False                            # tossed / knocked-off / tilted top cup = "slipped"
     cupgrip_lost_tilt_deg: float = 45.0
     cupgrip_lost_steps: int = 5
+    cupgrip_window_rew: float = 0.0                            # dense in-window squeeze reward per lifting step (0 = off)
     cupgrip_hint_obs: bool = False                             # oracle field cupgrip_hint (G_lo, squeeze / G_lo)
     cupgrip_detach_rule: bool = False                          # user 11-20: partial second-cup lift OK; fail = detach
     cupgrip_detach_mm: float = 45.0                            # second cup risen this much = off its nest (~60 mm deep)

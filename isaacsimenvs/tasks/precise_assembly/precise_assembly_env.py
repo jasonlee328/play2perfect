@@ -1284,6 +1284,14 @@ class PreciseAssemblyEnv(PlayEnv):
             reward = reward - pen
             self._reward_terms["cupgrip_penalty"] = -pen
             self._reward_terms["total_reward"] = reward
+        wr = float(getattr(pih_cfg, "cupgrip_window_rew", 0.0))
+        if _cupgrip.enabled(self) and wr > 0.0 and hasattr(self, "cg_G"):
+            # A21 dense shaping: while the hand lifts the nested top cup, +wr per step with the squeeze inside the
+            # hidden window [G_lo, D], minus wr x the relative distance outside it (capped at 1)
+            r = _cupgrip.window_reward(self) * wr
+            reward = reward + r
+            self._reward_terms["cupgrip_window_rew"] = r
+            self._reward_terms["total_reward"] = reward
 
         log_step_metrics(self)
         self._log_peg_metrics()

@@ -254,6 +254,24 @@ def pin_substep(env) -> None:
         cup2.write_root_velocity_to_sim(vel, env_ids=ids)
 
 
+def window_reward(env) -> torch.Tensor:
+    """In [-1, 1] per env: +1 while lifting the nested top cup with the squeeze inside [G_lo, D]; outside, minus the
+    relative distance to the nearest edge (capped at 1); 0 when not lifting / not nested (cupgrip_window_rew)."""
+    c = env.cfg.precise_assembly
+    o = env.scene.env_origins
+    rise = env.object.data.root_pos_w[:, 2] - o[:, 2] - env.cg_obj0[:, 2]
+    v1 = env.object.data.root_lin_vel_w[:, 2]
+    nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
+    lifting = nested & (rise > 0.001) & (v1 > 0.005)
+    sq = getattr(env, "hand_force_xy", torch.zeros_like(rise))
+    G, D = env.cg_G, env.cg_D
+    below = ((G - sq) / G.clamp(min=1e-3)).clamp(0.0, 1.0)
+    above = ((sq - D) / D.clamp(min=1e-3)).clamp(0.0, 1.0)
+    inside = (sq >= G) & (sq <= D)
+    r = torch.where(inside, torch.ones_like(sq), -(below + above))
+    return torch.where(lifting, r, torch.zeros_like(sq))
+
+
 def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
     """(dragged, slipped) for _get_dones (after _hand_force_update)."""
     z = torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
