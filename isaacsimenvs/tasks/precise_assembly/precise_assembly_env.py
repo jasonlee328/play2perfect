@@ -727,6 +727,42 @@ class PreciseAssemblyEnv(PlayEnv):
         # (z - init_z > 0.10, which gates the keypoint reward) would need ~20 cm above the bin. Measure from here.
         self._object_init_z[env_ids] = w[:, 2] - self.scene.env_origins[env_ids, 2]
 
+    def _adaptive_start_index(self, env_ids: torch.Tensor, k_uniform: torch.Tensor) -> torch.Tensor:
+        """A13 adaptive start-angle curriculum: bank entries are grouped by start angle (key_pre_flip, 15 deg bins).
+        Each bin keeps an EMA of the success of episodes started there; bins are sampled with weight
+        max(floor, 4 p (1 - p)) so training concentrates where success is near 50% (the frontier)."""
+        pre = self._start_bank_pre_flip
+        if not hasattr(self, "_ad_bin"):
+            self._ad_bin = torch.round(torch.rad2deg(pre) / 15.0).long().clamp(0, 12)
+            nb = int(self._ad_bin.max()) + 1
+            self._ad_p = torch.full((nb,), 0.5, device=self.device)
+            self._ad_env_bin = torch.full((self.num_envs,), -1, dtype=torch.long, device=self.device)
+            self._ad_members = [torch.nonzero(self._ad_bin == i).reshape(-1) for i in range(nb)]
+        # credit the episodes that just ended (termination reasons are from this step's _get_dones)
+        tr = getattr(self, "_termination_reasons", None)
+        eb = self._ad_env_bin[env_ids]
+        if tr is not None and "max_successes" in tr:
+            done_ok = (eb >= 0)
+            if done_ok.any():
+                succ = tr["max_successes"][env_ids].float()
+                a = float(getattr(self.cfg.precise_assembly, "start_state_adaptive_ema", 0.02))
+                for bi in torch.unique(eb[done_ok]).tolist():
+                    m = done_ok & (eb == bi)
+                    self._ad_p[bi] = (1 - a * m.sum()).clamp(min=0.0) * self._ad_p[bi] + a * succ[m].sum()
+        nb = self._ad_p.numel()
+        has = torch.tensor([mm.numel() > 0 for mm in self._ad_members], device=self.device)
+        w = torch.clamp(4.0 * self._ad_p * (1.0 - self._ad_p), min=float(getattr(self.cfg.precise_assembly, "start_state_adaptive_floor", 0.1))) * has.float()
+        bins = torch.multinomial(w / w.sum(), env_ids.numel(), replacement=True)
+        k = k_uniform.clone()
+        for bi in torch.unique(bins).tolist():
+            m = bins == bi
+            mem = self._ad_members[bi]
+            k[m] = mem[torch.randint(0, mem.numel(), (int(m.sum()),), device=self.device)]
+        self._ad_env_bin[env_ids] = self._ad_bin[k]
+        self.extras["start_adaptive_p_mean"] = self._ad_p.mean()
+        self.extras["start_adaptive_top_bin"] = torch.argmax(w).float()
+        return k
+
     def _apply_start_states(self, env_ids: torch.Tensor) -> None:
         """Overwrite robot + peg state with random entries of the start-state bank."""
         if not hasattr(self, "_start_bank"):
@@ -753,6 +789,8 @@ class PreciseAssemblyEnv(PlayEnv):
             k = (int(self.cfg.precise_assembly.start_state_offset) + env_ids.long()) % b["successes"].numel()
         else:
             k = torch.randint(0, b["successes"].numel(), (n,), device=self.device)
+            if bool(getattr(self.cfg.precise_assembly, "start_state_adaptive", False)) and getattr(self, "_start_bank_pre_flip", None) is not None:
+                k = self._adaptive_start_index(env_ids, k)
         if self._start_bank_hole_pos is not None:
             err = (self._start_bank_hole_pos[k] - self.hole_pos[env_ids]).norm(dim=-1).max().item()
             if err > 0.005:

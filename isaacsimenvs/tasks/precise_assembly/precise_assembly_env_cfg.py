@@ -143,6 +143,9 @@ class PreciseAssemblyCfg:
     key_assist_min_deg: float = 3.0     # no assist torque while |twist error to the current goal| < this
     key_goal_rot_deg: float = 0.0       # > 0: near-goal = key rotation error <= this AND position error <= key_goal_pos_m
     key_goal_pos_m: float = 0.015       # (separate checks, the brief's success definition) instead of the keypoint test
+    start_state_adaptive: bool = False   # A13: sample start-bank angle bins by 4p(1-p) of their success (frontier curriculum)
+    start_state_adaptive_ema: float = 0.02
+    start_state_adaptive_floor: float = 0.1
     key_goal_skip: bool = False
     key_goal_skip_final: bool = False   # key_goal_skip may also jump to the LAST goal (then held success_steps as usual):
                                         # success = final pose reached + held, never dropped (the brief), waypoints only shape
