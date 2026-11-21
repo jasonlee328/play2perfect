@@ -473,6 +473,10 @@ class CollectManager:
                + float(c.collect_w_carry_v2) * ((float(c.collect_carry_d0_v2) - dd).clamp(min=0.0) * in_hand.float()).sum(1))
         r_phi = torch.where(self.fresh, torch.zeros_like(phi), phi - self.prev_scoop)
         self.prev_scoop = phi
+        if c.collect_release_free:
+            # once the required count is in the bin, letting go of the other held parts is free: no scoop shaping
+            # (the potential keeps updating, so nothing can be farmed) and no drop penalty; release + success remain
+            r_phi = r_phi * (~all_in).float()
         new_lift = in_hand & ~self.bonus_paid
         self.bonus_paid |= in_hand
         dropped = (self.prev_hand & on_table & ~self.in_bin & self.active).sum(1).float()
@@ -485,7 +489,8 @@ class CollectManager:
         self.trip_fail = (self.trips > budget) & ~all_in if c.collect_trip_size > 0 else torch.zeros_like(self.trip_fail)
         self.rterms = dict(scoop=r_phi, lift_bonus=float(c.collect_lift_bonus) * new_lift.sum(1).float(),
                            bin=float(c.collect_w_bin_v2) * d_in, release=float(c.collect_w_release_v2) * r_rel,
-                           drop=-float(c.collect_drop_penalty) * dropped,
+                           drop=-float(c.collect_drop_penalty) * dropped * (
+                               (~all_in).float() if c.collect_release_free else 1.0),
                            trip=-float(c.collect_trip_penalty) * self.trip_fail.float())
 
     def group_obs(self, palm_pos: torch.Tensor) -> torch.Tensor:

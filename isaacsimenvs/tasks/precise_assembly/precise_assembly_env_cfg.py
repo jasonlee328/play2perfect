@@ -248,6 +248,7 @@ class PreciseAssemblyCfg:
     collect_hand_radius: float = 0.10
     collect_w_scoop_app: float = 200.0
     collect_w_inhand: float = 150.0
+    collect_release_free: bool = False          # scoop: no shaping / drop penalty once the required count is in
     collect_trip_size: float = 3.0
     collect_trip_gap: int = 30
     collect_trip_penalty: float = 500.0                    # > 8: fixed slot layout (collect_obs = 8 slots + collect_obs_x)
