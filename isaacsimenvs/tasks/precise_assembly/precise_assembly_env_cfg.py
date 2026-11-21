@@ -151,6 +151,8 @@ class PreciseAssemblyCfg:
     wrong_ball_penalty: float = 0.0
     # A22: PhysX angular damping of the object and every distractor (rolling resistance, e.g. balls in a foam tray); < 0 = default.
     object_angular_damping: float = -1.0
+    finger_compliant_stiffness: float = 0.0   # A10 38dddcc: > 0 = soft fingertip links (PhysX compliant contact, N/m)
+    finger_compliant_damping: float = 0.0
     object_linear_damping: float = -1.0   # A22 diagnostic only (translation drag on the balls)
     # A22: [[urdf path substring, friction], ...] static + dynamic friction for matching object / distractor assets.
     asset_frictions: tuple = ()
