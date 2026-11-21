@@ -5,10 +5,10 @@
   <link name="receptive">
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="spikyball_tray.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
     <collision><origin xyz="0.000000 0.000000 -0.003500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.122000 0.122000 0.013000"/></geometry></collision>
-    <collision><origin xyz="-0.059000 0.000000 0.012500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.004000 0.122000 0.019000"/></geometry></collision>
-    <collision><origin xyz="0.000000 -0.059000 0.012500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.122000 0.004000 0.019000"/></geometry></collision>
-    <collision><origin xyz="0.059000 0.000000 0.012500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.004000 0.122000 0.019000"/></geometry></collision>
-    <collision><origin xyz="0.000000 0.059000 0.012500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.122000 0.004000 0.019000"/></geometry></collision>
+    <collision><origin xyz="-0.059000 0.000000 0.023000" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.004000 0.122000 0.040000"/></geometry></collision>
+    <collision><origin xyz="0.000000 -0.059000 0.023000" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.122000 0.004000 0.040000"/></geometry></collision>
+    <collision><origin xyz="0.059000 0.000000 0.023000" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.004000 0.122000 0.040000"/></geometry></collision>
+    <collision><origin xyz="0.000000 0.059000 0.023000" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.122000 0.004000 0.040000"/></geometry></collision>
     <collision><origin xyz="0.000000 0.000000 0.012500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.006000 0.122000 0.019000"/></geometry></collision>
     <collision><origin xyz="0.000000 0.000000 0.012500" rpy="0.000000 0.000000 0.000000"/><geometry><box size="0.122000 0.006000 0.019000"/></geometry></collision>
     <collision><origin xyz="-0.019012 -0.030000 0.005917" rpy="0.000000 -0.436332 0.000000"/><geometry><box size="0.012000 0.012000 0.004000"/></geometry></collision>
