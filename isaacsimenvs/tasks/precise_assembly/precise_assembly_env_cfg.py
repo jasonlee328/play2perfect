@@ -183,6 +183,9 @@ class PreciseAssemblyCfg:
     # Privileged teacher obs: each distractor's position relative to the palm and to the object (6 per distractor,
     # field "distractor_obs", added to obs_list and state_list). A checkpoint trained without it warm-starts with
     # the new inputs zero-initialized when P2P_NEW_OBS_FIELD=distractor_obs (train.py).
+    # obs_balls_sorted: field balls_rel_palm = object + every distractor position rel. palm, sorted by angle about
+    # the fixture centre (identity-free under slot_shuffle; A22 spiky balls: actor sees where balls are, not which).
+    obs_balls_sorted: bool = False
     obs_distractors: bool = False
     # > 0: feed only the obs_distractors_k distractors whose reset pose is nearest the object's start (kept in
     # problem order), so a policy trained with k neighbours can run on a layout with more. 0 = all of them.

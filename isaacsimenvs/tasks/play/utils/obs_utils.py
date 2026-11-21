@@ -354,6 +354,17 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "balls_rel_palm" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
+        # A22: every body (object + distractors) rel. palm, sorted per env by angle about the fixture centre, so the
+        # actor sees where all balls are but not which one is the target (slot_shuffle permutes identities).
+        b = torch.cat([obj_pos.unsqueeze(1), torch.stack([d.data.root_pos_w for d in env.distractors], dim=1)
+                       - env_origins.unsqueeze(1)], dim=1)                                  # (N, K+1, 3)
+        c = env.hole_pos.unsqueeze(1) if hasattr(env, "hole_pos") else b.mean(dim=1, keepdim=True)
+        ang = torch.atan2(b[..., 1] - c[..., 1], b[..., 0] - c[..., 0])
+        order = torch.argsort(ang, dim=1)
+        b = torch.gather(b, 1, order.unsqueeze(-1).expand(-1, -1, 3))
+        obs_clean["balls_rel_palm"] = (b - palm_pos.unsqueeze(1)).reshape(env.num_envs, -1)
+
     if "fixture_pose_rel_palm" in OBS_FIELD_SIZES and hasattr(env, "hole_pos"):
         fpos = env.hole_pos + getattr(env, "_fixture_obs_noise", 0.0)      # fixture_obs_noise_m (per episode)
         obs_clean["fixture_pose_rel_palm"] = torch.cat([fpos - palm_pos, env.hole_quat_wxyz], dim=-1)
