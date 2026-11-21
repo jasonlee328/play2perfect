@@ -227,6 +227,32 @@ def reset(env, env_ids: torch.Tensor) -> None:
         st[k][env_ids] = False
 
 
+def _scoop_frac(env) -> float:
+    c = env.cfg.precise_assembly
+    steps = int(c.collect_scoop_ramp_steps)
+    if steps <= 0:
+        return 1.0
+    return min(1.0, float(env.common_step_counter + int(c.collect_scoop_ramp_offset_steps)) / steps)
+
+
+def _scoop_h_now(env) -> float:
+    """Scoop curriculum (A18 11-21): held height ramps from collect_scoop_h_start to collect_scoop_h."""
+    c = env.cfg.precise_assembly
+    lo = float(c.collect_scoop_h_start)
+    hi = float(c.collect_scoop_h)
+    return hi if lo < 0 else lo + (hi - lo) * _scoop_frac(env)
+
+
+def _scoop_min_now(env) -> int:
+    """Scoop curriculum: knives needed for success ramp from collect_scoop_min_start to collect_success_min_in."""
+    c = env.cfg.precise_assembly
+    hi = max(1, int(c.collect_success_min_in))
+    lo = int(c.collect_scoop_min_start)
+    if lo <= 0:
+        return hi
+    return int(round(lo + (hi - lo) * _scoop_frac(env)))
+
+
 def _yaw_range_now(env) -> float:
     """Utensil start yaw half-range (deg). collect_yaw_start_range_deg >= 0 ramps it to collect_yaw_range_deg over
     collect_yaw_ramp_steps env steps (A18 11-21 curriculum: start with knives lying almost along the slot)."""
@@ -455,14 +481,14 @@ def update(env) -> None:
         hp = env.robot.data.body_state_w[:, st["hand_body_ids"], 0:3] - o                               # (N, B, 3)
         dh = (pts.unsqueeze(2) - hp[:, None, :, None, :]).norm(dim=-1).amin(dim=(2, 3))                 # (N, K)
         near_hand = (dh < float(c.collect_scoop_hand_d)) & (vel.norm(dim=-1) < float(c.collect_scoop_max_v))
-        held_s = active & (h >= float(c.collect_scoop_h)) & near_hand
+        held_s = active & (h >= _scoop_h_now(env)) & near_hand
     else:
-        held_s = active & (h >= float(c.collect_scoop_h)) & touch_recent.unsqueeze(1)
+        held_s = active & (h >= _scoop_h_now(env)) & touch_recent.unsqueeze(1)
     n_scoop = held_s.sum(1)
     st["n_scoop"] = n_scoop
     st["scoop_max"] = torch.maximum(st["scoop_max"], n_scoop)
     if bool(c.collect_scoop_mode):
-        ok_s = n_scoop >= max(1, int(c.collect_success_min_in))
+        ok_s = n_scoop >= _scoop_min_now(env)
         st["clear"] = torch.where(ok_s, st["clear"] + 1, torch.zeros_like(st["clear"]))
         st["success"] = st["clear"] >= int(c.collect_clear_steps)
     # potential

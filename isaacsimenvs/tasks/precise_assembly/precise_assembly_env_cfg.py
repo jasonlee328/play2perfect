@@ -253,6 +253,10 @@ class PreciseAssemblyCfg:
     collect_scoop_mode: bool = False                # True: success = >= collect_success_min_in utensils held >= collect_scoop_h
                                                     # up (hand touching) for collect_clear_steps steps; no bin needed
     collect_scoop_h: float = 0.10
+    collect_scoop_h_start: float = -1.0             # >= 0: curriculum start height, ramps to collect_scoop_h
+    collect_scoop_min_start: int = 0                # > 0: curriculum start count, ramps to collect_success_min_in
+    collect_scoop_ramp_steps: int = 0
+    collect_scoop_ramp_offset_steps: int = 0
     collect_scoop_hand_d: float = 0.04              # > 0: held = a surface point within this of a hand link origin
     collect_scoop_max_v: float = 0.5                #   and COM slower than this (m/s), instead of the tactile contact test
     collect_scoop_contact_mem: int = 10             # hand counts as touching if it touched utensils within this many steps
