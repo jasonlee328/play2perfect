@@ -641,6 +641,12 @@ class PreciseAssemblyEnv(PlayEnv):
         """A22 precise_assembly.asset_frictions: [[urdf substring, mu], ...] = static + dynamic friction of every shape
         of the object / distractor bodies whose asset URDF path contains the substring (per env, multi clutter aware).
         PhysX averages the two materials' coefficients at a contact (fingertip pads 1.5 by default)."""
+        hf = float(getattr(self.cfg.precise_assembly, "fixture_friction", -1.0))
+        if hf >= 0.0:   # A22: the fixture (tray) material, e.g. ~0 = balls turn freely in their pockets
+            view = self.hole.root_physx_view
+            mat = view.get_material_properties(); mat[..., 0] = hf; mat[..., 1] = hf
+            view.set_material_properties(mat, torch.arange(self.num_envs, dtype=torch.int64, device="cpu"))
+            print(f"[PreciseAssemblyEnv] fixture friction {hf}", flush=True)
         rules = [(str(r[0]), float(r[1])) for r in (self.cfg.precise_assembly.asset_frictions or ())]
         if not rules:
             return

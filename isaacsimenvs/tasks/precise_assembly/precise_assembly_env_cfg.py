@@ -156,6 +156,7 @@ class PreciseAssemblyCfg:
     object_linear_damping: float = -1.0   # A22 diagnostic only (translation drag on the balls)
     # A22: [[urdf path substring, friction], ...] static + dynamic friction for matching object / distractor assets.
     asset_frictions: tuple = ()
+    fixture_friction: float = -1.0   # A22: >= 0 sets the fixture's static + dynamic friction
     # Privileged-free teacher obs: field "fixture_pose_rel_palm" (fixture position relative to the palm + its
     # quaternion wxyz, 7), added to obs_list and state_list.
     obs_fixture: bool = False
