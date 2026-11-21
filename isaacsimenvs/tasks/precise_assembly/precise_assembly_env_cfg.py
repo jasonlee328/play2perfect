@@ -194,6 +194,7 @@ class PreciseAssemblyCfg:
     cupgrip_detach_rule: bool = False                          # user 11-20: partial second-cup lift OK; fail = detach
     cupgrip_detach_mm: float = 45.0                            # second cup risen this much = off its nest (~60 mm deep)
     cupgrip_table_drop_mm: float = 0.0                         # >0: fail only if the second cup falls this far below its seat (onto the table); replaces the detach fail
+    cupgrip_table_hit: bool = False                            # fail the moment the second cup touches the table (replaces the detach fail)
     cupgrip_settle_mm: float = 3.0                             # success needs the second cup back within this of its seat
     cupgrip_drag_reaction: bool = True                         # apply -F of the drag coupling to the top cup (felt by proprio)
     cupgrip_over_cue: float = 0.0                              # touch-only over cue above ratio x D (0 = off)

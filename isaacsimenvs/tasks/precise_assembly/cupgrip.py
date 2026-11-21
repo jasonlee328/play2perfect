@@ -303,6 +303,20 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
             # user 11-21: lifting the second cup along is fine; fail only when it ends up on the table, i.e. its
             # centre falls more than tdrop mm below its seat on the stack (it can only get there by falling off)
             dragged = rise2 < -tdrop / 1000.0
+        if bool(getattr(c, "cupgrip_table_hit", False)):
+            # user 11-21: fail the moment the second (only loose) cup touches the table. Cup = frustum (ContactBench
+            # cup collision: rim r 20.4 mm at z -32.2 mm, rim r 34.3 mm at z +32.9 mm in the cup frame); lowest point of
+            # a tilted rim circle = centre_z - r sqrt(1 - axis_z^2); touching = lowest point within 2 mm of the table top
+            from isaaclab.utils.math import quat_apply as _qa
+            q2 = env.distractors[0].data.root_quat_w
+            ax = _qa(q2, torch.tensor([0.0, 0.0, 1.0], device=env.device).expand(env.num_envs, 3))
+            p2 = env.distractors[0].data.root_pos_w - env.scene.env_origins   # local, like _table_z_per_env
+            s_ = (1.0 - ax[:, 2] ** 2).clamp(min=0.0).sqrt()
+            low = torch.minimum(p2[:, 2] - 0.0322 * ax[:, 2] - 0.0204 * s_, p2[:, 2] + 0.0329 * ax[:, 2] - 0.0343 * s_)
+            from isaacsimenvs.tasks.precise_assembly.precise_assembly_env import TABLE_HALF_HEIGHT
+            table_top = env._table_z_per_env + TABLE_HALF_HEIGHT
+            env.cg_low2 = low - table_top
+            dragged = env.cg_low2 < 0.002
     from isaaclab.utils.math import quat_apply
     dn = torch.tensor([0.0, 0.0, -1.0], device=env.device).expand(env.num_envs, 3)
     env.cg_last_rise2 = rise2.clone()
