@@ -249,6 +249,9 @@ class PreciseAssemblyCfg:
     retr_fric_fixed_jitter: float = 0.0  # with retr_fric_card_mu: each card v + U(-j, j) per env (hidden, fixed for the env life)
     retr_fric_card_mu: tuple = ()        # fixed friction per card, front -> back (card 1, 2, 3, 4); < 0 = keep
     retr_deck_out_mm: float = 0.0       # > 0: deck_disturbed only when a deck card rises > this (fully out); partial rises that fall back are OK
+    retr_deck_out_start_mm: float = 0.0  # > 0: card-2 rise limit starts here and ramps to retr_deck_out_mm
+    retr_deck_out_ramp_steps: float = 0.0
+    retr_deck_out_offset_steps: float = 0.0
     retr_mass_log: bool = False         # retr_mass_scale_range sampled log-uniform (one scale per env, all cards)
     retr_mass_per_card: bool = False    # old behaviour: each card its own uniform scale
     finger_compliant_stiffness: float = 0.0   # > 0: soft fingertip links (PhysX compliant contact, N/m): touch depth grows with force

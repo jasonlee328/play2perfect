@@ -527,6 +527,12 @@ class RetrieveTask:
             self.final_count = torch.where(end_ok, self.final_count + 1, torch.zeros_like(self.final_count))
             self.success = self.final_count >= c.card_final_steps
         else:
+            # card-2 rise limit warm-up: retr_deck_out_start_mm -> retr_deck_out_mm over retr_deck_out_ramp_steps env steps
+            o0, orr = float(getattr(c, "retr_deck_out_start_mm", 0.0)), float(getattr(c, "retr_deck_out_ramp_steps", 0.0))
+            if out_mm > 0.0 and o0 > 0.0 and orr > 0.0:
+                a_o = min(1.0, float(env.common_step_counter + getattr(c, "retr_deck_out_offset_steps", 0.0)) / orr)
+                out_mm = o0 + (out_mm - o0) * a_o
+            self.out_mm_eff = out_mm
             bad = (self.deck_rise.max(-1).values > out_mm * 1e-3) if out_mm > 0.0 else ~neat
         self.deck_over = torch.where(bad, self.deck_over + 1, torch.zeros_like(self.deck_over))
         self.fail["deck_disturbed"] = self.deck_over >= max(1, int(c.card_deck_fail_hold_steps))
