@@ -303,8 +303,39 @@ def build_observations(env) -> dict[str, torch.Tensor]:
                           env._distractor_reset_pos.transpose(0, 1) - env_origins.unsqueeze(1)], dim=1)
         zf = env.hole_pos[:, 2:3] + float(getattr(pa_, "blind_target_rest_z", 0.0270))
         bp = torch.cat([bp[..., :2], torch.maximum(bp[..., 2], zf).unsqueeze(-1)], dim=-1)
-        k = (bp - palm_pos.unsqueeze(1)).norm(dim=-1).argmin(1)
+        dist = (bp - palm_pos.unsqueeze(1)).norm(dim=-1)                                # (N, B)
         ar = torch.arange(env.num_envs, device=env.device)
+        if getattr(pa_, "blind_target_search", False):
+            # A22 honest-searcher pointer (TEACHER only; the student masks these fields): target = nearest ball not
+            # yet tried. A smooth target held with >= 2 touch pads for blind_search_feel_steps (or raised 1 cm) is
+            # marked tried and the pointer moves on; a spiky target is kept. Uses the hidden label = perfect touch.
+            B = bp.shape[1]
+            if not hasattr(env, "_srch_tried"):
+                env._srch_tried = torch.zeros(env.num_envs, B, dtype=torch.bool, device=env.device)
+                env._srch_feel = torch.zeros(env.num_envs, dtype=torch.long, device=env.device)
+                env._srch_tgt = torch.zeros(env.num_envs, dtype=torch.long, device=env.device)
+            new_ep = env.episode_length_buf <= 1
+            env._srch_tried[new_ep] = False
+            env._srch_feel[new_ep] = 0
+            spk = torch.cat([torch.ones(env.num_envs, 1, dtype=torch.bool, device=env.device),
+                             env._twin_mask().t()], dim=1)                                 # (N, B) spiky
+            dmask = torch.where(env._srch_tried, torch.full_like(dist, 1e3), dist)
+            tgt = dmask.argmin(1)
+            env._srch_feel[tgt != env._srch_tgt] = 0
+            env._srch_tgt = tgt
+            tl = getattr(env, "_last_tactile", None)
+            ftc = (ft_pos_w - env_origins.unsqueeze(1)).mean(1, keepdim=True)
+            held = (bp - ftc).norm(dim=-1).argmin(1) == tgt
+            if tl is not None:
+                held = held & ((tl.view(env.num_envs, 5, -1).amax(-1) > 0.02).sum(1) >= 2)
+            env._srch_feel = torch.where(held, env._srch_feel + 1, torch.zeros_like(env._srch_feel))
+            risen = (bp[ar, tgt, 2] - rest[ar, tgt, 2]) > 0.01
+            done = (~spk[ar, tgt]) & ((env._srch_feel >= int(getattr(pa_, "blind_search_feel_steps", 10))) | risen)
+            env._srch_tried[ar[done], tgt[done]] = True
+            env._srch_tried[env._srch_tried.all(1)] = False
+            k = tgt
+        else:
+            k = dist.argmin(1)
         npos = bp[ar, k]
         gpos = rest[ar, k] + (goal_pos - (env._object_rest_pos - env_origins))
         qid = torch.zeros(env.num_envs, 4, device=env.device); qid[:, 0] = 1.0

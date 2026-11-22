@@ -195,6 +195,10 @@ class PreciseAssemblyCfg:
     # instead of zeros; identity rotation and z floored at blind_target_rest_z above the fixture (no identity leak).
     blind_target_nearest: bool = False
     blind_target_rest_z: float = 0.0270
+    # blind_target_search (with blind_target_nearest): honest-searcher pointer for a privileged TEACHER: nearest
+    # untried ball; a smooth target held >= blind_search_feel_steps with >= 2 pads (or raised 1 cm) is marked tried.
+    blind_target_search: bool = False
+    blind_search_feel_steps: int = 10
     search_reach_scale: float = 0.0
     search_touch_bonus: float = 0.0
     search_touch_dist: float = 0.008
