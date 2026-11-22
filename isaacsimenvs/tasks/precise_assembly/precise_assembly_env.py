@@ -439,6 +439,8 @@ class PreciseAssemblyEnv(PlayEnv):
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
+        if hasattr(self, "_press_best"):
+            self._press_best[env_ids] = 0.0
         if hasattr(self, "_search_prev"):
             self._search_prev[env_ids] = float("nan")
             self._search_touched[env_ids] = False
@@ -1443,6 +1445,20 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["search_touch_rew"] = touch
             self._reward_terms["total_reward"] = reward
             self.extras["search_balls_touched"] = self._search_touched.float().sum(1).mean()
+        if pih_cfg.search_press_scale > 0.0 and getattr(self, "_last_tactile", None) is not None:
+            # A22 press reward: potential on the episode's best fingertip contact area (share of taxels active, summed
+            # over the 2 most-pressed pads, capped). Pays one firm press (more texture to feel), not holding it.
+            tl = self._last_tactile.view(self.num_envs, 5, -1)
+            area = (tl > 0.02).float().mean(-1).topk(2, dim=1).values.sum(1).clamp(max=pih_cfg.search_press_cap)
+            if not hasattr(self, "_press_best"):
+                self._press_best = torch.zeros(self.num_envs, device=self.device)
+            gain = (area - self._press_best).clamp(min=0.0)
+            self._press_best = torch.maximum(self._press_best, area)
+            prew = gain * pih_cfg.search_press_scale
+            reward = reward + prew
+            self._reward_terms["search_press_rew"] = prew
+            self._reward_terms["total_reward"] = reward
+            self.extras["search_press_best"] = self._press_best.mean()
 
         log_step_metrics(self)
         self._log_peg_metrics()

@@ -198,6 +198,10 @@ class PreciseAssemblyCfg:
     search_reach_scale: float = 0.0
     search_touch_bonus: float = 0.0
     search_touch_dist: float = 0.008
+    # search_press_scale: potential reward on the episode-best contact area (taxel share active on the 2 most-pressed
+    # pads, capped at search_press_cap); 0 = off.
+    search_press_scale: float = 0.0
+    search_press_cap: float = 0.6
     search_ball_radius: float = 0.024
     obs_distractors: bool = False
     # > 0: feed only the obs_distractors_k distractors whose reset pose is nearest the object's start (kept in
