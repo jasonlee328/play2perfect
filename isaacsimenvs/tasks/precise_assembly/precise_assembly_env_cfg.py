@@ -199,6 +199,8 @@ class PreciseAssemblyCfg:
     # untried ball; a smooth target held >= blind_search_feel_steps with >= 2 pads (or raised 1 cm) is marked tried.
     blind_target_search: bool = False
     blind_search_feel_steps: int = 10
+    blind_search_touch_m: float = 0.008   # fingertip pad centre within this of the target surface = touching it
+    blind_search_ball_r: float = 0.024
     search_reach_scale: float = 0.0
     search_touch_bonus: float = 0.0
     search_touch_dist: float = 0.008

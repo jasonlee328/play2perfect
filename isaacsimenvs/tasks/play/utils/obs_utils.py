@@ -323,11 +323,9 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             tgt = dmask.argmin(1)
             env._srch_feel[tgt != env._srch_tgt] = 0
             env._srch_tgt = tgt
-            tl = getattr(env, "_last_tactile", None)
-            ftc = (ft_pos_w - env_origins.unsqueeze(1)).mean(1, keepdim=True)
-            held = (bp - ftc).norm(dim=-1).argmin(1) == tgt
-            if tl is not None:
-                held = held & ((tl.view(env.num_envs, 5, -1).amax(-1) > 0.02).sum(1) >= 2)
+            ftl = ft_pos_w - env_origins.unsqueeze(1)                                       # pad centres
+            gap_t = ((ftl - bp[ar, tgt].unsqueeze(1)).norm(dim=-1) - float(getattr(pa_, "blind_search_ball_r", 0.024))).min(1).values
+            held = gap_t < float(getattr(pa_, "blind_search_touch_m", 0.008))                # any fingertip at the target
             env._srch_feel = torch.where(held, env._srch_feel + 1, torch.zeros_like(env._srch_feel))
             risen = (bp[ar, tgt, 2] - rest[ar, tgt, 2]) > 0.01
             done = (~spk[ar, tgt]) & ((env._srch_feel >= int(getattr(pa_, "blind_search_feel_steps", 10))) | risen)
