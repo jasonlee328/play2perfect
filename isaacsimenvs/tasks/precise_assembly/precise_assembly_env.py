@@ -339,6 +339,15 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        _shm = str(getattr(cfg.precise_assembly, "cupgrip_shear_obs", "") or "")
+        if _shm:
+            # A21 11-21 (A10 recipe): real contact force incl. PhysX friction per hand link in the link frame (normal +
+            # shear), N / 5, clip +-3; actor only; zeroed by tactile.policy_override like the rest of touch
+            from isaacsimenvs.tasks.play.utils.hand_skin import HAND_LINKS as _HL
+            self._cg_shear_links = [n for n in _HL if n.endswith("_DP")] if _shm == "tips" else list(_HL)
+            OBS_FIELD_SIZES["tactile_shear"] = 3 * len(self._cg_shear_links)
+            if "tactile_shear" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_shear")
         if bool(getattr(cfg.precise_assembly, "cupgrip_hint_obs", False)):
             # A21 oracle: [G_lo / 6 N, squeeze / G_lo clipped to 3, / 3] in actor + critic (privileged; for DS distillation)
             OBS_FIELD_SIZES["cupgrip_hint"] = 2
@@ -1048,6 +1057,37 @@ class PreciseAssemblyEnv(PlayEnv):
             # squeeze that counts for the window rules = fingertip-pad force only (force through finger sides / palm
             # does not hold the cup in the window)
             self.hand_force_xy = self.hand_force_xy_tip
+        if getattr(self, "_cg_shear_links", None):
+            if getattr(self, "_cg_shear_view", None) is None:
+                import re as _re2
+                glob2 = lambda p: _re2.sub(r"env_\d+", "env_*", p)
+                lk = [glob2(p) for p in self.robot.root_physx_view.link_paths[0]]
+                self._cg_shear_view = self.object._physics_sim_view.create_rigid_contact_view(
+                    glob2(self.object.root_physx_view.prim_paths[0]), filter_patterns=lk,
+                    max_contact_data_count=int(self.num_envs) * 96)
+                names = list(self.robot.body_names)
+                ids = []
+                for n in self._cg_shear_links:
+                    m = n if n in names else ("iiwa14_link_7" if n == "left_hand_C_MC" else None)
+                    ids.append(names.index(m))
+                self._cg_shear_ids = torch.tensor(ids, dtype=torch.long, device=self.device)
+            N_ = self.num_envs
+            Ftot = F.clone()
+            fr, _pts, cnt, st = self._cg_shear_view.get_friction_data(float(self.physics_dt))
+            fr = fr.reshape(-1, 3).to(self.device); cnt = cnt.reshape(-1).long().to(self.device); st = st.reshape(-1).long().to(self.device)
+            pair = torch.repeat_interleave(torch.arange(cnt.numel(), device=self.device), cnt)
+            idx = torch.repeat_interleave(st, cnt) + (torch.arange(int(cnt.sum()), device=self.device)
+                                                       - torch.repeat_interleave(torch.cumsum(cnt, 0) - cnt, cnt))
+            agg = torch.zeros(cnt.numel(), 3, device=self.device)
+            if idx.numel():
+                agg.index_add_(0, pair, fr[idx])
+            Ftot = Ftot + agg.reshape(N_, -1, 3)
+            from isaaclab.utils.math import quat_apply_inverse as _qai
+            fv = Ftot[:, self._cg_shear_ids]                                   # (N, K, 3) force on the hand links, world
+            q = self.robot.data.body_quat_w[:, self._cg_shear_ids]
+            K_ = fv.shape[1]
+            self._cg_shear = (_qai(q.reshape(-1, 4), fv.reshape(-1, 3)).reshape(N_, 3 * K_)
+                              * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5)) / 5.0).clamp(-3.0, 3.0)
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
         over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)

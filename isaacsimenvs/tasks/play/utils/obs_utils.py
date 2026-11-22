@@ -351,6 +351,17 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             elif override != "none":
                 raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
 
+    if "tactile_shear" in OBS_FIELD_SIZES and getattr(env, "_cg_shear_links", None):
+        sh = getattr(env, "_cg_shear", None)
+        if sh is None:
+            sh = torch.zeros(env.num_envs, OBS_FIELD_SIZES["tactile_shear"], device=env.device)
+        ov = str(getattr(env.cfg.tactile, "policy_override", "none")).lower()
+        if ov == "zero":
+            sh = torch.zeros_like(sh)
+        elif ov == "random":
+            sh = torch.rand_like(sh)
+        obs_clean["tactile_shear"] = sh
+        env._last_tactile_shear = sh
     if "cupgrip_hint" in OBS_FIELD_SIZES:
         G = getattr(env, "cg_G", None)
         if G is None:
