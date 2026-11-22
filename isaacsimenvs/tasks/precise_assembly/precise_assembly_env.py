@@ -339,6 +339,11 @@ class PreciseAssemblyEnv(PlayEnv):
             OBS_FIELD_SIZES["tactile_shear"] = 15
             if "tactile_shear" not in cfg.obs.obs_list:
                 cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_shear")
+        if bool(getattr(cfg.precise_assembly, "retr_slip_obs", False)):
+            # A10 11-21: fingertip slip velocity on card 1 in each DP link frame (5 x 3, / 0.05 m/s, clip +-3), actor only
+            OBS_FIELD_SIZES["tactile_slip"] = 15
+            if "tactile_slip" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_slip")
         if bool(getattr(cfg.precise_assembly, "retr_hint_obs", False)):
             # A10 oracle: card_hint = [card weight scale, press / window centre] in actor + critic (for DS distillation)
             OBS_FIELD_SIZES["card_hint"] = 2

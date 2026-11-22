@@ -373,6 +373,22 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             sh = torch.rand_like(sh)
         obs_clean["tactile_shear"] = sh
         env._last_tactile_shear = sh
+    if "tactile_slip" in OBS_FIELD_SIZES:
+        from isaaclab.utils.math import quat_apply_inverse as _qai2
+        card = getattr(env, "_card", None)
+        vs = getattr(card, "v_slip_w", None) if card is not None else None
+        if vs is None:
+            sl = torch.zeros(env.num_envs, 15, device=env.device)
+        else:
+            q = env.robot.data.body_quat_w[:, card.tip_ids]
+            sl = (_qai2(q.reshape(-1, 4), vs.reshape(-1, 3)).reshape(env.num_envs, 15) / 0.05).clamp(-3.0, 3.0)
+        ov = str(getattr(env.cfg.tactile, "policy_override", "none")).lower()
+        if ov == "zero":
+            sl = torch.zeros_like(sl)
+        elif ov == "random":
+            sl = torch.rand_like(sl)
+        obs_clean["tactile_slip"] = sl
+        env._last_tactile_slip = sl
     if "card_hint" in OBS_FIELD_SIZES:
         # A10 oracle: [log card-weight scale / log 64, press on card 1 / (0.19 N x scale) clipped to 3, / 3]
         card = getattr(env, "_card", None)

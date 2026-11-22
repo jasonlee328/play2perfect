@@ -312,6 +312,20 @@ class RetrieveTask:
                 agg.index_add_(0, pair, fr[idx])
             self.f_tip_fric_w = agg.reshape(N, B, 3)[:, self.tip_ids]
             self.f_tip_vec_w = self.f_tip_vec_w + self.f_tip_fric_w           # full contact force = normal + friction
+        if bool(getattr(self.c, "retr_slip_obs", False)):
+            # slip speed per fingertip (like Genesis KinematicTaxel shear = -k_t v_t): card velocity at the fingertip minus
+            # fingertip velocity, tangential to the card face, only while that fingertip pushes on card 1 (> 0.1 N)
+            env = self.env; d = env.device
+            obj = env.object.data
+            tip_p = env.robot.data.body_pos_w[:, self.tip_ids]                     # (N, 5, 3)
+            tip_v = env.robot.data.body_lin_vel_w[:, self.tip_ids]
+            card_v = obj.root_lin_vel_w[:, None] + torch.cross(obj.root_ang_vel_w[:, None].expand_as(tip_p),
+                                                               tip_p - obj.root_pos_w[:, None], dim=-1)
+            n = quat_apply(obj.root_quat_w, torch.tensor([0.0, 0.0, 1.0], device=d).expand(N, 3))[:, None]
+            vr = card_v - tip_v
+            vt = vr - (vr * n).sum(-1, keepdim=True) * n
+            on = (M_rc.norm(dim=-1).reshape(N, -1)[:, self.tip_ids] > 0.1).float()[..., None]
+            self.v_slip_w = vt * on
         F_rc = M_rc.norm(dim=-1).reshape(N, -1)
         f_rob_card = F_rc.sum(-1)
         f_tips = F_rc[:, self.tip_ids]
