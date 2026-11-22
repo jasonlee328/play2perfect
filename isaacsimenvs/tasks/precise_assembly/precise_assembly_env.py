@@ -392,14 +392,18 @@ class PreciseAssemblyEnv(PlayEnv):
             cfg.termination.max_consecutive_successes = self._num_total_insertion_goals
 
     def _setup_scene(self) -> None:
-        setup_scene(self)
+        _pads_finish = None
         if bool(getattr(self.cfg.tactile, "original_pads", False)):
+            from ..play.utils.tacmap_pads import install_usd_bake
+            from . import scene_utils as _pa_scene
+            _pads_finish = install_usd_bake(self, _pa_scene)   # pad physics baked into the robot USD (fast at 12k envs)
+        setup_scene(self)
+        if _pads_finish is not None:
             # A23 11-22: original sharpa-tacmap pad physics (gel pads compliant 280/20, robot offsets 0.2/-0.1 mm,
             # object offsets 0.1/-0.5 mm); replaces A10's finger_compliant_* (which softened the whole DP link)
             if float(getattr(self.cfg.precise_assembly, "finger_compliant_stiffness", 0.0)) > 0.0:
                 raise ValueError("tactile.original_pads and precise_assembly.finger_compliant_stiffness are exclusive")
-            from ..play.utils.tacmap_pads import apply_original_tacmap_pads
-            self._tacmap_pads_info = apply_original_tacmap_pads(self)
+            self._tacmap_pads_info = _pads_finish()
 
     def _reset_idx(self, env_ids) -> None:
         if env_ids is None:
