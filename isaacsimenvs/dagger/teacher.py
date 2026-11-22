@@ -97,6 +97,10 @@ class Teacher:
         runner.set_vec_env(vec_env)
         player = runner.create_player()
         weights = _load_checkpoint_weights(player, str(checkpoint_path))
+        if any("eigendexplore" in k for k in weights["model"]):
+            # EigenDExplore exploration tensors (P2P_EIGEN_SETTINGS training): exploration only, the mean
+            # action is the plain network, so the standard player drops them.
+            weights = {**weights, "model": {k: v for k, v in weights["model"].items() if "eigendexplore" not in k}}
         player.set_weights(weights)
         player.has_batch_dimension = True
         player.reset()

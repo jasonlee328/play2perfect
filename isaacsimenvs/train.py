@@ -225,6 +225,26 @@ def main() -> None:
             )
             observers.append(WandbAlgoObserver(wandb_cfg))
 
+        # P2P_EIGEN_SETTINGS=<checkpoint with a2c_network.eigendexplore.* tensors>: EigenDExplore exploration
+        # (github.com/hgupt3/eigendexplore, vendored in rl_games/algos_torch/eigendexplore_*.py): actions get
+        # mu + iid noise + correlated hand-synergy noise along a fixed 9x29 basis, log-prob / entropy use the full
+        # covariance. The basis / iid multiplier come from that checkpoint; the start log_scale comes from the
+        # init checkpoint (set it there). PPO's adaptive-LR KL still sees only the iid part.
+        eigen_src = os.environ.get("P2P_EIGEN_SETTINGS", "")
+        if eigen_src:
+            import torch as _torch
+            from rl_games.algos_torch import eigendexplore_rlg
+            _ck = _torch.load(eigen_src, map_location="cpu", weights_only=False)
+            _ck = _ck[0] if 0 in _ck else _ck
+            _m = _ck["model"]
+            settings = {
+                "basis": _m["a2c_network.eigendexplore.basis"].tolist(),
+                "eigen_sigma": _m["a2c_network.eigendexplore.log_scale"].exp().tolist(),
+                "iid_sigma": _m["a2c_network.eigendexplore_iid_multiplier"].tolist(),
+            }
+            eigendexplore_rlg.configure(agent_cfg["params"], settings)
+            print(f"[eigendexplore] exploration on, settings from {eigen_src}")
+
         runner = Runner(MultiObserver(observers))
         # Co-locate rl_games artifacts (checkpoints, summaries) with the Hydra
         # run dir so slurm logs + config + videos all live together.
