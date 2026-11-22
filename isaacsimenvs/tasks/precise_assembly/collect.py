@@ -70,6 +70,7 @@ def setup(env) -> None:
     st["prev_phi"] = torch.zeros(N, device=dev)
     st["fresh"] = torch.ones(N, dtype=torch.bool, device=dev)
     st["clear"] = torch.zeros(N, dtype=torch.long, device=dev)
+    st["scoop_clear"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["success"] = torch.zeros(N, dtype=torch.bool, device=dev)
     st["fell"] = torch.zeros(N, dtype=torch.bool, device=dev)
     st["n_in_ep_max"] = torch.zeros(N, dtype=torch.long, device=dev)
@@ -214,6 +215,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
     st["pinch_done"][env_ids] = False
     st["fresh"][env_ids] = True
     st["clear"][env_ids] = 0
+    st["scoop_clear"][env_ids] = 0
     st["success"][env_ids] = False
     st["fell"][env_ids] = False
     st["n_in_ep_max"][env_ids] = 0
@@ -498,9 +500,12 @@ def update(env) -> None:
     st["n_scoop"] = n_scoop
     st["scoop_max"] = torch.maximum(st["scoop_max"], n_scoop)
     if bool(c.collect_scoop_mode):
+        # own counter: the bin-rule block above rewrites st["clear"] to 0 every step in scoop mode (no utensil is in
+        # a bin), so sharing it capped the held run at 1 step and no scoop episode could ever succeed (bug, 11-21)
         ok_s = n_scoop >= _scoop_min_now(env)
-        st["clear"] = torch.where(ok_s, st["clear"] + 1, torch.zeros_like(st["clear"]))
-        st["success"] = st["clear"] >= _scoop_clear_now(env)
+        st["scoop_clear"] = torch.where(ok_s, st["scoop_clear"] + 1, torch.zeros_like(st["scoop_clear"]))
+        st["clear"] = st["scoop_clear"]
+        st["success"] = st["scoop_clear"] >= _scoop_clear_now(env)
     # potential
     hn = (h / float(c.collect_lift_h)).clamp(max=1.0)
     d_bin = (pos[..., :2] - env.hole_pos[:, None, :2]).norm(dim=-1)
@@ -566,7 +571,7 @@ def update(env) -> None:
     phi = phi + float(c.collect_rew_scoop) * n_scoop.float()   # scoop mode: per utensil held high
     if bool(c.collect_scoop_mode) and float(c.collect_rew_hold) > 0.0:
         # hold-time potential (scp2: knives were picked up and dropped within 30 steps, nothing paid for holding on)
-        phi = phi + float(c.collect_rew_hold) * (st["clear"].float() / float(_scoop_clear_now(env))).clamp(max=1.0)
+        phi = phi + float(c.collect_rew_hold) * (st["scoop_clear"].float() / float(_scoop_clear_now(env))).clamp(max=1.0)
     r = torch.where(st["fresh"], torch.zeros_like(phi), phi - st["prev_phi"])
     # one-time bonus the first time each utensil is lifted (> 2 cm, out of the bin) in an episode
     new_lift = lifted & ~st["lift_done"] & ~st["fresh"].unsqueeze(1)
