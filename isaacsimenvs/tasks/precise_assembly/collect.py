@@ -164,11 +164,26 @@ def reset(env, env_ids: torch.Tensor) -> None:
     placed_y = torch.zeros(n, K, device=dev)
     placed = torch.zeros(n, K, dtype=torch.bool, device=dev)
     gap = float(c.collect_gap_m) / 2
+    grid = c.collect_grid
+    if grid:
+        gx, gy = int(grid[0]), int(grid[1])
+        if gx * gy < K:
+            raise ValueError(f"collect_grid {gx}x{gy} < {K} slots")
+        ii = torch.arange(gx * gy, device=dev)
+        cx = x0 + (x1 - x0) * ((ii % gx).float() + 0.5) / gx
+        cy = y0 + (y1 - y0) * ((ii // gx).float() + 0.5) / gy
+        cell = torch.rand(n, gx * gy, device=dev).argsort(1)[:, :K]                  # random distinct cell per slot
+        jx, jy, jyaw = (float(v) for v in c.collect_grid_jitter)
     for k in range(K):
-        cc = torch.stack([torch.empty(n, T, device=dev).uniform_(x0, x1),
-                          torch.empty(n, T, device=dev).uniform_(y0, y1)], -1)       # footprint centres
+        if grid:
+            cc = torch.stack([cx[cell[:, k]][:, None] + torch.empty(n, T, device=dev).uniform_(-jx, jx),
+                              cy[cell[:, k]][:, None] + torch.empty(n, T, device=dev).uniform_(-jy, jy)], -1)
+        else:
+            cc = torch.stack([torch.empty(n, T, device=dev).uniform_(x0, x1),
+                              torch.empty(n, T, device=dev).uniform_(y0, y1)], -1)   # footprint centres
         yc = bin_yaw[:, None] if bool(c.collect_yaw_rel_bin) else math.radians(c.collect_yaw_center_deg)
-        yy = yc + torch.empty(n, T, device=dev).uniform_(-1, 1) * math.radians(_yaw_range_now(env))
+        yr = jyaw if grid else _yaw_range_now(env)
+        yy = yc + torch.empty(n, T, device=dev).uniform_(-1, 1) * math.radians(yr)
         yy = yy + math.pi * (torch.rand(n, T, device=dev) < 0.5).float()            # either end first
         hk = (st["half"][k] + gap).expand(n, T, 2)
         bad = _rect_overlap(cc, yy, hk, bin_c[:, None].expand(n, T, 2), bin_yaw[:, None].expand(n, T),
