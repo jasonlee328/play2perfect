@@ -382,6 +382,8 @@ class PreciseAssemblyEnv(PlayEnv):
             if float(getattr(self.cfg.precise_assembly, "finger_compliant_stiffness", 0.0)) > 0.0:
                 raise ValueError("tactile.original_pads and precise_assembly.finger_compliant_stiffness are exclusive")
             self._tacmap_pads_info = _pads_finish()
+        if bool(getattr(self.cfg.precise_assembly, "cupgrip_shell_filter", False)):
+            self._cupgrip_shell_info = _cupgrip.apply_shell_filter(self)
         k = float(getattr(self.cfg.precise_assembly, "finger_compliant_stiffness", 0.0))
         if k > 0.0:
             # A10 11-20: soft (compliant-contact) fingertip links, like a gel pad: contact depth, and so the ray-cast

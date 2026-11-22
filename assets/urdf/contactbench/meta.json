@@ -637,6 +637,28 @@
    "collision": "coacd 24",
    "mass_g_density620": 0.22,
    "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
+  },
+  "cup_shell": {
+   "src": "cup.stl",
+   "extents_mm": [
+    68.63,
+    68.63,
+    65.12
+   ],
+   "mass_g": 15.22,
+   "com_src_mm": [
+    -0.0,
+    0.0,
+    32.189
+   ],
+   "object_scale": [
+    1.7157,
+    1.7157,
+    1.628
+   ],
+   "collision": "coacd 25 + solid hand shell (convex hull)",
+   "mass_g_density620": 7.61,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   }
  },
  "fixtures": {
@@ -8904,6 +8926,171 @@
   },
   "cb_cupgrip_highS": {
    "object": "cup",
+   "fixture": "cup_stack_inv_n3",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05167100000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      0.0,
+      0.0,
+      0.04698600000000001,
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.111671,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.17167100000000002,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "cups": 5,
+    "loose_cups": 1,
+    "fused_cups": 3,
+    "inverted": true,
+    "step_mm": 4.685
+   },
+   "settled": false
+  },
+  "cb_cupgrip_shell": {
+   "object": "cup_shell",
+   "fixture": "cup_stack_inv_n3",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05167100000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      0.0,
+      0.0,
+      0.04698600000000001,
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.111671,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.17167100000000002,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "cups": 5,
+    "loose_cups": 1,
+    "fused_cups": 3,
+    "inverted": true,
+    "step_mm": 4.685
+   },
+   "settled": false
+  },
+  "cb_cupgrip_shell_lowS": {
+   "object": "cup_shell",
+   "fixture": "cup_stack_inv_n3",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.05167100000000001,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      0.0,
+      0.0,
+      0.04698600000000001,
+      1.0,
+      0.0,
+      0.0,
+      0.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.111671,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     0.17167100000000002,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "cups": 5,
+    "loose_cups": 1,
+    "fused_cups": 3,
+    "inverted": true,
+    "step_mm": 4.685
+   },
+   "settled": false
+  },
+  "cb_cupgrip_shell_highS": {
+   "object": "cup_shell",
    "fixture": "cup_stack_inv_n3",
    "object_start_pose": [
     0.0,

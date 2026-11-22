@@ -402,3 +402,61 @@ def actor_object_override(env, obs: dict, kp_world_fn, palm_pos, goal_kp, kp_off
     obs["object_rot"] = convert_quat(q0, to="xyzw")
     obs["keypoints_rel_palm"] = kp0 - palm_pos.unsqueeze(1)
     obs["keypoints_rel_goal"] = kp0 - goal_kp
+
+
+def apply_shell_filter(env) -> dict:
+    """A21 11-22 (precise_assembly.cupgrip_shell_filter, object cup_shell): the top cup carries a solid convex 'shell'
+    collider (its outer frustum) so fingers cannot sink through the 1 mm wall. The shell overlaps the cups nested
+    inside it, so it is filtered (PhysicsFilteredPairsAPI) against the second cup and the fused stack: only the hand
+    and the table touch it, cup-cup contact keeps the real thin wall. Env 0 through Usd, envs 1.. through the Sdf
+    layer in one change block (fast at 12k envs; replicate_physics=False so PhysX reads every env), then a check
+    that envs 0 / 1 / n/2 / n-1 resolve to the same filtered pair."""
+    import time
+    from pxr import Sdf, Usd, UsdPhysics
+    import omni.usd
+
+    t0 = time.time()
+    stage = omni.usd.get_context().get_stage()
+    n = env.num_envs
+    e0 = lambda p: p.replace("env_.*", "env_0")  # noqa: E731
+    obj0 = stage.GetPrimAtPath(e0(env.object.cfg.prim_path))
+    shells = [p for p in Usd.PrimRange(obj0, Usd.TraverseInstanceProxies())
+              if p.HasAPI(UsdPhysics.CollisionAPI) and "shell" in str(p.GetPath()).lower()]
+    if len(shells) != 1:
+        raise RuntimeError(f"cupgrip_shell_filter: expected 1 shell collider under {obj0.GetPath()}, found "
+                           f"{[str(p.GetPath()) for p in shells]} (use object cup_shell / problem cb_cupgrip_shell)")
+    if shells[0].IsInstanceProxy():
+        raise RuntimeError("cupgrip_shell_filter: shell collider is an instance proxy (cannot author per env)")
+
+    def body(root):
+        r = stage.GetPrimAtPath(e0(root))
+        for p in Usd.PrimRange(r, Usd.TraverseInstanceProxies()):
+            if p.HasAPI(UsdPhysics.RigidBodyAPI):
+                return str(p.GetPath())
+        return str(r.GetPath())
+    targets0 = [body(env.distractors[0].cfg.prim_path), body(env.hole.cfg.prim_path)]
+    shell0 = str(shells[0].GetPath())
+    sub = lambda p, i: p.replace("/env_0/", f"/env_{i}/", 1)  # noqa: E731
+    fp = UsdPhysics.FilteredPairsAPI.Apply(shells[0])
+    fp.CreateFilteredPairsRel().SetTargets([Sdf.Path(t) for t in targets0])
+    layer = stage.GetEditTarget().GetLayer()
+    with Sdf.ChangeBlock():
+        for i in range(1, n):
+            spec = Sdf.CreatePrimInLayer(layer, sub(shell0, i))
+            ops = spec.GetInfo("apiSchemas") if spec.HasInfo("apiSchemas") else Sdf.TokenListOp()
+            items = list(ops.prependedItems)
+            if "PhysicsFilteredPairsAPI" not in items:
+                ops.prependedItems = items + ["PhysicsFilteredPairsAPI"]
+            spec.SetInfo("apiSchemas", ops)
+            rel = spec.relationships.get("physics:filteredPairs") or Sdf.RelationshipSpec(spec, "physics:filteredPairs", False)
+            rel.targetPathList.explicitItems = [Sdf.Path(sub(t, i)) for t in targets0]
+    checked = sorted({0, 1, n // 2, n - 1} & set(range(n)))
+    for i in checked:
+        p = stage.GetPrimAtPath(sub(shell0, i) if i else shell0)
+        got = [str(t) for t in UsdPhysics.FilteredPairsAPI(p).GetFilteredPairsRel().GetTargets()] if p and p.HasAPI(UsdPhysics.FilteredPairsAPI) else []
+        want = [sub(t, i) if i else t for t in targets0]
+        if got != want:
+            raise RuntimeError(f"cupgrip_shell_filter: env {i} shell filter {got} != {want}")
+    info = dict(shell=shell0, targets=targets0, envs=n, checked=checked, seconds=round(time.time() - t0, 2))
+    print(f"[cupgrip-shell] filtered hand shell vs second cup + stack in {n} envs (check OK {checked}): {info}", flush=True)
+    return info

@@ -176,6 +176,7 @@ class PreciseAssemblyCfg:
 
     # A21 cup grip window (cupgrip.py; problem cb_cupgrip). Needs hand_force_sense=true. See cupgrip.py for the model.
     cupgrip: bool = False
+    cupgrip_shell_filter: bool = False                         # A21 11-22: object cup_shell's solid hand shell filtered vs second cup + stack
     cupgrip_retain_range_N: tuple[float, float] = (0.3, 3.0)   # hidden nest retention S, log-uniform per episode
     cupgrip_retain_start_hi_N: float = 0.5                     # curriculum start of the S upper bound
     cupgrip_retain_ramp_steps: int = 0                         # env steps to grow it to the range's hi (0 = off)
