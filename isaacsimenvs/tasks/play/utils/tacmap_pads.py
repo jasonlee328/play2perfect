@@ -42,7 +42,8 @@ def apply_original_tacmap_pads(env, params: dict | None = None) -> dict:
     params: dict with the ORIGINAL keys (default: read env.cfg.tactile). Returns counts; raises if the hand does not
     have exactly 5 pad shapes per env."""
     from types import SimpleNamespace
-    from pxr import PhysxSchema, Usd, UsdPhysics, UsdShade
+    from pxr import PhysxSchema, Sdf, Usd, UsdPhysics, UsdShade
+    import time as _time
     import omni.usd
 
     t = SimpleNamespace(**params) if params is not None else env.cfg.tactile
@@ -71,7 +72,11 @@ def apply_original_tacmap_pads(env, params: dict | None = None) -> dict:
         pc.CreateContactOffsetAttr().Set(float(contact)); pc.CreateRestOffsetAttr().Set(float(rest))
 
     n_pad = n_tip = n_rob = n_obj = 0
+    _t0 = _time.time()
+    _cb = Sdf.ChangeBlock(); _cb.__enter__()   # A21 11-22: batch USD change notices (12288 envs hung > 40 min without)
     for i in range(env.cfg.scene.num_envs):
+        if i % 1024 == 0:
+            print(f"[tacmap-original] env {i}/{env.cfg.scene.num_envs} ({_time.time() - _t0:.1f}s)", flush=True)
         root = stage.GetPrimAtPath(f"/World/envs/env_{i}/Robot")
         pads_here = 0
         for prim in Usd.PrimRange(root):
@@ -94,6 +99,8 @@ def apply_original_tacmap_pads(env, params: dict | None = None) -> dict:
             for prim in Usd.PrimRange(oroot):
                 if prim.HasAPI(UsdPhysics.CollisionAPI):
                     _offsets(prim, t.object_contact_offset, t.object_rest_offset); n_obj += 1
+    _cb.__exit__(None, None, None)
+    print(f"[tacmap-original] USD patch done in {_time.time() - _t0:.1f}s", flush=True)
     env._finger_compliant = True   # the runtime tensor friction pass would replace the bound materials (A10 logic)
     out = dict(pad_shapes=n_pad, tip_shell_shapes=n_tip, robot_shapes=n_rob, object_shapes=n_obj, k=k, c=c, pad_mu=pad_mu)
     print(f"[tacmap-original] pads k={k} d={c} mu={pad_mu} on {n_pad} shapes (5/env), shells {n_tip}, robot {n_rob}; "
