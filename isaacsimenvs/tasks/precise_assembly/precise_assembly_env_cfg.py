@@ -186,6 +186,9 @@ class PreciseAssemblyCfg:
     # obs_balls_sorted: field balls_rel_palm = object + every distractor position rel. palm, sorted by angle about
     # the fixture centre (identity-free under slot_shuffle; A22 spiky balls: actor sees where balls are, not which).
     obs_balls_sorted: bool = False
+    # obs_touch_texture: actor field tactile_texture (30) = per-pad contact area / edges / holes / gradient computed
+    # from the fingertip taxels only (zero when touch is zeroed). Actor only.
+    obs_touch_texture: bool = False
     # A22 search reward: search_reach_scale x (decrease of the closest fingertip-to-ANY-ball surface gap, m) per step,
     # + search_touch_bonus once per ball the first time a fingertip comes within search_touch_dist of its surface.
     # blind_target_nearest: blinded envs see the ball nearest the palm as their target (object_rot / keypoints)

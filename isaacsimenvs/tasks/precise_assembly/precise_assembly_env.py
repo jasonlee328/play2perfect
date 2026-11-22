@@ -358,6 +358,10 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if cfg.precise_assembly.obs_touch_texture:
+            OBS_FIELD_SIZES["tactile_texture"] = 30
+            if "tactile_texture" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_texture")
         if cfg.precise_assembly.obs_balls_sorted and self._pih_distractor_urdf_abs:
             OBS_FIELD_SIZES["balls_rel_palm"] = 2 * (len(self._pih_distractor_urdf_abs) + 1)
             for lst in ("obs_list", "state_list"):

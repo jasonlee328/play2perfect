@@ -376,6 +376,21 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "tactile_texture" in OBS_FIELD_SIZES and "tactile" in obs_clean:
+        # A22: texture summaries computed ONLY from the (possibly zeroed) fingertip taxels, per pad: contact area,
+        # edge taxels, holes (inactive taxels surrounded by contact), summed gradient, and the edge / gradient per
+        # area. Bumps show up as patchy contact; this makes that cue linear for the actor. Zero when touch is zero.
+        tl = obs_clean["tactile"].view(env.num_envs, 5, -1)
+        r = int(round(tl.shape[-1] ** 0.5))
+        P = tl.view(env.num_envs, 5, r, r)
+        act = (P > 0.02).float()
+        pa = torch.nn.functional.pad(act, (1, 1, 1, 1))
+        nb = pa[..., :-2, 1:-1] * pa[..., 2:, 1:-1] * pa[..., 1:-1, :-2] * pa[..., 1:-1, 2:]
+        area = act.sum((2, 3)); edge = (act * (1 - nb)).sum((2, 3)); holes = ((1 - act) * nb).sum((2, 3))
+        grad = (P[..., 1:, :] - P[..., :-1, :]).abs().sum((2, 3)) + (P[..., :, 1:] - P[..., :, :-1]).abs().sum((2, 3))
+        obs_clean["tactile_texture"] = torch.cat([area / 50.0, edge / 50.0, holes / 10.0, grad, edge / (area + 1.0),
+                                                  grad / (area + 1.0)], dim=1)
+
     if "balls_rel_palm" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
         # A22: LIVE xy of every ball (object + distractors) rel. palm, sorted per env by angle about the fixture centre,
         # so the actor sees where all balls are but never which one is the target. z is left out: a spiky ball rests
