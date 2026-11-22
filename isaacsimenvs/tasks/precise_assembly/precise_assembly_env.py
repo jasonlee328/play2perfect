@@ -414,6 +414,46 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _setup_scene(self) -> None:
         setup_scene(self)
+        if bool(getattr(self.cfg.tactile, "original_pads", False)):
+            # A23 11-22: original sharpa-tacmap pad physics (gel pads compliant 280/20, robot offsets 0.2/-0.1 mm,
+            # object offsets 0.1/-0.5 mm); replaces A10's finger_compliant_* (which softened the whole DP link)
+            if float(getattr(self.cfg.precise_assembly, "finger_compliant_stiffness", 0.0)) > 0.0:
+                raise ValueError("tactile.original_pads and precise_assembly.finger_compliant_stiffness are exclusive")
+            from ..play.utils.tacmap_pads import apply_original_tacmap_pads
+            self._tacmap_pads_info = apply_original_tacmap_pads(self)
+        k = float(getattr(self.cfg.precise_assembly, "finger_compliant_stiffness", 0.0))
+        if k > 0.0:
+            # A10 11-20: soft (compliant-contact) fingertip links, like a gel pad: contact depth, and so the ray-cast
+            # TacMap taxels, grows with press force. Robot materials are bound in USD here (fingertips: compliant,
+            # friction = finger_tip_friction; other links: robot_friction) and the runtime tensor friction pass skips
+            # the robot (it would replace the compliant material).
+            from pxr import PhysxSchema, Usd, UsdPhysics, UsdShade
+            import omni.usd
+            from ..play.utils.scene_utils import FINGERTIP_LINK_NAMES
+            stage = omni.usd.get_context().get_stage()
+            a = self.cfg.assets
+            def _mat(path, mu, kk=0.0, cc=0.0):
+                m = UsdShade.Material.Define(stage, path)
+                UsdPhysics.MaterialAPI.Apply(m.GetPrim())
+                pm = UsdPhysics.MaterialAPI(m.GetPrim())
+                pm.CreateStaticFrictionAttr(float(mu)); pm.CreateDynamicFrictionAttr(float(mu)); pm.CreateRestitutionAttr(0.0)
+                if kk > 0.0:
+                    px = PhysxSchema.PhysxMaterialAPI.Apply(m.GetPrim())
+                    px.CreateCompliantContactStiffnessAttr(float(kk)); px.CreateCompliantContactDampingAttr(float(cc))
+                return m
+            tip = _mat("/World/A10SoftTip", a.finger_tip_friction, k, float(getattr(self.cfg.precise_assembly, "finger_compliant_damping", 0.0)))
+            rob = _mat("/World/A10RobotMat", a.robot_friction)
+            n_tip = n_rob = 0
+            for i in range(self.cfg.scene.num_envs):
+                root = stage.GetPrimAtPath(f"/World/envs/env_{i}/Robot")
+                for prim in Usd.PrimRange(root):
+                    if not prim.HasAPI(UsdPhysics.CollisionAPI):
+                        continue
+                    on_tip = any(f"/{n}/" in str(prim.GetPath()) + "/" for n in FINGERTIP_LINK_NAMES)
+                    UsdShade.MaterialBindingAPI.Apply(prim).Bind(tip if on_tip else rob, UsdShade.Tokens.strongerThanDescendants, "physics")
+                    n_tip += on_tip; n_rob += not on_tip
+            self._finger_compliant = True
+            print(f"[a10] soft fingertips k={k} N/m on {n_tip} shapes, robot material on {n_rob}", flush=True)
 
     def _reset_idx(self, env_ids) -> None:
         if env_ids is None:
