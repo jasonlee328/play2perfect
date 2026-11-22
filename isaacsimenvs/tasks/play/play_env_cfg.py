@@ -548,6 +548,9 @@ class TactileCfg:
     # "zero" (all 0) or "random" (i.i.d. uniform [0, 1] every step). The real taxels are
     # still computed and kept in env._last_tactile (student obs, eval tactile panels).
     policy_override: str = "none"
+    # per-episode touch dropout in the policy obs: each env zeroes tactile (+ tactile_hand) for a whole
+    # episode with probability p (resampled at every reset). 0 = off.
+    policy_dropout_p: float = 0.0
     # Taxels per pad side; must divide 240 (the TacMap map size).
     resolution: int = 8
     # Rays per taxel side: each taxel averages samples_per_taxel^2 ray depths.

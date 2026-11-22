@@ -353,6 +353,19 @@ def build_observations(env) -> dict[str, torch.Tensor]:
                 obs_clean[k] = torch.rand_like(obs_clean[k])
             elif override != "none":
                 raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
+        p_drop = float(getattr(env.cfg.tactile, "policy_dropout_p", 0.0))
+        if p_drop > 0.0:
+            m = getattr(env, "_tac_drop_mask", None)
+            fresh = env.episode_length_buf == 0
+            if m is None:
+                m = torch.rand(env.num_envs, device=env.device) < p_drop
+            else:
+                m = torch.where(fresh, torch.rand(env.num_envs, device=env.device) < p_drop, m)
+            env._tac_drop_mask = m
+            keep = (~m).float().unsqueeze(-1)
+            for k in ("tactile", "tactile_hand"):
+                if k in obs_clean:
+                    obs_clean[k] = obs_clean[k] * keep
 
     if "distractor_obs" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
         idx = getattr(env, "_obs_distractor_idx", None)
