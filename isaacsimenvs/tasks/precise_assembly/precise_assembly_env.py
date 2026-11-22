@@ -331,6 +331,14 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "card_expert_phase" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "card_expert_phase"))
+        if bool(getattr(cfg.precise_assembly, "retr_shear_probe", False)) and not bool(getattr(cfg.precise_assembly, "retr_shear_obs", False)):
+            OBS_FIELD_SIZES["tactile_shear"] = 15   # computed (env._last_tactile_shear) but not in any obs list (probes)
+        if bool(getattr(cfg.precise_assembly, "retr_shear_obs", False)):
+            # A10 11-21: fingertip contact force on card 1 in each DP link frame (5 x 3, N / 5, clip +-3), actor only;
+            # zeroed with the rest of touch by tactile.policy_override
+            OBS_FIELD_SIZES["tactile_shear"] = 15
+            if "tactile_shear" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_shear")
         if bool(getattr(cfg.precise_assembly, "retr_hint_obs", False)):
             # A10 oracle: card_hint = [card weight scale, press / window centre] in actor + critic (for DS distillation)
             OBS_FIELD_SIZES["card_hint"] = 2

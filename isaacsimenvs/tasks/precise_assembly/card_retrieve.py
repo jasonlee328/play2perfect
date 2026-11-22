@@ -289,7 +289,11 @@ class RetrieveTask:
 
     def _forces(self):
         N = self.env.num_envs
-        F_rc = self.v_rob_card.get_contact_force_matrix(self.env.physics_dt).norm(dim=-1).reshape(N, -1)
+        M_rc = self.v_rob_card.get_contact_force_matrix(self.env.physics_dt)
+        # retr_shear_obs (A10 11-21): keep the full 3D contact force of each fingertip DP link on card 1 (world frame);
+        # obs_utils turns it into the link frame = normal + shear, like a gel sensor's marker field
+        self.f_tip_vec_w = M_rc.reshape(N, -1, 3)[:, self.tip_ids]
+        F_rc = M_rc.norm(dim=-1).reshape(N, -1)
         f_rob_card = F_rc.sum(-1)
         f_tips = F_rc[:, self.tip_ids]
         f_rob_deck = torch.zeros(N, device=self.env.device)

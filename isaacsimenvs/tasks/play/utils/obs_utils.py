@@ -358,6 +358,21 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             elif override != "none":
                 raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
 
+    if "tactile_shear" in OBS_FIELD_SIZES:
+        from isaaclab.utils.math import quat_apply_inverse as _qai
+        card = getattr(env, "_card", None)
+        fv = getattr(card, "f_tip_vec_w", None) if card is not None else None
+        if fv is None or not hasattr(card, "tip_ids"):
+            sh = torch.zeros(env.num_envs, 15, device=env.device)
+        else:
+            q = env.robot.data.body_quat_w[:, card.tip_ids]                       # (N, 5, 4)
+            sh = (_qai(q.reshape(-1, 4), fv.reshape(-1, 3)).reshape(env.num_envs, 15) / 5.0).clamp(-3.0, 3.0)
+        if str(getattr(env.cfg.tactile, "policy_override", "none")).lower() == "zero":
+            sh = torch.zeros_like(sh)
+        elif str(getattr(env.cfg.tactile, "policy_override", "none")).lower() == "random":
+            sh = torch.rand_like(sh)
+        obs_clean["tactile_shear"] = sh
+        env._last_tactile_shear = sh
     if "card_hint" in OBS_FIELD_SIZES:
         # A10 oracle: [log card-weight scale / log 64, press on card 1 / (0.19 N x scale) clipped to 3, / 3]
         card = getattr(env, "_card", None)
