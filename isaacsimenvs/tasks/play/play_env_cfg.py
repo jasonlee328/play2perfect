@@ -563,6 +563,19 @@ class TactileCfg:
     # Upper bound on rays per raycast call (envs are processed in chunks).
     max_rays_per_chunk: int = 4_000_000
     gel_force_k: float = 0.0   # A10: gel-like force reading, taxel depth += k (m/N) x fingertip contact force on contact taxels
+    # Original sharpa-tacmap contact physics for the gel pads (utils/tacmap_pads.py; A23 11-22). The sensor code is
+    # unchanged (it already matches the original); this restores the pad physics the original was calibrated with.
+    # Use together with the sim overrides in FoundationTouch configs/tacmap_original.txt (dt 1/240, 8/0 iterations).
+    original_pads: bool = False
+    pad_compliant_stiffness: float = 280.0     # original: compliant_contact_stiffness on the 5 elastomer prims
+    pad_compliant_damping: float = 20.0        # original: compliant_contact_damping
+    pad_friction: float = -1.0                 # -1 = keep assets.finger_tip_friction (original: IsaacLab default 0.5)
+    pad_robot_offsets: bool = True             # original: every robot collision shape gets these offsets
+    robot_contact_offset: float = 0.0002
+    robot_rest_offset: float = -0.0001
+    pad_object_offsets: bool = True            # original presser offsets on the manipulated object (also changes its
+    object_contact_offset: float = 0.0001      # contacts with table / fixture: rest -0.5 mm = sinks 0.5 mm into them)
+    object_rest_offset: float = -0.0005
     # Experimental whole-hand skin (utils/hand_skin.py): field "tactile_hand" of 21 links x grid^2 taxels, appended
     # after "tactile" (policy obs; critic too with whole_hand_in_critic). Needs enabled=true. A checkpoint trained
     # without it warm-starts with P2P_NEW_OBS_FIELD=tactile_hand. policy_override applies to it as well.
