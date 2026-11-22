@@ -262,6 +262,7 @@ class PreciseAssemblyCfg:
     collect_scoop_min_start: int = 0                # > 0: curriculum start count, ramps to collect_success_min_in
     collect_scoop_ramp_steps: int = 0
     collect_scoop_clear_start: int = 0              # > 0: curriculum start for the consecutive held steps (-> clear_steps)
+    collect_phi_ratchet: bool = False               # A18: shaping pays only new episode highs of the potential (drops free)
     collect_rew_hold: float = 0.0                   # scoop: potential x (consecutive held steps / steps needed), max 1
     collect_scoop_ramp_offset_steps: int = 0
     collect_scoop_hand_d: float = 0.04              # > 0: held = a surface point within this of a hand link origin

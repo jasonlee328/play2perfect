@@ -68,6 +68,7 @@ def setup(env) -> None:
     st["n_active"] = torch.ones(N, dtype=torch.long, device=dev)
     st["n_active0"] = torch.ones(N, dtype=torch.long, device=dev)
     st["prev_phi"] = torch.zeros(N, device=dev)
+    st["phi_max"] = torch.zeros(N, device=dev)
     st["fresh"] = torch.ones(N, dtype=torch.bool, device=dev)
     st["clear"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["scoop_clear"] = torch.zeros(N, dtype=torch.long, device=dev)
@@ -616,7 +617,14 @@ def update(env) -> None:
     if bool(c.collect_scoop_mode) and float(c.collect_rew_hold) > 0.0:
         # hold-time potential (scp2: knives were picked up and dropped within 30 steps, nothing paid for holding on)
         phi = phi + float(c.collect_rew_hold) * (st["scoop_clear"].float() / float(_scoop_clear_now(env))).clamp(max=1.0)
-    r = torch.where(st["fresh"], torch.zeros_like(phi), phi - st["prev_phi"])
+    if bool(getattr(c, "collect_phi_ratchet", False)):
+        # A18 11-22: pay only new episode highs of the potential, so putting a 2-knife bundle down to retry costs
+        # nothing (with plain phi - prev_phi a drop costs ~1400 and the policy held 2 knives to the timeout)
+        pm = torch.where(st["fresh"], phi, st["phi_max"])
+        r = torch.where(st["fresh"], torch.zeros_like(phi), (phi - pm).clamp(min=0.0))
+        st["phi_max"] = torch.maximum(pm, phi)
+    else:
+        r = torch.where(st["fresh"], torch.zeros_like(phi), phi - st["prev_phi"])
     # one-time bonus the first time each utensil is lifted (> 2 cm, out of the bin) in an episode
     new_lift = lifted & ~st["lift_done"] & ~st["fresh"].unsqueeze(1)
     st["lift_done"] |= lifted
