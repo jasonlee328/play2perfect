@@ -477,7 +477,8 @@ class RetrieveTask:
             disp_max = torch.maximum(disp_max, disp); tilt_max = torch.maximum(tilt_max, tilt)
         self.deck_disp, self.deck_tilt = disp_max, tilt_max
         rises = [(self._rel_hole(b.data.root_pos_w, b.data.root_quat_w)[0][:, 2] - self.deck_ref_p[k][:, 2]) for k, b in enumerate(env.distractors)]
-        self.deck_rise = torch.stack(rises, -1)   # N x K (m), per deck card
+        # rigid-deck problem (no loose deck cards): one zero column so max() / logging still work
+        self.deck_rise = torch.stack(rises, -1) if rises else torch.zeros(env.num_envs, 1, device=d)   # N x K (m), per deck card
         if not hasattr(self, "deck_rise_ep") or self.deck_rise_ep.shape != self.deck_rise.shape:
             self.deck_rise_ep = torch.zeros_like(self.deck_rise)
         fr = getattr(self, "_rise_fresh", None)
