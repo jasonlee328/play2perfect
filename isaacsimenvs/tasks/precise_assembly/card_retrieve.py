@@ -77,6 +77,12 @@ class RetrieveTask:
             self.v_rob_holder = []
         others = [_glob(b.root_physx_view.prim_paths[0]) for b in env.distractors] + [_glob(env.hole.root_physx_view.prim_paths[0])]
         self.v_card_env = sim.create_rigid_contact_view(obj, filter_patterns=others)
+        self.v_rob_card_fr = None
+        if bool(getattr(self.c, "retr_shear_obs", False)) or bool(getattr(self.c, "retr_shear_probe", False)):
+            # friction is NOT in get_contact_force_matrix (normal force only; A10 11-21 check): separate view with a
+            # contact-data buffer for get_friction_data
+            self.v_rob_card_fr = sim.create_rigid_contact_view(obj, filter_patterns=links,
+                                                               max_contact_data_count=int(env.num_envs) * 96)
         self._views = True
 
     def _rel_hole(self, pos_w, quat_w):
@@ -292,7 +298,20 @@ class RetrieveTask:
         M_rc = self.v_rob_card.get_contact_force_matrix(self.env.physics_dt)
         # retr_shear_obs (A10 11-21): keep the full 3D contact force of each fingertip DP link on card 1 (world frame);
         # obs_utils turns it into the link frame = normal + shear, like a gel sensor's marker field
-        self.f_tip_vec_w = M_rc.reshape(N, -1, 3)[:, self.tip_ids]
+        self.f_tip_vec_w = M_rc.reshape(N, -1, 3)[:, self.tip_ids]          # normal force only (PhysX)
+        self.f_tip_fric_w = None
+        if getattr(self, "v_rob_card_fr", None) is not None:
+            fr, _pts, cnt, st = self.v_rob_card_fr.get_friction_data(self.env.physics_dt)
+            fr = fr.reshape(-1, 3); cnt = cnt.reshape(-1).long(); st = st.reshape(-1).long()
+            B = cnt.numel() // N
+            pair = torch.repeat_interleave(torch.arange(cnt.numel(), device=fr.device), cnt)
+            idx = torch.repeat_interleave(st, cnt) + (torch.arange(int(cnt.sum()), device=fr.device)
+                                                       - torch.repeat_interleave(torch.cumsum(cnt, 0) - cnt, cnt))
+            agg = torch.zeros(cnt.numel(), 3, device=fr.device)
+            if idx.numel():
+                agg.index_add_(0, pair, fr[idx])
+            self.f_tip_fric_w = agg.reshape(N, B, 3)[:, self.tip_ids]
+            self.f_tip_vec_w = self.f_tip_vec_w + self.f_tip_fric_w           # full contact force = normal + friction
         F_rc = M_rc.norm(dim=-1).reshape(N, -1)
         f_rob_card = F_rc.sum(-1)
         f_tips = F_rc[:, self.tip_ids]
