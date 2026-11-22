@@ -294,7 +294,11 @@ def dones(env) -> tuple[torch.Tensor, torch.Tensor]:
     nested = rise < float(c.cupgrip_nest_overlap_mm) / 1000.0
     # only the modelled squeeze-drag fails (an uncoupled one-substep friction blip is snapped back by the pin)
     dragged = (rise2 > float(c.cupgrip_drag_fail_mm) / 1000.0) & (env.cg_coupled | ~bool(c.cupgrip_pin_second))
-    env.cg_second_seated = rise2 < float(c.cupgrip_settle_mm) / 1000.0
+    # 11-22 fix: 'seated' used rise2 < settle only, so a second cup that fell OFF the stack (rise2 << 0) counted as
+    # seated and the top-cup lift was scored a success; now it must be back at its seat height and upright
+    from isaaclab.utils.math import quat_apply as _qa2
+    _ax2 = _qa2(env.distractors[0].data.root_quat_w, torch.tensor([0.0, 0.0, 1.0], device=env.device).expand(env.num_envs, 3))
+    env.cg_second_seated = (rise2.abs() < float(c.cupgrip_settle_mm) / 1000.0) & (_ax2[:, 2].abs() > 0.985)
     if bool(c.cupgrip_detach_rule):
         # user 11-20: a partial lift of the second cup is fine if it falls back; fail only when it detaches
         dragged = rise2 > float(c.cupgrip_detach_mm) / 1000.0
