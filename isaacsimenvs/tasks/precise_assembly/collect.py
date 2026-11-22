@@ -194,6 +194,7 @@ def reset(env, env_ids: torch.Tensor) -> None:
         arank = ((~active).long() * K + torch.arange(K, device=dev)).argsort(1).argsort(1)   # rank of each slot, active first
         cell = torch.gather(order, 1, arank)                                             # (n, K) distinct cell per slot
         jx, jy, jyaw = (float(v) for v in c.collect_grid_jitter)
+    ok_any_k = []
     for k in range(K):
         if grid:
             cc = torch.stack([cx[cell[:, k]][:, None] + torch.empty(n, T, device=dev).uniform_(-jx, jx),
@@ -228,6 +229,47 @@ def reset(env, env_ids: torch.Tensor) -> None:
         placed_c[:, k] = cc[sel, first]
         placed_y[:, k] = yy[sel, first]
         placed[:, k] = active[:, k] & (ok.any(1) | (k == 0))
+        ok_any_k.append(ok.any(1))
+    if grid and bool(getattr(c, "collect_grid_fallback", False)):
+        # A18 11-22: an active knife whose cell was blocked (start-pose hand / overlap) tries every unused cell centre
+        # (no jitter) before it is parked, so compact rows still get the full 6-10 knives
+        used = torch.zeros(n, gx * gy, dtype=torch.bool, device=dev)
+        for k in range(K):
+            used.scatter_(1, cell[:, k:k + 1], (placed[:, k] & (ok_any_k[k] | (k == 0))).unsqueeze(1))
+        for k in range(1, K):
+            miss = active[:, k] & ~placed[:, k]
+            if not bool(miss.any()):
+                continue
+            for jc in range(gx * gy):
+                ci = order[:, jc]                                               # cells best-first
+                cand = miss & ~torch.gather(used, 1, ci[:, None]).squeeze(1)
+                if not bool(cand.any()):
+                    continue
+                cc1 = torch.stack([cx[ci], cy[ci]], -1)[:, None]                 # (n, 1, 2)
+                yc1 = bin_yaw[:, None] if bool(c.collect_yaw_rel_bin) else torch.full((n, 1), math.radians(c.collect_yaw_center_deg), device=dev)
+                hk = (st["half"][k] + gap).expand(n, 1, 2)
+                bad1 = _rect_overlap(cc1, yc1, hk, bin_c[:, None], bin_yaw[:, None], bin_h[:, None])
+                hc = float(c.collect_hand_clear_m)
+                if hc > 0.0:
+                    hp = st["hand_pts0"][env_ids]
+                    low = hp[..., 2] < (env._table_z_per_env[env_ids] + TABLE_HALF_HEIGHT + 0.10).unsqueeze(1)
+                    d = hp[:, None, :, :2] - cc1[:, :, None, :]
+                    cy_, sy_ = torch.cos(yc1)[..., None], torch.sin(yc1)[..., None]
+                    lx = (d[..., 0] * cy_ + d[..., 1] * sy_).abs(); ly = (-d[..., 0] * sy_ + d[..., 1] * cy_).abs()
+                    h0 = st["half"][k]
+                    bad1 |= ((lx <= h0[0] + hc) & (ly <= h0[1] + hc) & low[:, None, :]).any(-1)
+                for j in range(K):
+                    hj = (st["half"][j] + gap).expand(n, 1, 2)
+                    ov = _rect_overlap(cc1, yc1, hk, placed_c[:, j:j + 1], placed_y[:, j:j + 1], hj)
+                    bad1 |= ov & placed[:, j:j + 1] & (j != k)
+                take = cand & ~bad1[:, 0]
+                placed_c[:, k] = torch.where(take[:, None], cc1[:, 0], placed_c[:, k])
+                placed_y[:, k] = torch.where(take, yc1[:, 0], placed_y[:, k])
+                placed[:, k] |= take
+                used.scatter_(1, ci[:, None], (torch.gather(used, 1, ci[:, None]).squeeze(1) | take).unsqueeze(1))
+                miss = miss & ~take
+                if not bool(miss.any()):
+                    break
     active = placed                        # a slot that found no free spot is parked (slot 0 always placed)
     st["active"][env_ids] = active
     st["n_active"][env_ids] = active.sum(1)
