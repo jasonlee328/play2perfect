@@ -188,6 +188,10 @@ class PreciseAssemblyCfg:
     obs_balls_sorted: bool = False
     # A22 search reward: search_reach_scale x (decrease of the closest fingertip-to-ANY-ball surface gap, m) per step,
     # + search_touch_bonus once per ball the first time a fingertip comes within search_touch_dist of its surface.
+    # blind_target_nearest: blinded envs see the ball nearest the palm as their target (object_rot / keypoints)
+    # instead of zeros; identity rotation and z floored at blind_target_rest_z above the fixture (no identity leak).
+    blind_target_nearest: bool = False
+    blind_target_rest_z: float = 0.0270
     search_reach_scale: float = 0.0
     search_touch_bonus: float = 0.0
     search_touch_dist: float = 0.008

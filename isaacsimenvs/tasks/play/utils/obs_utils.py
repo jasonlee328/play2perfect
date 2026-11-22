@@ -291,6 +291,28 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     else:
         noisy_goal_kp = goal_kp
 
+    pa_ = getattr(env.cfg, "precise_assembly", None)
+    if pa_ is not None and getattr(pa_, "blind_target_nearest", False) and getattr(env, "distractors", ()):
+        # A22: in blinded envs the actor's target = the ball NEAREST the palm (geometry only, never the hidden
+        # identity). Spheres: identity rotation for every ball (a smooth ball rolls more, so live rotation would
+        # leak); z floored at the shared rest height (a spiky ball rests 0.85 mm lower). Goal = that ball's
+        # reset spot + the task's goal offset.
+        bp = torch.cat([obj_pos.unsqueeze(1), torch.stack([d.data.root_pos_w for d in env.distractors], dim=1)
+                        - env_origins.unsqueeze(1)], dim=1)                                 # (N, B, 3)
+        rest = torch.cat([(env._object_rest_pos - env_origins).unsqueeze(1),
+                          env._distractor_reset_pos.transpose(0, 1) - env_origins.unsqueeze(1)], dim=1)
+        zf = env.hole_pos[:, 2:3] + float(getattr(pa_, "blind_target_rest_z", 0.0270))
+        bp = torch.cat([bp[..., :2], torch.maximum(bp[..., 2], zf).unsqueeze(-1)], dim=-1)
+        k = (bp - palm_pos.unsqueeze(1)).norm(dim=-1).argmin(1)
+        ar = torch.arange(env.num_envs, device=env.device)
+        npos = bp[ar, k]
+        gpos = rest[ar, k] + (goal_pos - (env._object_rest_pos - env_origins))
+        qid = torch.zeros(env.num_envs, 4, device=env.device); qid[:, 0] = 1.0
+        nkp = _keypoints_world(npos, qid, kp_offsets)
+        ngk = _keypoints_world(gpos, qid, kp_offsets)
+        env._blind_nearest_obs = {"object_rot": convert_quat(qid, to="xyzw"),
+                                  "keypoints_rel_palm": nkp - palm_pos.unsqueeze(1),
+                                  "keypoints_rel_goal": nkp - ngk}
     keypoints_rel_palm_clean = obj_kp - palm_pos.unsqueeze(1)
     keypoints_rel_palm_noisy = noisy_obj_kp - palm_pos.unsqueeze(1)
     keypoints_rel_goal_clean = obj_kp - goal_kp
@@ -417,10 +439,15 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         a = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter) / ramp)
         m = (torch.arange(env.num_envs, device=env.device) < round(a * env.num_envs)).float()
         env.blind_frac = a
+        near = getattr(env, "_blind_nearest_obs", None) if getattr(pa, "blind_target_nearest", False) else None
         for f in blind:
             if f in obs_noisy:
                 x = obs_noisy[f]
-                obs_noisy[f] = x * (1.0 - m).view(-1, *([1] * (x.dim() - 1)))   # fields may be (N, K, 3)
+                mm = m.view(-1, *([1] * (x.dim() - 1)))
+                if near is not None and f in near:
+                    obs_noisy[f] = x * (1.0 - mm) + near[f].reshape(x.shape) * mm   # nearest ball instead of zeros
+                else:
+                    obs_noisy[f] = x * (1.0 - mm)   # fields may be (N, K, 3)
 
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)
