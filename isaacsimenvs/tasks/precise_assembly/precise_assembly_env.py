@@ -459,9 +459,13 @@ class PreciseAssemblyEnv(PlayEnv):
                 setattr(self, key, (ids, self.robot.data.default_joint_stiffness[:, ids].clone(),
                                     self.robot.data.default_joint_damping[:, ids].clone()))
             ids, kp0, kd0 = getattr(self, key)
-            sv = lo + (hi - lo) * torch.rand(env_ids.numel(), device=self.device)
-            self.robot.write_joint_stiffness_to_sim(kp0[env_ids] * sv[:, None], joint_ids=ids, env_ids=env_ids)
-            self.robot.write_joint_damping_to_sim(kd0[env_ids] * sv.sqrt()[:, None], joint_ids=ids, env_ids=env_ids)
+            # kp_scale_per_joint: an independent scale per joint (A10 11-21: one shared scale still lets the joint
+            # tracking errors read press force); kp_scale_log: log-uniform in [lo, hi]
+            shape = (env_ids.numel(), ids.numel()) if bool(getattr(pa, "kp_scale_per_joint", False)) else (env_ids.numel(), 1)
+            u = torch.rand(shape, device=self.device)
+            sv = (lo * (hi / lo) ** u) if bool(getattr(pa, "kp_scale_log", False)) else (lo + (hi - lo) * u)
+            self.robot.write_joint_stiffness_to_sim(kp0[env_ids] * sv, joint_ids=ids, env_ids=env_ids)
+            self.robot.write_joint_damping_to_sim(kd0[env_ids] * sv.sqrt(), joint_ids=ids, env_ids=env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()

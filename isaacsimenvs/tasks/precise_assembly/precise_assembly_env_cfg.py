@@ -230,6 +230,8 @@ class PreciseAssemblyCfg:
     card_press_gain_per_N: float = 0.0    # touch-only load cue: pad image x (1 + g x fingertip force on the card); 0 = off
     kp_scale_range_arm: tuple = (1.0, 1.0)  # hidden per-episode PD gain scales (from A16); (1, 1) = off
     kp_scale_range_hand: tuple = (1.0, 1.0)
+    kp_scale_per_joint: bool = False   # independent hidden gain scale per joint (else one per arm / hand)
+    kp_scale_log: bool = False         # log-uniform scale in the range
     retr_lock_force_range: tuple = (0.0, 0.0)  # fragile lock: hidden unlock force F ~ logU[lo, hi] N per episode; (0,0) = off
     retr_lock_ratio: float = 1.4          # unlock needs press in [F, ratio F] for retr_lock_dwell steps; > ratio F = broken
     retr_lock_dwell: int = 8
