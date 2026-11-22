@@ -245,6 +245,21 @@ def main() -> None:
                 cols.append(f"{a}:{a + OBS_FIELD_SIZES[f]}")
             os.environ["P2P_STUDENT_MASK_COLS"] = ",".join(cols)
             print(f"[distill] student mask {mf} -> cols {os.environ['P2P_STUDENT_MASK_COLS']}", flush=True)
+        # A10: EigenDExplore exploration (hand-synergy PCA noise + iid) instead of plain Gaussian.
+        # P2P_EIGENDEXPLORE=<pth with a2c_network.eigendexplore.{basis,log_scale} + eigendexplore_iid_multiplier>.
+        _eig = os.environ.get("P2P_EIGENDEXPLORE", "")
+        if _eig:
+            import torch as _t
+            from isaacsimenvs.utils.eigendexplore.rl_games import configure as _eig_configure
+            _c = _t.load(_eig, map_location="cpu", weights_only=False)
+            _m = (_c[0] if 0 in _c else _c)["model"] if isinstance(_c, dict) else _c["model"]
+            _basis = _m["a2c_network.eigendexplore.basis"]
+            _ls = _m["a2c_network.eigendexplore.log_scale"]
+            _iid = _m["a2c_network.eigendexplore_iid_multiplier"]
+            _eig_configure(agent_cfg["params"], {"basis": _basis.tolist(),
+                "eigen_sigma": _ls.reshape(-1, _ls.shape[-1]).mean(0).exp().tolist(),
+                "iid_sigma": _iid.tolist()})
+            print(f"[eigendexplore] basis {tuple(_basis.shape)} log_scale {tuple(_ls.shape)} from {_eig}", flush=True)
         runner.load(agent_cfg)
         runner.reset()
         runner.run(
