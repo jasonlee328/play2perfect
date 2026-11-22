@@ -235,6 +235,16 @@ def _scoop_frac(env) -> float:
     return min(1.0, float(env.common_step_counter + int(c.collect_scoop_ramp_offset_steps)) / steps)
 
 
+def _scoop_clear_now(env) -> int:
+    """Scoop curriculum: consecutive held steps needed ramp from collect_scoop_clear_start to collect_clear_steps."""
+    c = env.cfg.precise_assembly
+    hi = int(c.collect_clear_steps)
+    lo = int(c.collect_scoop_clear_start)
+    if lo <= 0:
+        return hi
+    return max(1, int(round(lo + (hi - lo) * _scoop_frac(env))))
+
+
 def _scoop_h_now(env) -> float:
     """Scoop curriculum (A18 11-21): held height ramps from collect_scoop_h_start to collect_scoop_h."""
     c = env.cfg.precise_assembly
@@ -490,7 +500,7 @@ def update(env) -> None:
     if bool(c.collect_scoop_mode):
         ok_s = n_scoop >= _scoop_min_now(env)
         st["clear"] = torch.where(ok_s, st["clear"] + 1, torch.zeros_like(st["clear"]))
-        st["success"] = st["clear"] >= int(c.collect_clear_steps)
+        st["success"] = st["clear"] >= _scoop_clear_now(env)
     # potential
     hn = (h / float(c.collect_lift_h)).clamp(max=1.0)
     d_bin = (pos[..., :2] - env.hole_pos[:, None, :2]).norm(dim=-1)
@@ -554,6 +564,9 @@ def update(env) -> None:
     phi = phi + float(c.collect_rew_release) * release
     phi = phi + float(c.collect_rew_multi) * (lifted.sum(1) - 1).clamp(min=0).float()   # scooping: carried together
     phi = phi + float(c.collect_rew_scoop) * n_scoop.float()   # scoop mode: per utensil held high
+    if bool(c.collect_scoop_mode) and float(c.collect_rew_hold) > 0.0:
+        # hold-time potential (scp2: knives were picked up and dropped within 30 steps, nothing paid for holding on)
+        phi = phi + float(c.collect_rew_hold) * (st["clear"].float() / float(_scoop_clear_now(env))).clamp(max=1.0)
     r = torch.where(st["fresh"], torch.zeros_like(phi), phi - st["prev_phi"])
     # one-time bonus the first time each utensil is lifted (> 2 cm, out of the bin) in an episode
     new_lift = lifted & ~st["lift_done"] & ~st["fresh"].unsqueeze(1)
