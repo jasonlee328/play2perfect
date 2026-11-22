@@ -499,6 +499,7 @@ class DomainRandomizationCfg:
     joint_position_obs_bias: float = 0.0
     joint_position_obs_noise_ramp_steps: int = 0
     joint_position_obs_noise_offset_steps: int = 0
+    joint_position_obs_noise_hand_only: bool = False   # true = noise on the 22 hand joints only (arm exact)
 
     # Random force/torque impulses on the object body.
     force_scale: float = 20.0

@@ -133,6 +133,7 @@ domain_randomization:
   joint_position_obs_bias: 0.0
   joint_position_obs_noise_ramp_steps: 0
   joint_position_obs_noise_offset_steps: 0
+  joint_position_obs_noise_hand_only: false
   force_scale: 20.0
   force_prob_range: [0.001, 0.1]
   force_decay: 0.0

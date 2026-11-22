@@ -377,6 +377,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             g = min(1.0, float(env.common_step_counter + int(getattr(dr, "joint_position_obs_noise_offset_steps", 0))) / jr)
             jstd, jb = jstd * g, jb * g
         jp = obs_noisy["joint_pos"]
+        hm = None
+        if bool(getattr(dr, "joint_position_obs_noise_hand_only", False)):   # canonical cols 0-6 = arm: leave exact
+            hm = torch.ones(jp.shape[-1], device=jp.device); hm[:7] = 0.0
+        jp0 = jp
         if jb > 0:
             if getattr(env, "_jpos_obs_bias", None) is None or env._jpos_obs_bias.shape != jp.shape:
                 env._jpos_obs_bias = torch.rand_like(jp) * 2 - 1
@@ -386,6 +390,8 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             jp = jp + env._jpos_obs_bias * jb
         if jstd > 0:
             jp = jp + torch.randn_like(jp) * jstd
+        if hm is not None:
+            jp = jp0 + (jp - jp0) * hm
         obs_noisy["joint_pos"] = jp
 
     # Blind teacher (precise_assembly.blind_fields): these actor-obs fields are zeroed (the critic keeps them) in the
