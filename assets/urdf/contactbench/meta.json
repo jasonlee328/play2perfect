@@ -1204,6 +1204,132 @@
      0.004389
     ]
    ]
+  },
+  "fst_nut_s200": {
+   "src": "kit/nut/nut.stl x2.0",
+   "extents_mm": [
+    35.18,
+    31.0,
+    14.05
+   ],
+   "mass_g": 4.74,
+   "mass_model": "print (official catalog.py:216)",
+   "com_src_mm": [
+    0.041,
+    -0.0,
+    6.996
+   ],
+   "object_scale": [
+    0.8794,
+    0.775,
+    0.3511
+   ],
+   "collision": "coacd 10",
+   "bbox_corners_m": [
+    [
+     -0.01763,
+     -0.0155,
+     -0.007023
+    ],
+    [
+     -0.01763,
+     -0.0155,
+     0.007023
+    ],
+    [
+     -0.01763,
+     0.0155,
+     -0.007023
+    ],
+    [
+     -0.01763,
+     0.0155,
+     0.007023
+    ],
+    [
+     0.017547,
+     -0.0155,
+     -0.007023
+    ],
+    [
+     0.017547,
+     -0.0155,
+     0.007023
+    ],
+    [
+     0.017547,
+     0.0155,
+     -0.007023
+    ],
+    [
+     0.017547,
+     0.0155,
+     0.007023
+    ]
+   ]
+  },
+  "fst_nut_s250": {
+   "src": "kit/nut/nut.stl x2.5",
+   "extents_mm": [
+    43.97,
+    38.75,
+    17.56
+   ],
+   "mass_g": 8.126,
+   "mass_model": "print (official catalog.py:216)",
+   "com_src_mm": [
+    0.052,
+    -0.0,
+    8.745
+   ],
+   "object_scale": [
+    1.0993,
+    0.9688,
+    0.4389
+   ],
+   "collision": "coacd 10",
+   "bbox_corners_m": [
+    [
+     -0.022037,
+     -0.019375,
+     -0.008779
+    ],
+    [
+     -0.022037,
+     -0.019375,
+     0.008779
+    ],
+    [
+     -0.022037,
+     0.019375,
+     -0.008779
+    ],
+    [
+     -0.022037,
+     0.019375,
+     0.008779
+    ],
+    [
+     0.021934,
+     -0.019375,
+     -0.008779
+    ],
+    [
+     0.021934,
+     -0.019375,
+     0.008779
+    ],
+    [
+     0.021934,
+     0.019375,
+     -0.008779
+    ],
+    [
+     0.021934,
+     0.019375,
+     0.008779
+    ]
+   ]
   }
  },
  "fixtures": {
@@ -11360,6 +11486,240 @@
    "collect_n_range": [
     1,
     6
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_nut_s200": {
+   "object": "fst_nut_s200",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_nut_s200/fst_nut_s200.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s200/fst_nut_s200.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s200/fst_nut_s200.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s200/fst_nut_s200.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s200/fst_nut_s200.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s200/fst_nut_s200.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s200/fst_nut_s200.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    4
+   ],
+   "collect_bin": {
+    "floor_z": 0.001,
+    "rim_z": 0.046,
+    "half_floor": [
+     0.02614,
+     0.0186
+    ],
+    "half_rim": [
+     0.02724,
+     0.01937
+    ]
+   }
+  },
+  "cb_fasteners_nut_s250": {
+   "object": "fst_nut_s250",
+   "fixture": "fastener_bin_box",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/fst_nut_s250/fst_nut_s250.urdf",
+     [
+      -0.045,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s250/fst_nut_s250.urdf",
+     [
+      -0.009999999999999995,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s250/fst_nut_s250.urdf",
+     [
+      0.02500000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s250/fst_nut_s250.urdf",
+     [
+      0.06000000000000001,
+      -0.08,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s250/fst_nut_s250.urdf",
+     [
+      -0.08,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s250/fst_nut_s250.urdf",
+     [
+      -0.045,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/fst_nut_s250/fst_nut_s250.urdf",
+     [
+      -0.009999999999999995,
+      -0.115,
+      0.012,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.09,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "collect_n_range": [
+    1,
+    4
    ],
    "collect_bin": {
     "floor_z": 0.001,
