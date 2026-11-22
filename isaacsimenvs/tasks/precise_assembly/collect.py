@@ -177,7 +177,17 @@ def reset(env, env_ids: torch.Tensor) -> None:
         ii = torch.arange(gx * gy, device=dev)
         cx = x0 + (x1 - x0) * ((ii % gx).float() + 0.5) / gx
         cy = y0 + (y1 - y0) * ((ii // gx).float() + 0.5) / gy
-        cell = torch.rand(n, gx * gy, device=dev).argsort(1)[:, :K]                  # random distinct cell per slot
+        key = torch.rand(n, gx * gy, device=dev)
+        hc0 = float(c.collect_hand_clear_m)
+        if hc0 > 0.0:                                     # cells whose centre lies near the start-pose hand go last
+            hp0 = st["hand_pts0"][env_ids]
+            low0 = hp0[..., 2] < (env._table_z_per_env[env_ids] + TABLE_HALF_HEIGHT + 0.10).unsqueeze(1)
+            cc0 = torch.stack([cx, cy], -1)                                              # (C, 2)
+            d0 = hp0[:, None, :, :2] - cc0[None, :, None, :]                             # (n, C, H, 2), knife along y
+            h0 = st["half"][0]
+            near = ((d0[..., 0].abs() <= h0[1] + hc0 + 0.01) & (d0[..., 1].abs() <= h0[0] + hc0 + 0.01) & low0[:, None, :]).any(-1)
+            key = key + near.float()
+        cell = key.argsort(1)[:, :K]                                                     # random distinct cell per slot
         jx, jy, jyaw = (float(v) for v in c.collect_grid_jitter)
     for k in range(K):
         if grid:
