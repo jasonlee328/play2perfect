@@ -187,7 +187,11 @@ def reset(env, env_ids: torch.Tensor) -> None:
             h0 = st["half"][0]
             near = ((d0[..., 0].abs() <= h0[1] + hc0 + 0.01) & (d0[..., 1].abs() <= h0[0] + hc0 + 0.01) & low0[:, None, :]).any(-1)
             key = key + near.float()
-        cell = key.argsort(1)[:, :K]                                                     # random distinct cell per slot
+        order = key.argsort(1)                                                           # cells, best (far from hand) first
+        # A18 11-22: active slots take the best cells first (by slot index), so a near-hand cell only goes to an active
+        # knife when no free cell is left; before, inactive slots could take free cells and active ones got parked.
+        arank = ((~active).long() * K + torch.arange(K, device=dev)).argsort(1).argsort(1)   # rank of each slot, active first
+        cell = torch.gather(order, 1, arank)                                             # (n, K) distinct cell per slot
         jx, jy, jyaw = (float(v) for v in c.collect_grid_jitter)
     for k in range(K):
         if grid:
