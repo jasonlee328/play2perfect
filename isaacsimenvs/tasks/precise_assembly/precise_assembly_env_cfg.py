@@ -222,6 +222,7 @@ class PreciseAssemblyCfg:
                                                     # cells over collect_region (centres at the cell centres; A18 11-21:
                                                     # random sequential placement could not fit 10 knives)
     collect_grid_jitter: list = (0.006, 0.008, 3.0)  # per-cell jitter: x m, y m, yaw deg (yaw around collect_yaw_center_deg)
+    collect_hand_clear_m: float = 0.0               # > 0: no utensil footprint within this of a hand link (start pose, < 10 cm up)
     collect_bin_margin_m: float = 0.03
     collect_drop_m: float = 0.0005
     collect_obs_slots: int = 8                      # collect_obs is padded to this many slots (same obs for all problems)

@@ -95,6 +95,11 @@ def setup(env) -> None:
     st["prev_n_in_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["deposit_max"] = torch.zeros(N, dtype=torch.long, device=dev)
     st["place_ep_max"] = torch.zeros(N, device=dev)
+    # hand link positions at the start pose (origin-relative), for collect_hand_clear_m (A18 11-21: knives spawned under
+    # the hanging fingers were launched at reset)
+    nm = env.robot.body_names
+    hid = [i for i, b in enumerate(nm) if not (b.startswith("iiwa14_link_") and b != "iiwa14_link_7")]
+    st["hand_pts0"] = (env.robot.data.body_pos_w[:, hid] - env.scene.env_origins.unsqueeze(1)).clone()   # (N, H, 3)
     env._collect = st
     print(f"[collect] slots {types}, N range {n_range}, bin rim {st['rim']*1000:.1f} mm, "
           f"inner floor {[round(float(x)*1000, 1) for x in st['inner_floor']]} mm", flush=True)
@@ -188,6 +193,16 @@ def reset(env, env_ids: torch.Tensor) -> None:
         hk = (st["half"][k] + gap).expand(n, T, 2)
         bad = _rect_overlap(cc, yy, hk, bin_c[:, None].expand(n, T, 2), bin_yaw[:, None].expand(n, T),
                             bin_h[:, None].expand(n, T, 2))
+        hc = float(c.collect_hand_clear_m)
+        if hc > 0.0:
+            hp = st["hand_pts0"][env_ids]                                               # (n, H, 3)
+            low = hp[..., 2] < (env._table_z_per_env[env_ids] + TABLE_HALF_HEIGHT + 0.10).unsqueeze(1)
+            d = hp[:, None, :, :2] - cc[:, :, None, :]                                     # (n, T, H, 2)
+            cy_, sy_ = torch.cos(yy)[..., None], torch.sin(yy)[..., None]
+            lx = (d[..., 0] * cy_ + d[..., 1] * sy_).abs(); ly = (-d[..., 0] * sy_ + d[..., 1] * cy_).abs()
+            h0 = st["half"][k]
+            inside = (lx <= h0[0] + hc) & (ly <= h0[1] + hc) & low[:, None, :]
+            bad |= inside.any(-1)
         for j in range(k):
             hj = (st["half"][j] + gap).expand(n, T, 2)
             ov = _rect_overlap(cc, yy, hk, placed_c[:, j:j + 1].expand(n, T, 2), placed_y[:, j:j + 1].expand(n, T), hj)
