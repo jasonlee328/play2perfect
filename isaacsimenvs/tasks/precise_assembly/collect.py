@@ -179,6 +179,12 @@ def reset(env, env_ids: torch.Tensor) -> None:
         cx = x0 + (x1 - x0) * ((ii % gx).float() + 0.5) / gx
         cy = y0 + (y1 - y0) * ((ii // gx).float() + 0.5) / gy
         key = torch.rand(n, gx * gy, device=dev)
+        if bool(getattr(c, "collect_grid_contiguous", False)):
+            # A18 11-23: the active knives fill one run of adjacent cells with a random start (a pile, not scattered)
+            C = gx * gy
+            s0 = (torch.rand(n, device=dev) * (C - n_act + 1).float()).floor().long().clamp(min=0)
+            run = (ii[None, :] >= s0[:, None]) & (ii[None, :] < (s0 + n_act)[:, None])
+            key = key - 2.0 * run.float()
         hc0 = float(c.collect_hand_clear_m)
         if hc0 > 0.0:                                     # cells whose centre lies near the start-pose hand go last
             hp0 = st["hand_pts0"][env_ids]
