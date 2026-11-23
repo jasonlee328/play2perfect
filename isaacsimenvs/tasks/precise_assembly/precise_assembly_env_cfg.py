@@ -206,6 +206,9 @@ class PreciseAssemblyCfg:
     hand_force_sense: bool = False
     hand_force_scale: float = 0.5   # calibration of the PhysX force matrix (reads 2x on a flat contact)
     crush_force: float = 0.0
+    # A23 11-23: hidden object strength: (lo, hi) N > 0 -> each episode draws its own crush threshold
+    # log-uniform in [lo, hi] (object fragility unknown to the policy; replaces crush_force)
+    crush_force_range: tuple = (0.0, 0.0)
     crush_steps: int = 3
     crush_penalty: float = 200.0
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
