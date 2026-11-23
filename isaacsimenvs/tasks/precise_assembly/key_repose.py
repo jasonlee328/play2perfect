@@ -165,7 +165,7 @@ class KeyRepose:
             if not hasattr(self, "rel0"):
                 self.rel0 = rel.clone(); self.rel_age = torch.zeros(rel.shape[0], device=rel.device, dtype=torch.long)
             step = e.episode_length_buf
-            cap = step <= 2
+            cap = step <= int(getattr(c, "key_rot_capture_steps", 30))   # capture after the grip settles
             self.rel0 = torch.where(cap.unsqueeze(-1), rel, self.rel0)
             dr = quat_mul(quat_conjugate(self.rel0), rel)
             self.hold_rot_err = torch.rad2deg(2.0 * torch.acos(dr[:, 0].abs().clamp(max=1.0)))
