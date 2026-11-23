@@ -236,7 +236,10 @@ def reset(env, env_ids: torch.Tensor) -> None:
         used = torch.zeros(n, gx * gy, dtype=torch.bool, device=dev)
         for k in range(K):
             used.scatter_(1, cell[:, k:k + 1], (placed[:, k] & (ok_any_k[k] | (k == 0))).unsqueeze(1))
-        for k in range(1, K):
+        hc_passes = [float(c.collect_hand_clear_m)]
+        if bool(getattr(c, "collect_grid_fallback_relax", False)):
+            hc_passes.append(0.0)                       # A18 11-23: 2nd pass, no clearance margin (footprint still off the hand)
+        for k, hc_now in [(k, h) for h in hc_passes for k in range(1, K)]:
             miss = active[:, k] & ~placed[:, k]
             if not bool(miss.any()):
                 continue
@@ -249,8 +252,8 @@ def reset(env, env_ids: torch.Tensor) -> None:
                 yc1 = bin_yaw[:, None] if bool(c.collect_yaw_rel_bin) else torch.full((n, 1), math.radians(c.collect_yaw_center_deg), device=dev)
                 hk = (st["half"][k] + gap).expand(n, 1, 2)
                 bad1 = _rect_overlap(cc1, yc1, hk, bin_c[:, None], bin_yaw[:, None], bin_h[:, None])
-                hc = float(c.collect_hand_clear_m)
-                if hc > 0.0:
+                hc = hc_now
+                if True:
                     hp = st["hand_pts0"][env_ids]
                     low = hp[..., 2] < (env._table_z_per_env[env_ids] + TABLE_HALF_HEIGHT + 0.10).unsqueeze(1)
                     d = hp[:, None, :, :2] - cc1[:, :, None, :]
