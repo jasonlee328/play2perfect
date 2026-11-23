@@ -160,8 +160,16 @@ class KeyRepose:
         self.far_steps = torch.where(far, self.far_steps + 1, torch.zeros_like(self.far_steps))
         self.dropped = (self.far_steps >= int(c.key_drop_steps)) | below
         rf = float(getattr(c, "key_rot_fail_deg", 0.0))
-        if rf > 0.0:   # rotation-hold: turned too far in the grip (palm frame, vs the start pose)
-            self.rot_failed = self.final_rot_err > rf
+        if rf > 0.0:   # rotation-hold: turned too far in the grip (palm frame, vs the pose captured on step 2)
+            rel = quat_mul(quat_conjugate(pq), kq)
+            if not hasattr(self, "rel0"):
+                self.rel0 = rel.clone(); self.rel_age = torch.zeros(rel.shape[0], device=rel.device, dtype=torch.long)
+            step = e.episode_length_buf
+            cap = step <= 2
+            self.rel0 = torch.where(cap.unsqueeze(-1), rel, self.rel0)
+            dr = quat_mul(quat_conjugate(self.rel0), rel)
+            self.hold_rot_err = torch.rad2deg(2.0 * torch.acos(dr[:, 0].abs().clamp(max=1.0)))
+            self.rot_failed = (self.hold_rot_err > rf) & ~cap
             self.dropped = self.dropped | self.rot_failed
         self.fingertip_dmin = dmin
 
