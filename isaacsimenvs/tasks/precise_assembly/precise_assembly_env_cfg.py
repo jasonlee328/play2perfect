@@ -40,6 +40,9 @@ class PreciseAssemblyCfg:
     # round-robin with MultiUsdFileCfg). All problems must share the insertion waypoints and hole_z_offset (true
     # for the fmb_* problems). Overrides `problem` when non-empty. Empty = single problem (legacy).
     multi_problems: tuple[str, ...] = ()
+    # Multi clutter (multi_problems whose problems have distractors, or a one-entry list): the actor's layout fields
+    # are shown as this problem's rest layout ("" = cb_binh_chopstick_n5_lift if registered, else the first problem).
+    multi_canonical_problem: str = ""
     goal_mode: str = "preInsertAndFinal"
 
     hole_x_range: tuple[float, float] = (-0.1875, 0.1875)
@@ -122,6 +125,7 @@ class PreciseAssemblyCfg:
     # Clutter "stay in the box" mode: (xmin, xmax, ymin, ymax, zmax) in m, receptive frame. When set, the penalty and
     # termination above use how far the furthest distractor's root is outside this box (0 while inside) instead of
     # its displacement, so neighbours may be pushed around inside the bin but not lifted or dragged out of it.
+    # Optional 6th value zmin: a root below it (pushed through the floor) also counts as outside.
     distractor_box: tuple[float, ...] = ()
     # Start-pose variation for clutter problems: (dx, dy, dz) half-widths in m, receptive frame. At every reset the
     # object and each distractor are shifted independently by U(-d, d) per axis from their receptive-frame poses
@@ -130,6 +134,22 @@ class PreciseAssemblyCfg:
     # Same as start_shift_m but ONE offset per env shared by the object and every distractor (moves the whole row,
     # e.g. sideways in the tray: (0, 0.006, 0)); added to the independent start_shift_m offsets.
     start_shift_group_m: tuple[float, ...] = ()
+    # stick_spread_m > 0: per episode, re-draw every stick's sideways position (receptive y) in [-B, B], sorted,
+    # >= stick_spread_min_pitch_m apart (thickness-independent), random gaps, row order kept (replaces the y part of
+    # start_shift_m / start_shift_group_m). For single-row stick trays (cb_binh_chopstick_n10s_lift*).
+    stick_spread_m: float = 0.0
+    # multi_lift: "lift as many sticks as you can" (user 11-21). A stick (object or distractor) counts as held when it
+    # is >= multi_lift_rise_m above its own rest height and within multi_lift_hand_m of the palm centre for
+    # multi_lift_hold_steps steps running. Reward per step: multi_lift_hold_rew x held count, plus
+    # multi_lift_new_bonus x (rise of the episode's best held count). Goal success no longer ends the episode
+    # (runs to timeout); metric = the episode's best held count (env.multi_lift_last_ep_max at reset).
+    multi_lift: bool = False
+    multi_lift_rise_m: float = 0.05
+    multi_lift_hand_m: float = 0.15
+    multi_lift_hold_steps: int = 10
+    multi_lift_hold_rew: float = 0.5
+    multi_lift_new_bonus: float = 200.0
+    stick_spread_min_pitch_m: float = 0.0085
     # "Any one of identical objects" tasks (blind chopstick search): > 0 = once a distractor has risen this far (m)
     # above its reset pose while the object is still within 5 mm of its own, the two swap states (pose, velocity and
     # reset pose; the goals move to the new object), so lifting any one stick is lifting "the object". Identical
@@ -152,6 +172,16 @@ class PreciseAssemblyCfg:
     blind_offset_m: tuple[float, ...] = ()
     blind_offset_ramp_steps: int = 0
     blind_offset_offset_steps: int = 0  # added to common_step_counter for the ramp (set on resume / warm start)
+    # blind_offset_m: also add the same per-episode error to the actor's fixture_pose_rel_palm position (actor only; the
+    # critic keeps the true tray pose). Without it the exact tray pose localizes the row to start_shift_group_m.
+    # With blind_fade_fields set, this tray error is scaled by the fade fraction f(t) (it ramps in as the poses fade).
+    blind_offset_fixture: bool = False
+    # Fade-out blinding: these actor-obs fields are scaled by (1 - f(t)) in every env (critic unchanged), f ramping
+    # 0 -> 1 over blind_fade_ramp_steps env steps (+ blind_fade_offset_steps on resume); 0 steps = fully faded from
+    # the start. A gradual alternative to blind_fields, whose hard per-env zeroing froze the policy.
+    blind_fade_fields: tuple[str, ...] = ()
+    blind_fade_ramp_steps: int = 0
+    blind_fade_offset_steps: int = 0
     # Dense "don't lift the neighbours" shaping: per-step reward -= distractor_lift_penalty_scale * the largest
     # distractor rise above its reset height beyond distractor_lift_slack (m). Sliding / rolling inside the bin is free.
     distractor_lift_penalty_scale: float = 0.0
@@ -175,6 +205,9 @@ class PreciseAssemblyCfg:
     # starts from the same state.
     start_state_sequential: bool = False
     start_state_offset: int = 0
+    # A8 (11-18): hidden per-episode hand PD gain scale U(lo, hi) on the hand joints (stiffness x s, damping x sqrt(s)),
+    # sampled at reset, not in any obs. Breaks the joint-tracking-error -> contact-force mapping proprio reads. (1, 1) = off.
+    hand_kp_scale_range: tuple[float, float] = (1.0, 1.0)
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:

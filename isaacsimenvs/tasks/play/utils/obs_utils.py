@@ -367,10 +367,42 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
+    # Joint-position obs noise (actor only; critic uses obs_clean): per-step Gaussian std + a per-episode bias
+    # U(+-b) per joint, so the actor can't read contact force exactly from (joint_pos - target).
+    jstd = float(getattr(dr, "joint_position_obs_noise_std", 0.0))
+    jb = float(getattr(dr, "joint_position_obs_bias", 0.0))
+    if (jstd > 0 or jb > 0) and "joint_pos" in obs_noisy:
+        jr = int(getattr(dr, "joint_position_obs_noise_ramp_steps", 0))
+        if jr > 0:   # ramp std and bias 0 -> full over jr env steps (+ offset so a resume does not replay it)
+            g = min(1.0, float(env.common_step_counter + int(getattr(dr, "joint_position_obs_noise_offset_steps", 0))) / jr)
+            jstd, jb = jstd * g, jb * g
+        jp = obs_noisy["joint_pos"]
+        hm = None
+        if bool(getattr(dr, "joint_position_obs_noise_hand_only", False)):   # canonical cols 0-6 = arm: leave exact
+            hm = torch.ones(jp.shape[-1], device=jp.device); hm[:7] = 0.0
+        jp0 = jp
+        if jb > 0:
+            if getattr(env, "_jpos_obs_bias", None) is None or env._jpos_obs_bias.shape != jp.shape:
+                env._jpos_obs_bias = torch.rand_like(jp) * 2 - 1
+            new_ep = env.episode_length_buf <= 1
+            if bool(new_ep.any()):
+                env._jpos_obs_bias[new_ep] = torch.rand_like(jp[new_ep]) * 2 - 1
+            jp = jp + env._jpos_obs_bias * jb
+        if jstd > 0:
+            jp = jp + torch.randn_like(jp) * jstd
+        if hm is not None:
+            jp = jp0 + (jp - jp0) * hm
+        obs_noisy["joint_pos"] = jp
 
     # Blind teacher (precise_assembly.blind_fields): these actor-obs fields are zeroed (the critic keeps them) in the
     # first a(t) * num_envs envs, a(t) ramping 0 -> 1 over blind_ramp_steps env steps (0 = all envs from the start).
     pa = getattr(env.cfg, "precise_assembly", None)
+    fade = tuple(getattr(pa, "blind_fade_fields", ())) if pa is not None else ()
+    f = 1.0
+    if fade:
+        ramp = int(getattr(pa, "blind_fade_ramp_steps", 0))
+        f = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter + int(getattr(pa, "blind_fade_offset_steps", 0))) / ramp)
+        env.blind_fade_frac = f
     bo = tuple(getattr(pa, "blind_offset_m", ())) if pa is not None else ()
     if bo and hasattr(env, "_blind_offset_u"):
         ramp = int(getattr(pa, "blind_offset_ramp_steps", 0))
@@ -385,6 +417,29 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             x = obs_noisy["distractor_obs"].view(env.num_envs, -1, 6).clone()       # [d - palm, d - obj] per stick
             x[..., :3] += off.unsqueeze(1)
             obs_noisy["distractor_obs"] = x.view(obs_noisy["distractor_obs"].shape)
+        if getattr(pa, "blind_offset_fixture", False) and "fixture_pose_rel_palm" in obs_noisy:
+            x = obs_noisy["fixture_pose_rel_palm"].clone()                           # [pos - palm (3), quat (4)]
+            x[:, :3] += off * f                                                      # ramps in with the fade
+            obs_noisy["fixture_pose_rel_palm"] = x
+    if getattr(env, "_multi_clutter", False):
+        # multi clutter (e.g. stick thicknesses): actor sees the canonical problem's layout (see mc_obs_offset)
+        mo = env.mc_obs_offset()                                                       # (S, N, 3)
+        if "keypoints_rel_palm" in obs_noisy:
+            x = obs_noisy["keypoints_rel_palm"]
+            obs_noisy["keypoints_rel_palm"] = (x.view(env.num_envs, -1, 3) + mo[0].unsqueeze(1)).view(x.shape)
+        if "distractor_obs" in obs_noisy:
+            idx = getattr(env, "_obs_distractor_idx", None)
+            sel = torch.as_tensor([1 + i for i in (idx if idx is not None else range(mo.shape[0] - 1))],
+                                  device=env.device)
+            md = mo[sel].transpose(0, 1)                                               # (N, K, 3)
+            x = obs_noisy["distractor_obs"].view(env.num_envs, -1, 6).clone()
+            x[..., :3] += md
+            x[..., 3:] += md - mo[0].unsqueeze(1)
+            obs_noisy["distractor_obs"] = x.view(obs_noisy["distractor_obs"].shape)
+    if fade:
+        for k in fade:
+            if k in obs_noisy:
+                obs_noisy[k] = obs_noisy[k] * (1.0 - f)
     blind = tuple(getattr(pa, "blind_fields", ())) if pa is not None else ()
     if blind:
         ramp = int(getattr(pa, "blind_ramp_steps", 0))

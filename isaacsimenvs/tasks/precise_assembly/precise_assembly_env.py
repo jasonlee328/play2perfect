@@ -120,6 +120,8 @@ class PreciseAssemblyEnv(PlayEnv):
         )
         self._insert_pos_rel = insert_poses[:, 0:3].contiguous()
         self._insert_quat_wxyz = _xyzw_to_wxyz(insert_poses[:, 3:7]).contiguous()
+        if getattr(self, "_multi_clutter", False):
+            self._mc_tables()
 
         self.hole_pos = torch.zeros(
             self.num_envs, 3, dtype=torch.float32, device=self.device
@@ -246,14 +248,24 @@ class PreciseAssemblyEnv(PlayEnv):
                 )
         problem_name = problem_names[0] if len(problem_names) == 1 else "+".join(problem_names)
         problem = PROBLEM_REGISTRY[problem_names[0]]
+        # multi_problems with distractors (e.g. chopstick thickness variants): same fixture, same number of
+        # distractors and waypoints; each env gets its own object / distractor assets, start poses and waypoints
+        # (problem i % K, see _multi_clutter).
+        self._multi_clutter = bool(multi) and any(PROBLEM_REGISTRY[n].distractors for n in problem_names)
         for name in problem_names[1:]:
             other = PROBLEM_REGISTRY[name]
             same = len(other.insert_pose_rel_receptive) == len(problem.insert_pose_rel_receptive) and all(
-                abs(a - b) < 1e-9
+                abs(a - b) < (5e-3 if self._multi_clutter else 1e-9)
                 for pa, pb in zip(other.insert_pose_rel_receptive, problem.insert_pose_rel_receptive)
                 for a, b in zip(pa, pb)
             ) and abs(other.hole_z_offset - problem.hole_z_offset) < 1e-9 and (
                 other.prelude_lift_offset == problem.prelude_lift_offset)
+            if self._multi_clutter:
+                same = same and (other.receptive_urdf == problem.receptive_urdf
+                                 and len(other.distractors) == len(problem.distractors)
+                                 and bool(other.object_start_pose_rel_receptive)
+                                 == bool(problem.object_start_pose_rel_receptive)
+                                 and not other.joints and not problem.joints)
             if not same:
                 raise ValueError(
                     f"multi_problems must share insertion waypoints / hole_z_offset: {name!r} differs from "
@@ -305,13 +317,33 @@ class PreciseAssemblyEnv(PlayEnv):
         )
 
         # Clutter: distractor bodies + an optional object start pose, both in the receptive frame (single problem).
-        if len(problem_names) > 1 and any(
-                PROBLEM_REGISTRY[n].distractors or PROBLEM_REGISTRY[n].object_start_pose_rel_receptive
-                for n in problem_names):
-            raise ValueError("distractors / object_start_pose_rel_receptive need a single problem")
+        if len(problem_names) > 1 and not self._multi_clutter and any(
+                PROBLEM_REGISTRY[n].object_start_pose_rel_receptive for n in problem_names):
+            raise ValueError("object_start_pose_rel_receptive with several problems needs distractors (multi clutter)")
         self._pih_distractor_urdf_abs = tuple(str(_resolve_asset_path(u)) for u, _ in problem.distractors)
         self._pih_distractor_pose_rel = tuple(tuple(float(v) for v in pose) for _, pose in problem.distractors)
         self._pih_object_start_rel = tuple(float(v) for v in problem.object_start_pose_rel_receptive)
+        if self._multi_clutter:
+            P = [PROBLEM_REGISTRY[n] for n in problem_names]
+            # per problem: distractor slot k asset, distractor poses (K, 7), object start pose (7,), waypoints (G, 7)
+            self._pih_distractor_urdf_abs_multi = tuple(
+                tuple(str(_resolve_asset_path(p.distractors[k][0])) for p in P) for k in range(len(problem.distractors)))
+            self._pih_distractor_pose_rel_multi = tuple(
+                tuple(tuple(float(v) for v in pose) for _, pose in p.distractors) for p in P)
+            self._pih_object_start_rel_multi = tuple(
+                tuple(float(v) for v in p.object_start_pose_rel_receptive) for p in P)
+            seqs = [(p.final_insert_pose_rel_receptive,) if pih_cfg.goal_mode == "finalGoalOnly"
+                    else p.insert_pose_rel_receptive for p in P]
+            cn = str(pih_cfg.multi_canonical_problem) or (
+                "cb_binh_chopstick_n5_lift" if "cb_binh_chopstick_n5_lift" in PROBLEM_REGISTRY else problem_names[0])
+            cp = PROBLEM_REGISTRY[cn]
+            if len(cp.distractors) != len(problem.distractors):
+                raise ValueError(f"multi_canonical_problem {cn!r} has a different number of distractors")
+            self._mc_canon_problem = cn
+            self._mc_canon_rel = ((tuple(float(v) for v in cp.object_start_pose_rel_receptive[:3]),)
+                                  + tuple(tuple(float(v) for v in pose[:3]) for _, pose in cp.distractors))
+            self._pih_insert_pose_sequence_multi = tuple(
+                tuple(tuple(float(v) for v in pose) for pose in s) for s in seqs)
         self._obs_distractor_idx = None
         if cfg.precise_assembly.obs_distractors and self._pih_distractor_urdf_abs:
             n_d = len(self._pih_distractor_urdf_abs)
@@ -365,7 +397,27 @@ class PreciseAssemblyEnv(PlayEnv):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
         super()._reset_idx(env_ids)
+        self._reset_hand_kp(env_ids)
         self._reset_peg_episode(env_ids)
+
+    def _reset_hand_kp(self, env_ids: torch.Tensor) -> None:
+        """A8 hand_kp_scale_range: hidden per-episode hand PD gain scale (stiffness x s, damping x sqrt(s))."""
+        lo, hi = (float(v) for v in getattr(self.cfg.precise_assembly, "hand_kp_scale_range", (1.0, 1.0)))
+        if lo == 1.0 and hi == 1.0:
+            return
+        if not hasattr(self, "_hand_kp_ids"):
+            ids, _ = self.robot.find_joints("left_.*")
+            self._hand_kp_ids = torch.as_tensor(ids, device=self.device, dtype=torch.long)
+            self._hand_kp0 = self.robot.data.default_joint_stiffness[:, self._hand_kp_ids].clone()
+            self._hand_kd0 = self.robot.data.default_joint_damping[:, self._hand_kp_ids].clone()
+            self.hand_kp_scale = torch.ones(self.num_envs, device=self.device)
+        n = env_ids.numel()
+        s = lo + (hi - lo) * torch.rand(n, device=self.device)
+        self.hand_kp_scale[env_ids] = s
+        kp = self._hand_kp0[env_ids] * s[:, None]
+        kd = self._hand_kd0[env_ids] * s.sqrt()[:, None]
+        self.robot.write_joint_stiffness_to_sim(kp, joint_ids=self._hand_kp_ids, env_ids=env_ids)
+        self.robot.write_joint_damping_to_sim(kd, joint_ids=self._hand_kp_ids, env_ids=env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
@@ -494,13 +546,51 @@ class PreciseAssemblyEnv(PlayEnv):
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
 
+    def _mc_tables(self) -> None:
+        """multi clutter: per-env tables (problem = the env's object asset index), built once."""
+        if hasattr(self, "_object_start_rel_env"):
+            return
+        ai = self._object_asset_index_per_env
+        f = dict(dtype=torch.float32, device=self.device)
+        wp = torch.tensor(self._pih_insert_pose_sequence_multi, **f)[ai]                       # (N, G, 7)
+        self._insert_pos_rel_env = wp[..., 0:3].contiguous()
+        self._insert_quat_wxyz_env = _xyzw_to_wxyz(wp[..., 3:7].reshape(-1, 4)).reshape(wp.shape[0], -1, 4)
+        self._object_start_rel_env = torch.tensor(self._pih_object_start_rel_multi, **f)[ai]       # (N, 7)
+        self._distractor_pose_rel_env = torch.tensor(
+            self._pih_distractor_pose_rel_multi, **f)[ai].transpose(0, 1).contiguous()            # (K, N, 7)
+        # Actor-obs canonicalisation: rest positions (hole frame) of every slot (0 = object, 1.. = distractors) in
+        # the env's problem vs the canonical problem (the base thickness if present, else problem 0). The actor sees
+        # every body shifted by R_hole (canon - env) of the slot it started in (_mc_slot follows swaps), so its
+        # layout fields (stick pitch, stick height) do not reveal the thickness.
+        start = torch.tensor(self._pih_object_start_rel_multi, **f)[:, None, :3]                  # (P, 1, 3)
+        dist = torch.tensor(self._pih_distractor_pose_rel_multi, **f)[..., :3]                     # (P, K, 3)
+        rel = torch.cat([start, dist], dim=1)                                                       # (P, S, 3)
+        canon = torch.tensor(self._mc_canon_rel, **f)                                               # (S, 3)
+        self._mc_delta_rel = (canon.unsqueeze(0) - rel[ai]).transpose(0, 1).contiguous()            # (S, N, 3)
+        self._mc_slot = torch.arange(rel.shape[1], device=self.device).unsqueeze(1).repeat(1, self.num_envs)
+        print(f"[PreciseAssemblyEnv] multi clutter: {list(self._pih_problem_names)} (actor layout = "
+              f"{self._mc_canon_problem}), envs per problem "
+              f"{torch.bincount(ai, minlength=len(self._pih_problem_names)).tolist()}", flush=True)
+
+    def mc_obs_offset(self) -> torch.Tensor:
+        """(S, N, 3) world-frame shift for the actor's view of body b (0 = object, 1.. = distractors)."""
+        self._mc_tables()
+        d = torch.gather(self._mc_delta_rel, 0, self._mc_slot.unsqueeze(-1).expand(-1, -1, 3))       # (S, N, 3)
+        S = d.shape[0]
+        return quat_apply(self.hole_quat_wxyz.unsqueeze(0).expand(S, -1, -1).reshape(-1, 4),
+                          d.reshape(-1, 3)).reshape(S, -1, 3)
+
     def _pose_rel_hole_to_world(self, env_ids: torch.Tensor, pose7, shift: torch.Tensor | None = None) -> torch.Tensor:
         """(n, 7) world pose (pos + quat wxyz) of a receptive-frame pose7 (xyz + quat xyzw) for env_ids."""
         n = env_ids.numel()
-        p = torch.tensor(pose7[:3], device=self.device, dtype=torch.float32).expand(n, 3)
+        if torch.is_tensor(pose7) and pose7.dim() == 2:   # per-env (n, 7) poses (multi clutter)
+            p = pose7[:, :3]
+            q = _xyzw_to_wxyz(pose7[:, 3:7])
+        else:
+            p = torch.tensor(pose7[:3], device=self.device, dtype=torch.float32).expand(n, 3)
+            q = _xyzw_to_wxyz(torch.tensor([pose7[3:7]], device=self.device, dtype=torch.float32)).expand(n, 4)
         if shift is not None:                      # (n, 3) receptive-frame offset (start_shift_m)
             p = p + shift
-        q = _xyzw_to_wxyz(torch.tensor([pose7[3:7]], device=self.device, dtype=torch.float32)).expand(n, 4)
         hq = self.hole_quat_wxyz[env_ids]
         pos = self.hole_pos[env_ids] + quat_apply(hq, p) + self.scene.env_origins[env_ids]
         return torch.cat([pos, quat_mul(hq, q)], dim=-1)
@@ -517,11 +607,28 @@ class PreciseAssemblyEnv(PlayEnv):
             self.distractor_disp_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_moved_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_rise = torch.zeros(self.num_envs, device=self.device)
+        mc = getattr(self, "_multi_clutter", False)
+        if mc:
+            self._mc_tables()
+            self._mc_slot[:, env_ids] = torch.arange(self._mc_slot.shape[0], device=self.device).unsqueeze(1)
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
+            if mc:
+                pose = self._distractor_pose_rel_env[k, env_ids]
             w = self._pose_rel_hole_to_world(env_ids, pose, self._start_shift[k + 1, env_ids])
             body.write_root_pose_to_sim(w, env_ids=env_ids)
             body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
             self._distractor_reset_pos[k, env_ids] = w[:, :3]
+        if self.cfg.precise_assembly.multi_lift:
+            S = len(dists) + 1
+            if not hasattr(self, "_ml_streak"):
+                self._ml_streak = torch.zeros(S, self.num_envs, dtype=torch.long, device=self.device)
+                self.multi_lift_count = torch.zeros(self.num_envs, device=self.device)
+                self.multi_lift_ep_max = torch.zeros(self.num_envs, device=self.device)
+                self.multi_lift_last_ep_max = torch.full((self.num_envs,), -1.0, device=self.device)
+            self.multi_lift_last_ep_max[env_ids] = self.multi_lift_ep_max[env_ids]
+            self._ml_streak[:, env_ids] = 0
+            self.multi_lift_count[env_ids] = 0.0
+            self.multi_lift_ep_max[env_ids] = 0.0
         self.distractor_disp[env_ids] = 0.0
         self.distractor_disp_ep_max[env_ids] = 0.0
         self.distractor_moved_ep_max[env_ids] = 0.0
@@ -551,6 +658,45 @@ class PreciseAssemblyEnv(PlayEnv):
         if g:
             half = torch.tensor((tuple(g) + (0.0, 0.0, 0.0))[:3], device=self.device, dtype=torch.float32)
             self._start_shift[:, env_ids] += ((torch.rand(env_ids.numel(), 3, device=self.device) * 2 - 1) * half).unsqueeze(0)
+        B = float(self.cfg.precise_assembly.stick_spread_m)
+        if B > 0:
+            # stick_spread_m: every stick (object + distractors) gets a fresh sideways (receptive y) position in
+            # [-B, B]: sorted, at least stick_spread_min_pitch_m apart (same for every thickness, so the spacing does
+            # not reveal it), free space split U-randomly (Dirichlet(1)) over the N+1 gaps.
+            S, n = n_dist + 1, env_ids.numel()
+            mp = float(self.cfg.precise_assembly.stick_spread_min_pitch_m)
+            slack = 2 * B - (S - 1) * mp
+            if slack <= 0:
+                raise ValueError(f"stick_spread_m {B} too small for {S} sticks at pitch {mp}")
+            nom_l = [self._pih_object_start_rel[1]] + [pp[1] for pp in self._pih_distractor_pose_rel]
+            e = -torch.log(torch.rand(n, S + 1, device=self.device).clamp_min(1e-12))
+            g = e / e.sum(dim=1, keepdim=True) * slack                                   # (n, S+1)
+            y = -B + torch.cumsum(g[:, :S], dim=1) + torch.arange(S, device=self.device) * mp   # (n, S) sorted
+            # slots keep their row order (slot s = s-th stick from -y in the problem), so obs_distractors_k's
+            # nearest-neighbour slots stay the target's row neighbours.
+            order = torch.tensor(sorted(range(S), key=lambda i: nom_l[i]), device=self.device)
+            y = y[:, torch.argsort(order)]                                                # slot s -> y[:, s]
+            nom = torch.tensor(nom_l, device=self.device, dtype=torch.float32)            # (S,) nominal y
+            self._start_shift[:, env_ids, 1] = (y - nom.unsqueeze(0)).transpose(0, 1)
+
+    def _update_multi_lift(self) -> None:
+        """multi_lift: held count = sticks >= rise above their rest height, near the palm, for hold_steps running."""
+        c = self.cfg.precise_assembly
+        if not hasattr(self, "_ml_streak") or not hasattr(self, "_object_rest_pos"):
+            return
+        dists = getattr(self, "distractors", ())
+        pos = torch.stack([self.object.data.root_pos_w] + [b.data.root_pos_w for b in dists])       # (S, N, 3)
+        rest = torch.cat([self._object_rest_pos.unsqueeze(0), self._distractor_reset_pos], dim=0)    # (S, N, 3)
+        st = self.robot.data.body_state_w[:, self._palm_body_id, :]
+        from isaacsimenvs.tasks.play.utils.obs_utils import PALM_CENTER_OFFSET, _apply_local_offset
+        palm = _apply_local_offset(st[:, 0:3], st[:, 3:7], PALM_CENTER_OFFSET, (self.num_envs,))     # (N, 3) world
+        up = (pos[..., 2] - rest[..., 2] >= c.multi_lift_rise_m) & \
+             ((pos - palm.unsqueeze(0)).norm(dim=-1) <= c.multi_lift_hand_m)
+        self._ml_streak = torch.where(up, self._ml_streak + 1, torch.zeros_like(self._ml_streak))
+        prev_max = self.multi_lift_ep_max.clone()
+        self.multi_lift_count = (self._ml_streak >= int(c.multi_lift_hold_steps)).float().sum(dim=0)
+        self.multi_lift_ep_max = torch.maximum(self.multi_lift_ep_max, self.multi_lift_count)
+        self._ml_new = self.multi_lift_ep_max - prev_max
 
     def _swap_lifted_distractor(self) -> None:
         """swap_lifted_distractor: make a lifted distractor the object (identical bodies, see the cfg)."""
@@ -574,6 +720,9 @@ class PreciseAssemblyEnv(PlayEnv):
             d.write_root_state_to_sim(s_obj, env_ids=ids)
             old_rest, new_rest = self._object_rest_pos[ids].clone(), self._distractor_reset_pos[kk, ids].clone()
             self._object_rest_pos[ids], self._distractor_reset_pos[kk, ids] = new_rest, old_rest
+            if getattr(self, "_multi_clutter", False):
+                so, sd = self._mc_slot[0, ids].clone(), self._mc_slot[kk + 1, ids].clone()
+                self._mc_slot[0, ids], self._mc_slot[kk + 1, ids] = sd, so
             hq = self.hole_quat_wxyz[ids]
             self._start_shift[0, ids] += quat_apply_inverse(hq, new_rest - old_rest)   # goals follow the object
             self._object_init_z[ids] = new_rest[:, 2] - self.scene.env_origins[ids, 2]
@@ -604,7 +753,8 @@ class PreciseAssemblyEnv(PlayEnv):
             rel = pos - (self.hole_pos + self.scene.env_origins).unsqueeze(0)
             rel = quat_apply_inverse(self.hole_quat_wxyz.unsqueeze(0).expand(K, -1, -1).reshape(-1, 4),
                                      rel.reshape(-1, 3)).reshape(K, -1, 3)
-            lo = torch.tensor([box[0], box[2], -1e9], device=self.device)
+            # optional 6th value = z floor (a stick pushed through the tray floor counts as out of the bin)
+            lo = torch.tensor([box[0], box[2], box[5] if len(box) > 5 else -1e9], device=self.device)
             hi = torch.tensor([box[1], box[3], box[4]], device=self.device)
             out = (torch.clamp(lo - rel, min=0.0) + torch.clamp(rel - hi, min=0.0)).norm(dim=-1)
             self.distractor_disp = out.max(dim=0).values
@@ -653,7 +803,11 @@ class PreciseAssemblyEnv(PlayEnv):
         self._apply_joint_detents()
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
-        w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel, self._start_shift[0, env_ids])
+        pose = self._pih_object_start_rel
+        if getattr(self, "_multi_clutter", False):
+            self._mc_tables()
+            pose = self._object_start_rel_env[env_ids]
+        w = self._pose_rel_hole_to_world(env_ids, pose, self._start_shift[0, env_ids])
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
@@ -749,10 +903,15 @@ class PreciseAssemblyEnv(PlayEnv):
                 tail_ids = ins_ids[in_tail]
                 tail_idx = subgoal_idx[in_tail] - self._num_prelude_goals
                 hole_q = self.hole_quat_wxyz[tail_ids]
-                insert_pos = self._insert_pos_rel[tail_idx]
+                if getattr(self, "_multi_clutter", False):   # per-env waypoints (problem of the env)
+                    self._mc_tables()
+                    insert_pos = self._insert_pos_rel_env[tail_ids, tail_idx]
+                    insert_q = self._insert_quat_wxyz_env[tail_ids, tail_idx]
+                else:
+                    insert_pos = self._insert_pos_rel[tail_idx]
+                    insert_q = self._insert_quat_wxyz[tail_idx]
                 if hasattr(self, "_start_shift"):     # start_shift_m: the goals move with the object
                     insert_pos = insert_pos + self._start_shift[0, tail_ids]
-                insert_q = self._insert_quat_wxyz[tail_idx]
                 ins_pos_local[in_tail] = (
                     self.hole_pos[tail_ids] + quat_apply(hole_q, insert_pos)
                 )
@@ -1074,6 +1233,9 @@ class PreciseAssemblyEnv(PlayEnv):
 
         retract_fail = self.retract_failed if pih_cfg.enable_retract else torch.zeros_like(fall)
         self._update_distractor_disp()
+        if pih_cfg.multi_lift:
+            self._update_multi_lift()
+            max_successes = torch.zeros_like(max_successes)          # run to timeout; metric = best held count
         self._update_joint_angles()
         if pih_cfg.terminate_on_disturb and hasattr(self, "distractor_disp"):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
@@ -1179,6 +1341,16 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
 
+        if pih_cfg.multi_lift and hasattr(self, "multi_lift_count"):
+            ml = pih_cfg.multi_lift_hold_rew * self.multi_lift_count + pih_cfg.multi_lift_new_bonus * getattr(
+                self, "_ml_new", torch.zeros_like(self.multi_lift_count))
+            reward = reward + ml
+            self._reward_terms["multi_lift_rew"] = ml
+            self._reward_terms["total_reward"] = reward
+            self.extras["multi_lift_count_mean"] = self.multi_lift_count.mean()
+            done_m = self.multi_lift_last_ep_max >= 0
+            if done_m.any():
+                self.extras["multi_lift_last_ep_max_mean"] = self.multi_lift_last_ep_max[done_m].mean()
         log_step_metrics(self)
         self._log_peg_metrics()
         return reward

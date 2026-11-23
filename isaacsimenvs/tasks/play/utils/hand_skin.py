@@ -95,8 +95,15 @@ class HandSkinSensor:
         import trimesh
         from isaaclab.utils.warp import convert_to_warp_mesh
 
-        if len(env._object_urdf_paths) > 1:
-            raise NotImplementedError("whole-hand tactile supports a single object asset")
+        n_assets = len(env._object_urdf_paths)
+        if n_assets > 1 and not getattr(env, "_multi_clutter", False):
+            raise NotImplementedError("whole-hand tactile supports a single object asset (or multi clutter)")
+        if n_assets > 1:   # env groups by asset (multi clutter: object and distractors share the round-robin)
+            ai = env._object_asset_index_per_env
+            self.asset_env_ids = [(ai == k).nonzero().reshape(-1) for k in range(n_assets)]
+            self.asset_env_ids = [i for i in self.asset_env_ids if i.numel()]
+        else:
+            self.asset_env_ids = [torch.arange(env.num_envs, device=env.device)]
         self.env, self.device = env, env.device
         g, sp = int(tactile_cfg.whole_hand_grid), float(tactile_cfg.whole_hand_spacing_mm)
         skin = float(tactile_cfg.whole_hand_skin_mm) * 1e-3
@@ -130,7 +137,9 @@ class HandSkinSensor:
         self.max_dist = skin + 3e-3  # a body can also sink a little into the collision surface
         self.targets = [env.object] + (list(getattr(env, "distractors", ())) if tactile_cfg.whole_hand_distractors
                                        else [])
-        self.meshes = [convert_to_warp_mesh(*prim_mesh(o.cfg.prim_path), device=self.device) for o in self.targets]
+        # meshes[t][a] = target t's mesh in asset group a (taken from the group's first env)
+        self.meshes = [[convert_to_warp_mesh(*prim_mesh(o.cfg.prim_path, int(ids[0])), device=self.device)
+                        for ids in self.asset_env_ids] for o in self.targets]
         self.envs_per_chunk = max(1, int(tactile_cfg.max_rays_per_chunk) // len(self.starts))
         empty = int((torch.bincount(self.taxel, minlength=self.n_tax) == 0).sum())
         print(f"[hand skin] {len(HAND_LINKS)} links x {g}x{g} taxels ({empty} without rays), {len(self.starts)} "
@@ -145,10 +154,19 @@ class HandSkinSensor:
         link = env.robot.data.body_state_w[:, self.body_ids, 0:7]  # (N, B, 7)
         R_wl = matrix_from_quat(link[..., 3:7])
         result = torch.zeros(env.num_envs, self.n_tax, device=self.device)
-        for a in range(0, env.num_envs, self.envs_per_chunk):
-            c = slice(a, a + self.envs_per_chunk)
+        for g, ids in enumerate(self.asset_env_ids):
+            self._compute_group(ids, g, link, R_wl, result)
+        return _deform_quantize(result) / 255.0
+
+    def _compute_group(self, ids, g, link, R_wl, result) -> None:
+        from isaaclab.utils.math import matrix_from_quat
+        from isaaclab.utils.warp import raycast_mesh
+
+        for a in range(0, ids.numel(), self.envs_per_chunk):
+            c = ids[a:a + self.envs_per_chunk]
             depth = None
-            for obj, mesh in zip(self.targets, self.meshes):
+            for obj, meshes in zip(self.targets, self.meshes):
+                mesh = meshes[g]
                 R_ow = matrix_from_quat(obj.data.root_quat_w[c]).transpose(-1, -2).unsqueeze(1)  # world -> body
                 R = (R_ow @ R_wl[c])[:, self.body]                                                 # (n, R, 3, 3)
                 t = (R_ow @ (link[c, :, 0:3] - obj.data.root_pos_w[c].unsqueeze(1)).unsqueeze(-1)).squeeze(-1)
@@ -161,7 +179,6 @@ class HandSkinSensor:
                 depth = dj if depth is None else torch.maximum(depth, dj)
             result[c] = torch.zeros(depth.shape[0], self.n_tax, device=self.device).scatter_reduce_(
                 1, self.taxel.expand(depth.shape[0], -1), depth, "amax")
-        return _deform_quantize(result) / 255.0
 
 
 __all__ = ["HAND_LINKS", "HandSkinSensor", "hand_skin_obs_dim"]
