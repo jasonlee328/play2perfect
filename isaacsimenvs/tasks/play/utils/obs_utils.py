@@ -420,6 +420,18 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     if jpn > 0:   # encoder noise (rad) on the actor's joint_pos obs; joint_pos is normalised to [-1, 1] by the range
         obs_noisy["joint_pos"] = joint_pos + torch.randn_like(joint_pos) * jpn * 2.0 / (
             env._joint_upper_canon - env._joint_lower_canon)
+    jb = float(getattr(dr, "joint_position_obs_bias", 0.0))
+    if jb > 0:   # per-episode constant offset U(+-jb) (normalized units) on the actor's joint_pos, hand joints only
+        jp = obs_noisy["joint_pos"]
+        if getattr(env, "_jpos_obs_bias", None) is None or env._jpos_obs_bias.shape != jp.shape:
+            env._jpos_obs_bias = (torch.rand_like(jp) * 2 - 1) * jb
+            env._jpos_obs_bias[:, :7] = 0.0
+        new_ep = env.episode_length_buf <= 1
+        if bool(new_ep.any()):
+            nb = (torch.rand_like(jp[new_ep]) * 2 - 1) * jb
+            nb[:, :7] = 0.0
+            env._jpos_obs_bias[new_ep] = nb
+        obs_noisy["joint_pos"] = jp + env._jpos_obs_bias
     if dr.joint_velocity_obs_noise_std > 0:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std

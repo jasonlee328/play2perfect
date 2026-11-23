@@ -505,6 +505,7 @@ class DomainRandomizationCfg:
     joint_velocity_obs_noise_std: float = 0.1
     # Per-step Gaussian noise (rad) on the actor's joint-position obs (encoder / tendon sensing error); 0 = off.
     joint_position_obs_noise_std: float = 0.0
+    joint_position_obs_bias: float = 0.0   # per-episode U(+-b) offset (normalized units) on actor hand joint_pos
 
     # Random force/torque impulses on the object body.
     force_scale: float = 20.0
