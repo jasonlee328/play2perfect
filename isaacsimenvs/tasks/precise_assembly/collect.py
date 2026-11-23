@@ -676,6 +676,11 @@ def update(env) -> None:
         st["phi_max"] = torch.maximum(pm, phi)
     else:
         r = torch.where(st["fresh"], torch.zeros_like(phi), phi - st["prev_phi"])
+    tp = float(getattr(c, "collect_time_penalty", 0.0))
+    if tp > 0.0:
+        # A18 11-23: per-step cost after collect_time_penalty_after steps (det fails hold 2 knives up to the timeout)
+        late = env.episode_length_buf >= int(getattr(c, "collect_time_penalty_after", 300))
+        r = r - tp * (late & ~st["fresh"]).float()
     # one-time bonus the first time each utensil is lifted (> 2 cm, out of the bin) in an episode
     new_lift = lifted & ~st["lift_done"] & ~st["fresh"].unsqueeze(1)
     st["lift_done"] |= lifted

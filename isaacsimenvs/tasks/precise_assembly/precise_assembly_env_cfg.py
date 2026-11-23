@@ -224,6 +224,8 @@ class PreciseAssemblyCfg:
     collect_grid_fallback: bool = False             # A18: a blocked active knife tries the other free cells before parking
     collect_grid_fallback_relax: bool = False       # A18: fallback 2nd pass with hand clearance 0 (keeps >= 6 knives)
     collect_grid_contiguous: bool = False           # A18: active knives in one run of adjacent cells, random start
+    collect_time_penalty: float = 0.0               # A18: per-step cost once the episode is older than collect_time_penalty_after
+    collect_time_penalty_after: int = 300
     collect_grid_jitter: list = (0.006, 0.008, 3.0)  # per-cell jitter: x m, y m, yaw deg (yaw around collect_yaw_center_deg)
     collect_hand_clear_m: float = 0.0               # > 0: no utensil footprint within this of a hand link (start pose, < 10 cm up)
     collect_bin_margin_m: float = 0.03
