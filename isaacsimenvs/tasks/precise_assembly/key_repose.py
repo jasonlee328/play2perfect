@@ -159,6 +159,10 @@ class KeyRepose:
         far = dmin > float(c.key_drop_dist)
         self.far_steps = torch.where(far, self.far_steps + 1, torch.zeros_like(self.far_steps))
         self.dropped = (self.far_steps >= int(c.key_drop_steps)) | below
+        rf = float(getattr(c, "key_rot_fail_deg", 0.0))
+        if rf > 0.0:   # rotation-hold: turned too far in the grip (palm frame, vs the start pose)
+            self.rot_failed = self.final_rot_err > rf
+            self.dropped = self.dropped | self.rot_failed
         self.fingertip_dmin = dmin
 
     def log(self, extras):

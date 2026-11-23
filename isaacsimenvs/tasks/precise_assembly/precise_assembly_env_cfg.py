@@ -129,6 +129,8 @@ class PreciseAssemblyCfg:
     key_drop_below: float = 0.0         # m, > 0: also dropped when the key COM is this far below the palm
     key_drop_table_m: float = 0.01      # m, dropped when the key COM is within this of the table top
     key_drop_penalty: float = 200.0
+    key_rot_fail_deg: float = 0.0       # A23 11-23: > 0: the key turning more than this (deg) from its start pose in the
+                                        # palm frame counts as dropped (rotation-hold task)
     key_shape_scale: float = 0.0        # > 0: reward scale x (decrease of final twist + w x swing error, rad) per step
     key_shape_swing_w: float = 1.0
     key_shape_pos_w: float = 0.0        # per m: position error to the final goal in the shaping potential (rad-equivalent)
