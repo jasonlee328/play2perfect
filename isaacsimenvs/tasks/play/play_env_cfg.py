@@ -518,6 +518,7 @@ class DomainRandomizationCfg:
     force_only_when_lifted: bool = True
 
     torque_scale: float = 2.0
+    torque_mult_log_range: tuple = ()   # A23: (lo, hi) hidden per-episode log-uniform multiplier on torque_scale
     torque_prob_range: tuple[float, float] = (0.001, 0.1)
     torque_decay: float = 0.0
     torque_decay_interval: float = 0.08

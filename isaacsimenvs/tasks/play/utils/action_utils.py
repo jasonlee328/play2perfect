@@ -108,6 +108,18 @@ def apply_wrench_dr(env) -> None:
     new_torque = (
         torch.randn(env.num_envs, 1, 3, device=env.device) * mass * dr.torque_scale
     )
+    tr = tuple(getattr(dr, "torque_mult_log_range", ()) or ())
+    if len(tr) == 2:   # A23: hidden per-episode twist strength, log-uniform multiplier on torque_scale
+        if getattr(env, "_torque_mult", None) is None:
+            env._torque_mult = torch.ones(env.num_envs, device=env.device)
+            env._torque_mult_fresh = torch.ones(env.num_envs, dtype=torch.bool, device=env.device)
+        fresh = env.episode_length_buf <= 1
+        lo, hi = math.log(float(tr[0])), math.log(float(tr[1]))
+        draw = torch.exp(lo + (hi - lo) * torch.rand(env.num_envs, device=env.device))
+        newep = fresh & env._torque_mult_fresh
+        env._torque_mult = torch.where(newep, draw, env._torque_mult)
+        env._torque_mult_fresh = ~fresh
+        new_torque = new_torque * env._torque_mult.view(-1, 1, 1)
     env._object_forces = torch.where(force_fire, new_force, env._object_forces)
     env._object_torques = torch.where(torque_fire, new_torque, env._object_torques)
 
