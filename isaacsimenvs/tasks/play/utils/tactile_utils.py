@@ -191,4 +191,58 @@ class TactileSensor:
         return _deform_quantize(result) / 255.0
 
 
-__all__ = ["FINGERS", "TactileSensor", "tactile_obs_dim"]
+class TactileFlow:
+    """A23 11-23: TactileLab-style tactile flow (arXiv 2611.07881) from the same rays as ``TactileSensor``.
+    Per taxel: mean over its contact rays of the tangential velocity of the object surface relative to the pad
+    (v_obj(p) - v_pad(p) with the component along the ray removed), in two fixed tangent axes per pad (DP frame),
+    divided by ``scale`` (m/s) and clipped to +-clip. 0 where no ray of the taxel is in contact. Output
+    (N, 5 * res * res * 2), taxel-major then (t1, t2). Rigid-body kinematics only (no gel shear)."""
+
+    def __init__(self, sensor: "TactileSensor", scale: float = 0.05, clip: float = 3.0) -> None:
+        self.s, self.scale, self.clip = sensor, float(scale), float(clip)
+        dev = sensor.device
+        F = len(sensor.body_ids)
+        self.t1 = torch.zeros(F, 3, device=dev); self.t2 = torch.zeros(F, 3, device=dev)
+        for f in range(F):
+            n = sensor.dirs[sensor.finger == f].mean(0); n = n / n.norm()
+            a = torch.tensor([1.0, 0.0, 0.0], device=dev)
+            if abs(float(n @ a)) > 0.9:
+                a = torch.tensor([0.0, 1.0, 0.0], device=dev)
+            t1 = a - (a @ n) * n; t1 = t1 / t1.norm()
+            self.t1[f], self.t2[f] = t1, torch.linalg.cross(n, t1)
+        self.T = len(sensor.counts)
+
+    def compute(self) -> torch.Tensor:
+        from isaaclab.utils.math import matrix_from_quat
+        from isaaclab.utils.warp import raycast_mesh
+        s, env = self.s, self.s.env
+        bs = env.robot.data.body_state_w[:, s.body_ids]
+        R_wd = matrix_from_quat(bs[..., 3:7])
+        os_ = env.object.data.root_state_w
+        R_ow = matrix_from_quat(os_[:, 3:7]).transpose(-1, -2)
+        R_od = R_ow.unsqueeze(1) @ R_wd
+        t_od = (R_ow.unsqueeze(1) @ (bs[..., 0:3] - os_[:, None, 0:3]).unsqueeze(-1)).squeeze(-1)
+        out = torch.zeros(env.num_envs, self.T, 2, device=s.device)
+        for mesh, ids in zip(s.meshes, s.asset_env_ids):
+            for a in range(0, len(ids), s.envs_per_chunk):
+                c = ids[a:a + s.envs_per_chunk]
+                Rc, tc = R_od[c][:, s.finger], t_od[c][:, s.finger]
+                st = (Rc @ s.starts.unsqueeze(-1)).squeeze(-1) + tc
+                d = (Rc @ s.dirs.unsqueeze(-1)).squeeze(-1)
+                _, dist, _, _ = raycast_mesh(st, d, mesh, max_dist=MAX_DIST, return_distance=True)
+                back = st + d * (dist.clamp_min(0.0) + CPD_EPS).nan_to_num(0.0, 0.0, 0.0).unsqueeze(-1)
+                _, dist2, _, _ = raycast_mesh(back, -d, mesh, max_dist=CPD_MAX_DIST, return_distance=True)
+                m = (torch.isfinite(dist) & torch.isfinite(dist2) & (dist > 0)).float()
+                Rwd = R_wd[c][:, s.finger]
+                p = bs[c][:, s.finger, 0:3] + (Rwd @ s.starts.unsqueeze(-1)).squeeze(-1)
+                v_pad = bs[c][:, s.finger, 7:10] + torch.linalg.cross(bs[c][:, s.finger, 10:13], p - bs[c][:, s.finger, 0:3], dim=-1)
+                v_obj = os_[c, None, 7:10] + torch.linalg.cross(os_[c, None, 10:13].expand_as(p), p - os_[c, None, 0:3], dim=-1)
+                v_d = (Rwd.transpose(-1, -2) @ (v_obj - v_pad).unsqueeze(-1)).squeeze(-1)
+                v_t = v_d - (v_d * s.dirs).sum(-1, keepdim=True) * s.dirs
+                f2 = torch.stack([(v_t * self.t1[s.finger]).sum(-1), (v_t * self.t2[s.finger]).sum(-1)], -1) * m.unsqueeze(-1)
+                cnt = torch.zeros(len(c), self.T, device=s.device).index_add_(1, s.taxel, m).clamp_min(1.0)
+                out[c] = torch.zeros(len(c), self.T, 2, device=s.device).index_add_(1, s.taxel, f2) / cnt.unsqueeze(-1)
+        return (out / self.scale).clamp(-self.clip, self.clip).reshape(env.num_envs, -1)
+
+
+__all__ = ["FINGERS", "TactileFlow", "TactileSensor", "tactile_obs_dim"]

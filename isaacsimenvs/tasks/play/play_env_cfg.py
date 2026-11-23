@@ -382,6 +382,9 @@ class RewardCfg:
 
     kuka_actions_penalty_scale: float = 0.03
     hand_actions_penalty_scale: float = 0.003
+    # A23 11-23: penalty on grip effort = scale x sum |applied torque| over the hand joints (N m), every step. The
+    # action penalties above only charge for changing targets, so holding a hard squeeze was free.
+    grip_effort_penalty_scale: float = 0.0
 
 
 # ----------------------------------------------------------------------------
@@ -569,6 +572,13 @@ class TactileCfg:
     # unchanged (it already matches the original); this restores the pad physics the original was calibrated with.
     # Use together with the sim overrides in FoundationTouch configs/tacmap_original.txt (dt 1/240, 8/0 iterations).
     original_pads: bool = False
+    # A23 11-23: TactileLab-style tactile flow (arXiv 2611.07881) as an extra policy field ``tactile_flow``: per pad x
+    # resolution^2 taxels x 2, the tangential velocity of the object surface relative to the pad at the contact rays
+    # (rigid-body kinematics, same rays and back-cast check as the depth taxels), in pad tangent axes, divided by
+    # flow_scale (m/s) and clipped to +-flow_clip. 0 off contact. policy_override zeroes it too.
+    flow_obs: bool = False
+    flow_scale: float = 0.05
+    flow_clip: float = 3.0
     pad_compliant_stiffness: float = 280.0     # original: compliant_contact_stiffness on the 5 elastomer prims
     pad_compliant_damping: float = 20.0        # original: compliant_contact_damping
     pad_friction: float = -1.0                 # -1 = keep assets.finger_tip_friction (original: IsaacLab default 0.5)

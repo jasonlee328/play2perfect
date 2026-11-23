@@ -44,6 +44,10 @@ class PlayEnv(DirectRLEnv):
                 cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile")
             if cfg.tactile.in_critic and "tactile" not in cfg.obs.state_list:
                 cfg.obs.state_list = (*cfg.obs.state_list, "tactile")
+            if bool(getattr(cfg.tactile, "flow_obs", False)):
+                OBS_FIELD_SIZES["tactile_flow"] = 5 * int(cfg.tactile.resolution) ** 2 * 2
+                if cfg.tactile.in_policy and "tactile_flow" not in cfg.obs.obs_list:
+                    cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_flow")
             if cfg.tactile.whole_hand:
                 OBS_FIELD_SIZES["tactile_hand"] = hand_skin_obs_dim(cfg.tactile)
                 if cfg.tactile.in_policy and "tactile_hand" not in cfg.obs.obs_list:
@@ -59,6 +63,10 @@ class PlayEnv(DirectRLEnv):
         apply_physx_material_properties(self)
         allocate_state_buffers(self)
         self._tactile = TactileSensor(self, cfg.tactile) if cfg.tactile.enabled else None
+        self._tactile_flow = None
+        if self._tactile is not None and bool(getattr(cfg.tactile, "flow_obs", False)):
+            from .utils.tactile_utils import TactileFlow
+            self._tactile_flow = TactileFlow(self._tactile, float(cfg.tactile.flow_scale), float(cfg.tactile.flow_clip))
         self._hand_skin = HandSkinSensor(self, cfg.tactile) if cfg.tactile.enabled and cfg.tactile.whole_hand else None
         self._tactile_hr = self._tactile_encoder = None
         so = getattr(cfg, "student_obs", None)

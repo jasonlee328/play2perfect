@@ -339,11 +339,13 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             r = env._tactile_hr_res
             hr = env._tactile_hr.compute().view(-1, r, r)               # (N*5, r, r) in [0, 1]
             env._last_tactile_feat = env._tactile_encoder(hr).view(env.num_envs, -1)
+        if getattr(env, "_tactile_flow", None) is not None:
+            obs_clean["tactile_flow"] = env._tactile_flow.compute()
         if getattr(env, "_hand_skin", None) is not None:
             obs_clean["tactile_hand"] = env._hand_skin.compute()
             env._last_tactile_hand = obs_clean["tactile_hand"]
         override = str(getattr(env.cfg.tactile, "policy_override", "none")).lower()
-        for k in ("tactile", "tactile_hand"):
+        for k in ("tactile", "tactile_hand", "tactile_flow"):
             if k not in obs_clean:
                 continue
             if override == "zero":

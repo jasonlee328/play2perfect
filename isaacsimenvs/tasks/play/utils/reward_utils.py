@@ -141,7 +141,11 @@ def compute_rewards(env) -> torch.Tensor:
         force_consecutive=term_cfg.force_consecutive_near_goal_steps,
     )
 
-    reward = lift_rew + lift_bonus_rew + ft_rew + kp_rew + kuka_pen + hand_pen + bonus
+    grip_pen = torch.zeros_like(kp_rew)
+    gs = float(getattr(rew_cfg, "grip_effort_penalty_scale", 0.0))
+    if gs > 0.0:
+        grip_pen = -gs * env.robot.data.applied_torque[:, env._hand_joint_ids].abs().sum(-1)
+    reward = lift_rew + lift_bonus_rew + ft_rew + kp_rew + kuka_pen + hand_pen + bonus + grip_pen
     env._reward_terms = {
         "fingertip_delta_rew": ft_rew,
         "lifting_rew": lift_rew,
@@ -150,6 +154,7 @@ def compute_rewards(env) -> torch.Tensor:
         "kuka_actions_penalty": kuka_pen,
         "hand_actions_penalty": hand_pen,
         "bonus_rew": bonus,
+        "grip_effort_penalty": grip_pen,
         "total_reward": reward,
     }
 
