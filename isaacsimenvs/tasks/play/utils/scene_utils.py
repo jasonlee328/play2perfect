@@ -1621,6 +1621,9 @@ def apply_physx_material_properties(env) -> None:
             view = body.root_physx_view
             materials = view.get_material_properties()
             mu_e = bucket_vals[torch.randint(0, n_buckets, (env.num_envs,))]
+            _m3 = float(getattr(dr, "deal_lower_over_top", -1.0))   # A26: cards below card 2 at least top + margin
+            if _m3 >= 0.0 and k_ >= 1 and hasattr(env, "_deal_obj_mu"):
+                mu_e = torch.maximum(mu_e, env._deal_obj_mu.to(mu_e.device) + _m3)
             materials[:, :, 0] = mu_e.unsqueeze(-1); materials[:, :, 1] = mu_e.unsqueeze(-1); materials[:, :, 2] = 0.0
             view.set_material_properties(materials, env_ids)
             mus.append(mu_e)
