@@ -10941,6 +10941,234 @@
      0.03186
     ]
    }
+  },
+  "cb_deal_card3": {
+   "object": "card",
+   "fixture": "keychain_mat",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      0.0,
+      0.0,
+      0.0029,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      0.0,
+      0.0,
+      0.0016499999999999998,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.004149999999999999,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.004149999999999999,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.004149999999999999,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "cards": 3,
+    "task": "A26 deal: thumb slides the top card of a held deck by a target distance",
+    "distractor_order": "distractor0 = card right under the top card"
+   }
+  },
+  "cb_deal_card4": {
+   "object": "card",
+   "fixture": "keychain_mat",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      0.0,
+      0.0,
+      0.004149999999999999,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      0.0,
+      0.0,
+      0.0029,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      0.0,
+      0.0,
+      0.0016499999999999998,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.005399999999999999,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.005399999999999999,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.005399999999999999,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "cards": 4,
+    "task": "A26 deal: thumb slides the top card of a held deck by a target distance",
+    "distractor_order": "distractor0 = card right under the top card"
+   }
+  },
+  "cb_deal_card5": {
+   "object": "card",
+   "fixture": "keychain_mat",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      0.0,
+      0.0,
+      0.005399999999999999,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      0.0,
+      0.0,
+      0.004149999999999999,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      0.0,
+      0.0,
+      0.0029,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/card/card.urdf",
+     [
+      0.0,
+      0.0,
+      0.0016499999999999998,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.006649999999999999,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.006649999999999999,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.006649999999999999,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "cards": 5,
+    "task": "A26 deal: thumb slides the top card of a held deck by a target distance",
+    "distractor_order": "distractor0 = card right under the top card"
+   }
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"
