@@ -288,7 +288,10 @@ def setup_scene(env) -> None:
         # Round-robin over the env prims (same source-prim order for all three), so env i's object, hole and
         # goal viz are all asset i % K (see _build_object_scale_tensor for the per-env index).
         env.hole = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths))
-        env.object = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths))
+        _ocfg_m = build_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths)
+        if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)) or bool(getattr(env.cfg.precise_assembly, "key_repose", False)):
+            _ocfg_m.spawn.activate_contact_sensors = True   # A27: hand-on-object contact views with multi_problems too
+        env.object = RigidObject(_ocfg_m)
         env.goal_viz = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths))
     else:
         _hcfg = _pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0])

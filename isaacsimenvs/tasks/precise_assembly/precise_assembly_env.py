@@ -339,6 +339,11 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if bool(getattr(cfg.precise_assembly, "roll_target_obs", False)):   # A27 roll command
+            OBS_FIELD_SIZES["roll_target"] = 1
+            for lst in ("obs_list", "state_list"):
+                if "roll_target" not in getattr(cfg.obs, lst):
+                    setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "roll_target"))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
@@ -419,12 +424,39 @@ class PreciseAssemblyEnv(PlayEnv):
             for f, v in usb.fail.items():
                 self.usb_last[f"fail_{f}"][env_ids] = v[env_ids].float()
         super()._reset_idx(env_ids)
+        self._hand_motor_dr(env_ids)
         self._reset_peg_episode(env_ids)
         if self.cfg.precise_assembly.usb_task != "off":
             if usb is None:
                 from .usb_task import UsbTask
                 self._usb = usb = UsbTask(self)
             usb.reset(env_ids)
+
+    def _hand_motor_dr(self, env_ids: torch.Tensor) -> None:
+        """A27: hidden per-env hand motor randomization (resampled each reset): PD gains x log-U(range), joint friction
+        U(0, max). Same as A23's slip_probe --act_dr, but per episode and inside the env."""
+        pc = self.cfg.precise_assembly
+        lo, hi = (float(v) for v in getattr(pc, "hand_gain_log_range", (1.0, 1.0)))
+        fmax = float(getattr(pc, "hand_joint_friction_max", 0.0))
+        if (lo, hi) == (1.0, 1.0) and fmax <= 0.0:
+            return
+        rb = self.robot
+        if getattr(self, "_hand_dof_ids", None) is None:
+            self._hand_dof_ids = [i for i, nm in enumerate(rb.joint_names) if not nm.startswith("iiwa")]
+            self._hand_kp0 = rb.root_physx_view.get_dof_stiffnesses().to(self.device)[:, self._hand_dof_ids].clone()
+            self._hand_kd0 = rb.root_physx_view.get_dof_dampings().to(self.device)[:, self._hand_dof_ids].clone()
+            self.hand_gain_mult = torch.ones(self.num_envs, len(self._hand_dof_ids), device=self.device)
+            self.hand_joint_fric = torch.zeros(self.num_envs, len(self._hand_dof_ids), device=self.device)
+        h, n = self._hand_dof_ids, env_ids.numel()
+        if (lo, hi) != (1.0, 1.0):
+            g = torch.exp(torch.empty(n, len(h), device=self.device).uniform_(math.log(lo), math.log(hi)))
+            self.hand_gain_mult[env_ids] = g
+            rb.write_joint_stiffness_to_sim(self._hand_kp0[env_ids] * g, joint_ids=h, env_ids=env_ids)
+            rb.write_joint_damping_to_sim(self._hand_kd0[env_ids] * g, joint_ids=h, env_ids=env_ids)
+        if fmax > 0.0:
+            mu = torch.empty(n, len(h), device=self.device).uniform_(0.0, fmax)
+            self.hand_joint_fric[env_ids] = mu
+            rb.write_joint_friction_coefficient_to_sim(mu, joint_dynamic_friction_coeff=0.8 * mu, joint_ids=h, env_ids=env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
@@ -755,6 +787,12 @@ class PreciseAssemblyEnv(PlayEnv):
                                          if "hole_pos" in d.files else None)
             self._start_bank_pre_flip = (torch.as_tensor(d["key_pre_flip"], device=self.device).float()
                                          if "key_pre_flip" in d.files else None)   # A13 reverse curriculum
+            self._start_bank_prob = (torch.as_tensor(d["problem_idx"], device=self.device).long()
+                                     if "problem_idx" in d.files and len(self._pih_problem_names) > 1 else None)
+            if self._start_bank_prob is not None:
+                self._start_bank_pools = [(self._start_bank_prob == p_).nonzero(as_tuple=False).squeeze(-1)
+                                          for p_ in range(len(self._pih_problem_names))]
+                print("[PreciseAssemblyEnv] start states per problem:", [int(v.numel()) for v in self._start_bank_pools], flush=True)
             if self._start_bank_hole_pos is None:
                 print("[PreciseAssemblyEnv] start-state bank has no hole_pos; can't check the hole "
                       "layout matches (use the layout it was recorded on)", flush=True)
@@ -764,6 +802,22 @@ class PreciseAssemblyEnv(PlayEnv):
             k = (int(self.cfg.precise_assembly.start_state_offset) + env_ids.long()) % b["successes"].numel()
         else:
             k = torch.randint(0, b["successes"].numel(), (n,), device=self.device)
+        if getattr(self, "_start_bank_prob", None) is not None:
+            # A27: multi-problem bank (entry recorded on problem problem_idx = env % K); draw from the env's problem
+            K = len(self._pih_problem_names)
+            want = env_ids.long() % K
+            for p_ in range(K):
+                sel = (want == p_).nonzero(as_tuple=False).squeeze(-1)
+                pool = self._start_bank_pools[p_]
+                if sel.numel() == 0:
+                    continue
+                if pool.numel() == 0:
+                    raise RuntimeError(f"start-state bank has no entries for problem {self._pih_problem_names[p_]}")
+                if self.cfg.precise_assembly.start_state_sequential:
+                    j = (int(self.cfg.precise_assembly.start_state_offset) + env_ids[sel].long() // K) % pool.numel()
+                else:
+                    j = torch.randint(0, pool.numel(), (sel.numel(),), device=self.device)
+                k[sel] = pool[j]
         if self._start_bank_hole_pos is not None:
             err = (self._start_bank_hole_pos[k] - self.hole_pos[env_ids]).norm(dim=-1).max().item()
             if err > 0.005:

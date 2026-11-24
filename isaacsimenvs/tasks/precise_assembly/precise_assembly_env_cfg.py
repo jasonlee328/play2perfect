@@ -148,6 +148,22 @@ class PreciseAssemblyCfg:
                                         # success = final pose reached + held, never dropped (the brief), waypoints only shape
          # credit every waypoint before a LATER intermediate one the key is already
                                         # within tolerance of (a flat key flops through 45-75 deg); the last goal is never skipped
+    # A27 roll a pinched stick (key_repose machinery, one goal): per-episode target roll about the object's long axis,
+    # |angle| ~ U(lo, hi) deg with a random sign (> 0 enables; key_flip_deg should be one entry, its value unused)
+    roll_target_range_deg: tuple = (0.0, 0.0)
+    roll_target_obs: bool = False        # actor + critic field "roll_target" = [angle / pi] (the task command)
+    roll_twist_only: bool = False        # near goal = twist error <= key_goal_rot_deg, swing <= roll_swing_tol_deg,
+    roll_swing_tol_deg: float = 30.0     #   position <= key_goal_pos_m (instead of the full rotation error)
+    roll_still_deg_s: float = 0.0        # > 0: near goal also needs |spin about the long axis| below this
+    # hidden per-env roll resistance (training/eval DR, "stiff stick"): each physics substep a torque
+    # -tau * tanh(w_x / roll_drag_w0) about the stick axis, tau log-U(roll_drag_range); roll inertia x roll_inertia_mult
+    roll_drag_range: tuple = (0.0, 0.0)
+    roll_drag_w0: float = 0.5
+    roll_inertia_mult: float = 1.0
+    # A27 hidden per-env hand motor randomization, resampled every reset: hand PD gains x log-U(range) (stiffness and
+    # damping alike) and hand joint friction U(0, hand_joint_friction_max) (dynamic 0.8x)
+    hand_gain_log_range: tuple = (1.0, 1.0)
+    hand_joint_friction_max: float = 0.0
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
     key_hold_rew: float = 0.0           # per step while the key is not dropped (fingertip within key_drop_dist)
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built

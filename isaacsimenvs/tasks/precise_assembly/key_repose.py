@@ -41,6 +41,12 @@ class KeyRepose:
         self.min_final_rot_err = torch.full((N,), 180.0, device=dev)
         self.x_axis = torch.tensor([1.0, 0.0, 0.0], device=dev)
         self._step = 0
+        # A27 roll: per-episode target angle (rad, signed), replaces flip[k] when roll_target_range_deg[1] > 0
+        rr = tuple(float(v) for v in getattr(c, "roll_target_range_deg", (0.0, 0.0)))
+        self.roll = rr[1] > 0.0
+        self.roll_lo, self.roll_hi = math.radians(rr[0]), math.radians(rr[1])
+        self.target = torch.zeros(N, device=dev)
+        self.spin = torch.zeros(N, device=dev)       # rad/s about the object's long axis
 
     # ------------------------------------------------------------------ helpers
     def scale(self) -> float:
@@ -53,6 +59,9 @@ class KeyRepose:
         return float(s0 + (1.0 - s0) * min(max(t, 0.0), 1.0))
 
     def _rot(self, env_ids, k):
+        if self.roll:
+            ang = self.target[env_ids] * self.scale()
+            return quat_from_angle_axis(ang, self.x_axis.expand(env_ids.numel(), 3))
         ang = self.flip[k.clamp(max=self.flip.numel() - 1)] * self.scale()
         return quat_from_angle_axis(ang, self.x_axis.expand(env_ids.numel(), 3))
 
@@ -90,6 +99,11 @@ class KeyRepose:
         self.far_steps[env_ids] = 0
         self.dropped[env_ids] = False
         self.min_final_rot_err[env_ids] = 180.0
+        if self.roll:
+            n = env_ids.numel()
+            mag = self.roll_lo + torch.rand(n, device=e.device) * (self.roll_hi - self.roll_lo)
+            sgn = torch.where(torch.rand(n, device=e.device) < 0.5, -1.0, 1.0)
+            self.target[env_ids] = mag * sgn
 
     def update(self):
         """Start of _get_dones (fresh physics state): fix base_rel for new episodes, rewrite every goal, drop check."""
@@ -127,6 +141,8 @@ class KeyRepose:
         self.twist_signed = torch.atan2(torch.sin(ts), torch.cos(ts))   # rad, key-frame x, current goal -> key
         sw = quat_mul(dq, quat_conjugate(tw))
         self.swing_err = torch.rad2deg(2.0 * torch.acos(sw[:, 0].abs().clamp(max=1.0)))
+        ax_w = quat_apply(kq, self.x_axis.expand(kq.shape[0], 3))
+        self.spin = (e.object.data.root_ang_vel_w * ax_w).sum(-1)
         last = torch.full_like(k, self.flip.numel() - 1)
         gf = self.goal_world(ids, last)
         dqf = quat_mul(quat_conjugate(gf[:, 3:7]), kq)
@@ -180,3 +196,6 @@ class KeyRepose:
         extras["key_pos_err_mm"] = self.pos_err.mean() * 1e3
         extras["key_final_rot_err_deg"] = self.final_rot_err.mean()
         extras["key_flip_scale"] = self.scale()
+        if self.roll:
+            extras["roll_target_abs_deg"] = torch.rad2deg(self.target.abs()).mean()
+            extras["roll_spin_abs"] = self.spin.abs().mean()

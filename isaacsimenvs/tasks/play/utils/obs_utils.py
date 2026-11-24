@@ -201,6 +201,12 @@ def compute_intermediate_values(env) -> None:
     if _kr > 0.0 and getattr(env, "_key", None) is not None:
         # A13: the task's own definition (orientation error and position error checked separately)
         env._near_goal = (env._key.rot_err <= _kr) & (env._key.pos_err <= float(getattr(_pc, "key_goal_pos_m", 0.015)))
+        if bool(getattr(_pc, "roll_twist_only", False)):   # A27: twist about the long axis, swing loose
+            env._near_goal = ((env._key.twist_err <= _kr) & (env._key.swing_err <= float(getattr(_pc, "roll_swing_tol_deg", 30.0)))
+                              & (env._key.pos_err <= float(getattr(_pc, "key_goal_pos_m", 0.015))))
+        _st = float(getattr(_pc, "roll_still_deg_s", 0.0))
+        if _st > 0.0:
+            env._near_goal = env._near_goal & (torch.rad2deg(env._key.spin.abs()) <= _st)
     env._near_goal_steps = update_near_goal_steps(
         near_goal=env._near_goal,
         near_goal_steps=env._near_goal_steps,
@@ -361,6 +367,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "roll_target" in OBS_FIELD_SIZES:   # A27 task command
+        k_ = getattr(env, "_key", None)
+        obs_clean["roll_target"] = ((k_.target / math.pi).unsqueeze(-1) if k_ is not None
+                                    else torch.zeros(env.num_envs, 1, device=env.device))
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel

@@ -1009,6 +1009,174 @@
     -0.0,
     0.173
    ]
+  },
+  "chopstick_d085": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    5.516,
+    5.516
+   ],
+   "mass_g": 3.309,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "mass_g_density620": 3.66,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled",
+   "diameter_scale": 0.85,
+   "note": "A27 roll task: chopstick cross-section scaled about the long axis (make_roll_stick.py)"
+  },
+  "chopstick_d090": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    5.841,
+    5.841
+   ],
+   "mass_g": 3.7098,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "mass_g_density620": 3.66,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled",
+   "diameter_scale": 0.9,
+   "note": "A27 roll task: chopstick cross-section scaled about the long axis (make_roll_stick.py)"
+  },
+  "chopstick_d095": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.165,
+    6.165
+   ],
+   "mass_g": 4.1334,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "mass_g_density620": 3.66,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled",
+   "diameter_scale": 0.95,
+   "note": "A27 roll task: chopstick cross-section scaled about the long axis (make_roll_stick.py)"
+  },
+  "chopstick_d100": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 4.58,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "mass_g_density620": 3.66,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled",
+   "diameter_scale": 1.0,
+   "note": "A27 roll task: chopstick cross-section scaled about the long axis (make_roll_stick.py)"
+  },
+  "chopstick_d105": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.815,
+    6.815
+   ],
+   "mass_g": 5.0495,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "mass_g_density620": 3.66,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled",
+   "diameter_scale": 1.05,
+   "note": "A27 roll task: chopstick cross-section scaled about the long axis (make_roll_stick.py)"
+  },
+  "chopstick_d110": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    7.139,
+    7.139
+   ],
+   "mass_g": 5.5418,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "mass_g_density620": 3.66,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled",
+   "diameter_scale": 1.1,
+   "note": "A27 roll task: chopstick cross-section scaled about the long axis (make_roll_stick.py)"
+  },
+  "chopstick_d115": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    7.463,
+    7.463
+   ],
+   "mass_g": 6.057,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "coacd 1",
+   "mass_g_density620": 3.66,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled",
+   "diameter_scale": 1.15,
+   "note": "A27 roll task: chopstick cross-section scaled about the long axis (make_roll_stick.py)"
   }
  },
  "fixtures": {
@@ -10940,6 +11108,265 @@
      -0.0191,
      0.03186
     ]
+   }
+  },
+  "cb_roll_stick_d085": {
+   "object": "chopstick_d085",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A27 (ours): roll a pinched chopstick about its long axis to a target angle",
+    "grip_point_key_frame_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.09036,
+     0.10964
+    ],
+    "diameter_scale": 0.85
+   }
+  },
+  "cb_roll_stick_d090": {
+   "object": "chopstick_d090",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A27 (ours): roll a pinched chopstick about its long axis to a target angle",
+    "grip_point_key_frame_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.09036,
+     0.10964
+    ],
+    "diameter_scale": 0.9
+   }
+  },
+  "cb_roll_stick_d095": {
+   "object": "chopstick_d095",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A27 (ours): roll a pinched chopstick about its long axis to a target angle",
+    "grip_point_key_frame_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.09036,
+     0.10964
+    ],
+    "diameter_scale": 0.95
+   }
+  },
+  "cb_roll_stick_d100": {
+   "object": "chopstick_d100",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A27 (ours): roll a pinched chopstick about its long axis to a target angle",
+    "grip_point_key_frame_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.09036,
+     0.10964
+    ],
+    "diameter_scale": 1.0
+   }
+  },
+  "cb_roll_stick_d105": {
+   "object": "chopstick_d105",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A27 (ours): roll a pinched chopstick about its long axis to a target angle",
+    "grip_point_key_frame_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.09036,
+     0.10964
+    ],
+    "diameter_scale": 1.05
+   }
+  },
+  "cb_roll_stick_d110": {
+   "object": "chopstick_d110",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A27 (ours): roll a pinched chopstick about its long axis to a target angle",
+    "grip_point_key_frame_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.09036,
+     0.10964
+    ],
+    "diameter_scale": 1.1
+   }
+  },
+  "cb_roll_stick_d115": {
+   "object": "chopstick_d115",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A27 (ours): roll a pinched chopstick about its long axis to a target angle",
+    "grip_point_key_frame_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.09036,
+     0.10964
+    ],
+    "diameter_scale": 1.15
    }
   }
  },
