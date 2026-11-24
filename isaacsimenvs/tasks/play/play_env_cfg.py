@@ -151,6 +151,8 @@ class ObsCfg:
     )
 
     clamp_abs_observations: float = 10.0
+    # A26: actor-only fields replaced by zeros (keeps a checkpoint's obs layout while hiding e.g. the object pose)
+    actor_zero_fields: tuple[str, ...] = ()
 
 
 # ----------------------------------------------------------------------------

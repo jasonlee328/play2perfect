@@ -380,6 +380,8 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
 
+    for f_ in tuple(getattr(env.cfg.obs, "actor_zero_fields", ())):
+        obs_noisy[f_] = torch.zeros_like(obs_noisy[f_])
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)
 
