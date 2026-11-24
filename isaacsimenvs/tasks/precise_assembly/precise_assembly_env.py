@@ -1933,9 +1933,29 @@ class PreciseAssemblyEnv(PlayEnv):
             self._write_goal_pose(jid, is_first_goal=False)
         self.extras["key_goal_skips"] = jump.float().mean()
 
+    def _grip_need_env(self) -> torch.Tensor:
+        """A8 doorslip: grip (N, summed normal force) this env's knob needs at its stop = spring torque at the stop
+        (tau0 + K stop) / (effective friction x knob radius); effective friction = PhysX average of pad and knob."""
+        c = self.cfg.precise_assembly
+        if not hasattr(self, "_cbf_spring_at_stop"):
+            stop = torch.as_tensor([math.radians(float(v)) for v in self._cbf["stop_deg"]], device=self.device)
+            self._cbf_spring_at_stop = (torch.as_tensor(self._cbf["tau0"], device=self.device, dtype=torch.float32)
+                                        + torch.as_tensor(self._cbf["K"], device=self.device, dtype=torch.float32) * stop)
+        knob_mu = getattr(self, "_object_mu_env", None)
+        if knob_mu is None:
+            knob_mu = torch.full((self.num_envs,), float(self.cfg.assets.object_friction))
+        mu_eff = 0.5 * (float(self.cfg.assets.finger_tip_friction) + knob_mu.to(self.device))
+        return self._cbf_spring_at_stop / (mu_eff * float(getattr(c, "crush_need_radius_m", 0.0275)))
+
     def _sample_crush_thr(self, env_ids) -> torch.Tensor:
-        lo, hi = (float(v) for v in self.cfg.precise_assembly.crush_force_range)
         u = torch.rand(len(env_ids), device=self.device)
+        mr = tuple(getattr(self.cfg.precise_assembly, "crush_need_mult_range", (0.0, 0.0)))
+        if float(mr[1]) > 0.0 and getattr(self, "_cbf", None) is not None:
+            # A8 doorslip (modelled rule, labelled): crush limit = U(a, b) x this env's needed grip, + floor
+            need = self._grip_need_env()[env_ids]
+            thr = (float(mr[0]) + u * (float(mr[1]) - float(mr[0]))) * need
+            return thr + float(getattr(self.cfg.precise_assembly, "crush_need_floor_N", 0.0))
+        lo, hi = (float(v) for v in self.cfg.precise_assembly.crush_force_range)
         return torch.exp(math.log(lo) + u * (math.log(hi) - math.log(lo)))
 
     def _hand_force_update(self) -> None:
@@ -1961,7 +1981,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
         cr = tuple(getattr(self.cfg.precise_assembly, "crush_force_range", (0.0, 0.0)))
-        if float(cr[1]) > 0.0:   # A23 (merged): hidden per-episode crush threshold
+        mr = tuple(getattr(self.cfg.precise_assembly, "crush_need_mult_range", (0.0, 0.0)))
+        if float(cr[1]) > 0.0 or float(mr[1]) > 0.0:   # A23 (merged) / A8 need-scaled: hidden per-episode crush threshold
             if getattr(self, "_crush_thr", None) is None:
                 self._crush_thr = self._sample_crush_thr(torch.arange(self.num_envs, device=self.device))
             over = self.hand_force > self._crush_thr
@@ -2205,7 +2226,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.door_stop_torque.zero_(); self.door_pull_torque.zero_(); self.door_pull_force.zero_()
         self._hand_force_update()
         crushed = torch.zeros_like(fall)
-        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0) and hasattr(self, "_crush_count"):
+        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0 or float(tuple(getattr(pih_cfg, "crush_need_mult_range", (0.0, 0.0)))[1]) > 0.0) and hasattr(self, "_crush_count"):
             crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
         usb_fail = {}
         if pih_cfg.usb_task != "off" and getattr(self, "_usb", None) is not None:
@@ -2330,7 +2351,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
-        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0) and "crushed" in getattr(self, "_termination_reasons", {}):
+        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0 or float(tuple(getattr(pih_cfg, "crush_need_mult_range", (0.0, 0.0)))[1]) > 0.0) and "crushed" in getattr(self, "_termination_reasons", {}):
             c_pen = float(pih_cfg.crush_penalty) * self._termination_reasons["crushed"].float()
             reward = reward - c_pen
             self._reward_terms["crush_penalty"] = -c_pen

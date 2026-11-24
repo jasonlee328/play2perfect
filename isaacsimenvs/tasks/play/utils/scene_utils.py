@@ -1595,6 +1595,7 @@ def apply_physx_material_properties(env) -> None:
             bucket_vals = torch.linspace(obj_lo, obj_hi, n_buckets) * obj_base
             bucket_idx = torch.randint(0, n_buckets, (env.num_envs,))
             per_env_obj = bucket_vals[bucket_idx]  # (N_envs,)
+            env._object_mu_env = per_env_obj.clone()   # A8 doorslip: per-env object friction (for need-scaled crush)
             materials[:, :, 0] = per_env_obj.unsqueeze(-1)
             materials[:, :, 1] = per_env_obj.unsqueeze(-1)
         view.set_material_properties(materials, env_ids)
