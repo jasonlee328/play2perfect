@@ -5,6 +5,6 @@
   <link name="object">
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="charging_block_1.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="charging_block_1.obj" scale="1 1 1"/></geometry><sdf resolution="256"/></collision>
-    <inertial><mass value="0.019393"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="2.688504e-06" ixy="-5.769585e-23" ixz="-3.632702e-23" iyy="3.519523e-06" iyz="8.499788e-16" izz="4.638196e-06"/></inertial>
+    <inertial><mass value="0.012742"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="1.766493e-06" ixy="-3.790931e-23" ixz="-2.386883e-23" iyy="2.312518e-06" iyz="5.584823e-16" izz="3.047547e-06"/></inertial>
   </link>
 </robot>

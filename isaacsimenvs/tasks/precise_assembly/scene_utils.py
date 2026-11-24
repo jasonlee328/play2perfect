@@ -94,19 +94,23 @@ def _create_fixture_joints(env) -> None:
         w, x, y, z = (float(v) for v in q_wxyz)
         o.Set(Gf.Quatd(w, Gf.Vec3d(x, y, z)) if "quatd" in str(o.GetTypeName()) else Gf.Quatf(w, Gf.Vec3f(x, y, z)))
 
-    # The joint's fixture end does not follow the kinematic fixture when a reset teleports it (the knob stayed at
-    # the fixture's spawn pose), so jointed problems keep every env's fixture at one pose for the env's lifetime
-    # (env._joint_hole_np, rel. to the env origin) and the prims start there: fixture + jointed body at their reset
-    # poses before PhysX parses the joints.
+    # The joint's fixture end does not follow the kinematic fixture when a reset teleports it, so jointed problems
+    # keep every env's fixture at one pose for its lifetime (env._joint_hole_np / _joint_hole_yaw_np, rel. to the
+    # env origin) and the prims start there, jointed bodies at their reset poses, before PhysX parses the joints.
     hole_np = getattr(env, "_joint_hole_np", None)
     if hole_np is not None:
+        yaw_np = getattr(env, "_joint_hole_yaw_np", None)
         for i in range(env.num_envs):
-            set_local_pose(f"/World/envs/env_{i}/Hole", hole_np[i], (1.0, 0.0, 0.0, 0.0))
+            yw = float(yaw_np[i]) if yaw_np is not None else 0.0
+            qh = Gf.Quatd(math.cos(yw / 2), Gf.Vec3d(0.0, 0.0, math.sin(yw / 2)))
+            set_local_pose(f"/World/envs/env_{i}/Hole", hole_np[i], (qh.GetReal(), *qh.GetImaginary()))
+            rh = Gf.Rotation(qh)
             for j in joints:
                 pose = env._joint_reset_pose_rel(j)
                 root = "Object" if j.body == "object" else f"Distractor{int(j.body[10:])}"
-                set_local_pose(f"/World/envs/env_{i}/{root}", np.asarray(pose[:3]) + hole_np[i],
-                               (pose[6], pose[3], pose[4], pose[5]))
+                pw = np.asarray(rh.TransformDir(Gf.Vec3d(*pose[:3]))) + hole_np[i]
+                qb = qh * Gf.Quatd(pose[6], Gf.Vec3d(*pose[3:6]))
+                set_local_pose(f"/World/envs/env_{i}/{root}", pw, (qb.GetReal(), *qb.GetImaginary()))
     for k, j in enumerate(joints):
         pose = env._joint_reset_pose_rel(j)
         p_b = Gf.Vec3d(*pose[:3]); q_b = Gf.Quatd(pose[6], Gf.Vec3d(*pose[3:6]))
@@ -130,11 +134,25 @@ def _create_fixture_joints(env) -> None:
         for i in range(env.num_envs):
             b0 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{parent_root}").GetPath()
             b1 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{body_root}").GetPath()
-            jp = UsdPhysics.RevoluteJoint.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
+            pris = getattr(j, "kind", "revolute") == "prismatic"
+            jcls = UsdPhysics.PrismaticJoint if pris else UsdPhysics.RevoluteJoint
+            jp = jcls.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
             jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
             jp.CreateAxisAttr("Z")
             jp.CreateLocalPos0Attr(pos0); jp.CreateLocalRot0Attr(rot0)
             jp.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jp.CreateLocalRot1Attr(Gf.Quatf(q1))
+            if pris:
+                # limits in m (stage units), linear drive stiffness N/m, damping N s/m
+                if j.lower is not None:
+                    jp.CreateLowerLimitAttr(float(j.lower))
+                if j.upper is not None:
+                    jp.CreateUpperLimitAttr(float(j.upper))
+                if j.damping or j.stiffness:
+                    drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "linear")
+                    drive.CreateTypeAttr("force")
+                    drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
+                    drive.CreateDampingAttr(float(j.damping)); drive.CreateStiffnessAttr(float(j.stiffness))
+                continue
             if j.lower_deg is not None:
                 jp.CreateLowerLimitAttr(float(j.lower_deg))
             unlock = getattr(env, "_unlock_deg_np", None)
@@ -190,6 +208,9 @@ def setup_scene(env) -> None:
     usd_work_dir.mkdir(parents=True, exist_ok=True)
 
     multi = len(obj_urdfs) > 1
+    pa_cfg = env.cfg.precise_assembly
+    obj_iters = int(getattr(pa_cfg, "object_solver_position_iterations", 4))
+    rest = getattr(pa_cfg, "object_rest_offset", None)  # None = the play default (_REST_OFFSET)
     object_usd_paths, goalviz_usd_paths, hole_usd_paths = [], [], []
     for k, (obj_urdf, hole_urdf) in enumerate(zip(obj_urdfs, hole_urdfs)):
         sfx = f"_{k}" if multi else ""
@@ -202,10 +223,11 @@ def setup_scene(env) -> None:
                 kinematic_enabled=False,
                 disable_gravity=False,
                 max_depenetration_velocity=1000.0,
-                rb_solver_position_iterations=int(env.cfg.precise_assembly.object_position_iterations) or 4,
+                rb_solver_position_iterations=max(int(env.cfg.precise_assembly.object_position_iterations) or 4, obj_iters),
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
             ),
+            rest_offset=rest,
         ))
         goalviz_usd_paths.append(_bake_usd(
             object_raw_usd,
@@ -231,6 +253,7 @@ def setup_scene(env) -> None:
                 rb_solver_position_iterations=4,
                 rb_solver_velocity_iterations=0,
             ),
+            rest_offset=rest,
         ))
 
     distractor_usd_paths = []
@@ -246,10 +269,11 @@ def setup_scene(env) -> None:
                 disable_gravity=k in kin_d,
                 max_depenetration_velocity=1000.0,
                 rb_solver_position_iterations=(int(env.cfg.precise_assembly.object_position_iterations) or 4)
-                if k in stiff_d else 4,
+                if k in stiff_d else obj_iters,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
             ),
+            rest_offset=rest,
         ))
 
     robot_usd_path = _bake_usd(
@@ -304,16 +328,23 @@ def setup_scene(env) -> None:
         env.object = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths))
         env.goal_viz = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths))
     else:
-        env.hole = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0]))
+        _hcfg = _pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0])
+        if getattr(env.cfg.precise_assembly, "usb_task", "off") != "off":
+            _hcfg.spawn.activate_contact_sensors = True   # A12: robot <-> slot contact (released_and_clear)
+        env.hole = RigidObject(_hcfg)
         _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0])
-        if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)):
-            _ocfg.spawn.activate_contact_sensors = True   # PhysxContactReportAPI: hand-on-object force (A1, ported by A8)
+        _usb = getattr(env.cfg.precise_assembly, "usb_task", "off") != "off"
+        _usb = _usb or bool(getattr(env.cfg.precise_assembly, "key_repose", False))   # A13: hand-on-key contact views
+        if bool(getattr(env.cfg.precise_assembly, "hand_force_sense", False)) or _usb:
+            _ocfg.spawn.activate_contact_sensors = True   # PhysxContactReportAPI: hand-on-object force (A1)
         env.object = RigidObject(_ocfg)
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
-    env.distractors = tuple(
-        RigidObject(_a8_contact_cfg(env, _pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd), k))
-        for k, usd in enumerate(distractor_usd_paths)
-    )
+    def _dcfg(k, usd):
+        dc = _pih_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd)
+        if getattr(env.cfg.precise_assembly, "usb_task", "off") != "off":
+            dc.spawn.activate_contact_sensors = True   # A12: stick / robot <-> USB jaw contact
+        return RigidObject(_a8_contact_cfg(env, dc, k))
+    env.distractors = tuple(_dcfg(k, usd) for k, usd in enumerate(distractor_usd_paths))
     _log_scene_step(setup_t0, f"spawned robot/table/hole/object/goalviz + {len(env.distractors)} distractors")
 
     spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())

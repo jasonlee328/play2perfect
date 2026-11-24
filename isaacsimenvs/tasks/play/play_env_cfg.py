@@ -101,6 +101,12 @@ class AssetsCfg:
     finger_tip_friction: float = 1.5
     object_friction: float = 0.5
     table_friction: float = 0.5
+    # A10 (ContactBench card): opt-in per-body frictions. object_friction_apply: the object gets object_friction
+    # (else robot_friction, the old behaviour). hole_friction / distractor_friction >= 0: those bodies get it
+    # (< 0: unchanged; distractors otherwise keep their USD default material).
+    object_friction_apply: bool = False
+    hole_friction: float = -1.0
+    distractor_friction: float = -1.0
 
 # ----------------------------------------------------------------------------
 # obs
@@ -344,6 +350,9 @@ class ActionCfg:
     arm_moving_average: float = 0.1
     hand_moving_average: float = 0.1
     dof_speed_scale: float = 1.5
+    # A12: > 0 = hand actions are velocity deltas (target += scale * dt * a), not absolute [-1, 1] positions
+    hand_delta_scale: float = 0.0
+    arm_action_scale: float = 1.0     # A13: 0 = arm targets frozen at the episode start (in-hand only)
 
 
 # ----------------------------------------------------------------------------
@@ -383,6 +392,9 @@ class RewardCfg:
 
     kuka_actions_penalty_scale: float = 0.03
     hand_actions_penalty_scale: float = 0.003
+    # A23 11-23: penalty on grip effort = scale x sum |applied torque| over the hand joints (N m), every step. The
+    # action penalties above only charge for changing targets, so holding a hard squeeze was free.
+    grip_effort_penalty_scale: float = 0.0
 
 
 # ----------------------------------------------------------------------------
@@ -412,6 +424,8 @@ class ResetCfg:
     # Per-env XY position noise applied at reset (uniform half-widths in m).
     # Default (0, 0) keeps the table centered on the env origin (legacy behavior).
     table_reset_xy_range_m: tuple[float, float] = (0.0, 0.0)
+    # fixed table xy offset (m) added at every reset, e.g. to keep the table under a fixture moved toward the robot
+    table_offset_xy: tuple[float, float] = (0.0, 0.0)
     # Per-env yaw noise applied at reset (uniform half-width in degrees about z).
     # Default 0.0 preserves the identity quat (legacy behavior).
     table_reset_yaw_range_deg: float = 0.0
@@ -517,6 +531,7 @@ class DomainRandomizationCfg:
     force_only_when_lifted: bool = True
 
     torque_scale: float = 2.0
+    torque_mult_log_range: tuple = ()   # A23: (lo, hi) hidden per-episode log-uniform multiplier on torque_scale
     torque_prob_range: tuple[float, float] = (0.001, 0.1)
     torque_decay: float = 0.0
     torque_decay_interval: float = 0.08
@@ -567,6 +582,26 @@ class TactileCfg:
     map_dir: str = "assets/tactile/sharpa_tacmap"
     # Upper bound on rays per raycast call (envs are processed in chunks).
     max_rays_per_chunk: int = 4_000_000
+    # Original sharpa-tacmap contact physics for the gel pads (utils/tacmap_pads.py; A23 11-22). The sensor code is
+    # unchanged (it already matches the original); this restores the pad physics the original was calibrated with.
+    # Use together with the sim overrides in FoundationTouch configs/tacmap_original.txt (dt 1/240, 8/0 iterations).
+    original_pads: bool = False
+    # A23 11-23: TactileLab-style tactile flow (arXiv 2611.07881) as an extra policy field ``tactile_flow``: per pad x
+    # resolution^2 taxels x 2, the tangential velocity of the object surface relative to the pad at the contact rays
+    # (rigid-body kinematics, same rays and back-cast check as the depth taxels), in pad tangent axes, divided by
+    # flow_scale (m/s) and clipped to +-flow_clip. 0 off contact. policy_override zeroes it too.
+    flow_obs: bool = False
+    flow_scale: float = 0.05
+    flow_clip: float = 3.0
+    pad_compliant_stiffness: float = 280.0     # original: compliant_contact_stiffness on the 5 elastomer prims
+    pad_compliant_damping: float = 20.0        # original: compliant_contact_damping
+    pad_friction: float = -1.0                 # -1 = keep assets.finger_tip_friction (original: IsaacLab default 0.5)
+    pad_robot_offsets: bool = True             # original: every robot collision shape gets these offsets
+    robot_contact_offset: float = 0.0002
+    robot_rest_offset: float = -0.0001
+    pad_object_offsets: bool = True            # original presser offsets on the manipulated object (also changes its
+    object_contact_offset: float = 0.0001      # contacts with table / fixture: rest -0.5 mm = sinks 0.5 mm into them)
+    object_rest_offset: float = -0.0005
     # Experimental whole-hand skin (utils/hand_skin.py): field "tactile_hand" of 21 links x grid^2 taxels, appended
     # after "tactile" (policy obs; critic too with whole_hand_in_critic). Needs enabled=true. A checkpoint trained
     # without it warm-starts with P2P_NEW_OBS_FIELD=tactile_hand. policy_override applies to it as well.

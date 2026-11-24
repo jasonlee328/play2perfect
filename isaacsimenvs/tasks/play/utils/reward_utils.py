@@ -16,7 +16,8 @@ def lifting_reward(
     grasp_ok: torch.Tensor | None = None,     # (N,) bool: dense lift reward only while grasped
     grasp_held: torch.Tensor | None = None,   # (N,) bool: latch only after a held grasped lift
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Lift progress, one-shot lift bonus, and latched lifted state."""
+    """Lift progress, one-shot lift bonus, and latched lifted state. lifting_rew_offset is the dense reward paid at
+    rest (0.05 = the original; 0 pays only for height gained, so an un-lifted episode isn't worth more than lifting)."""
     z_lift = 0.05 + object_z - object_init_z
     # The offset pays lifting_rew_scale * offset per step before the lift even with the object untouched; with long
     # episodes and a lift reward forced on (precise_assembly.force_lift_reward_active) that beats the lift bonus.
@@ -175,6 +176,11 @@ def compute_rewards(env) -> torch.Tensor:
     if grasp_ok is not None and rew_cfg.grasp_rew_scale > 0:
         grasp_rew = rew_cfg.grasp_rew_scale * (grasp_ok & ~env._lifted_object).float()
         reward = reward + grasp_rew
+    grip_pen = torch.zeros_like(kp_rew)
+    gs = float(getattr(rew_cfg, "grip_effort_penalty_scale", 0.0))
+    if gs > 0.0:   # A23 (merged): grip effort penalty on the hand joint torques
+        grip_pen = -gs * env.robot.data.applied_torque[:, env._hand_joint_ids].abs().sum(-1)
+        reward = reward + grip_pen
     env._reward_terms = {
         "fingertip_delta_rew": ft_rew,
         "lifting_rew": lift_rew,
@@ -184,6 +190,7 @@ def compute_rewards(env) -> torch.Tensor:
         "kuka_actions_penalty": kuka_pen,
         "hand_actions_penalty": hand_pen,
         "bonus_rew": bonus,
+        "grip_effort_penalty": grip_pen,
         "total_reward": reward,
     }
 

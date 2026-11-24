@@ -48,7 +48,7 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
         ]
 
     # Arm: velocity-delta accumulator.
-    arm_action = actions[:, :7]
+    arm_action = actions[:, :7] * float(getattr(act_cfg, "arm_action_scale", 1.0))   # A13: 0 = arm frozen (fingers only)
     arm_raw = env._prev_targets[:, :7] + act_cfg.dof_speed_scale * dt * arm_action
     arm_raw = torch.clamp(arm_raw, env._arm_lower, env._arm_upper)
     arm_smoothed = (
@@ -59,9 +59,14 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
 
     # Hand: absolute [-1, 1] scale.
     hand_action = actions[:, 7:]
-    hand_raw = env._hand_lower + 0.5 * (hand_action + 1.0) * (
-        env._hand_upper - env._hand_lower
-    )
+    hand_delta = float(getattr(act_cfg, "hand_delta_scale", 0.0))
+    if hand_delta > 0.0:
+        # A12: relative hand (like the arm): zero action holds the current grip
+        hand_raw = env._prev_targets[:, 7:] + hand_delta * dt * hand_action
+    else:
+        hand_raw = env._hand_lower + 0.5 * (hand_action + 1.0) * (
+            env._hand_upper - env._hand_lower
+        )
     hand_smoothed = (
         act_cfg.hand_moving_average * hand_raw
         + (1.0 - act_cfg.hand_moving_average) * env._prev_targets[:, 7:]
@@ -103,6 +108,18 @@ def apply_wrench_dr(env) -> None:
     new_torque = (
         torch.randn(env.num_envs, 1, 3, device=env.device) * mass * dr.torque_scale
     )
+    tr = tuple(getattr(dr, "torque_mult_log_range", ()) or ())
+    if len(tr) == 2:   # A23: hidden per-episode twist strength, log-uniform multiplier on torque_scale
+        if getattr(env, "_torque_mult", None) is None:
+            env._torque_mult = torch.ones(env.num_envs, device=env.device)
+            env._torque_mult_fresh = torch.ones(env.num_envs, dtype=torch.bool, device=env.device)
+        fresh = env.episode_length_buf <= 1
+        lo, hi = math.log(float(tr[0])), math.log(float(tr[1]))
+        draw = torch.exp(lo + (hi - lo) * torch.rand(env.num_envs, device=env.device))
+        newep = fresh & env._torque_mult_fresh
+        env._torque_mult = torch.where(newep, draw, env._torque_mult)
+        env._torque_mult_fresh = ~fresh
+        new_torque = new_torque * env._torque_mult.view(-1, 1, 1)
     env._object_forces = torch.where(force_fire, new_force, env._object_forces)
     env._object_torques = torch.where(torque_fire, new_torque, env._object_torques)
 

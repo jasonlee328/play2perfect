@@ -94,6 +94,11 @@ class JointSpec:
     detent_torque: float = 0.0
     # The joint's other end: "fixture" (the receptive fixture) or "distractor<k>" (e.g. a knob on a hinged door).
     parent: str = "fixture"
+    # "prismatic" (A12 USB jaws): slides along ``axis``; ``lower`` / ``upper`` end stops in m, ``stiffness`` N/m,
+    # ``damping`` N s/m (a linear drive to 0). The *_deg / detent fields are ignored then.
+    kind: str = "revolute"
+    lower: float | None = None
+    upper: float | None = None
 
 
 @dataclass(frozen=True)

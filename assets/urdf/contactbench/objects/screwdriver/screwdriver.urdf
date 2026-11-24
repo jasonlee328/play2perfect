@@ -5,6 +5,6 @@
   <link name="object">
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="screwdriver.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="screwdriver.obj" scale="1 1 1"/></geometry><sdf resolution="256"/></collision>
-    <inertial><mass value="0.006503"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="1.225066e-07" ixy="-1.261966e-12" ixz="-6.140898e-13" iyy="5.456771e-06" iyz="1.037882e-13" izz="5.456771e-06"/></inertial>
+    <inertial><mass value="0.005945"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="1.119972e-07" ixy="-1.153707e-12" ixz="-5.614094e-13" iyy="4.988655e-06" iyz="9.488460e-14" izz="4.988655e-06"/></inertial>
   </link>
 </robot>

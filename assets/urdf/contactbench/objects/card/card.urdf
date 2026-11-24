@@ -5,6 +5,6 @@
   <link name="object">
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="card.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><box size="0.085000 0.055000 0.001200"/></geometry></collision>
-    <inertial><mass value="0.003472"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="8.729794e-07" ixy="-8.547533e-24" ixz="-7.595952e-25" iyy="2.084292e-06" iyz="-6.260400e-27" izz="2.956438e-06"/></inertial>
+    <inertial><mass value="0.006945"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="1.746118e-06" ixy="-1.709663e-23" ixz="-1.519329e-24" iyy="4.168965e-06" iyz="-1.252194e-26" izz="5.913416e-06"/></inertial>
   </link>
 </robot>

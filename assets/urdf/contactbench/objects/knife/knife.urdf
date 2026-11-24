@@ -6,6 +6,6 @@
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="knife.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_00.obj" scale="1 1 1"/></geometry></collision>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_01.obj" scale="1 1 1"/></geometry></collision>
-    <inertial><mass value="0.004266"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="5.744693e-08" ixy="1.096912e-09" ixz="1.700367e-07" iyy="1.295131e-05" iyz="-7.385646e-11" izz="1.290256e-05"/></inertial>
+    <inertial><mass value="0.006002"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="8.082167e-08" ixy="1.543238e-09" ixz="2.392234e-07" iyy="1.822110e-05" iyz="-1.039081e-10" izz="1.815252e-05"/></inertial>
   </link>
 </robot>

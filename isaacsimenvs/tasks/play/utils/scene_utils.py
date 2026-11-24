@@ -1428,8 +1428,11 @@ def _bake_usd(
     props: dict | None = None,
     apply_physx_articulation: bool = False,
     collision_enabled: bool | None = None,
+    rest_offset: float | None = None,
 ) -> str:
     """Copy raw USD into bake_root/baked_subdir and pre-author physics props.
+
+    ``rest_offset`` (m) replaces _REST_OFFSET on this asset's collision shapes (None = _REST_OFFSET).
 
     ``props`` keys come from ``_PHYSICS_SPECS``; ``None`` values are skipped,
     and keys whose group doesn't match a prim's APIs are skipped per-prim.
@@ -1490,7 +1493,7 @@ def _bake_usd(
         if prim.HasAPI(UsdPhysics.CollisionAPI):
             px = PhysxSchema.PhysxCollisionAPI(prim) or PhysxSchema.PhysxCollisionAPI.Apply(prim)
             px.CreateContactOffsetAttr().Set(_CONTACT_OFFSET)
-            px.CreateRestOffsetAttr().Set(_REST_OFFSET)
+            px.CreateRestOffsetAttr().Set(_REST_OFFSET if rest_offset is None else float(rest_offset))
             if collision_enabled is not None:
                 ce = UsdPhysics.CollisionAPI(prim)
                 (ce.GetCollisionEnabledAttr() or ce.CreateCollisionEnabledAttr()).Set(
@@ -1566,7 +1569,10 @@ def apply_physx_material_properties(env) -> None:
             robot_materials[:, ft_indices, 0] = per_env_ft.unsqueeze(-1)
             robot_materials[:, ft_indices, 1] = per_env_ft.unsqueeze(-1)
 
-    robot_view.set_material_properties(robot_materials, env_ids)
+    if getattr(env, "_finger_compliant", False):
+        print("[materials] robot friction pass skipped: TacMap gel pad materials bound in USD (A23 original_pads)", flush=True)
+    else:
+        robot_view.set_material_properties(robot_materials, env_ids)
 
     for name in ("table", "object", "goal_viz", "hole"):
         if not hasattr(env, name):
@@ -1574,11 +1580,16 @@ def apply_physx_material_properties(env) -> None:
         view = getattr(env, name).root_physx_view
         materials = view.get_material_properties()
         materials[:] = default
+        mu = None
         if name == "object":
-            # A1 (11-16): the object's own friction (default 0.5 = robot_friction, so unchanged unless set; e.g. the
-            # official doorknob grip 0.6)
-            materials[:, :, 0] = float(assets_cfg.object_friction)
-            materials[:, :, 1] = float(assets_cfg.object_friction)
+            # A1 (11-16) / A8: the object's own friction always applied (default 0.5 = robot_friction, so unchanged
+            # unless set; e.g. the official doorknob grip 0.6). (A23's object_friction_apply flag is implied.)
+            mu = float(assets_cfg.object_friction)
+        if name == "hole" and float(getattr(assets_cfg, "hole_friction", -1.0)) >= 0.0:
+            mu = float(assets_cfg.hole_friction)
+        if mu is not None:
+            materials[:, :, 0] = mu
+            materials[:, :, 1] = mu
         if name == "object" and obj_active:
             obj_base = float(assets_cfg.object_friction)
             bucket_vals = torch.linspace(obj_lo, obj_hi, n_buckets) * obj_base
@@ -1587,6 +1598,25 @@ def apply_physx_material_properties(env) -> None:
             materials[:, :, 0] = per_env_obj.unsqueeze(-1)
             materials[:, :, 1] = per_env_obj.unsqueeze(-1)
         view.set_material_properties(materials, env_ids)
+
+    d_mu = float(getattr(assets_cfg, "distractor_friction", -1.0))
+    # per-problem jaw friction (A12 USB: meta.json problems[<p>]["distractor_friction"] overrides the cfg value)
+    try:
+        import json as _json
+        from evaluation.problems.contactbench.problems import ASSETS_DIR as _CB
+        _pn = str(getattr(env, "_pih_problem_name", "")).split("contactbench.")[-1]
+        _pm = _json.loads((_CB / "meta.json").read_text())["problems"].get(_pn, {})
+        if "distractor_friction" in _pm:
+            d_mu = float(_pm["distractor_friction"])
+            print(f"[scene] {_pn}: per-problem distractor_friction {d_mu}", flush=True)
+    except Exception as _e:  # noqa: BLE001
+        print(f"[scene] per-problem distractor_friction lookup skipped: {_e}", flush=True)
+    if d_mu >= 0.0:
+        for body in getattr(env, "distractors", ()) or ():
+            view = body.root_physx_view
+            materials = view.get_material_properties()
+            materials[:] = torch.tensor([d_mu, d_mu, 0.0], dtype=torch.float32)
+            view.set_material_properties(materials, env_ids)
 
     _log_scene_step(t0, "applied PhysX material properties")
 

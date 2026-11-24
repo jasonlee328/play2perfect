@@ -48,6 +48,9 @@ class PreciseAssemblyCfg:
     # derived insertion goals. Range is symmetric: yaw ~ U(-range, +range).
     # Default 0.0 keeps legacy behavior (identity hole quat).
     hole_yaw_range_deg: float = 0.0
+    # Fixture yaw = hole_yaw_center_deg + U(+-hole_yaw_range_deg) (A12 USB: official slot yaw 90 +- 20)
+    hole_yaw_center_deg: float = 0.0
+    joint_fixture_seed: int = 0
 
     goal_xy_obs_noise: float = 0.002
     # Per-episode yaw obs noise about world +Z applied to the observed goal
@@ -113,6 +116,62 @@ class PreciseAssemblyCfg:
     # the hole frame, and the goal index reached. Each reset samples one entry;
     # the episode then continues from that goal. "" keeps the normal reset.
     start_state_file: str = ""
+    # A12 USB (usb_task.py): "off" | "report" (contact views + verdict logged) | "gate" (verdict = task success)
+    usb_task: str = "off"
+    # A13 key repose (key_repose.py): goal = the key's start pose in the palm frame turned about its long axis
+    key_repose: bool = False
+    key_flip_deg: tuple = (45.0, 90.0, 135.0, 180.0)   # one goal per angle, in order; last = the task
+    key_flip_ramp_steps: int = 0        # > 0: all angles scaled from key_flip_ramp_start to 1 over this many env steps
+    key_flip_ramp_start: float = 0.25
+    key_flip_ramp_offset_steps: int = 0  # set on a resume (the step counter restarts)
+    key_drop_dist: float = 0.04         # m, key COM from the nearest fingertip
+    key_drop_steps: int = 5
+    key_drop_below: float = 0.0         # m, > 0: also dropped when the key COM is this far below the palm
+    key_drop_table_m: float = 0.01      # m, dropped when the key COM is within this of the table top
+    key_drop_penalty: float = 200.0
+    key_rot_fail_deg: float = 0.0       # A23 11-23: > 0: the key turning more than this (deg) from its start pose in the
+                                        # palm frame counts as dropped (rotation-hold task)
+    key_shape_scale: float = 0.0        # > 0: reward scale x (decrease of final twist + w x swing error, rad) per step
+    key_shape_swing_w: float = 1.0
+    key_shape_pos_w: float = 0.0        # per m: position error to the final goal in the shaping potential (rad-equivalent)
+    key_waypoint_hold_steps: int = 0    # >0: intermediate flip waypoints need only this many near-goal steps
+    key_assist_torque: float = 0.0      # N m > 0: training aid, torque on the key about its own long axis toward the
+                                        # current goal twist (+ damping on that spin), fading 1 -> 0 over key_assist_ramp_steps
+    key_assist_damp: float = 0.002      # N m s on the spin about the long axis
+    key_assist_ramp_steps: int = 0      # 0 = never fades
+    key_assist_offset_steps: int = 0    # set on a resume (the step counter restarts)
+    key_assist_min_deg: float = 3.0     # no assist torque while |twist error to the current goal| < this
+    key_goal_rot_deg: float = 0.0       # > 0: near-goal = key rotation error <= this AND position error <= key_goal_pos_m
+    key_goal_pos_m: float = 0.015       # (separate checks, the brief's success definition) instead of the keypoint test
+    key_goal_skip: bool = False
+    key_goal_skip_final: bool = False   # key_goal_skip may also jump to the LAST goal (then held success_steps as usual):
+                                        # success = final pose reached + held, never dropped (the brief), waypoints only shape
+         # credit every waypoint before a LATER intermediate one the key is already
+                                        # within tolerance of (a flat key flops through 45-75 deg); the last goal is never skipped
+    key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
+    key_hold_rew: float = 0.0           # per step while the key is not dropped (fingertip within key_drop_dist)
+    object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
+    usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
+    usb_hold_steps: int = 36           # held_in_hand_at_start window (0.6 s)
+    usb_pad_force: float = 0.2         # N, a link "carries" the stick
+    usb_clear_force: float = 0.05      # N, official released_and_clear contact threshold
+    usb_pinch_frac: float = 0.9        # finger_pinch_real: share of pre-release steps with the pinch loaded
+    usb_seat_tol: float = 0.0005       # fully_inserted (plug_in_usb.py:153)
+    usb_release_steps: int = 3
+    usb_clear_steps: int = 10
+    usb_clear_dist: float = 0.04       # hand moved >= 40 mm after the release
+    usb_push_force: float = 8.0        # N, env-applied push along -slot z (plug_in_usb.py:136-139)
+    usb_push_steps: int = 36           # 0.6 s
+    usb_push_gain_tol: float = 0.0003  # no_motion_when_pushed (l.154)
+    usb_stay_tol: float = 0.0003       # stays_seated_after_release (l.155)
+    usb_unseated_steps: int = 30       # released + untouched + not inserted for this long = fail
+    usb_terminate_on_fail: bool = True
+    usb_success_bonus: float = 1000.0
+    usb_release_bonus: float = 200.0   # released while fully inserted (once)
+    usb_fail_penalty: float = 200.0
+    usb_clear_rew_scale: float = 0.0   # per step, x min(palm distance from release, usb_clear_dist), released + inserted
+    usb_hold_rew: float = 0.0          # per step while pinched and not released
+    usb_seat_rew_scale: float = 0.0    # potential: x change of -seat_err (m), before the release
     # Clutter problems (Problem.distractors): per-step reward -= distractor_penalty_scale * the largest distractor
     # displacement from its reset pose (m); with terminate_on_disturb the episode ends once it exceeds
     # distractor_disturb_tol. Both off by default (and no effect on problems without distractors).
@@ -357,6 +416,9 @@ class PreciseAssemblyCfg:
     object_compliant_damping: float = 0.0
     hand_force_gain: float = 0.5
     crush_force: float = 0.0
+    # A23 11-23 (merged): hidden object strength (lo, hi) N > 0 -> each episode draws its own crush threshold
+    # log-uniform in [lo, hi] (replaces crush_force)
+    crush_force_range: tuple = (0.0, 0.0)
     crush_steps: int = 3
     crush_penalty: float = 200.0
     latch_cbf_grasp_fingers: int = 2
@@ -380,6 +442,24 @@ class PreciseAssemblyCfg:
     kinematic_distractors: tuple[int, ...] = ()
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
     stiff_distractors: tuple[int, ...] = ()
+
+    # Object / distractor rigid bodies: PhysX position iterations (4 = unchanged) and, when not None, the collision
+    # rest offset (m, may be negative) of the object, distractor and receptive shapes (None: play scene_utils
+    # _REST_OFFSET = 0). A pair rests at the sum of its two shapes' rest offsets.
+    object_solver_position_iterations: int = 4
+    object_rest_offset: float = 0.0   # 0.0 = the play default _REST_OFFSET (a None default rejects float overrides)
+
+    # Official-style ("strict") success for the last goal, from the ContactBench sim's retrieve_top_cup_from_stack
+    # verdict (force_bench appendix_tasks): the object upright (tilt < strict_max_tilt_deg) and every distractor
+    # still where it was reset ("stack_remains_neat": reference point strict_ref_local (object frame, m; the cup's
+    # base centre) within strict_neat_axis_tol sideways and strict_neat_step_tol vertically of its reset position,
+    # tilt < strict_max_tilt_deg). "off" = old rule; "report" = old rule, but the checks at the moment the last goal
+    # is credited are recorded (env._strict_at_success, for evals); "gate" = the last goal only counts while they hold.
+    strict_success: str = "off"
+    strict_max_tilt_deg: float = 3.0
+    strict_neat_axis_tol: float = 0.002
+    strict_neat_step_tol: float = 0.0015
+    strict_ref_local: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
 
 def _default_precise_assembly_sim_cfg() -> SimulationCfg:

@@ -112,6 +112,18 @@ class PreciseAssemblyEnv(PlayEnv):
         finally:
             _pe.apply_physx_material_properties = _orig_mat
 
+        # A12: optional object mass override (solver conditioning: a 15 g USB stick can't spread the stiff spring
+        # jaws in PhysX, the official sim already raises the print mass for the same reason). Inertia scales alike.
+        m_kg = float(getattr(cfg.precise_assembly, "object_mass_kg", 0.0))
+        if m_kg > 0.0:
+            view = self.object.root_physx_view
+            ids = torch.arange(self.num_envs, dtype=torch.int32)
+            m0 = view.get_masses().clone(); i0 = view.get_inertias().clone()
+            ratio = m_kg / m0[:, 0:1].clamp(min=1e-9)
+            view.set_masses(m0 * ratio, ids); view.set_inertias(i0 * ratio, ids)
+            self._object_mass = (m0[:, 0:1] * ratio).to(self.device)
+            print(f"[PreciseAssemblyEnv] object mass {float(m0[0, 0]) * 1e3:.2f} g -> {m_kg * 1e3:.2f} g", flush=True)
+
         # When student_obs is enabled, the env exposes three obs groups via
         # `_get_observations`: "policy" = student obs (image+proprio, what
         # the depth-CNN reads), "critic" = state_list (privileged), and
@@ -334,6 +346,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self._pih_receptive_urdf_abs = str(receptive_urdf)
         self._pih_object_scale = tuple(float(v) for v in object_spec.scale)
         self._pih_hole_z_offset = float(problem.hole_z_offset)
+        if pih_cfg.key_repose:   # A13: one (palm-frame) goal per flip angle; the waypoint poses are unused
+            insert_pose_sequence = tuple(insert_pose_sequence[:1]) * len(pih_cfg.key_flip_deg)
         self._pih_insert_pose_sequence = tuple(insert_pose_sequence)
         self._num_insertion_goals = len(self._pih_insert_pose_sequence)
 
@@ -402,19 +416,23 @@ class PreciseAssemblyEnv(PlayEnv):
                 raise ValueError(f"JointSpec.parent must be 'fixture' or 'distractor<k>', got {par!r}")
             if j.body == "object" and not self._pih_object_start_rel:
                 raise ValueError("a joint on the object needs Problem.object_start_pose_rel_receptive")
-        # Jointed problems: one fixture pose per env for its lifetime (see scene_utils._create_fixture_joints)
+        # Jointed problems: one fixture pose per env for its lifetime (a teleported kinematic fixture leaves its USD
+        # joint behind at the spawn pose; doorknob fix b7e08d3 + yaw). See scene_utils._create_fixture_joints.
         self._joint_hole_np = None
+        self._joint_hole_yaw_np = None
         if self._pih_joints:
             import numpy as np
-            rng = np.random.default_rng(int(pih_cfg.unlock_seed) + 1)
+            rng = np.random.default_rng(int(pih_cfg.joint_fixture_seed) + 1)
             n_env = int(cfg.scene.num_envs)
             hz = float(cfg.reset.table_reset_z) + TABLE_HALF_HEIGHT + float(problem.hole_z_offset)
             self._joint_hole_np = np.stack([rng.uniform(*[float(v) for v in pih_cfg.hole_x_range], n_env),
                                             rng.uniform(*[float(v) for v in pih_cfg.hole_y_range], n_env),
                                             np.full(n_env, hz)], -1)
-            if float(cfg.reset.table_reset_z_range) != 0.0 or float(pih_cfg.hole_yaw_range_deg) != 0.0:
-                print("[PreciseAssemblyEnv] WARNING: jointed problem with table_reset_z_range / hole_yaw_range_deg "
-                      "!= 0: the fixture keeps its spawn pose (use env.reset.table_reset_z_range=0.0)", flush=True)
+            yr = float(pih_cfg.hole_yaw_range_deg)
+            self._joint_hole_yaw_np = np.deg2rad(float(pih_cfg.hole_yaw_center_deg) + rng.uniform(-yr, yr, n_env))
+            if float(cfg.reset.table_reset_z_range) != 0.0:
+                print("[PreciseAssemblyEnv] WARNING: jointed problem with table_reset_z_range != 0: the fixture keeps "
+                      "its spawn height (use env.reset.table_reset_z_range=0.0)", flush=True)
         self._unlock_deg_np = None
         if pih_cfg.unlock_angle_range_deg or pih_cfg.unlock_angle_values_deg:
             import numpy as np
@@ -450,6 +468,13 @@ class PreciseAssemblyEnv(PlayEnv):
             cfg.termination.max_consecutive_successes = self._num_total_insertion_goals
 
     def _setup_scene(self) -> None:
+        _pads_finish = None
+        if bool(getattr(self.cfg.tactile, "original_pads", False)):
+            # A23 11-22: original sharpa-tacmap pad physics (gel pads compliant 280/20, robot offsets 0.2/-0.1 mm),
+            # baked into the robot USD (fast at 12k envs)
+            from ..play.utils.tacmap_pads import install_usd_bake
+            from . import scene_utils as _pa_scene
+            _pads_finish = install_usd_bake(self, _pa_scene)
         setup_scene(self)
         k = float(getattr(self.cfg.precise_assembly, "object_compliant_stiffness", 0.0))
         if k > 0.0:
@@ -474,16 +499,42 @@ class PreciseAssemblyEnv(PlayEnv):
                         UsdShade.MaterialBindingAPI.Apply(prim).Bind(mat, UsdShade.Tokens.weakerThanDescendants, "physics")
                         n += 1
             print(f"[a8] compliant object material k={k} bound to {n} collision prims", flush=True)
+        if _pads_finish is not None:
+            self._tacmap_pads_info = _pads_finish()
 
     def _reset_idx(self, env_ids) -> None:
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self.device)
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        if hasattr(self, "hand_force_ep_max"):
+            if not hasattr(self, "hand_force_last_ep_max"):
+                self.hand_force_last_ep_max = torch.zeros_like(self.hand_force_ep_max)
+            self.hand_force_last_ep_max[env_ids] = self.hand_force_ep_max[env_ids]
+            self.hand_force_ep_max[env_ids] = 0.0
+            self._crush_count[env_ids] = 0
+            if getattr(self, "_crush_thr", None) is not None:
+                self._crush_thr[env_ids] = self._sample_crush_thr(env_ids)
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
+        usb = getattr(self, "_usb", None)
+        if usb is not None and usb.checks:
+            # keep the finished episode's verdict for evals (read before the auto-reset clears it)
+            if not hasattr(self, "usb_last"):
+                self.usb_last = {k: torch.zeros(self.num_envs, device=self.device)
+                                 for k in list(usb.checks) + list(usb.meas) + ["success"] + [f"fail_{f}" for f in usb.fail]}
+            for k, v in list(usb.checks.items()) + list(usb.meas.items()):
+                self.usb_last[k][env_ids] = v[env_ids].float()
+            self.usb_last["success"][env_ids] = usb.success[env_ids].float()
+            for f, v in usb.fail.items():
+                self.usb_last[f"fail_{f}"][env_ids] = v[env_ids].float()
         super()._reset_idx(env_ids)
         self._reset_peg_episode(env_ids)
+        if self.cfg.precise_assembly.usb_task != "off":
+            if usb is None:
+                from .usb_task import UsbTask
+                self._usb = usb = UsbTask(self)
+            usb.reset(env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
@@ -524,14 +575,18 @@ class PreciseAssemblyEnv(PlayEnv):
         if self._joint_hole_np is not None:  # jointed problem: the env's fixed fixture pose
             if not hasattr(self, "_joint_hole_t"):
                 self._joint_hole_t = torch.as_tensor(self._joint_hole_np, device=self.device, dtype=torch.float32)
+                self._joint_hole_yaw_t = torch.as_tensor(self._joint_hole_yaw_np, device=self.device, dtype=torch.float32)
             self.hole_pos[env_ids] = self._joint_hole_t[env_ids]
         if is_random_goal.any():
             rg_ids = env_ids[is_random_goal]
             self.hole_pos[rg_ids, 0:2] = 0.0
             self.hole_pos[rg_ids, 2] = -1.0
 
-        yaw_range_deg = float(pih_cfg.hole_yaw_range_deg) if self._joint_hole_np is None else 0.0
-        if yaw_range_deg > 0.0:
+        yaw_range_deg = float(pih_cfg.hole_yaw_range_deg)
+        if self._joint_hole_np is not None:
+            z_axis = torch.tensor([0.0, 0.0, 1.0], device=self.device, dtype=torch.float32).expand(n, -1)
+            hole_quat = quat_from_angle_axis(self._joint_hole_yaw_t[env_ids], z_axis)
+        elif yaw_range_deg > 0.0:
             yaw = (
                 torch.rand(n, device=self.device) * 2.0 - 1.0
             ) * yaw_range_deg * (math.pi / 180.0)
@@ -644,15 +699,70 @@ class PreciseAssemblyEnv(PlayEnv):
             self.distractor_disp_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_moved_ep_max = torch.zeros(self.num_envs, device=self.device)
             self.distractor_rise = torch.zeros(self.num_envs, device=self.device)
+            self._distractor_reset_ref = torch.zeros(len(dists), self.num_envs, 3, device=self.device)
+        ref = torch.tensor(self.cfg.precise_assembly.strict_ref_local, device=self.device, dtype=torch.float32)
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
             w = self._pose_rel_hole_to_world(env_ids, pose)
             body.write_root_pose_to_sim(w, env_ids=env_ids)
             body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
             self._distractor_reset_pos[k, env_ids] = w[:, :3]
+            self._distractor_reset_ref[k, env_ids] = w[:, :3] + quat_apply(w[:, 3:7], ref.expand(env_ids.numel(), 3))
         self.distractor_disp[env_ids] = 0.0
         self.distractor_disp_ep_max[env_ids] = 0.0
         self.distractor_moved_ep_max[env_ids] = 0.0
         self.distractor_rise[env_ids] = 0.0
+
+    def _strict_checks(self) -> dict[str, torch.Tensor]:
+        """Official-style end checks (cfg strict_*; retrieve_top_cup_from_stack's top_cup_on_table tilt and
+        stack_remains_neat): object tilt from world +z (deg) and, over the distractors, the largest sideways /
+        vertical offset of the reference point from its reset position (m) and the largest tilt (deg)."""
+        c = self.cfg.precise_assembly
+        z = torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(self.num_envs, 3)
+        tilt = torch.rad2deg(torch.acos(quat_apply(self.object.data.root_quat_w, z)[:, 2].clamp(-1.0, 1.0)))
+        out = {"tilt_deg": tilt}
+        dists = getattr(self, "distractors", ())
+        zeros = torch.zeros(self.num_envs, device=self.device)
+        if dists and hasattr(self, "_distractor_reset_ref"):
+            ref = torch.tensor(c.strict_ref_local, device=self.device, dtype=torch.float32).expand(self.num_envs, 3)
+            pts = torch.stack([b.data.root_pos_w + quat_apply(b.data.root_quat_w, ref) for b in dists])  # (K, N, 3)
+            d = pts - self._distractor_reset_ref
+            out["nb_axis_m"] = d[..., :2].norm(dim=-1).max(dim=0).values
+            out["nb_step_m"] = d[..., 2].abs().max(dim=0).values
+            out["nb_rise_m"] = d[..., 2].max(dim=0).values
+            out["nb_tilt_deg"] = torch.stack([torch.rad2deg(torch.acos(
+                quat_apply(b.data.root_quat_w, z)[:, 2].clamp(-1.0, 1.0))) for b in dists]).max(dim=0).values
+        else:
+            out.update(nb_axis_m=zeros, nb_step_m=zeros, nb_rise_m=zeros, nb_tilt_deg=zeros)
+        out["upright"] = tilt < c.strict_max_tilt_deg
+        out["neat"] = ((out["nb_axis_m"] <= c.strict_neat_axis_tol) & (out["nb_step_m"] <= c.strict_neat_step_tol)
+                       & (out["nb_tilt_deg"] < c.strict_max_tilt_deg))
+        out["ok"] = out["upright"] & out["neat"]
+        return out
+
+    def _apply_strict_success(self, is_success: torch.Tensor) -> torch.Tensor:
+        """strict_success "report" / "gate" for the last goal (see the cfg). Records the checks at the step the
+        last goal is (or, in report mode, would be) credited in self._strict_at_success (NaN until then)."""
+        mode = self.cfg.precise_assembly.strict_success
+        if mode == "off":
+            return is_success
+        if mode not in ("report", "gate"):
+            raise ValueError(f"strict_success must be off / report / gate, got {mode!r}")
+        last = is_success & (self._successes + 1 >= self.env_max_goals) & ~self.is_random_goal_env
+        chk = self._strict_checks()
+        if not hasattr(self, "_strict_at_success"):
+            self._strict_at_success = {k: torch.full((self.num_envs,), float("nan"), device=self.device)
+                                       for k in chk}
+        if mode == "gate":
+            is_success = is_success & ~(last & ~chk["ok"])
+            last = last & chk["ok"]
+            # consecutive hold: at the last goal every step the checks fail restarts the hold counter, so success
+            # needs termination.success_steps consecutive near-goal steps WITH the checks passing
+            at_last = (self._successes + 1 >= self.env_max_goals) & ~self.is_random_goal_env
+            self._near_goal_steps = torch.where(at_last & ~chk["ok"], torch.zeros_like(self._near_goal_steps),
+                                                self._near_goal_steps)
+        for k, v in chk.items():
+            self._strict_at_success[k][last] = v[last].float()
+        return is_success
 
     def _distractor_curriculum(self) -> tuple[float, float]:
         """(disturb tolerance, penalty multiplier in [0, 1]) at the current env step."""
@@ -717,6 +827,16 @@ class PreciseAssemblyEnv(PlayEnv):
             angles.append(2.0 * torch.atan2(s, q_rel[:, 0]))
         a = torch.stack(angles)
         self.cb_joint_angle = torch.atan2(torch.sin(a), torch.cos(a))
+        # prismatic joints: displacement along the axis since reset (m), self.cb_joint_disp (J, N); 0 for revolute
+        disp = []
+        for j, body in zip(self._pih_joints, self._joint_bodies()):
+            if getattr(j, "kind", "revolute") != "prismatic":
+                disp.append(torch.zeros(self.num_envs, device=self.device)); continue
+            p0 = torch.tensor(self._joint_reset_pose_rel(j)[:3], device=self.device, dtype=torch.float32)
+            rel = quat_apply_inverse(hq, body.data.root_pos_w - self.scene.env_origins - self.hole_pos) - p0
+            ax = torch.tensor(j.axis, device=self.device, dtype=torch.float32)
+            disp.append((rel * (ax / ax.norm())).sum(-1))
+        self.cb_joint_disp = torch.stack(disp)
 
     def _apply_joint_detents(self) -> None:
         if not any(j.detent_count > 0 and j.detent_torque != 0.0 for j in self._pih_joints):
@@ -735,6 +855,9 @@ class PreciseAssemblyEnv(PlayEnv):
         super()._pre_physics_step(actions)
         self._apply_joint_detents()
         self._update_latch()
+        self._key_assist()
+        if getattr(self, "_usb", None) is not None:
+            self._usb._set_push()   # after the wrench-DR write (it overwrites the object's external force)
 
     def _apply_action(self) -> None:
         super()._apply_action()
@@ -1314,6 +1437,8 @@ class PreciseAssemblyEnv(PlayEnv):
             # Robot joints are absolute, so the bank only fits the hole layout it was recorded on.
             self._start_bank_hole_pos = (torch.as_tensor(d["hole_pos"], device=self.device).float()
                                          if "hole_pos" in d.files else None)
+            self._start_bank_pre_flip = (torch.as_tensor(d["key_pre_flip"], device=self.device).float()
+                                         if "key_pre_flip" in d.files else None)   # A13 reverse curriculum
             if self._start_bank_hole_pos is None:
                 print("[PreciseAssemblyEnv] start-state bank has no hole_pos; can't check the hole "
                       "layout matches (use the layout it was recorded on)", flush=True)
@@ -1343,11 +1468,25 @@ class PreciseAssemblyEnv(PlayEnv):
 
         self._successes[env_ids] = b["successes"][k].long()
         self._start_successes[env_ids] = b["successes"][k].long()
+        if getattr(self, "_start_bank_pre_flip", None) is not None:
+            if not hasattr(self, "_key_pre_flip"):
+                self._key_pre_flip = torch.zeros(self.num_envs, device=self.device)
+            self._key_pre_flip[env_ids] = self._start_bank_pre_flip[k]
         self._lifted_object[env_ids] = b["lifted"][k].bool()
         self._object_init_z[env_ids] = b["object_init_z"][k].float()
 
     def _write_goal_pose(self, env_ids: torch.Tensor, is_first_goal: bool = False) -> None:
         n = env_ids.numel()
+        if self.cfg.precise_assembly.key_repose:
+            if getattr(self, "_key", None) is None:
+                from .key_repose import KeyRepose
+                self._key = KeyRepose(self)
+            if is_first_goal:
+                self._key.reset(env_ids)
+            k = (self._successes[env_ids] % self.env_max_goals[env_ids].clamp_min(1)).long()
+            self.goal_viz.write_root_pose_to_sim(self._key.goal_world(env_ids, k), env_ids=env_ids)
+            self.goal_viz.write_root_velocity_to_sim(torch.zeros(n, 6, device=self.device), env_ids=env_ids)
+            return
         env_origins = self.scene.env_origins[env_ids]
         is_random_goal = self.is_random_goal_env[env_ids]
 
@@ -1690,6 +1829,75 @@ class PreciseAssemblyEnv(PlayEnv):
         self.extras["latch_cbf_open_grasped_frac"] = (open_ & self._cbf_grasp_ok).float().mean()
         return open_ & ok
 
+    def _key_assist(self) -> None:
+        """A13 curriculum (training aid, evals run with it off): torque on the key about its own long axis (object +x)
+        toward the current goal's twist, k sign(-twist) - d w_x, scaled by f = 1 -> 0 over key_assist_ramp_steps."""
+        pc = self.cfg.precise_assembly
+        k0 = float(getattr(pc, "key_assist_torque", 0.0))
+        key = getattr(self, "_key", None)
+        if k0 <= 0.0 or key is None or not hasattr(key, "twist_signed"):
+            return
+        ramp = float(getattr(pc, "key_assist_ramp_steps", 0))
+        step = float(self.common_step_counter) + float(getattr(pc, "key_assist_offset_steps", 0))
+        f = max(0.0, 1.0 - step / ramp) if ramp > 0.0 else 1.0
+        self.extras["key_assist_frac"] = torch.tensor(f, device=self.device)
+        if f <= 0.0:
+            return
+        quat = self.object.data.root_quat_w
+        a = quat_apply(quat, torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3))
+        ts = key.twist_signed
+        on = (ts.abs() > math.radians(float(getattr(pc, "key_assist_min_deg", 3.0)))) & ~key.dropped
+        wx = (self.object.data.root_ang_vel_w * a).sum(-1)
+        tau_mag = f * (k0 * (-torch.sign(ts)) * on.float() - float(getattr(pc, "key_assist_damp", 0.002)) * wx)
+        tau = (tau_mag.unsqueeze(-1) * a).unsqueeze(1)
+        fw = getattr(self, "_object_forces", None)
+        tw = getattr(self, "_object_torques", None)
+        zero = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        f_w = zero if fw is None else fw.reshape(self.num_envs, -1, 3)
+        t_w = (zero if tw is None else tw.reshape(self.num_envs, -1, 3)) + tau
+        self.object.set_external_force_and_torque(f_w, t_w, is_global=True)
+        self.extras["key_assist_tau"] = tau_mag.abs().mean()
+
+    def _key_goal_skip(self, allow: torch.Tensor) -> None:
+        """A13 key_goal_skip: if the key is within the goal tolerance of a later intermediate waypoint j (never the
+        last goal), set _successes = j, crediting every waypoint before j; j itself still needs its normal near-goal
+        steps. A flat key can't rest at 45-75 deg in a pinch, it flops through in a few steps."""
+        N = self.num_envs
+        G = self._key.flip.numel()
+        kp = (self._keypoint_offsets_fixed if self.cfg.reward.fixed_size_keypoint_reward else self._keypoint_offsets)
+        K = kp.shape[1]
+        obj_kp = _keypoints_world(self.object.data.root_pos_w, self.object.data.root_quat_w, kp)          # (N, K, 3)
+        ids = torch.arange(N, device=self.device)
+        tol = self._keypoint_success_tolerance_m()
+        far = torch.full((N,), -1, dtype=torch.long, device=self.device)
+        last = G if bool(getattr(self.cfg.precise_assembly, "key_goal_skip_final", False)) else G - 1
+        for j in range(1, last):
+            g = self._key.goal_world(ids, torch.full((N,), j, dtype=torch.long, device=self.device))
+            kr = float(getattr(self.cfg.precise_assembly, "key_goal_rot_deg", 0.0))
+            if kr > 0.0:
+                dq = quat_mul(quat_conjugate(g[:, 3:7]), self.object.data.root_quat_w)
+                rot = torch.rad2deg(2.0 * torch.acos(dq[:, 0].abs().clamp(max=1.0)))
+                near = (rot <= kr) & ((self.object.data.root_pos_w - g[:, 0:3]).norm(dim=-1)
+                                      <= float(getattr(self.cfg.precise_assembly, "key_goal_pos_m", 0.015)))
+            else:
+                gk = _keypoints_world(g[:, 0:3], g[:, 3:7], kp)
+                near = (obj_kp - gk).norm(dim=-1).max(dim=-1).values <= tol
+            ok = near & (self._successes < j) & (self._successes < self.env_max_goals) & ~self.is_random_goal_env
+            far = torch.where(ok, torch.full_like(far, j), far)
+        jump = (far >= 0) & allow
+        if jump.any():
+            self._successes[jump] = far[jump]
+            self.episode_length_buf[jump] = 0
+            jid = jump.nonzero(as_tuple=False).squeeze(-1)
+            self._clear_goal_trackers(jid)
+            self._write_goal_pose(jid, is_first_goal=False)
+        self.extras["key_goal_skips"] = jump.float().mean()
+
+    def _sample_crush_thr(self, env_ids) -> torch.Tensor:
+        lo, hi = (float(v) for v in self.cfg.precise_assembly.crush_force_range)
+        u = torch.rand(len(env_ids), device=self.device)
+        return torch.exp(math.log(lo) + u * (math.log(hi) - math.log(lo)))
+
     def _hand_force_update(self) -> None:
         """hand_force_sense (A1 a1-cup 6a76824, ported by A8): sum over robot links of |contact force on the object| (N,
         x hand_force_gain), physical PhysX contact report; per-link max in self.hand_force_link_max."""
@@ -1712,7 +1920,13 @@ class PreciseAssemblyEnv(PlayEnv):
         self.hand_force_link_max = nrm.amax(-1)
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
-        over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
+        cr = tuple(getattr(self.cfg.precise_assembly, "crush_force_range", (0.0, 0.0)))
+        if float(cr[1]) > 0.0:   # A23 (merged): hidden per-episode crush threshold
+            if getattr(self, "_crush_thr", None) is None:
+                self._crush_thr = self._sample_crush_thr(torch.arange(self.num_envs, device=self.device))
+            over = self.hand_force > self._crush_thr
+        else:
+            over = self.hand_force > thr if thr > 0.0 else torch.zeros_like(self.hand_force, dtype=torch.bool)
         self._crush_count = torch.where(over, self._crush_count + 1, torch.zeros_like(self._crush_count))
         self.extras["hand_force_mean"] = self.hand_force.mean()
         self.extras["hand_force_max"] = self.hand_force.max()
@@ -1758,6 +1972,8 @@ class PreciseAssemblyEnv(PlayEnv):
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
+        if getattr(self, "_key", None) is not None:
+            self._key.update()
         prev_near_steps = self._near_goal_steps.clone()
         compute_intermediate_values(self)
 
@@ -1767,8 +1983,17 @@ class PreciseAssemblyEnv(PlayEnv):
         if pih_cfg.allow_goal_skip:
             self._apply_goal_skip()
         is_success = self._is_success.clone()
+        hold_wp = int(getattr(pih_cfg, "key_waypoint_hold_steps", 0))
+        if hold_wp > 0 and getattr(self, "_key", None) is not None:
+            # A13: intermediate flip waypoints are pass-through (hold_wp near-goal steps); only the last goal
+            # needs termination.success_steps (a flat key cannot rest at 45 deg in a pinch)
+            inter = (self._successes + 1 < self.env_max_goals) & ~self.is_random_goal_env
+            is_success = torch.where(inter, self._near_goal_steps >= hold_wp, is_success)
+        if bool(getattr(pih_cfg, "key_goal_skip", False)) and getattr(self, "_key", None) is not None:
+            self._key_goal_skip(~is_success)
         if pih_cfg.enable_retract:
             is_success &= ~self.retract_phase
+        is_success = self._apply_strict_success(is_success)
         self._is_success = is_success
 
         self._successes += is_success.long()
@@ -1940,9 +2165,22 @@ class PreciseAssemblyEnv(PlayEnv):
             self.door_stop_torque.zero_(); self.door_pull_torque.zero_(); self.door_pull_force.zero_()
         self._hand_force_update()
         crushed = torch.zeros_like(fall)
-        if float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 and hasattr(self, "_crush_count"):
+        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0) and hasattr(self, "_crush_count"):
             crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop | broken | crushed
+        usb_fail = {}
+        if pih_cfg.usb_task != "off" and getattr(self, "_usb", None) is not None:
+            self._usb.update()
+            if pih_cfg.usb_task == "gate":
+                max_successes = self._usb.success.clone()
+                if pih_cfg.usb_terminate_on_fail:
+                    usb_fail = {k: v & ~max_successes for k, v in self._usb.fail.items()}
+        key_dropped = torch.zeros_like(fall)
+        if getattr(self, "_key", None) is not None:
+            key_dropped = self._key.dropped & ~max_successes
+        terminated = (fall | max_successes | hand_far | dropped | retract_fail | disturbed | forced | overturned | false_stop
+                      | broken | crushed | key_dropped)
+        for v in usb_fail.values():
+            terminated = terminated | v
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1960,6 +2198,8 @@ class PreciseAssemblyEnv(PlayEnv):
             "broken_latch": getattr(self, "broken_latch", torch.zeros_like(broken)) & broken,
             "broken": broken,
             "crushed": crushed,
+            "key_dropped": key_dropped,
+            **{f"usb_{k}": v for k, v in usb_fail.items()},
             "timeout": truncated,
         }
         return terminated, truncated
@@ -2050,6 +2290,57 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
+        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0) and "crushed" in getattr(self, "_termination_reasons", {}):
+            c_pen = float(pih_cfg.crush_penalty) * self._termination_reasons["crushed"].float()
+            reward = reward - c_pen
+            self._reward_terms["crush_penalty"] = -c_pen
+            self._reward_terms["total_reward"] = reward
+
+        usb = getattr(self, "_usb", None)
+        if pih_cfg.usb_task == "gate" and usb is not None:
+            tr = self._termination_reasons
+            u_rew = pih_cfg.usb_success_bonus * tr["max_successes"].float() \
+                + pih_cfg.usb_release_bonus * usb.just_rel_seated.float()
+            for k, v in tr.items():
+                if k.startswith("usb_"):
+                    u_rew = u_rew - pih_cfg.usb_fail_penalty * v.float()
+            if pih_cfg.usb_clear_rew_scale > 0.0:
+                u_rew = u_rew + pih_cfg.usb_clear_rew_scale * usb.inserted.float() * usb.released.float() \
+                    * usb.meas["palm_from_release"].clamp(max=pih_cfg.usb_clear_dist)
+            if pih_cfg.usb_hold_rew > 0.0:
+                u_rew = u_rew + pih_cfg.usb_hold_rew * usb.meas["pinch"] * (~usb.released).float()
+            if pih_cfg.usb_seat_rew_scale > 0.0:
+                phi = -usb.meas["seat_err_mm"] * 1e-3
+                if not hasattr(usb, "phi_prev"):
+                    usb.phi_prev = phi.clone()
+                fresh = usb.step <= 1
+                d_phi = torch.where(fresh | usb.released, torch.zeros_like(phi), phi - usb.phi_prev)
+                usb.phi_prev = phi.clone()
+                u_rew = u_rew + pih_cfg.usb_seat_rew_scale * d_phi
+            reward = reward + u_rew
+            self._reward_terms["usb_reward"] = u_rew
+            self._reward_terms["total_reward"] = reward
+            for k, v in usb.checks.items():
+                self.extras[f"usb/{k}"] = v.float().mean()
+            self.extras["usb/success"] = usb.success.float().mean()
+            self.extras["usb/pushing"] = usb.pushing.float().mean()
+            self.extras["usb/released"] = usb.released.float().mean()
+        key = getattr(self, "_key", None)
+        if key is not None:   # A13
+            k_rew = -pih_cfg.key_drop_penalty * self._termination_reasons["key_dropped"].float()
+            if pih_cfg.key_hold_rew > 0.0:
+                k_rew = k_rew + pih_cfg.key_hold_rew * (key.fingertip_dmin < pih_cfg.key_drop_dist).float()
+            if pih_cfg.key_shape_scale > 0.0 and hasattr(key, "shape"):
+                k_rew = k_rew + pih_cfg.key_shape_scale * key.shape
+            if pih_cfg.key_pad_rew > 0.0 and getattr(self, "_last_tactile", None) is not None:
+                tp = self._last_tactile.reshape(self.num_envs, 5, -1).amax(-1)   # real taxels (before policy_override)
+                both = (tp[:, 0] > 0.02) & (tp[:, 1] > 0.02)                      # thumb + index pads on the key
+                k_rew = k_rew + pih_cfg.key_pad_rew * both.float()
+                self.extras["key_pads_both"] = both.float().mean()
+            reward = reward + k_rew
+            self._reward_terms["key_reward"] = k_rew
+            self._reward_terms["total_reward"] = reward
+            key.log(self.extras)
 
         # One-time penalty when the episode ends with the object below the fall height: after the lift bonus the
         # remaining steps only cost action penalties, so throwing a small part off the table paid (bolt runs).
@@ -2214,6 +2505,11 @@ class PreciseAssemblyEnv(PlayEnv):
             sf["neighbours_out_of_box_cm"] = self.distractor_disp_ep_max * 100.0
             sf["ended_disturbed"] = self._termination_reasons["disturbed"].float() \
                 if "disturbed" in self._termination_reasons else torch.zeros_like(task)
+        key = getattr(self, "_key", None)
+        if key is not None:
+            sf["key_dropped"] = self._termination_reasons["key_dropped"].float() \
+                if "key_dropped" in getattr(self, "_termination_reasons", {}) else torch.zeros_like(task)
+            sf["key_min_final_rot_err_deg"] = key.min_final_rot_err.clone()
         self.extras["success_final"] = {k: v.detach().clone() for k, v in sf.items()}
 
         prev_ratio = (

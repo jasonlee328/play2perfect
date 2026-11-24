@@ -10,6 +10,6 @@
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_03.obj" scale="1 1 1"/></geometry></collision>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_04.obj" scale="1 1 1"/></geometry></collision>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="coll_05.obj" scale="1 1 1"/></geometry></collision>
-    <inertial><mass value="0.001823"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="1.724095e-07" ixy="-9.348864e-25" ixz="-9.620807e-40" iyy="1.724095e-07" iyz="8.013312e-25" izz="4.122146e-08"/></inertial>
+    <inertial><mass value="0.002372"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="2.242838e-07" ixy="-1.216173e-24" ixz="-1.251550e-39" iyy="2.242838e-07" iyz="1.042434e-24" izz="5.362410e-08"/></inertial>
   </link>
 </robot>

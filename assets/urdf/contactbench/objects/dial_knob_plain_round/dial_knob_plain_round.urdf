@@ -5,6 +5,6 @@
   <link name="object">
     <visual><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="dial_knob_plain_round.obj" scale="1 1 1"/></geometry><material name="c"/></visual>
     <collision><origin xyz="0 0 0" rpy="0 0 0"/><geometry><mesh filename="dial_knob_plain_round.obj" scale="1 1 1"/></geometry><sdf resolution="256"/></collision>
-    <inertial><mass value="0.036746"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="9.255761e-06" ixy="1.389940e-15" ixz="-8.332409e-10" iyy="9.255265e-06" iyz="-2.989236e-15" izz="8.789774e-06"/></inertial>
+    <inertial><mass value="0.022545"/><origin xyz="0 0 0" rpy="0 0 0"/><inertia ixx="5.678683e-06" ixy="8.527694e-16" ixz="-5.112180e-10" iyy="5.678379e-06" iyz="-1.833985e-15" izz="5.392787e-06"/></inertial>
   </link>
 </robot>

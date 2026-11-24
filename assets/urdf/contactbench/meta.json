@@ -20,7 +20,9 @@
     0.875,
     0.5625
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 19.39,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "charging_block_2": {
    "src": "charging_blocks/charging_block_2.stl",
@@ -40,7 +42,9 @@
     0.7,
     0.625
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 9.97,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "charging_block_3": {
    "src": "charging_blocks/charging_block_3.stl",
@@ -60,7 +64,9 @@
     0.875,
     1.375
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 26.82,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "charging_block_4": {
    "src": "charging_blocks/charging_block_4.stl",
@@ -80,7 +86,9 @@
     0.625,
     0.45
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 5.39,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "ethernet_plug": {
    "src": "ethernet_plug_and_slot_unz/ethernet_plug_and_slot/ethernet_plug.stl",
@@ -100,7 +108,9 @@
     0.825,
     0.3886
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 1.4,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "toy_block_top": {
    "src": "toy_assembly_block_unz/toy_assembly_block/toy_assembly_block_top.stl",
@@ -120,7 +130,9 @@
     0.75,
     0.35
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 13.0,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "cup": {
    "src": "cup.stl",
@@ -140,7 +152,9 @@
     1.7157,
     1.628
    ],
-   "collision": "coacd 42"
+   "collision": "coacd 42",
+   "mass_g_density620": 7.61,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "screwdriver": {
    "src": "tools/screwdriver.stl",
@@ -160,7 +174,9 @@
     0.3,
     0.3
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 6.5,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "allen_key": {
    "src": "tools/allen_key.stl",
@@ -180,7 +196,9 @@
     0.75,
     0.125
    ],
-   "collision": "coacd 4"
+   "collision": "coacd 4",
+   "mass_g_density620": 1.37,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "wrench": {
    "src": "tools/wrench.stl",
@@ -200,7 +218,9 @@
     0.7499,
     0.1875
    ],
-   "collision": "coacd 10"
+   "collision": "coacd 10",
+   "mass_g_density620": 6.76,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "key_1": {
    "src": "keys/key_1.stl",
@@ -220,7 +240,9 @@
     0.5,
     0.0625
    ],
-   "collision": "coacd 16"
+   "collision": "coacd 16",
+   "mass_g_density620": 0.69,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "card": {
    "src": "card.stl",
@@ -240,7 +262,9 @@
     1.375,
     0.03
    ],
-   "collision": "box"
+   "collision": "box",
+   "mass_g_density620": 3.47,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "spoon": {
    "src": "utensils/spoon.stl",
@@ -260,7 +284,9 @@
     1.128,
     0.6328
    ],
-   "collision": "coacd 13"
+   "collision": "coacd 13",
+   "mass_g_density620": 5.22,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "fork": {
    "src": "utensils/fork.stl",
@@ -280,7 +306,9 @@
     0.6146,
     0.4586
    ],
-   "collision": "coacd 4"
+   "collision": "coacd 4",
+   "mass_g_density620": 5.51,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "knife": {
    "src": "utensils/knife.stl",
@@ -300,7 +328,9 @@
     0.1,
     0.4372
    ],
-   "collision": "coacd 2"
+   "collision": "coacd 2",
+   "mass_g_density620": 4.27,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "chopstick": {
    "src": "utensils/chopstick.stl",
@@ -320,7 +350,9 @@
     0.1624,
     0.1624
    ],
-   "collision": "coacd 1"
+   "collision": "coacd 1",
+   "mass_g_density620": 3.66,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "ruler": {
    "src": "ruler.stl",
@@ -340,7 +372,9 @@
     0.625,
     0.05
    ],
-   "collision": "coacd 5"
+   "collision": "coacd 5",
+   "mass_g_density620": 3.93,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "key_fob": {
    "src": "keys/key_fob.stl",
@@ -360,7 +394,9 @@
     0.7749,
     0.15
    ],
-   "collision": "coacd 7"
+   "collision": "coacd 7",
+   "mass_g_density620": 2.62,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "key_2": {
    "src": "keys/key_2.stl",
@@ -380,7 +416,9 @@
     0.5764,
     0.0625
    ],
-   "collision": "coacd 16"
+   "collision": "coacd 16",
+   "mass_g_density620": 0.86,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "key_3": {
    "src": "keys/key_3.stl",
@@ -400,7 +438,9 @@
     0.65,
     0.0625
    ],
-   "collision": "coacd 16"
+   "collision": "coacd 16",
+   "mass_g_density620": 0.76,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "dial_knob_plain_flat": {
    "src": "generated",
@@ -420,7 +460,9 @@
     1.25,
     1.1125
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 19.62,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "dial_knob_plain_round": {
    "src": "generated",
@@ -440,7 +482,9 @@
     1.25,
     1.1125
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 36.75,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "dial_knob_snap_flat": {
    "src": "generated",
@@ -460,7 +504,9 @@
     1.2497,
     1.1125
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 19.62,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "dial_knob_snap_round": {
    "src": "generated",
@@ -480,7 +526,9 @@
     1.2497,
     1.1125
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 36.74,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "dial_knob_push_flat": {
    "src": "generated",
@@ -500,7 +548,9 @@
     1.625,
     0.825
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 17.94,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "dial_knob_push_round": {
    "src": "generated",
@@ -520,7 +570,9 @@
     1.625,
     0.825
    ],
-   "collision": "sdf"
+   "collision": "sdf",
+   "mass_g_density620": 34.88,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "cb_screw": {
    "src": "generated",
@@ -540,7 +592,9 @@
     0.4,
     0.75
    ],
-   "collision": "coacd 6"
+   "collision": "coacd 6",
+   "mass_g_density620": 1.82,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "cb_bolt_m6": {
    "src": "generated",
@@ -580,7 +634,9 @@
     0.6499,
     0.0624
    ],
-   "collision": "coacd 24"
+   "collision": "coacd 24",
+   "mass_g_density620": 0.22,
+   "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), shell = min(V, area x 0.8 mm) (force_bench catalog.print_mass); inertia scaled"
   },
   "doorknob_1_60mm": {
    "src": "for_visualization/doorknob_module/doorknob_1_60mm.stl",
@@ -947,6 +1003,378 @@
    "hull_zmax_mm": 80.0,
    "hull_rmax_mm": 30.0,
    "hull_vertices": 1899
+  },
+  "usb_jaw_02_r": {
+   "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.2mm_indent.stl (jaw crop)",
+   "extents_mm": [
+    2.6,
+    10.0,
+    10.0
+   ],
+   "mass_g": 30.0,
+   "com_src_mm": [
+    7.1083,
+    -0.0,
+    15.382
+   ],
+   "object_scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "collision": "convex hull",
+   "face_mm": 5.8,
+   "bounds_mm": [
+    [
+     5.8,
+     -5.0,
+     10.5
+    ],
+    [
+     8.4,
+     5.0,
+     20.5
+    ]
+   ],
+   "collision_comp_inward_mm": 0.029
+  },
+  "usb_jaw_02_l": {
+   "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.2mm_indent.stl (jaw crop)",
+   "extents_mm": [
+    2.6,
+    10.0,
+    10.0
+   ],
+   "mass_g": 30.0,
+   "com_src_mm": [
+    -7.1083,
+    0.0,
+    15.382
+   ],
+   "object_scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "collision": "convex hull",
+   "face_mm": 5.8,
+   "bounds_mm": [
+    [
+     -8.4,
+     -5.0,
+     10.5
+    ],
+    [
+     -5.8,
+     5.0,
+     20.5
+    ]
+   ],
+   "collision_comp_inward_mm": 0.029
+  },
+  "usb_jaw_04_r": {
+   "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.4mm_indent.stl (jaw crop)",
+   "extents_mm": [
+    2.8,
+    10.0,
+    10.0
+   ],
+   "mass_g": 30.0,
+   "com_src_mm": [
+    7.0142,
+    0.0,
+    15.4291
+   ],
+   "object_scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "collision": "convex hull",
+   "face_mm": 5.6,
+   "bounds_mm": [
+    [
+     5.6,
+     -5.0,
+     10.5
+    ],
+    [
+     8.4,
+     5.0,
+     20.5
+    ]
+   ],
+   "collision_comp_inward_mm": 0.034
+  },
+  "usb_jaw_04_l": {
+   "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.4mm_indent.stl (jaw crop)",
+   "extents_mm": [
+    2.8,
+    10.0,
+    10.0
+   ],
+   "mass_g": 30.0,
+   "com_src_mm": [
+    -7.0142,
+    -0.0,
+    15.4291
+   ],
+   "object_scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "collision": "convex hull",
+   "face_mm": 5.6,
+   "bounds_mm": [
+    [
+     -8.4,
+     -5.0,
+     10.5
+    ],
+    [
+     -5.6,
+     5.0,
+     20.5
+    ]
+   ],
+   "collision_comp_inward_mm": 0.034
+  },
+  "usb_jaw_06_r": {
+   "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.6mm_indent.stl (jaw crop)",
+   "extents_mm": [
+    3.0,
+    10.0,
+    10.0
+   ],
+   "mass_g": 30.0,
+   "com_src_mm": [
+    6.9381,
+    0.0,
+    15.3133
+   ],
+   "object_scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "collision": "convex hull",
+   "face_mm": 5.4,
+   "bounds_mm": [
+    [
+     5.4,
+     -5.0,
+     10.5
+    ],
+    [
+     8.4,
+     5.0,
+     20.5
+    ]
+   ],
+   "collision_comp_inward_mm": 0.03
+  },
+  "usb_jaw_06_l": {
+   "src": "official_sim/assets/kit/usb-slot/usb_slot_spring_0.6mm_indent.stl (jaw crop)",
+   "extents_mm": [
+    3.0,
+    10.0,
+    10.0
+   ],
+   "mass_g": 30.0,
+   "com_src_mm": [
+    -6.9381,
+    0.0,
+    15.3133
+   ],
+   "object_scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "collision": "convex hull",
+   "face_mm": 5.4,
+   "bounds_mm": [
+    [
+     -8.4,
+     -5.0,
+     10.5
+    ],
+    [
+     -5.4,
+     5.0,
+     20.5
+    ]
+   ],
+   "collision_comp_inward_mm": 0.03
+  },
+  "usb_stick_1": {
+   "src": "official_sim/assets/kit/usb-stick-1/usb_1.stl",
+   "mass_g": 15.0,
+   "print_mass_g": 1.5,
+   "object_scale": [
+    1.0,
+    0.8,
+    0.5
+   ],
+   "collision": "plug: convex hulls of the tube walls; grip: CoACD",
+   "x_tip_mm": 10.0,
+   "plug_centre_mm": [
+    0.0,
+    0.0
+   ],
+   "key_channel_from_tip_mm": 12.00000000000001,
+   "plug_from_tip_mm": 12.00000000000001,
+   "outer_mm": [
+    -6.0,
+    -2.5,
+    6.0,
+    2.5
+   ],
+   "channel_mm": [
+    -5.4,
+    -0.3,
+    5.4,
+    1.9
+   ],
+   "n_hulls": 5,
+   "vol_cm3": 1.675672466524118,
+   "extents_mm": [
+    20.0,
+    16.0,
+    10.0
+   ],
+   "com_src_mm": [
+    -3.294,
+    -0.0,
+    -0.131
+   ]
+  },
+  "usb_stick_2": {
+   "src": "official_sim/assets/kit/usb-stick-2/usb_2.stl",
+   "mass_g": 15.0,
+   "print_mass_g": 5.6,
+   "object_scale": [
+    2.5999999999999996,
+    1.0,
+    0.65
+   ],
+   "collision": "plug: convex hulls of the tube walls; grip: CoACD",
+   "x_tip_mm": 30.0,
+   "plug_centre_mm": [
+    0.0,
+    0.0
+   ],
+   "key_channel_from_tip_mm": 12.00000000000001,
+   "plug_from_tip_mm": 12.00000000000001,
+   "outer_mm": [
+    -6.0,
+    -2.5,
+    6.0,
+    2.5
+   ],
+   "channel_mm": [
+    -5.4,
+    -0.3,
+    5.4,
+    1.9
+   ],
+   "n_hulls": 5,
+   "vol_cm3": 10.70208883979922,
+   "extents_mm": [
+    52.0,
+    20.0,
+    13.0
+   ],
+   "com_src_mm": [
+    -0.861,
+    0.0,
+    -0.02
+   ]
+  },
+  "usb_stick_3": {
+   "src": "official_sim/assets/kit/usb-stick-3/usb_3.stl",
+   "mass_g": 15.0,
+   "print_mass_g": 2.8,
+   "object_scale": [
+    1.8500000000000003,
+    0.9999927997589111,
+    0.5000177383422851
+   ],
+   "collision": "plug: convex hulls of the tube walls; grip: CoACD",
+   "x_tip_mm": 21.0,
+   "plug_centre_mm": [
+    0.003777027130127085,
+    -0.007591724395752085
+   ],
+   "key_channel_from_tip_mm": 12.00000000000001,
+   "plug_from_tip_mm": 12.00000000000001,
+   "outer_mm": [
+    -5.996,
+    -2.508,
+    6.004,
+    2.492
+   ],
+   "channel_mm": [
+    -5.396,
+    -0.308,
+    5.404,
+    1.892
+   ],
+   "n_hulls": 5,
+   "vol_cm3": 4.373548913590443,
+   "extents_mm": [
+    37.0,
+    20.0,
+    10.0
+   ],
+   "com_src_mm": [
+    -1.517,
+    0.004,
+    -0.058
+   ]
+  },
+  "usb_stick_4": {
+   "src": "official_sim/assets/kit/usb-stick-4/usb_4.stl",
+   "mass_g": 15.0,
+   "print_mass_g": 1.8,
+   "object_scale": [
+    1.9246149063110354,
+    0.6,
+    0.25
+   ],
+   "collision": "plug: convex hulls of the tube walls; grip: CoACD",
+   "x_tip_mm": 18.000000000000004,
+   "plug_centre_mm": [
+    0.0,
+    0.299999952316284
+   ],
+   "key_channel_from_tip_mm": 12.00000000000001,
+   "plug_from_tip_mm": 28.500000000000025,
+   "outer_mm": [
+    -6.0,
+    -2.2,
+    6.0,
+    2.8
+   ],
+   "channel_mm": [
+    -5.4,
+    -0.0,
+    5.4,
+    2.2
+   ],
+   "n_hulls": 17,
+   "vol_cm3": 1.7276574321785316,
+   "extents_mm": [
+    38.49,
+    12.0,
+    5.0
+   ],
+   "com_src_mm": [
+    -0.426,
+    -0.0,
+    0.173
+   ]
   }
  },
  "fixtures": {
@@ -1542,6 +1970,68 @@
      ]
     ]
    ]
+  },
+  "cup_stack_n4": {
+   "src": [
+    "cup_stack_n4"
+   ],
+   "extents_mm": [
+    68.63,
+    68.63,
+    79.28
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    -0.0
+   ]
+  },
+  "usb_slot": {
+   "src": [
+    "official_sim/assets/kit/usb-slot/usb_slot_{shell,center}.stl"
+   ],
+   "collision": "convex hulls of axis-box crops (A12 usb_tasks.py)",
+   "cavity_mm": [
+    -23.3,
+    -8.05,
+    23.3,
+    5.425
+   ],
+   "tongue_bounds_mm": [
+    [
+     -4.719,
+     -1.535,
+     10.01
+    ],
+    [
+     4.719,
+     -0.025,
+     20.5
+    ]
+   ],
+   "block_bounds_mm": [
+    [
+     -6.675,
+     -1.535,
+     -0.0
+    ],
+    [
+     6.675,
+     3.175,
+     10.01
+    ]
+   ],
+   "n_hulls": 11,
+   "extents_mm": [
+    52.0,
+    28.0,
+    22.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ]
   }
  },
  "problems": {
@@ -2109,7 +2599,8 @@
    ],
    "layout": {
     "cups": 2,
-    "loose_cups": 0
+    "loose_cups": 0,
+    "fused_cups": 1
    },
    "geometric_start_pose": [
     -6.025902578639107e-18,
@@ -2179,7 +2670,8 @@
    ],
    "layout": {
     "cups": 3,
-    "loose_cups": 1
+    "loose_cups": 1,
+    "fused_cups": 1
    },
    "geometric_start_pose": [
     -6.025902578639107e-18,
@@ -2261,7 +2753,8 @@
    ],
    "layout": {
     "cups": 4,
-    "loose_cups": 2
+    "loose_cups": 2,
+    "fused_cups": 1
    },
    "geometric_start_pose": [
     -6.025902578639107e-18,
@@ -2367,8 +2860,19 @@
    ],
    "layout": {
     "cups": 6,
-    "loose_cups": 4
-   }
+    "loose_cups": 4,
+    "fused_cups": 4
+   },
+   "geometric_start_pose": [
+    -6.025902578639107e-18,
+    4.1433071667200306e-08,
+    0.055787008907276316,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "settled": true
   },
   "cb_binv_retrieve_fork": {
    "object": "fork",
@@ -12871,6 +13375,2157 @@
     "door_mass_g": 386.77,
     "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
    }
+  },
+  "cb_cupstack_n4": {
+   "object": "cup",
+   "fixture": "cup_stack_n4",
+   "pre_insert_offset": 0.05,
+   "seated_pose": [
+    -6.025902578639107e-18,
+    4.1433071667200306e-08,
+    0.05106741051860442,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "layout": {
+    "cups_below": 4,
+    "nest_z_mm": [
+     0.0,
+     4.72,
+     9.44,
+     14.16,
+     18.88
+    ]
+   }
+  },
+  "cb_cuptop_n2_lift": {
+   "object": "cup",
+   "fixture": "cup_stack_n1",
+   "object_start_pose": [
+    7.301568984985352e-07,
+    6.3405209402844775e-06,
+    0.036851465702056885,
+    -2.658367156982422e-05,
+    1.689972123131156e-05,
+    -0.0004930496215820312,
+    0.9999997615814209
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     7.301568984985352e-07,
+     6.3405209402844775e-06,
+     0.1368514657020569,
+     -2.658367156982422e-05,
+     1.689972123131156e-05,
+     -0.0004930496215820312,
+     0.9999997615814209
+    ]
+   ],
+   "layout": {
+    "cups": 2,
+    "loose_cups": 0,
+    "fused_cups": 1,
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ]
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "geometric_start_pose": [
+    -6.025902578639107e-18,
+    4.1433071667200306e-08,
+    0.03690861535258873,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "settled": true
+  },
+  "cb_cuptop_n3_lift": {
+   "object": "cup",
+   "fixture": "cup_stack_n1",
+   "object_start_pose": [
+    9.611248970031738e-07,
+    5.646906629408477e-06,
+    0.04113095998764038,
+    -6.80088996887207e-05,
+    -0.0001275511458516121,
+    -0.00020682811737060547,
+    1.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      6.899237632751465e-06,
+      3.3626299682509853e-06,
+      0.03672391176223755,
+      -3.1828880310058594e-05,
+      -9.346111619379371e-05,
+      -1.2934207916259766e-05,
+      0.9999999403953552
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     9.611248970031738e-07,
+     5.646906629408477e-06,
+     0.1411309599876404,
+     -6.80088996887207e-05,
+     -0.0001275511458516121,
+     -0.00020682811737060547,
+     1.0
+    ]
+   ],
+   "layout": {
+    "cups": 3,
+    "loose_cups": 1,
+    "fused_cups": 1,
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ]
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "geometric_start_pose": [
+    -6.025902578639107e-18,
+    4.1433071667200306e-08,
+    0.041628213741260627,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "settled": true
+  },
+  "cb_cuptop_n4_lift": {
+   "object": "cup",
+   "fixture": "cup_stack_n1",
+   "object_start_pose": [
+    -3.069639205932617e-06,
+    -4.368241661723005e-06,
+    0.043953895568847656,
+    -0.00010895729064941406,
+    1.6682781279087067e-05,
+    -0.0010306835174560547,
+    0.9999994039535522
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      6.884336471557617e-06,
+      -4.766972097058897e-07,
+      0.03659331798553467,
+      -4.351139068603516e-06,
+      0.00013905728701502085,
+      -0.0005952119827270508,
+      0.9999997615814209
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      5.848705768585205e-06,
+      -5.65771188121289e-06,
+      0.04009276628494263,
+      -4.649162292480469e-05,
+      0.00010870833648368716,
+      -0.0008317232131958008,
+      0.9999996423721313
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     -3.069639205932617e-06,
+     -4.368241661723005e-06,
+     0.14395389556884766,
+     -0.00010895729064941406,
+     1.6682781279087067e-05,
+     -0.0010306835174560547,
+     0.9999994039535522
+    ]
+   ],
+   "layout": {
+    "cups": 4,
+    "loose_cups": 2,
+    "fused_cups": 1,
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ]
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "geometric_start_pose": [
+    -6.025902578639107e-18,
+    4.1433071667200306e-08,
+    0.046347812129932525,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "settled": true
+  },
+  "cb_cuptop_n6_lift": {
+   "object": "cup",
+   "fixture": "cup_stack_n4",
+   "object_start_pose": [
+    4.522502422332764e-06,
+    -2.435565420455532e-06,
+    0.055043041706085205,
+    4.5299530029296875e-06,
+    9.555609722156078e-06,
+    -0.0001195669174194336,
+    1.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      3.851950168609619e-06,
+      -3.783834245041362e-06,
+      0.05068081617355347,
+      9.834766387939453e-06,
+      1.819335375330411e-05,
+      1.1265277862548828e-05,
+      0.9999999403953552
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     4.522502422332764e-06,
+     -2.435565420455532e-06,
+     0.1550430417060852,
+     4.5299530029296875e-06,
+     9.555609722156078e-06,
+     -0.0001195669174194336,
+     1.0
+    ]
+   ],
+   "layout": {
+    "cups": 6,
+    "loose_cups": 1,
+    "fused_cups": 4,
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ]
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "geometric_start_pose": [
+    -6.025902578639107e-18,
+    4.1433071667200306e-08,
+    0.055787008907276316,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "settled": true
+  },
+  "cb_cuptop_n3_lift_neat": {
+   "object": "cup",
+   "fixture": "cup_stack_n1",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.041559,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      0.0,
+      0.0,
+      0.036874000000000004,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.141559,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "cups": 3,
+    "loose_cups": 1,
+    "fused_cups": 1,
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false",
+     "env.precise_assembly.strict_success=gate",
+     "env.precise_assembly.strict_max_tilt_deg=3.0",
+     "env.precise_assembly.strict_neat_axis_tol=0.002",
+     "env.precise_assembly.strict_neat_step_tol=0.0015",
+     "env.precise_assembly.strict_ref_local=[0.0,0.0,-0.032189]",
+     "env.precise_assembly.object_rest_offset=-2.5e-05"
+    ],
+    "nest": {
+     "step_mm": 4.685,
+     "fused_top_base_mm": 0.0,
+     "source": "exact cup mesh profiles; official STACK_STEP 4.68 mm",
+     "rest_offset_m": -2.5e-05
+    }
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_cuptop_n6_lift_neat": {
+   "object": "cup",
+   "fixture": "cup_stack_n4",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.055719000000000005,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/cup/cup.urdf",
+     [
+      0.0,
+      0.0,
+      0.051034,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.155719,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "cups": 6,
+    "loose_cups": 1,
+    "fused_cups": 4,
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false",
+     "env.precise_assembly.strict_success=gate",
+     "env.precise_assembly.strict_max_tilt_deg=3.0",
+     "env.precise_assembly.strict_neat_axis_tol=0.002",
+     "env.precise_assembly.strict_neat_step_tol=0.0015",
+     "env.precise_assembly.strict_ref_local=[0.0,0.0,-0.032189]",
+     "env.precise_assembly.object_rest_offset=-2.5e-05"
+    ],
+    "nest": {
+     "step_mm": 4.685,
+     "fused_top_base_mm": 14.16,
+     "source": "exact cup mesh profiles; official STACK_STEP 4.68 mm",
+     "rest_offset_m": -2.5e-05
+    }
+   },
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ]
+  },
+  "cb_usb": {
+   "object": "usb_stick_1",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    -1.494667987052228e-11,
+    0.00013060308724362668,
+    0.0232938498858816,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0005999999850533201,
+    -0.0006693969127563734,
+    0.048293849885881604,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_02_r/usb_jaw_02_r.urdf",
+     [
+      0.007108314181501686,
+      -8.32663509808446e-20,
+      0.015381951756621826,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_02_l/usb_jaw_02_l.urdf",
+     [
+      -0.007108314181501687,
+      8.326635098084456e-20,
+      0.015381951756621822,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.007108314181501686,
+      -8.32663509808446e-20,
+      0.015381951756621826
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.007108314181501687,
+      8.326635098084456e-20,
+      0.015381951756621822
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     -1.494667987052228e-11,
+     0.00013060308724362668,
+     0.048293849885881604,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     -1.494667987052228e-11,
+     0.00013060308724362668,
+     0.0232938498858816,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 1,
+    "spring_indent_mm": 0.2,
+    "jaw_face_mm": [
+     5.8,
+     5.8
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 12.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.6
+  },
+  "cb_usb_1_spring04": {
+   "object": "usb_stick_1",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    -1.494667987052228e-11,
+    0.00013060308724362668,
+    0.0232938498858816,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0005999999850533201,
+    -0.0006693969127563734,
+    0.048293849885881604,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_04_r/usb_jaw_04_r.urdf",
+     [
+      0.007014176336239787,
+      7.068932182933543e-20,
+      0.015429080807875072,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_04_l/usb_jaw_04_l.urdf",
+     [
+      -0.00701417633623979,
+      -6.854722116784044e-20,
+      0.015429080807875079,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.007014176336239787,
+      7.068932182933543e-20,
+      0.015429080807875072
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.00701417633623979,
+      -6.854722116784044e-20,
+      0.015429080807875079
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     -1.494667987052228e-11,
+     0.00013060308724362668,
+     0.048293849885881604,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     -1.494667987052228e-11,
+     0.00013060308724362668,
+     0.0232938498858816,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 1,
+    "spring_indent_mm": 0.4,
+    "jaw_face_mm": [
+     5.6,
+     5.6
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 18.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.6
+  },
+  "cb_usb_1_spring06": {
+   "object": "usb_stick_1",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    -1.494667987052228e-11,
+    0.00013060308724362668,
+    0.0232938498858816,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0005999999850533201,
+    -0.0006693969127563734,
+    0.048293849885881604,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_06_r/usb_jaw_06_r.urdf",
+     [
+      0.006938083415106889,
+      2.845591825502049e-20,
+      0.015313338781138497,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_06_l/usb_jaw_06_l.urdf",
+     [
+      -0.006938083415106891,
+      2.0325655896443212e-20,
+      0.0153133387811385,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.006938083415106889,
+      2.845591825502049e-20,
+      0.015313338781138497
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.006938083415106891,
+      2.0325655896443212e-20,
+      0.0153133387811385
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     -1.494667987052228e-11,
+     0.00013060308724362668,
+     0.048293849885881604,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     -1.494667987052228e-11,
+     0.00013060308724362668,
+     0.0232938498858816,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 1,
+    "spring_indent_mm": 0.6,
+    "jaw_face_mm": [
+     5.4,
+     5.4
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 24.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.55
+  },
+  "cb_usb_2": {
+   "object": "usb_stick_2",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    0.0,
+    2.0449091885392453e-05,
+    0.04086090083093604,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0006,
+    -0.0007795509081146075,
+    0.06586090083093604,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_02_r/usb_jaw_02_r.urdf",
+     [
+      0.007108314181501686,
+      -8.32663509808446e-20,
+      0.015381951756621826,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_02_l/usb_jaw_02_l.urdf",
+     [
+      -0.007108314181501687,
+      8.326635098084456e-20,
+      0.015381951756621822,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.007108314181501686,
+      -8.32663509808446e-20,
+      0.015381951756621826
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.007108314181501687,
+      8.326635098084456e-20,
+      0.015381951756621822
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     0.0,
+     2.0449091885392453e-05,
+     0.06586090083093604,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     0.0,
+     2.0449091885392453e-05,
+     0.04086090083093604,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 2,
+    "spring_indent_mm": 0.2,
+    "jaw_face_mm": [
+     5.8,
+     5.8
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 12.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.6
+  },
+  "cb_usb_2_spring04": {
+   "object": "usb_stick_2",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    0.0,
+    2.0449091885392453e-05,
+    0.04086090083093604,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0006,
+    -0.0007795509081146075,
+    0.06586090083093604,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_04_r/usb_jaw_04_r.urdf",
+     [
+      0.007014176336239787,
+      7.068932182933543e-20,
+      0.015429080807875072,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_04_l/usb_jaw_04_l.urdf",
+     [
+      -0.00701417633623979,
+      -6.854722116784044e-20,
+      0.015429080807875079,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.007014176336239787,
+      7.068932182933543e-20,
+      0.015429080807875072
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.00701417633623979,
+      -6.854722116784044e-20,
+      0.015429080807875079
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     0.0,
+     2.0449091885392453e-05,
+     0.06586090083093604,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     0.0,
+     2.0449091885392453e-05,
+     0.04086090083093604,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 2,
+    "spring_indent_mm": 0.4,
+    "jaw_face_mm": [
+     5.6,
+     5.6
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 18.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.6
+  },
+  "cb_usb_2_spring06": {
+   "object": "usb_stick_2",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    0.0,
+    2.0449091885392453e-05,
+    0.04086090083093604,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0006,
+    -0.0007795509081146075,
+    0.06586090083093604,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_06_r/usb_jaw_06_r.urdf",
+     [
+      0.006938083415106889,
+      2.845591825502049e-20,
+      0.015313338781138497,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_06_l/usb_jaw_06_l.urdf",
+     [
+      -0.006938083415106891,
+      2.0325655896443212e-20,
+      0.0153133387811385,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.006938083415106889,
+      2.845591825502049e-20,
+      0.015313338781138497
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.006938083415106891,
+      2.0325655896443212e-20,
+      0.0153133387811385
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     0.0,
+     2.0449091885392453e-05,
+     0.06586090083093604,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     0.0,
+     2.0449091885392453e-05,
+     0.04086090083093604,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 2,
+    "spring_indent_mm": 0.6,
+    "jaw_face_mm": [
+     5.4,
+     5.4
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 24.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.55
+  },
+  "cb_usb_3": {
+   "object": "usb_stick_3",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    -1.6066804528534128e-07,
+    5.00534754108388e-05,
+    0.03251677015874998,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0005998393319547146,
+    -0.0007499465245891612,
+    0.05751677015874998,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_02_r/usb_jaw_02_r.urdf",
+     [
+      0.007108314181501686,
+      -8.32663509808446e-20,
+      0.015381951756621826,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_02_l/usb_jaw_02_l.urdf",
+     [
+      -0.007108314181501687,
+      8.326635098084456e-20,
+      0.015381951756621822,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.007108314181501686,
+      -8.32663509808446e-20,
+      0.015381951756621826
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.007108314181501687,
+      8.326635098084456e-20,
+      0.015381951756621822
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     -1.6066804528534128e-07,
+     5.00534754108388e-05,
+     0.05751677015874998,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     -1.6066804528534128e-07,
+     5.00534754108388e-05,
+     0.03251677015874998,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 3,
+    "spring_indent_mm": 0.2,
+    "jaw_face_mm": [
+     5.8,
+     5.8
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 12.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.6
+  },
+  "cb_usb_3_spring04": {
+   "object": "usb_stick_3",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    -1.6066804528534128e-07,
+    5.00534754108388e-05,
+    0.03251677015874998,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0005998393319547146,
+    -0.0007499465245891612,
+    0.05751677015874998,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_04_r/usb_jaw_04_r.urdf",
+     [
+      0.007014176336239787,
+      7.068932182933543e-20,
+      0.015429080807875072,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_04_l/usb_jaw_04_l.urdf",
+     [
+      -0.00701417633623979,
+      -6.854722116784044e-20,
+      0.015429080807875079,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.007014176336239787,
+      7.068932182933543e-20,
+      0.015429080807875072
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.00701417633623979,
+      -6.854722116784044e-20,
+      0.015429080807875079
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     -1.6066804528534128e-07,
+     5.00534754108388e-05,
+     0.05751677015874998,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     -1.6066804528534128e-07,
+     5.00534754108388e-05,
+     0.03251677015874998,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 3,
+    "spring_indent_mm": 0.4,
+    "jaw_face_mm": [
+     5.6,
+     5.6
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 18.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.6
+  },
+  "cb_usb_3_spring06": {
+   "object": "usb_stick_3",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    -1.6066804528534128e-07,
+    5.00534754108388e-05,
+    0.03251677015874998,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0005998393319547146,
+    -0.0007499465245891612,
+    0.05751677015874998,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_06_r/usb_jaw_06_r.urdf",
+     [
+      0.006938083415106889,
+      2.845591825502049e-20,
+      0.015313338781138497,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_06_l/usb_jaw_06_l.urdf",
+     [
+      -0.006938083415106891,
+      2.0325655896443212e-20,
+      0.0153133387811385,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.006938083415106889,
+      2.845591825502049e-20,
+      0.015313338781138497
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.006938083415106891,
+      2.0325655896443212e-20,
+      0.0153133387811385
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     -1.6066804528534128e-07,
+     5.00534754108388e-05,
+     0.05751677015874998,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     -1.6066804528534128e-07,
+     5.00534754108388e-05,
+     0.03251677015874998,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 3,
+    "spring_indent_mm": 0.6,
+    "jaw_face_mm": [
+     5.4,
+     5.4
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 24.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.55
+  },
+  "cb_usb_4": {
+   "object": "usb_stick_4",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    -6.904442793936233e-15,
+    0.00012667326125096425,
+    0.028426267794174728,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0005999999999930955,
+    -0.0006733267387490358,
+    0.053426267794174725,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_02_r/usb_jaw_02_r.urdf",
+     [
+      0.007108314181501686,
+      -8.32663509808446e-20,
+      0.015381951756621826,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_02_l/usb_jaw_02_l.urdf",
+     [
+      -0.007108314181501687,
+      8.326635098084456e-20,
+      0.015381951756621822,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.007108314181501686,
+      -8.32663509808446e-20,
+      0.015381951756621826
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.007108314181501687,
+      8.326635098084456e-20,
+      0.015381951756621822
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     -6.904442793936233e-15,
+     0.00012667326125096425,
+     0.053426267794174725,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     -6.904442793936233e-15,
+     0.00012667326125096425,
+     0.028426267794174728,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 4,
+    "spring_indent_mm": 0.2,
+    "jaw_face_mm": [
+     5.8,
+     5.8
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 12.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.6
+  },
+  "cb_usb_4_spring04": {
+   "object": "usb_stick_4",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    -6.904442793936233e-15,
+    0.00012667326125096425,
+    0.028426267794174728,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0005999999999930955,
+    -0.0006733267387490358,
+    0.053426267794174725,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_04_r/usb_jaw_04_r.urdf",
+     [
+      0.007014176336239787,
+      7.068932182933543e-20,
+      0.015429080807875072,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_04_l/usb_jaw_04_l.urdf",
+     [
+      -0.00701417633623979,
+      -6.854722116784044e-20,
+      0.015429080807875079,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.007014176336239787,
+      7.068932182933543e-20,
+      0.015429080807875072
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.00701417633623979,
+      -6.854722116784044e-20,
+      0.015429080807875079
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     -6.904442793936233e-15,
+     0.00012667326125096425,
+     0.053426267794174725,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     -6.904442793936233e-15,
+     0.00012667326125096425,
+     0.028426267794174728,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 4,
+    "spring_indent_mm": 0.4,
+    "jaw_face_mm": [
+     5.6,
+     5.6
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 18.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.6
+  },
+  "cb_usb_4_spring06": {
+   "object": "usb_stick_4",
+   "fixture": "usb_slot",
+   "seated_pose": [
+    -6.904442793936233e-15,
+    0.00012667326125096425,
+    0.028426267794174728,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "object_start_pose": [
+    0.0005999999999930955,
+    -0.0006733267387490358,
+    0.053426267794174725,
+    0.5,
+    0.5000000000000001,
+    -0.5000000000000001,
+    0.5000000000000001
+   ],
+   "distractors": [
+    [
+     "urdf/contactbench/objects/usb_jaw_06_r/usb_jaw_06_r.urdf",
+     [
+      0.006938083415106889,
+      2.845591825502049e-20,
+      0.015313338781138497,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/usb_jaw_06_l/usb_jaw_06_l.urdf",
+     [
+      -0.006938083415106891,
+      2.0325655896443212e-20,
+      0.0153133387811385,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+     ]
+    ]
+   ],
+   "joints": [
+    {
+     "body": "distractor0",
+     "anchor": [
+      0.006938083415106889,
+      2.845591825502049e-20,
+      0.015313338781138497
+     ],
+     "axis": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    },
+    {
+     "body": "distractor1",
+     "anchor": [
+      -0.006938083415106891,
+      2.0325655896443212e-20,
+      0.0153133387811385
+     ],
+     "axis": [
+      -1.0,
+      0.0,
+      0.0
+     ],
+     "kind": "prismatic",
+     "lower": -0.0002,
+     "upper": 0.0012,
+     "stiffness": 66000.0,
+     "damping": 60.0
+    }
+   ],
+   "waypoints": [
+    [
+     -6.904442793936233e-15,
+     0.00012667326125096425,
+     0.053426267794174725,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ],
+    [
+     -6.904442793936233e-15,
+     0.00012667326125096425,
+     0.028426267794174728,
+     0.5,
+     0.5000000000000001,
+     -0.5000000000000001,
+     0.5000000000000001
+    ]
+   ],
+   "layout": {
+    "source": "contactbench-sim force_bench/kit/mechanisms/usb_slot.py, appendix_tasks/plug_in_usb.py",
+    "stick": 4,
+    "spring_indent_mm": 0.6,
+    "jaw_face_mm": [
+     5.4,
+     5.4
+    ],
+    "ke_N_per_m": 66000.0,
+    "kd": 60.0,
+    "jaw_mass_g": 30.0,
+    "travel_m": [
+     -0.0002,
+     0.0012
+    ],
+    "pinch_N_per_pad": 24.0,
+    "seat_tip_z_mm": 10.0,
+    "mouth_z_mm": 22.0,
+    "mouth_half_mm": [
+     6.175,
+     2.675
+    ],
+    "raise_mm": 25.0,
+    "start_offset_mm": [
+     0.6,
+     -0.8
+    ],
+    "stick_mass_g": 15.0
+   },
+   "distractor_friction": 0.55
+  },
+  "cb_keyrepose": {
+   "object": "key_1",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "ContactBench task 11 (website tasks.json '11'; not in the official sim, docs/tasks.md:473)",
+    "task": "in-hand repose: flip the key about its long axis in a fingertip pinch, goal in the palm frame",
+    "key": 1,
+    "grip_point_key_frame_m": [
+     -0.00765,
+     0.00024,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.01883,
+     0.0309
+    ]
+   }
+  },
+  "cb_keyrepose_key2": {
+   "object": "key_2",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "ContactBench task 11 (website tasks.json '11'; not in the official sim, docs/tasks.md:473)",
+    "task": "in-hand repose: flip the key about its long axis in a fingertip pinch, goal in the palm frame",
+    "key": 2,
+    "grip_point_key_frame_m": [
+     -0.00497,
+     3e-05,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.01627,
+     0.03401
+    ]
+   }
+  },
+  "cb_keyrepose_key3": {
+   "object": "key_3",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "ContactBench task 11 (website tasks.json '11'; not in the official sim, docs/tasks.md:473)",
+    "task": "in-hand repose: flip the key about its long axis in a fingertip pinch, goal in the palm frame",
+    "key": 3,
+    "grip_point_key_frame_m": [
+     -0.00764,
+     0.00024,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     -0.0191,
+     0.03186
+    ]
+   }
   }
  },
  "parts": {
@@ -13018,5 +15673,6 @@
     0.02251
    ]
   }
- }
+ },
+ "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"
 }
