@@ -153,6 +153,8 @@ class ObsCfg:
     clamp_abs_observations: float = 10.0
     # A8 doorslip: obs fields zeroed in the actor input only (critic / state_list keeps them)
     actor_zero_fields: tuple[str, ...] = ()
+    # A8 doorslip: actor object_rot / keypoints use the unturned knob (position kept, knob angle removed)
+    actor_unturned_knob: bool = False
 
 
 # ----------------------------------------------------------------------------

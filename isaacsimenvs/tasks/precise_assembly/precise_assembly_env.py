@@ -819,6 +819,22 @@ class PreciseAssemblyEnv(PlayEnv):
     def _joint_reset_pose_rel(self, j) -> tuple:
         return self._pih_object_start_rel if j.body == "object" else self._pih_distractor_pose_rel[int(j.body[10:])]
 
+    def _knob_unturned_quat(self) -> torch.Tensor:
+        """A8 doorslip: world rotation the unlock-joint body (the knob) would have at joint angle 0 = its parent's
+        current rotation x its reset rotation (follows the door, drops the knob's own turn). For actor obs only."""
+        j = self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)]
+        q0 = _xyzw_to_wxyz(torch.tensor([self._joint_reset_pose_rel(j)[3:7]], device=self.device,
+                                        dtype=torch.float32)).expand(self.num_envs, 4)
+        par = getattr(j, "parent", "fixture")
+        if par == "fixture":
+            q_par = self.hole_quat_wxyz
+        else:
+            kp = int(par[10:])
+            qp0 = _xyzw_to_wxyz(torch.tensor([self._pih_distractor_pose_rel[kp][3:7]], device=self.device,
+                                             dtype=torch.float32)).expand(self.num_envs, 4)
+            q_par = quat_mul(self.distractors[kp].data.root_quat_w, quat_conjugate(qp0))
+        return quat_mul(q_par, q0)
+
     def _update_joint_angles(self) -> None:
         """Signed angle of every jointed body about its axis since reset (rad), self.cb_joint_angle (J, N)."""
         if not self._pih_joints:
