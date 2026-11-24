@@ -131,6 +131,9 @@ class SlideStick:
         self.dropped = (lat > float(c.slide_drop_lateral)) | (xp < self.x_top) | (bottom[:, 2] < top + 0.005)
         # shaping potential on the target error (m -> cm units)
         phi = -err.abs() / 0.01
+        P = float(getattr(c, "slide_peak_scale", 0.0))
+        if P > 0.0:   # sharp peak at the target: stopping 5 mm short pays little under the linear term alone
+            phi = phi + P * torch.exp(-err.abs() / float(c.slide_peak_width))
         self.phi_prev = torch.where(self.fresh, phi, self.phi_prev)
         self.shape = phi - self.phi_prev
         self.phi_prev = phi
@@ -148,6 +151,7 @@ class SlideStick:
         c = self.env.cfg.precise_assembly
         r = float(c.slide_shape_scale) * self.shape
         r = r + float(c.slide_tol_rew) * self.in_tol.float()
+        r = r + float(getattr(c, "slide_hold_rew", 0.0)) * (self.hold.float() / float(c.slide_hold_steps)).clamp(max=1.0)
         k = float(getattr(c, "slide_near_speed_pen", 0.0))
         if k > 0.0:   # speed^2 near the target: slowing down before the window pays (linear speed would cost the same at any speed)
             near = torch.exp(-(self.prot - self.target).abs() / float(c.slide_near_width))

@@ -166,6 +166,9 @@ class PreciseAssemblyCfg:
     slide_near_speed_pen: float = 0.0   # x exp(-|err|/slide_near_width) x (speed in cm/s)^2 per step
     slide_near_width: float = 0.01
     slide_tol_rew: float = 0.1          # per step inside the tolerance
+    slide_peak_scale: float = 0.0       # extra shaping potential P x exp(-|err|/slide_peak_width) (cm units like the linear term)
+    slide_peak_width: float = 0.0025
+    slide_hold_rew: float = 0.0         # per step x (hold counter / slide_hold_steps): pays stillness inside the tolerance
     slide_success_bonus: float = 100.0
     slide_fail_penalty: float = 100.0
     slide_mass_scale_range: tuple = (1.0, 1.0)   # hidden per-env stick mass x U(lo, hi), set once at init
