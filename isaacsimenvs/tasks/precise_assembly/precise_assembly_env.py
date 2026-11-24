@@ -1526,6 +1526,12 @@ class PreciseAssemblyEnv(PlayEnv):
                 both = (tp[:, 0] > 0.02) & (tp[:, 1] > 0.02)                      # thumb + index pads on the key
                 k_rew = k_rew + pih_cfg.key_pad_rew * both.float()
                 self.extras["key_pads_both"] = both.float().mean()
+            kfb = getattr(pih_cfg, "key_force_band_rew", 0.0)
+            if kfb > 0.0 and hasattr(self, "hand_force"):   # A27: grip force kept inside a band (privileged reward)
+                lo_, hi_ = (float(v) for v in pih_cfg.key_force_band)
+                inb = (self.hand_force >= lo_) & (self.hand_force <= hi_)
+                k_rew = k_rew + kfb * inb.float()
+                self.extras["key_force_inband"] = inb.float().mean()
             reward = reward + k_rew
             self._reward_terms["key_reward"] = k_rew
             self._reward_terms["total_reward"] = reward

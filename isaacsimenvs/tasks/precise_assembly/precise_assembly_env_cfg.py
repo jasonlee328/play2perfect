@@ -165,6 +165,8 @@ class PreciseAssemblyCfg:
     hand_gain_log_range: tuple = (1.0, 1.0)
     hand_joint_friction_max: float = 0.0
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
+    key_force_band_rew: float = 0.0     # A27: per step while hand_force in key_force_band (N)
+    key_force_band: tuple = (0.6, 1.1)
     key_hold_rew: float = 0.0           # per step while the key is not dropped (fingertip within key_drop_dist)
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
     usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
