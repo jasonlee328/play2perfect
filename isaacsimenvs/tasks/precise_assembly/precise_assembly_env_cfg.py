@@ -163,6 +163,8 @@ class PreciseAssemblyCfg:
     slide_overshoot: float = 0.015
     slide_drop_lateral: float = 0.015
     slide_shape_scale: float = 1.0      # x decrease of |error| in cm
+    slide_near_speed_pen: float = 0.0   # x exp(-|err|/slide_near_width) x (speed in cm/s)^2 per step
+    slide_near_width: float = 0.01
     slide_tol_rew: float = 0.1          # per step inside the tolerance
     slide_success_bonus: float = 100.0
     slide_fail_penalty: float = 100.0

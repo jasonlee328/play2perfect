@@ -148,6 +148,11 @@ class SlideStick:
         c = self.env.cfg.precise_assembly
         r = float(c.slide_shape_scale) * self.shape
         r = r + float(c.slide_tol_rew) * self.in_tol.float()
+        k = float(getattr(c, "slide_near_speed_pen", 0.0))
+        if k > 0.0:   # speed^2 near the target: slowing down before the window pays (linear speed would cost the same at any speed)
+            near = torch.exp(-(self.prot - self.target).abs() / float(c.slide_near_width))
+            v = (self.speed / 0.01).clamp(max=50.0)   # cm/s
+            r = r - k * near * v * v
         r = r + float(c.slide_success_bonus) * terms["max_successes"].float()
         r = r - float(c.slide_fail_penalty) * (terms["slide_overshoot"] | terms["slide_dropped"]).float()
         r = r - float(c.slide_timeout_penalty) * (terms["timeout"] & ~terms["max_successes"]).float()
