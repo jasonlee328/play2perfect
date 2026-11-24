@@ -425,6 +425,9 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.usb_last[f"fail_{f}"][env_ids] = v[env_ids].float()
         super()._reset_idx(env_ids)
         self._hand_motor_dr(env_ids)
+        if getattr(self, "_roll_tau", None) is not None:
+            lo, hi = (float(v) for v in self.cfg.precise_assembly.roll_drag_range)
+            self._roll_tau[env_ids] = torch.exp(torch.empty(env_ids.numel(), device=self.device).uniform_(math.log(lo), math.log(hi)))
         self._reset_peg_episode(env_ids)
         if self.cfg.precise_assembly.usb_task != "off":
             if usb is None:
@@ -754,6 +757,33 @@ class PreciseAssemblyEnv(PlayEnv):
                                                                   dtype=torch.float32).expand(self.num_envs, 3))
             torque = (tau.unsqueeze(-1) * axis_w).unsqueeze(1)
             body.set_external_force_and_torque(torch.zeros_like(torque), torque, is_global=True)
+
+    def _apply_action(self) -> None:
+        super()._apply_action()
+        self._roll_drag()
+
+    def _roll_drag(self) -> None:
+        """A27 hidden roll resistance: every physics substep a torque -tau * tanh(w_x / w0) about the object's long axis
+        (object +x), tau per env log-U(roll_drag_range) resampled at reset; roll inertia scaled by roll_inertia_mult once."""
+        pc = self.cfg.precise_assembly
+        lo, hi = (float(v) for v in getattr(pc, "roll_drag_range", (0.0, 0.0)))
+        if hi <= 0.0:
+            return
+        if getattr(self, "_roll_tau", None) is None:
+            self._roll_tau = torch.exp(torch.empty(self.num_envs, device=self.device).uniform_(math.log(lo), math.log(hi)))
+            mult = float(getattr(pc, "roll_inertia_mult", 1.0))
+            if mult != 1.0:
+                view = self.object.root_physx_view
+                I = view.get_inertias().clone()
+                I[:, 0] = I[:, 0] * mult
+                view.set_inertias(I, torch.arange(self.num_envs, dtype=torch.int32))
+                print(f"[PreciseAssemblyEnv] roll inertia x{mult}: ixx {float(I[0, 0]):.3e}", flush=True)
+        q = self.object.data.root_quat_w
+        a = quat_apply(q, torch.tensor([1.0, 0.0, 0.0], device=self.device).expand(self.num_envs, 3))
+        w = (self.object.data.root_ang_vel_w * a).sum(-1)
+        tau = -self._roll_tau * torch.tanh(w / float(getattr(pc, "roll_drag_w0", 0.5)))
+        t = (tau.unsqueeze(-1) * a).unsqueeze(1)
+        self.object.set_external_force_and_torque(torch.zeros_like(t), t, is_global=True)
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
