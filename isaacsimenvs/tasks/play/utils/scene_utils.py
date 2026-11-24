@@ -1613,9 +1613,11 @@ def apply_physx_material_properties(env) -> None:
     dlo, dhi = (float(v) for v in getattr(dr, "distractor_friction_scale_range", (1.0, 1.0)))
     if (dlo, dhi) != (1.0, 1.0) and getattr(env, "distractors", ()):
         base = d_mu if d_mu >= 0.0 else float(assets_cfg.object_friction)
-        bucket_vals = torch.linspace(dlo, dhi, n_buckets) * base
+        bases = list(getattr(dr, "distractor_friction_bases", ()) or ())   # A26: per-distractor base (card 2, card 3, ...)
         mus = []
-        for body in env.distractors:
+        for k_, body in enumerate(env.distractors):
+            b_ = float(bases[min(k_, len(bases) - 1)]) if bases else base
+            bucket_vals = torch.linspace(dlo, dhi, n_buckets) * b_
             view = body.root_physx_view
             materials = view.get_material_properties()
             mu_e = bucket_vals[torch.randint(0, n_buckets, (env.num_envs,))]
