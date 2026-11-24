@@ -369,7 +369,7 @@ def build_observations(env) -> dict[str, torch.Tensor]:
 
     if "roll_target" in OBS_FIELD_SIZES:   # A27 task command
         k_ = getattr(env, "_key", None)
-        obs_clean["roll_target"] = ((k_.target / math.pi).unsqueeze(-1) if k_ is not None
+        obs_clean["roll_target"] = ((k_.target * k_.scale() / math.pi).unsqueeze(-1) if k_ is not None
                                     else torch.zeros(env.num_envs, 1, device=env.device))
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
