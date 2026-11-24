@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import shutil
 import tempfile
@@ -1592,7 +1593,10 @@ def apply_physx_material_properties(env) -> None:
             materials[:, :, 1] = mu
         if name == "object" and obj_active:
             obj_base = float(assets_cfg.object_friction)
-            bucket_vals = torch.linspace(obj_lo, obj_hi, n_buckets) * obj_base
+            if bool(getattr(dr, "object_friction_log", False)):   # A8 doorslip: log-spaced buckets
+                bucket_vals = torch.logspace(math.log10(obj_lo), math.log10(obj_hi), n_buckets) * obj_base
+            else:
+                bucket_vals = torch.linspace(obj_lo, obj_hi, n_buckets) * obj_base
             bucket_idx = torch.randint(0, n_buckets, (env.num_envs,))
             per_env_obj = bucket_vals[bucket_idx]  # (N_envs,)
             env._object_mu_env = per_env_obj.clone()   # A8 doorslip: per-env object friction (for need-scaled crush)

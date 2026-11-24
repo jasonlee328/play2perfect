@@ -556,6 +556,8 @@ class DomainRandomizationCfg:
     # PhysX configuration. The proper path is Isaac Lab's
     # EventCfg.ActorMassRandomization, which is a larger refactor.
     object_friction_scale_range: tuple[float, float] = (1.0, 1.0)
+    # A8 doorslip: draw the object friction buckets log-spaced instead of linear
+    object_friction_log: bool = False
     fingertip_friction_scale_range: tuple[float, float] = (1.0, 1.0)
     friction_n_buckets: int = 16
 
