@@ -1593,6 +1593,7 @@ def apply_physx_material_properties(env) -> None:
             bucket_vals = torch.linspace(obj_lo, obj_hi, n_buckets) * obj_base
             bucket_idx = torch.randint(0, n_buckets, (env.num_envs,))
             per_env_obj = bucket_vals[bucket_idx]  # (N_envs,)
+            env._deal_obj_mu = per_env_obj.clone()
             materials[:, :, 0] = per_env_obj.unsqueeze(-1)
             materials[:, :, 1] = per_env_obj.unsqueeze(-1)
         view.set_material_properties(materials, env_ids)
@@ -1609,7 +1610,22 @@ def apply_physx_material_properties(env) -> None:
             print(f"[scene] {_pn}: per-problem distractor_friction {d_mu}", flush=True)
     except Exception as _e:  # noqa: BLE001
         print(f"[scene] per-problem distractor_friction lookup skipped: {_e}", flush=True)
-    if d_mu >= 0.0:
+    dlo, dhi = (float(v) for v in getattr(dr, "distractor_friction_scale_range", (1.0, 1.0)))
+    if (dlo, dhi) != (1.0, 1.0) and getattr(env, "distractors", ()):
+        base = d_mu if d_mu >= 0.0 else float(assets_cfg.object_friction)
+        bucket_vals = torch.linspace(dlo, dhi, n_buckets) * base
+        mus = []
+        for body in env.distractors:
+            view = body.root_physx_view
+            materials = view.get_material_properties()
+            mu_e = bucket_vals[torch.randint(0, n_buckets, (env.num_envs,))]
+            materials[:, :, 0] = mu_e.unsqueeze(-1); materials[:, :, 1] = mu_e.unsqueeze(-1); materials[:, :, 2] = 0.0
+            view.set_material_properties(materials, env_ids)
+            mus.append(mu_e)
+        top = getattr(env, "_deal_obj_mu", torch.full((env.num_envs,), float(assets_cfg.object_friction)))
+        env._deal_card_mu = torch.stack([top] + mus, -1).to(env.device)
+        print(f"[scene] A26 per-card friction x U({dlo},{dhi}) of {base}: {len(mus)} cards", flush=True)
+    elif d_mu >= 0.0:
         for body in getattr(env, "distractors", ()) or ():
             view = body.root_physx_view
             materials = view.get_material_properties()

@@ -118,6 +118,23 @@ class PreciseAssemblyCfg:
     start_state_file: str = ""
     # A12 USB (usb_task.py): "off" | "report" (contact views + verdict logged) | "gate" (verdict = task success)
     usb_task: str = "off"
+    # A26 deal card (deal_card.py): thumb slides the top card of a held deck by a target distance
+    deal_task: bool = False
+    deal_target_m: tuple = (0.015, 0.04)
+    deal_tol_m: float = 0.003
+    deal_others_m: float = 0.003
+    deal_hold_steps: int = 30
+    deal_card2_fail_m: float = 0.005
+    deal_others_fail_m: float = 0.005
+    deal_drop_m: float = 0.02
+    deal_over_m: float = 0.015
+    deal_motor_gain: tuple = (1.0, 1.0)     # per-episode hand kp/kd x log-U(lo, hi)
+    deal_motor_fric: float = 0.0            # per-episode hand joint friction U(0, x)
+    deal_progress_scale: float = 2000.0     # potential on -|slide - target| (m)
+    deal_others_penalty: float = 0.5
+    deal_in_tol_rew: float = 1.0
+    deal_success_bonus: float = 500.0
+    deal_fail_penalty: float = 200.0
     # A13 key repose (key_repose.py): goal = the key's start pose in the palm frame turned about its long axis
     key_repose: bool = False
     key_flip_deg: tuple = (45.0, 90.0, 135.0, 180.0)   # one goal per angle, in order; last = the task

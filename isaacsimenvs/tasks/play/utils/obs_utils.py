@@ -361,6 +361,15 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    deal = getattr(env, "_deal", None)
+    if "deal_target" in OBS_FIELD_SIZES:
+        if deal is not None:
+            obs_clean["deal_target"] = deal.actor_obs()
+            obs_clean["deal_priv"] = deal.critic_obs()
+        else:
+            obs_clean["deal_target"] = torch.zeros(env.num_envs, OBS_FIELD_SIZES["deal_target"], device=env.device)
+            obs_clean["deal_priv"] = torch.zeros(env.num_envs, OBS_FIELD_SIZES["deal_priv"], device=env.device)
+
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel

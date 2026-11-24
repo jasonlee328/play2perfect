@@ -539,6 +539,9 @@ class DomainRandomizationCfg:
     # PhysX configuration. The proper path is Isaac Lab's
     # EventCfg.ActorMassRandomization, which is a larger refactor.
     object_friction_scale_range: tuple[float, float] = (1.0, 1.0)
+    # A26: per-env, per-distractor friction x U(lo, hi) of the base (distractor_friction if >= 0, else object_friction),
+    # init-only buckets like the object's; per-env values kept in env._deal_card_mu (top card first)
+    distractor_friction_scale_range: tuple[float, float] = (1.0, 1.0)
     fingertip_friction_scale_range: tuple[float, float] = (1.0, 1.0)
     friction_n_buckets: int = 16
 

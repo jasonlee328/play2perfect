@@ -339,6 +339,15 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if cfg.precise_assembly.deal_task:   # A26: target in the actor obs, deck state + hidden physics for the critic
+            n_c = 1 + len(self._pih_distractor_urdf_abs)
+            OBS_FIELD_SIZES["deal_target"] = 1
+            OBS_FIELD_SIZES["deal_priv"] = 9 + n_c
+            if "deal_target" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "deal_target")
+            for f in ("deal_target", "deal_priv"):
+                if f not in cfg.obs.state_list:
+                    cfg.obs.state_list = (*cfg.obs.state_list, f)
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
@@ -425,6 +434,18 @@ class PreciseAssemblyEnv(PlayEnv):
                 from .usb_task import UsbTask
                 self._usb = usb = UsbTask(self)
             usb.reset(env_ids)
+        if self.cfg.precise_assembly.deal_task:
+            if getattr(self, "_deal", None) is None:
+                from .deal_card import DealCard
+                self._deal = DealCard(self)
+            if not hasattr(self, "deal_last"):
+                self.deal_last = {k: torch.zeros(self.num_envs, device=self.device)
+                                  for k in ("success", "slide_mm", "target_mm", "others_mm", "card2_mm", "slide_max_mm")}
+            d = self._deal
+            for k, v in (("success", d.success.float()), ("slide_mm", d.slide * 1e3), ("target_mm", d.target * 1e3),
+                         ("others_mm", d.others_max * 1e3), ("card2_mm", d.card2 * 1e3), ("slide_max_mm", d.slide_max * 1e3)):
+                self.deal_last[k][env_ids] = v[env_ids]
+            d.reset(env_ids)
 
     def _reset_peg_episode(self, env_ids: torch.Tensor) -> None:
         n = env_ids.numel()
@@ -753,6 +774,8 @@ class PreciseAssemblyEnv(PlayEnv):
             # Robot joints are absolute, so the bank only fits the hole layout it was recorded on.
             self._start_bank_hole_pos = (torch.as_tensor(d["hole_pos"], device=self.device).float()
                                          if "hole_pos" in d.files else None)
+            self._start_bank_extra = {k_: torch.as_tensor(d[k_], device=self.device)
+                                      for k_ in ("dist_pos_h", "dist_quat_h") if k_ in d.files}
             self._start_bank_pre_flip = (torch.as_tensor(d["key_pre_flip"], device=self.device).float()
                                          if "key_pre_flip" in d.files else None)   # A13 reverse curriculum
             if self._start_bank_hole_pos is None:
@@ -781,6 +804,16 @@ class PreciseAssemblyEnv(PlayEnv):
                          quat_apply(hole_q, b["peg_angvel_h"][k].float())], dim=-1)
         self.object.write_root_pose_to_sim(torch.cat([pos + self.scene.env_origins[env_ids], quat], -1), env_ids=env_ids)
         self.object.write_root_velocity_to_sim(vel, env_ids=env_ids)
+
+        if "dist_pos_h" in getattr(self, "_start_bank_extra", {}) and getattr(self, "distractors", ()):
+            dp, dq = self._start_bank_extra["dist_pos_h"], self._start_bank_extra["dist_quat_h"]
+            for j, body in enumerate(self.distractors):
+                p_ = self.hole_pos[env_ids] + quat_apply(hole_q, dp[k, j].float())
+                q_ = quat_mul(hole_q, dq[k, j].float())
+                body.write_root_pose_to_sim(torch.cat([p_ + self.scene.env_origins[env_ids], q_], -1), env_ids=env_ids)
+                body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
+                if hasattr(self, "_distractor_reset_pos"):
+                    self._distractor_reset_pos[j, env_ids] = p_ + self.scene.env_origins[env_ids]
 
         self._successes[env_ids] = b["successes"][k].long()
         self._start_successes[env_ids] = b["successes"][k].long()
@@ -1288,6 +1321,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 max_successes = self._usb.success.clone()
                 if pih_cfg.usb_terminate_on_fail:
                     usb_fail = {k: v & ~max_successes for k, v in self._usb.fail.items()}
+        if pih_cfg.deal_task and getattr(self, "_deal", None) is not None:
+            self._deal.update()
+            max_successes = self._deal.success.clone()
+            usb_fail = {f"deal_{k}": v.clone() for k, v in self._deal.fail.items()}
+            crushed = crushed & ~max_successes
         key_dropped = torch.zeros_like(fall)
         if getattr(self, "_key", None) is not None:
             key_dropped = self._key.dropped & ~max_successes
@@ -1304,7 +1342,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "disturbed": disturbed,
             "crushed": crushed,
             "key_dropped": key_dropped,
-            **{f"usb_{k}": v for k, v in usb_fail.items()},
+            **{(k if k.startswith("deal_") else f"usb_{k}"): v for k, v in usb_fail.items()},
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1430,6 +1468,17 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["usb/success"] = usb.success.float().mean()
             self.extras["usb/pushing"] = usb.pushing.float().mean()
             self.extras["usb/released"] = usb.released.float().mean()
+        deal = getattr(self, "_deal", None)
+        if pih_cfg.deal_task and deal is not None:   # A26
+            tr = self._termination_reasons
+            d_rew = deal.reward() + pih_cfg.deal_success_bonus * tr["max_successes"].float()
+            for k, v in tr.items():
+                if k.startswith("deal_"):
+                    d_rew = d_rew - pih_cfg.deal_fail_penalty * v.float()
+            reward = reward + d_rew
+            self._reward_terms["deal_reward"] = d_rew
+            self._reward_terms["total_reward"] = reward
+            deal.log(self.extras)
         key = getattr(self, "_key", None)
         if key is not None:   # A13
             k_rew = -pih_cfg.key_drop_penalty * self._termination_reasons["key_dropped"].float()
@@ -1474,6 +1523,13 @@ class PreciseAssemblyEnv(PlayEnv):
             sf["neighbours_out_of_box_cm"] = self.distractor_disp_ep_max * 100.0
             sf["ended_disturbed"] = self._termination_reasons["disturbed"].float() \
                 if "disturbed" in self._termination_reasons else torch.zeros_like(task)
+        if getattr(self, "_deal", None) is not None:
+            tr_ = getattr(self, "_termination_reasons", {})
+            sf["task"] = tr_["max_successes"].float() if "max_successes" in tr_ else torch.zeros_like(task)
+            for k_ in ("deal_dragged", "deal_dropped", "deal_over", "crushed", "timeout"):
+                if k_ in tr_:
+                    sf[k_] = tr_[k_].float()
+            sf["deal_slide_mm"] = self._deal.slide * 1e3
         key = getattr(self, "_key", None)
         if key is not None:
             sf["key_dropped"] = self._termination_reasons["key_dropped"].float() \
