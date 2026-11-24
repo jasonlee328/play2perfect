@@ -7,7 +7,7 @@ Per env and episode:
   target  = slide distance of the top card relative to the deck, U(deal_target_m) (actor obs field ``deal_target``).
 Every step (all in the palm frame, so the frozen arm / wrist do not matter):
   slide   = planar (deck-plane) displacement of the top card relative to the bottom card, from the episode start
-  others  = max displacement of any lower card in the palm frame from the episode start (card 2 .. bottom)
+  others  = max planar displacement of the middle cards (card 2 .. card C-1) relative to the bottom card (deck frame)
   card2   = displacement of card 2 relative to the bottom card (the card the thumb would drag along)
   held    = bottom card within deal_drop_m of its start in the palm frame
 Success: |slide - target| <= deal_tol_m, others < deal_others_m, held, for deal_hold_steps steps in a row.
@@ -69,7 +69,10 @@ class DealCard:
         bq = bot[:, 3:7]
         top_rel = quat_apply_inverse(bq, self.cards[0].data.root_pos_w - bot[:, :3])      # bottom-card frame
         c2_rel = quat_apply_inverse(bq, self.cards[1].data.root_pos_w - bot[:, :3]) if self.C > 2 else torch.zeros_like(top_rel)
-        low = torch.stack([quat_apply_inverse(pq, b.data.root_pos_w - pp) for b in self.cards[1:]], 0)   # palm frame
+        # middle cards (card 2 .. card C-1) rel. the bottom card (deck frame); the bottom card itself in the palm frame
+        mid = [quat_apply_inverse(bq, b.data.root_pos_w - bot[:, :3]) for b in self.cards[1:-1]]
+        bot_p = quat_apply_inverse(pq, bot[:, :3] - pp)
+        low = torch.stack(mid + [bot_p], 0)
         return top_rel, c2_rel, low
 
     # ---------------------------------------------------------------- reset
@@ -119,9 +122,9 @@ class DealCard:
         d = top_rel - self.top0
         self.slide_vec = d[:, :2]
         self.slide = d[:, :2].norm(dim=-1)
-        dl = (low - self.low0).norm(dim=-1)                       # (C-1, N)
-        self.others = dl.amax(0)
-        self.bottom_move = dl[-1]
+        dl = (low - self.low0)[..., :2].norm(dim=-1)              # (C-1, N): middle cards in the deck plane, bottom in palm xy
+        self.others = dl[:-1].amax(0) if self.C > 2 else torch.zeros_like(dl[0])
+        self.bottom_move = (low[-1] - self.low0[-1]).norm(dim=-1)
         self.card2 = (c2_rel - self.c20)[:, :2].norm(dim=-1) if self.C > 2 else dl[0]
         self.held = self.bottom_move < float(c.deal_drop_m)
         self.slide_max = torch.maximum(self.slide_max, self.slide)
