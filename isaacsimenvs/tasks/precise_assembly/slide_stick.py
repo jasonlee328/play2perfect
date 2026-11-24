@@ -49,6 +49,7 @@ class SlideStick:
         self.dt = float(env.physics_dt) * int(env.cfg.decimation)
         self.x_end = float(c.slide_x_end)
         self.x_top = float(c.slide_x_top)
+        self._step = 0
 
     # ------------------------------------------------------------------ geometry
     def pinch_point(self):
@@ -89,6 +90,10 @@ class SlideStick:
         c = self.env.cfg.precise_assembly
         lo_t, hi_t = (float(v) for v in c.slide_target_range)
         lo_c, hi_c = (float(v) for v in c.slide_change_range)
+        s0 = tuple(float(v) for v in c.slide_change_start_range)
+        if s0[1] > 0.0 and int(c.slide_change_ramp_steps) > 0:   # curriculum on the requested change
+            f = min(max((self._step + int(c.slide_change_ramp_offset_steps)) / int(c.slide_change_ramp_steps), 0.0), 1.0)
+            lo_c, hi_c = s0[0] + f * (lo_c - s0[0]), s0[1] + f * (hi_c - s0[1])
         lo = torch.maximum(torch.full_like(p0, lo_c), lo_t - p0)
         hi = torch.minimum(torch.full_like(p0, hi_c), hi_t - p0)
         hi = torch.maximum(hi, lo)
@@ -101,6 +106,7 @@ class SlideStick:
         """Start of _get_dones (fresh physics state)."""
         e = self.env
         c = e.cfg.precise_assembly
+        self._step += 1
         prot, lat, xp = self.measure()
         new = (self.fresh & self.draw_on_update).nonzero(as_tuple=False).squeeze(-1)
         if new.numel() > 0:
@@ -144,6 +150,7 @@ class SlideStick:
         r = r + float(c.slide_tol_rew) * self.in_tol.float()
         r = r + float(c.slide_success_bonus) * terms["max_successes"].float()
         r = r - float(c.slide_fail_penalty) * (terms["slide_overshoot"] | terms["slide_dropped"]).float()
+        r = r - float(c.slide_timeout_penalty) * (terms["timeout"] & ~terms["max_successes"]).float()
         return r
 
     def log(self, extras):
@@ -152,6 +159,8 @@ class SlideStick:
         extras["slide/in_tol"] = self.in_tol.float().mean()
         extras["slide/speed_mm_s"] = self.speed.mean() * 1e3
         extras["slide/lateral_mm"] = self.lateral.mean() * 1e3
+        extras["slide/change_mean_mm"] = self.change.mean() * 1e3
+        extras["slide/slid_mm"] = (self.prot - self.start).mean() * 1e3
 
 
 def apply_act_dr(env, env_ids):

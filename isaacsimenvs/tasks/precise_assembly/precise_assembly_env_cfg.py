@@ -167,6 +167,10 @@ class PreciseAssemblyCfg:
     slide_success_bonus: float = 100.0
     slide_fail_penalty: float = 100.0
     slide_mass_scale_range: tuple = (1.0, 1.0)   # hidden per-env stick mass x U(lo, hi), set once at init
+    slide_change_start_range: tuple = (0.0, 0.0)   # curriculum: request range at step 0 (0,0 = off), ramps to slide_change_range
+    slide_change_ramp_steps: int = 0    # env steps of the ramp
+    slide_change_ramp_offset_steps: int = 0   # set on a resume (the step counter restarts)
+    slide_timeout_penalty: float = 0.0  # paid when the episode times out
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
     usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
     usb_hold_steps: int = 36           # held_in_hand_at_start window (0.6 s)
