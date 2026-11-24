@@ -129,9 +129,8 @@ def main() -> None:
         # P2P_NEW_OBS_FIELD names another field that is new relative to the checkpoint (e.g. distractor_obs).
         # A comma list must be contiguous in ``fields`` (e.g. distractor_obs,tactile from the Stage-1 play policy).
         new = [f for f in os.environ.get("P2P_NEW_OBS_FIELD", "").split(",") if f]
+        new = [f for f in new if f in fields]   # A27: a list may hold only some of the new fields (critic: no tactile)
         if new:
-            if any(f not in fields for f in new):
-                return None
             i = min(fields.index(f) for f in new)
             if set(fields[i:i + len(new)]) != set(new):
                 raise ValueError(f"P2P_NEW_OBS_FIELD {new} not contiguous in {fields}")
