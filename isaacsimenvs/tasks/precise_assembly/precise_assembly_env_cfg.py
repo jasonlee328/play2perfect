@@ -121,6 +121,9 @@ class PreciseAssemblyCfg:
     # A26 deal card (deal_card.py): thumb slides the top card of a held deck by a target distance
     deal_task: bool = False
     deal_target_m: tuple = (0.015, 0.04)
+    deal_target_start_m: tuple = (0.005, 0.015)   # curriculum start (with deal_target_ramp_steps > 0)
+    deal_target_ramp_steps: int = 0
+    deal_target_ramp_offset_steps: int = 0
     deal_tol_m: float = 0.003
     deal_others_m: float = 0.003
     deal_hold_steps: int = 30

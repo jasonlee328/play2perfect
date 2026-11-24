@@ -98,6 +98,11 @@ class DealCard:
     def reset(self, env_ids):
         c = self.env.cfg.precise_assembly
         lo, hi = (float(v) for v in c.deal_target_m)
+        n_r = int(getattr(c, "deal_target_ramp_steps", 0))
+        if n_r > 0:   # curriculum: target range ramps from deal_target_start_m to deal_target_m (env steps; a resume replays it)
+            f = min(1.0, (int(self.env.common_step_counter) + int(getattr(c, "deal_target_ramp_offset_steps", 0))) / n_r)
+            lo0, hi0 = (float(v) for v in c.deal_target_start_m)
+            lo, hi = lo0 + f * (lo - lo0), hi0 + f * (hi - hi0)
         self.target[env_ids] = lo + (hi - lo) * torch.rand(env_ids.numel(), device=self.env.device)
         self.ready[env_ids] = False          # reference captured at the first update (poses written by now)
         self.step_i[env_ids] = 0
