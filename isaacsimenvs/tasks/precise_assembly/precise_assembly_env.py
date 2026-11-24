@@ -477,7 +477,8 @@ class PreciseAssemblyEnv(PlayEnv):
             _pads_finish = install_usd_bake(self, _pa_scene)
         setup_scene(self)
         k = float(getattr(self.cfg.precise_assembly, "object_compliant_stiffness", 0.0))
-        if k > 0.0:
+        comb = str(getattr(self.cfg.precise_assembly, "object_friction_combine", "") or "")
+        if k > 0.0 or comb:
             # A8 (A3's force_window recipe): compliant-contact PhysX material on every object collision prim, so
             # contact depth (and the ray-cast taxels) grows with force; friction = assets.object_friction.
             from pxr import PhysxSchema, Usd, UsdPhysics, UsdShade
@@ -489,8 +490,13 @@ class PreciseAssemblyEnv(PlayEnv):
             mu = float(self.cfg.assets.object_friction)
             pm.CreateStaticFrictionAttr(mu); pm.CreateDynamicFrictionAttr(mu); pm.CreateRestitutionAttr(0.0)
             px = PhysxSchema.PhysxMaterialAPI.Apply(mat.GetPrim())
-            px.CreateCompliantContactStiffnessAttr(k)
-            px.CreateCompliantContactDampingAttr(float(getattr(self.cfg.precise_assembly, "object_compliant_damping", 0.0)))
+            if k > 0.0:
+                px.CreateCompliantContactStiffnessAttr(k)
+                px.CreateCompliantContactDampingAttr(float(getattr(self.cfg.precise_assembly, "object_compliant_damping", 0.0)))
+            if comb:
+                # A8 doorslip: friction combine mode of the object (knob) material, e.g. "multiply": PhysX picks the
+                # higher-priority mode of the pair (average < min < multiply < max), so the knob's own mu sets the contact
+                px.CreateFrictionCombineModeAttr(comb)
             n = 0
             for i in range(self.cfg.scene.num_envs):
                 root = stage.GetPrimAtPath(f"/World/envs/env_{i}/Object")
@@ -498,7 +504,7 @@ class PreciseAssemblyEnv(PlayEnv):
                     if prim.HasAPI(UsdPhysics.CollisionAPI):
                         UsdShade.MaterialBindingAPI.Apply(prim).Bind(mat, UsdShade.Tokens.weakerThanDescendants, "physics")
                         n += 1
-            print(f"[a8] compliant object material k={k} bound to {n} collision prims", flush=True)
+            print(f"[a8] object material k={k} combine={comb or 'default'} bound to {n} collision prims", flush=True)
         if _pads_finish is not None:
             self._tacmap_pads_info = _pads_finish()
 

@@ -421,6 +421,8 @@ class PreciseAssemblyCfg:
     crush_force_range: tuple = (0.0, 0.0)
     # A8 doorslip: hidden hand motor DR (gain lo, gain hi, joint friction max), once per env; (1,1,0) = off
     hand_motor_dr: tuple = (1.0, 1.0, 0.0)
+    # A8 doorslip: friction combine mode on the object material ('' = PhysX default average; 'min' / 'multiply' / 'max')
+    object_friction_combine: str = ""
     crush_steps: int = 3
     crush_penalty: float = 200.0
     latch_cbf_grasp_fingers: int = 2
