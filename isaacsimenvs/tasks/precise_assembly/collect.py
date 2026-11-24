@@ -387,6 +387,17 @@ class CollectManager:
         self.ft_min_all = self.ft_min.min(1).values
         out = self.active & ~self.in_bin
         self.ft_min_out = torch.where(out, self.ft_min, torch.full_like(self.ft_min, 9.0)).min(1).values
+        hld = float(getattr(c, "collect_hand_link_dist", 0.0))
+        if hld > 0:
+            # A19 stash: parts held by curled fingers sit next to PP / MP links, far from the tips and the wrist body
+            if not hasattr(self, "_hand_link_ids"):
+                self._hand_link_ids = [i for i, n in enumerate(env.robot.body_names)
+                                       if n.startswith("left_") and not n.endswith(("elastomer", "fingertip"))]
+            hl = env.robot.data.body_state_w[:, self._hand_link_ids, 0:3] - env.scene.env_origins.unsqueeze(1)
+            dl = (hl.unsqueeze(2) - pos.unsqueeze(1)).norm(dim=-1).min(1).values
+            self.link_near = self.active & (dl < hld)
+        else:
+            self.link_near = torch.zeros_like(self.active)
         all_in = (self.in_bin == self.active).all(1)
         k_min = int(c.collect_success_min_in)
         if k_min > 0 and int(c.collect_success_min_in_start) > 0 and c.collect_success_min_in_ramp_steps > 0:
@@ -421,7 +432,7 @@ class CollectManager:
             # palm), for collect_success_steps steps. Score = parts held.
             palm_p = env.robot.data.body_state_w[:, env._palm_body_id, 0:3] - env.scene.env_origins
             near = ((pos - palm_p.unsqueeze(1)).norm(dim=-1) < float(c.collect_hand_radius)) | \
-                (self.ft_min < float(c.collect_grasp_dist))
+                (self.ft_min < float(c.collect_grasp_dist)) | self.link_near
             held = self.active & (pos[..., 2] - self.z0 > float(c.collect_lift_only_h)) & near
             self.n_held = held.sum(1).float()
             self.held_max = torch.maximum(self.held_max, self.n_held)
@@ -503,6 +514,7 @@ class CollectManager:
             # a fingertip pinch holds the part ~10-15 cm from the palm body: also count a lifted part within
             # collect_grasp_dist of any fingertip (else the in-hand / carry potentials never fire for pinches)
             near_palm = near_palm | (self.ft_min < float(c.collect_grasp_dist))
+        near_palm = near_palm | getattr(self, "link_near", torch.zeros_like(near_palm))
         in_hand = out & (rise > 0.02) & near_palm
         n_hand = in_hand.sum(1).float()
         self.n_in_hand = n_hand
