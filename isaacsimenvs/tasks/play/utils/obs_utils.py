@@ -51,6 +51,8 @@ OBS_FIELD_SIZES: dict[str, int] = {
     "progress": 1,
     "successes": 1,
     "reward": 1,
+    "slide_target": 2,   # A25 slide_stick: [target protrusion, requested change] / 0.1 m
+    "slide_state": 6,    # A25 critic only: protrusion, error, speed, lateral, hold, max protrusion
 }
 
 
@@ -354,6 +356,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
                 obs_clean[k] = torch.rand_like(obs_clean[k])
             elif override != "none":
                 raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
+
+    if getattr(env, "_slide", None) is not None:   # A25
+        obs_clean["slide_target"] = env._slide.obs()
+        obs_clean["slide_state"] = env._slide.state()
 
     if "distractor_obs" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
         idx = getattr(env, "_obs_distractor_idx", None)

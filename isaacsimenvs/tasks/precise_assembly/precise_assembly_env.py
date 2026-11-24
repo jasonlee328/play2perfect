@@ -69,8 +69,28 @@ class PreciseAssemblyEnv(PlayEnv):
         self, cfg: PreciseAssemblyEnvCfg, render_mode: str | None = None, **kwargs
     ) -> None:
         self._configure_problem(cfg)
+        self._slide = None
+        if bool(getattr(cfg.precise_assembly, "slide_stick", False)):   # A25: target in the actor obs, state in the critic
+            if "slide_target" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "slide_target")
+            for f in ("slide_target", "slide_state"):
+                if f not in cfg.obs.state_list:
+                    cfg.obs.state_list = (*cfg.obs.state_list, f)
 
         super().__init__(cfg, render_mode, **kwargs)
+
+        if bool(getattr(cfg.precise_assembly, "slide_stick", False)):
+            from .slide_stick import SlideStick
+            self._slide = SlideStick(self)
+            lo, hi = (float(v) for v in cfg.precise_assembly.slide_mass_scale_range)
+            if (lo, hi) != (1.0, 1.0):   # hidden per-env stick mass, fixed for the env's life
+                view = self.object.root_physx_view
+                ids = torch.arange(self.num_envs, dtype=torch.int32)
+                m0 = view.get_masses().clone(); i0 = view.get_inertias().clone()
+                sc = torch.empty(self.num_envs, 1).uniform_(lo, hi)
+                view.set_masses(m0 * sc, ids); view.set_inertias(i0 * sc, ids)
+                self._slide_mass_scale = sc.squeeze(-1).to(self.device)
+                print(f"[PreciseAssemblyEnv] A25 stick mass x U({lo},{hi}) per env: {float(m0[0, 0]) * 1e3:.2f} g base", flush=True)
 
         # A12: optional object mass override (solver conditioning: a 15 g USB stick can't spread the stiff spring
         # jaws in PhysX, the official sim already raises the print mass for the same reason). Inertia scales alike.
@@ -753,6 +773,8 @@ class PreciseAssemblyEnv(PlayEnv):
             # Robot joints are absolute, so the bank only fits the hole layout it was recorded on.
             self._start_bank_hole_pos = (torch.as_tensor(d["hole_pos"], device=self.device).float()
                                          if "hole_pos" in d.files else None)
+            self._start_bank_slide_prot = (torch.as_tensor(d["slide_prot0"], device=self.device).float()
+                                           if "slide_prot0" in d.files else None)   # A25 settled start protrusion
             self._start_bank_pre_flip = (torch.as_tensor(d["key_pre_flip"], device=self.device).float()
                                          if "key_pre_flip" in d.files else None)   # A13 reverse curriculum
             if self._start_bank_hole_pos is None:
@@ -790,9 +812,23 @@ class PreciseAssemblyEnv(PlayEnv):
             self._key_pre_flip[env_ids] = self._start_bank_pre_flip[k]
         self._lifted_object[env_ids] = b["lifted"][k].bool()
         self._object_init_z[env_ids] = b["object_init_z"][k].float()
+        if getattr(self, "_start_bank_slide_prot", None) is not None:
+            if not hasattr(self, "_slide_prot0"):
+                self._slide_prot0 = torch.zeros(self.num_envs, device=self.device)
+            self._slide_prot0[env_ids] = self._start_bank_slide_prot[k]
 
     def _write_goal_pose(self, env_ids: torch.Tensor, is_first_goal: bool = False) -> None:
         n = env_ids.numel()
+        if getattr(self, "_slide", None) is not None:   # A25: no keypoint goal; park the marker 1 m above the stick
+            if is_first_goal:
+                self._slide.reset(env_ids)
+                from .slide_stick import apply_act_dr
+                apply_act_dr(self, env_ids)
+            g = torch.cat([self.object.data.root_pos_w[env_ids] + torch.tensor([0.0, 0.0, 1.0], device=self.device),
+                           self.object.data.root_quat_w[env_ids]], -1)
+            self.goal_viz.write_root_pose_to_sim(g, env_ids=env_ids)
+            self.goal_viz.write_root_velocity_to_sim(torch.zeros(n, 6, device=self.device), env_ids=env_ids)
+            return
         if self.cfg.precise_assembly.key_repose:
             if getattr(self, "_key", None) is None:
                 from .key_repose import KeyRepose
@@ -1155,6 +1191,8 @@ class PreciseAssemblyEnv(PlayEnv):
         update_tolerance_curriculum(self)
         if getattr(self, "_key", None) is not None:
             self._key.update()
+        if getattr(self, "_slide", None) is not None:
+            self._slide.update()
         compute_intermediate_values(self)
 
         pih_cfg = self.cfg.precise_assembly
@@ -1291,7 +1329,17 @@ class PreciseAssemblyEnv(PlayEnv):
         key_dropped = torch.zeros_like(fall)
         if getattr(self, "_key", None) is not None:
             key_dropped = self._key.dropped & ~max_successes
+        slide_fail = {}
+        if getattr(self, "_slide", None) is not None:   # A25: success / fail from the slide rule only
+            sl = self._slide
+            max_successes = sl.success.clone()
+            slide_fail = {"slide_overshoot": sl.overshoot & ~max_successes,
+                          "slide_dropped": sl.dropped & ~max_successes & ~sl.overshoot}
+            crushed = crushed & ~max_successes
+            fall = fall & ~max_successes
         terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | key_dropped
+        for v in slide_fail.values():
+            terminated = terminated | v
         for v in usb_fail.values():
             terminated = terminated | v
         truncated = self.episode_length_buf >= self.max_episode_length
@@ -1305,6 +1353,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "crushed": crushed,
             "key_dropped": key_dropped,
             **{f"usb_{k}": v for k, v in usb_fail.items()},
+            **slide_fail,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1430,6 +1479,13 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["usb/success"] = usb.success.float().mean()
             self.extras["usb/pushing"] = usb.pushing.float().mean()
             self.extras["usb/released"] = usb.released.float().mean()
+        sl = getattr(self, "_slide", None)
+        if sl is not None:   # A25
+            s_rew = sl.reward(self._termination_reasons)
+            reward = reward + s_rew
+            self._reward_terms["slide_reward"] = s_rew
+            self._reward_terms["total_reward"] = reward
+            sl.log(self.extras)
         key = getattr(self, "_key", None)
         if key is not None:   # A13
             k_rew = -pih_cfg.key_drop_penalty * self._termination_reasons["key_dropped"].float()

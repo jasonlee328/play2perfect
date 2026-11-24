@@ -150,6 +150,23 @@ class PreciseAssemblyCfg:
                                         # within tolerance of (a flat key flops through 45-75 deg); the last goal is never skipped
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
     key_hold_rew: float = 0.0           # per step while the key is not dropped (fingertip within key_drop_dist)
+    # A25 slide a pinched stick to a requested length (slide_stick.py)
+    slide_stick: bool = False
+    slide_x_end: float = 0.1096        # m, stick bottom end along object +x (chopstick thin end)
+    slide_x_top: float = -0.085        # m, pinch above this object x (near the top end) = dropped
+    slide_target_range: tuple = (0.04, 0.12)   # m, target protrusion below the pinch
+    slide_change_range: tuple = (0.02, 0.08)   # m, requested change (target - start)
+    slide_tol: float = 0.005
+    slide_still_mps: float = 0.001
+    slide_speed_ema: float = 0.3
+    slide_hold_steps: int = 30
+    slide_overshoot: float = 0.015
+    slide_drop_lateral: float = 0.015
+    slide_shape_scale: float = 1.0      # x decrease of |error| in cm
+    slide_tol_rew: float = 0.1          # per step inside the tolerance
+    slide_success_bonus: float = 100.0
+    slide_fail_penalty: float = 100.0
+    slide_mass_scale_range: tuple = (1.0, 1.0)   # hidden per-env stick mass x U(lo, hi), set once at init
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
     usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
     usb_hold_steps: int = 36           # held_in_hand_at_start window (0.6 s)

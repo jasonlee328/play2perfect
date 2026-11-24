@@ -539,6 +539,10 @@ class DomainRandomizationCfg:
     # PhysX configuration. The proper path is Isaac Lab's
     # EventCfg.ActorMassRandomization, which is a larger refactor.
     object_friction_scale_range: tuple[float, float] = (1.0, 1.0)
+    # A25: hidden per-env hand motor randomization, resampled at every reset (precise_assembly slide_stick.apply_act_dr):
+    # per hand joint stiffness + damping x logU(range), joint friction U(0, max)
+    hand_gain_log_range: tuple[float, float] = (1.0, 1.0)
+    hand_joint_friction_max: float = 0.0
     fingertip_friction_scale_range: tuple[float, float] = (1.0, 1.0)
     friction_n_buckets: int = 16
 

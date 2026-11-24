@@ -10941,6 +10941,37 @@
      0.03186
     ]
    }
+  },
+  "cb_slide_stick": {
+   "object": "chopstick",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A25 (FoundationTouch, new task; ContactBench chopstick asset)",
+    "task": "pinched upright stick slides down through the fingers to a requested protrusion, then re-grip",
+    "stick_axis": "object +x = down (thin end), x from -0.0904 (thick, 6.49 mm) to +0.1096 (thin, 5.02 mm)",
+    "x_end_m": 0.1096,
+    "x_top_m": -0.0904
+   }
   }
  },
  "mass_model": "per object: objects.<name>.mass_model (apply_print_masses.py)"
