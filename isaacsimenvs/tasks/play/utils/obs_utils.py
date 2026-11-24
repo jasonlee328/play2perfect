@@ -415,6 +415,11 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             env._jp_bias[new_ep] = (torch.rand_like(env._jp_bias[new_ep]) * 2.0 - 1.0) * jp_bias
         obs_noisy["joint_pos"] = jp + env._jp_bias + torch.randn_like(jp) * jp_std
 
+    # A8 doorslip: actor-only blind fields (zeroed in the policy obs, critic keeps them; layout unchanged so a
+    # checkpoint that saw them still loads), e.g. object_rot / keypoints_rel_* = the knob pose hidden from the actor.
+    for f in tuple(getattr(env.cfg.obs, "actor_zero_fields", ()) or ()):
+        if f in obs_noisy:
+            obs_noisy[f] = torch.zeros_like(obs_noisy[f])
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)
 
