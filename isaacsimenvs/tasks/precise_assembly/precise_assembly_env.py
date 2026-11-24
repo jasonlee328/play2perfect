@@ -502,10 +502,28 @@ class PreciseAssemblyEnv(PlayEnv):
         if _pads_finish is not None:
             self._tacmap_pads_info = _pads_finish()
 
+    def _hand_motor_dr_once(self) -> None:
+        """A8 doorslip (A23 slip_probe --act_dr): hidden per-env hand motor DR, applied once (first reset): every hand
+        joint's PD stiffness + damping x logU(lo, hi) (same factor) and joint friction U(0, fric) (dynamic 0.8x), so an
+        ideal PD can't turn the object's tug on the fingers into a clean joint signal."""
+        lo, hi, fr = (float(v) for v in tuple(getattr(self.cfg.precise_assembly, "hand_motor_dr", (1.0, 1.0, 0.0))))
+        if getattr(self, "_hand_motor_dr_done", False) or (lo == 1.0 and hi == 1.0 and fr <= 0.0):
+            return
+        rb = self.robot; hand = list(self._hand_joint_ids); n = self.num_envs; dev = self.device
+        g = torch.exp(torch.empty(n, len(hand), device=dev).uniform_(math.log(lo), math.log(hi)))
+        rb.write_joint_stiffness_to_sim(rb.root_physx_view.get_dof_stiffnesses().to(dev)[:, hand] * g, joint_ids=hand)
+        rb.write_joint_damping_to_sim(rb.root_physx_view.get_dof_dampings().to(dev)[:, hand] * g, joint_ids=hand)
+        if fr > 0.0:
+            mu = torch.empty(n, len(hand), device=dev).uniform_(0.0, fr)
+            rb.write_joint_friction_coefficient_to_sim(mu, joint_dynamic_friction_coeff=0.8 * mu, joint_ids=hand)
+        self._hand_motor_dr_done = True
+        print(f"[a8] hand motor DR: gains x logU({lo},{hi}), joint friction U(0,{fr}) on {len(hand)} joints", flush=True)
+
     def _reset_idx(self, env_ids) -> None:
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self.device)
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        self._hand_motor_dr_once()
         if hasattr(self, "hand_force_ep_max"):
             if not hasattr(self, "hand_force_last_ep_max"):
                 self.hand_force_last_ep_max = torch.zeros_like(self.hand_force_ep_max)
