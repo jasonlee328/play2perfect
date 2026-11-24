@@ -151,6 +151,8 @@ class ObsCfg:
     )
 
     clamp_abs_observations: float = 10.0
+    # A27: obs_list fields fed to the actor as zeros (e.g. object pose hidden but the checkpoint's input layout kept)
+    actor_zero_fields: tuple[str, ...] = ()
 
 
 # ----------------------------------------------------------------------------
