@@ -171,6 +171,7 @@ class PreciseAssemblyCfg:
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
     key_hold_rew: float = 0.0           # per step while the key is not dropped (fingertip within key_drop_dist)
     object_mass_kg: float = 0.0        # > 0: override the object's mass (inertia scaled alike) after the scene is built
+    object_mass_scale_range: tuple = (0.0, 0.0)   # A26: > 0 = hidden per-env object mass x log-U(lo, hi)
     usb_settle_steps: int = 0          # steps after a start-bank reset before the checks start (pinch settles)
     usb_hold_steps: int = 36           # held_in_hand_at_start window (0.6 s)
     usb_pad_force: float = 0.2         # N, a link "carries" the stick

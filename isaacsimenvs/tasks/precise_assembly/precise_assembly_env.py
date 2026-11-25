@@ -83,6 +83,19 @@ class PreciseAssemblyEnv(PlayEnv):
             view.set_masses(m0 * ratio, ids); view.set_inertias(i0 * ratio, ids)
             self._object_mass = (m0[:, 0:1] * ratio).to(self.device)
             print(f"[PreciseAssemblyEnv] object mass {float(m0[0, 0]) * 1e3:.2f} g -> {m_kg * 1e3:.2f} g", flush=True)
+        # A26: hidden per-env object mass scale x log-U(lo, hi) (fixed for the env's life; inertia scaled alike).
+        ms = tuple(getattr(cfg.precise_assembly, "object_mass_scale_range", (0.0, 0.0)))
+        if ms[0] > 0.0 and ms[1] > 0.0:
+            view = self.object.root_physx_view
+            ids = torch.arange(self.num_envs, dtype=torch.int32)
+            m0 = view.get_masses().clone(); i0 = view.get_inertias().clone()
+            g = torch.Generator().manual_seed(1234 + int(getattr(cfg, "seed", 0) or 0))
+            ratio = torch.exp(torch.empty(self.num_envs, 1).uniform_(math.log(ms[0]), math.log(ms[1]), generator=g))
+            view.set_masses(m0 * ratio, ids); view.set_inertias(i0 * ratio, ids)
+            self._object_mass = (m0[:, 0:1] * ratio).to(self.device)
+            self._object_mass_scale = ratio[:, 0].to(self.device)
+            print(f"[PreciseAssemblyEnv] object mass scale log-U{ms}: {float(m0[0, 0]) * 1e3:.2f} g x "
+                  f"[{float(ratio.min()):.2f}, {float(ratio.max()):.2f}]", flush=True)
 
         # When student_obs is enabled, the env exposes three obs groups via
         # `_get_observations`: "policy" = student obs (image+proprio, what
