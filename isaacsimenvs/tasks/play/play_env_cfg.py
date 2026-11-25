@@ -547,6 +547,7 @@ class DomainRandomizationCfg:
     # init-only buckets like the object's; per-env values kept in env._deal_card_mu (top card first)
     distractor_friction_scale_range: tuple[float, float] = (1.0, 1.0)
     deal_lower_over_top: float = -1.0   # A26: >= 0 -> card 3+ friction >= top card friction + this (no unsolvable drags)
+    deal_window_lower_mu: float = 0.8   # A26: friction of cards 4+ when deal_window_ratio_range is set
     deal_window_rho: float = 1.0   # A26: card-2 weight / top-card weight assumed by deal_window_ratio_range
     deal_window_ratio_range: tuple = ()   # A26: (r_lo, r_hi): card 3+ mu set so card-2 drag press / top-slide press = r (hidden)
     distractor_friction_bases: tuple = ()   # A26: per-distractor base friction (last value repeats); empty = one base

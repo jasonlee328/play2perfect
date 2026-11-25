@@ -1640,7 +1640,10 @@ def apply_physx_material_properties(env) -> None:
                 k__ = r_ * b_ / (a_ - b_).clamp(min=1e-3)
                 c_ = b_ * (1 + k__) / (1 + rho + k__)
                 m3 = (2 * c_ - s_).clamp(min=0.02)
-                mu_e = torch.where(a_ > b_ + 1e-3, m3, mu_e)
+                if k_ == 1:
+                    mu_e = torch.where(a_ > b_ + 1e-3, m3, mu_e)
+                else:   # cards 4+: sticky so card 3 stays put under a dragged card 2
+                    mu_e = torch.full_like(mu_e, float(getattr(dr, "deal_window_lower_mu", 0.8)))
             materials[:, :, 0] = mu_e.unsqueeze(-1); materials[:, :, 1] = mu_e.unsqueeze(-1); materials[:, :, 2] = 0.0
             view.set_material_properties(materials, env_ids)
             mus.append(mu_e)
