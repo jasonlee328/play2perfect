@@ -347,11 +347,24 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             env._last_tactile_feat = env._tactile_encoder(hr).view(env.num_envs, -1)
         if getattr(env, "_tactile_flow", None) is not None:
             obs_clean["tactile_flow"] = env._tactile_flow.compute()
+        if "tactile_slip" in OBS_FIELD_SIZES:
+            # A8 11-25: gel shear proxy = sliding velocity of the object surface under each fingertip pad
+            # (object point velocity at the fingertip minus fingertip velocity, fingertip frame), only while
+            # that pad is in contact. Physical slip (what a marker-based gel sensor sees); /5 cm/s, clip +-3.
+            from isaaclab.utils.math import quat_apply_inverse as _qai_s
+            o = env.object.data
+            fs = env.robot.data.body_state_w[:, env._fingertip_body_ids, :]          # (N, 5, 13)
+            tp, tq, tv = fs[..., 0:3], fs[..., 3:7], fs[..., 7:10]
+            ov = o.root_lin_vel_w[:, None] + torch.cross(o.root_ang_vel_w[:, None].expand_as(tp),
+                                                         tp - o.root_pos_w[:, None], dim=-1)
+            on = (obs_clean["tactile"].view(env.num_envs, 5, -1).amax(-1) > 0).float()[..., None]
+            rel = _qai_s(tq.reshape(-1, 4), (ov - tv).reshape(-1, 3)).reshape(env.num_envs, 5, 3)
+            obs_clean["tactile_slip"] = ((rel * on) / 0.05).clamp(-3.0, 3.0).reshape(env.num_envs, 15)
         if getattr(env, "_hand_skin", None) is not None:
             obs_clean["tactile_hand"] = env._hand_skin.compute()
             env._last_tactile_hand = obs_clean["tactile_hand"]
         override = str(getattr(env.cfg.tactile, "policy_override", "none")).lower()
-        for k in ("tactile", "tactile_hand", "tactile_flow"):
+        for k in ("tactile", "tactile_hand", "tactile_flow", "tactile_slip"):
             if k not in obs_clean:
                 continue
             if override == "zero":

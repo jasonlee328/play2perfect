@@ -598,6 +598,7 @@ class TactileCfg:
     # (rigid-body kinematics, same rays and back-cast check as the depth taxels), in pad tangent axes, divided by
     # flow_scale (m/s) and clipped to +-flow_clip. 0 off contact. policy_override zeroes it too.
     flow_obs: bool = False
+    slip_obs: bool = False  # A8: fingertip slip velocity on the object (gel shear proxy), field tactile_slip (15)
     flow_scale: float = 0.05
     flow_clip: float = 3.0
     pad_compliant_stiffness: float = 280.0     # original: compliant_contact_stiffness on the 5 elastomer prims
