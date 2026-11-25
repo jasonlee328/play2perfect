@@ -133,6 +133,8 @@ class PreciseAssemblyCfg:
     deal_over_m: float = 0.015
     deal_motor_gain: tuple = (1.0, 1.0)     # per-episode hand kp/kd x log-U(lo, hi)
     deal_motor_fric: float = 0.0            # per-episode hand joint friction U(0, x)
+    deal_force_penalty: float = 0.0         # A26 11-25: reward -= x * relu(hand force - deal_force_free) per step (N)
+    deal_force_free: float = 0.5
     deal_card_mass_kg: float = 0.0          # A26 11-25: > 0 -> every card (top + deck) gets this mass (real card ~1.8 g)
     deal_progress_scale: float = 2000.0     # potential on -|slide - target| (m)
     deal_others_penalty: float = 0.5

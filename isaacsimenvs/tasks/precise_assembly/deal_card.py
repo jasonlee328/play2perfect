@@ -155,6 +155,9 @@ class DealCard:
         r = float(c.deal_progress_scale) * dphi
         r = r - float(c.deal_others_penalty) * (self.others / max(float(c.deal_others_m), 1e-6)).clamp(max=3.0)
         r = r + float(c.deal_in_tol_rew) * (self.in_steps > 0).float()
+        fp = float(getattr(c, "deal_force_penalty", 0.0))   # A26 11-25: soft press-force cost (replaces a hard crush rule)
+        if fp > 0.0 and getattr(self.env, "hand_force", None) is not None:
+            r = r - fp * (self.env.hand_force - float(getattr(c, "deal_force_free", 0.5))).clamp(min=0.0)
         return r
 
     # ---------------------------------------------------------------- obs
