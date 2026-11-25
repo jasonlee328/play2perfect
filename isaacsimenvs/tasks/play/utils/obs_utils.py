@@ -436,6 +436,16 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             x[..., :3] += md
             x[..., 3:] += md - mo[0].unsqueeze(1)
             obs_noisy["distractor_obs"] = x.view(obs_noisy["distractor_obs"].shape)
+    if "priv_sticks" in env.cfg.obs.obs_list:
+        # privileged teacher field: exact (clean) stick poses + stick diameter, never noised / offset
+        pd = getattr(env, "_priv_diam_env", None)
+        if pd is None:
+            tab = torch.tensor(env._priv_diam_per_problem, device=env.device, dtype=torch.float32)
+            ai = getattr(env, "_object_asset_index_per_env", None)
+            pd = tab[ai] if (ai is not None and tab.numel() > 1) else tab[:1].expand(env.num_envs)
+            env._priv_diam_env = pd = pd.reshape(-1, 1).clone()
+        obs_noisy["priv_sticks"] = torch.cat([obs_clean["keypoints_rel_palm"].reshape(env.num_envs, -1),
+                                              obs_clean["distractor_obs"].reshape(env.num_envs, -1), pd], dim=-1)
     if fade:
         for k in fade:
             if k in obs_noisy:

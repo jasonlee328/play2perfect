@@ -357,6 +357,15 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if cfg.precise_assembly.obs_priv:
+            if "distractor_obs" not in OBS_FIELD_SIZES:
+                raise ValueError("obs_priv needs obs_distractors=true")
+            OBS_FIELD_SIZES["priv_sticks"] = 12 + OBS_FIELD_SIZES["distractor_obs"] + 1
+            if "priv_sticks" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "priv_sticks")
+            dmap = {"dm15": 4.99, "dm1": 5.49, "dm05": 5.99, "dp1": 7.49}
+            self._priv_diam_per_problem = tuple(
+                (dmap.get(n.rsplit("_", 1)[-1], 6.49) - 6.49) / 1.5 for n in problem_names)
         if cfg.precise_assembly.obs_fixture:
             OBS_FIELD_SIZES["fixture_pose_rel_palm"] = 7
             for lst in ("obs_list", "state_list"):

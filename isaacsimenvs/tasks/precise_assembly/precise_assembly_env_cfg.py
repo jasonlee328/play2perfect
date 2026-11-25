@@ -158,6 +158,11 @@ class PreciseAssemblyCfg:
     # Privileged-free teacher obs: field "fixture_pose_rel_palm" (fixture position relative to the palm + its
     # quaternion wxyz, 7), added to obs_list and state_list.
     obs_fixture: bool = False
+    # Privileged teacher (A17 clean test): actor field priv_sticks = EXACT keypoints_rel_palm (12) + exact
+    # distractor_obs (6 K) + the env's stick-diameter offset (1, (d - 6.49 mm) / 1.5 mm, from the problem name).
+    # Not affected by blind_offset_m / multi-clutter canonicalisation / obs noise. Students mask it
+    # (P2P_STUDENT_MASK_FIELDS=priv_sticks). Needs obs_distractors=true.
+    obs_priv: bool = False
     # obs_fixture: per-episode constant error on the observed fixture position, U(-d, d) per axis (m, world), so the
     # tray is only roughly known and the sticks must be found by contact. () = exact.
     fixture_obs_noise_m: tuple[float, ...] = ()

@@ -177,7 +177,11 @@ class A2CAgent(a2c_common.ContinuousA2CBase):
             if 'teacher_mu' in input_dict and getattr(self, '_distill_coef', 0.0) > 0:
                 d_loss = ((mu - input_dict['teacher_mu'].detach()) ** 2).sum(-1, keepdim=True)
                 d_loss = torch_ext.apply_masks([d_loss], rnn_masks)[0][0]
-                loss = loss + self._distill_coef * d_loss
+                if os.environ.get("P2P_DISTILL_ONLY", "0") == "1":
+                    # pure DAgger: actor learns only from the teacher labels on the student's own states
+                    loss = 0.5 * c_loss * self.critic_coef + self._distill_coef * d_loss
+                else:
+                    loss = loss + self._distill_coef * d_loss
                 self._distill_last = float(d_loss.detach())
 
             if self.multi_gpu:
