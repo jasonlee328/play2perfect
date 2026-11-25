@@ -437,6 +437,26 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
 
+    # A8 real-robot joint sensing: fixed delay of the measured joint positions, then noise in degrees per joint.
+    jd = int(getattr(dr, "joint_position_obs_delay_steps", 0))
+    jdeg = float(getattr(dr, "joint_position_obs_noise_deg", 0.0))
+    if jd > 0 or jdeg > 0:
+        jp = obs_noisy["joint_pos"]
+        if jd > 0:
+            q = getattr(env, "_jp_delay_queue", None)
+            if q is None or q.shape != (jp.shape[0], jd + 1, jp.shape[1]):
+                q = jp.unsqueeze(1).repeat(1, jd + 1, 1)
+            new_ep = env.episode_length_buf <= 1
+            if bool(new_ep.any()):
+                q[new_ep] = jp[new_ep].unsqueeze(1).expand(-1, jd + 1, -1)
+            q = torch.roll(q, shifts=1, dims=1); q[:, 0] = jp
+            env._jp_delay_queue = q
+            jp = q[:, jd]
+        if jdeg > 0:
+            half = 0.5 * (env._joint_upper_canon - env._joint_lower_canon)   # rad -> normalized obs: divide by half range
+            jp = jp + torch.randn_like(jp) * (jdeg * 3.141592653589793 / 180.0) / half.clamp(min=1e-6)
+        obs_noisy["joint_pos"] = jp
+
     # A8 doorslip: actor-only blind fields (zeroed in the policy obs, critic keeps them; layout unchanged so a
     # checkpoint that saw them still loads), e.g. object_rot / keypoints_rel_* = the knob pose hidden from the actor.
     for f in tuple(getattr(env.cfg.obs, "actor_zero_fields", ()) or ()):
