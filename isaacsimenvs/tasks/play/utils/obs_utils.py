@@ -237,6 +237,21 @@ def _apply_obs_delay(env, policy_tensor: torch.Tensor) -> torch.Tensor:
     return delayed
 
 
+def _joint_obs_delay(env, jp: torch.Tensor, jv: torch.Tensor, lo: int, hi: int):
+    """A25: per-env fixed delay (lo..hi policy steps) on joint pos / vel, ring buffer like TactileFlow."""
+    f = torch.cat([jp, jv], dim=-1)
+    if getattr(env, "_joint_obs_hist", None) is None or env._joint_obs_hist.shape[1:] != f.shape:
+        env._joint_obs_hist = torch.zeros(hi + 1, *f.shape, device=f.device)
+        env._joint_obs_delay = torch.randint(lo, hi + 1, (env.num_envs,), device=f.device)
+    h = torch.roll(env._joint_obs_hist, 1, 0)
+    h[0] = f
+    fresh = env.episode_length_buf <= 1
+    h[:, fresh] = f[fresh]
+    env._joint_obs_hist = h
+    out = h[env._joint_obs_delay, torch.arange(env.num_envs, device=f.device)]
+    return out[:, : jp.shape[1]], out[:, jp.shape[1]:]
+
+
 def build_observations(env) -> dict[str, torch.Tensor]:
     """Assemble actor-critic observations with obs-side DR."""
     dr = env.cfg.domain_randomization
@@ -376,6 +391,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         obs_noisy["joint_vel"] = (
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
+    jd = tuple(getattr(dr, "joint_obs_delay_range", (0, 0)))
+    if int(jd[1]) > 0:
+        obs_noisy["joint_pos"], obs_noisy["joint_vel"] = _joint_obs_delay(
+            env, obs_noisy["joint_pos"], obs_noisy["joint_vel"], int(jd[0]), int(jd[1]))
 
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)
