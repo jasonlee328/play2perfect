@@ -418,6 +418,8 @@ class PreciseAssemblyEnv(PlayEnv):
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self.device)
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        if getattr(self, "_jp_obs_walk", None) is not None:
+            self._jp_obs_walk[env_ids] = 0.0  # A26: joint_pos obs random walk restarts each episode
         if hasattr(self, "hand_force_ep_max"):
             if not hasattr(self, "hand_force_last_ep_max"):
                 self.hand_force_last_ep_max = torch.zeros_like(self.hand_force_ep_max)

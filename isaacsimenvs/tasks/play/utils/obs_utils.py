@@ -380,6 +380,22 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             joint_vel + torch.randn_like(joint_vel) * dr.joint_velocity_obs_noise_std
         )
 
+    # A26: actor-only joint-position observation noise: white (std, rad) + per-episode random-walk offset
+    # (per-step std, rad; reset with the episode by the env) - blurs PD tracking error as a press-force readout.
+    jp_std = float(getattr(dr, "joint_position_obs_noise_std", 0.0))
+    jp_walk = float(getattr(dr, "joint_position_obs_walk_std", 0.0))
+    if jp_std > 0 or jp_walk > 0:
+        jp = obs_noisy["joint_pos"]
+        if jp_walk > 0:
+            w = getattr(env, "_jp_obs_walk", None)
+            if w is None or w.shape != jp.shape:
+                w = torch.zeros_like(jp); env._jp_obs_walk = w
+            w.add_(torch.randn_like(w) * jp_walk)
+            jp = jp + w
+        if jp_std > 0:
+            jp = jp + torch.randn_like(jp) * jp_std
+        obs_noisy["joint_pos"] = jp
+
     for f_ in tuple(getattr(env.cfg.obs, "actor_zero_fields", ())):
         obs_noisy[f_] = torch.zeros_like(obs_noisy[f_])
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
