@@ -553,6 +553,10 @@ class DomainRandomizationCfg:
     distractor_friction_bases: tuple = ()   # A26: per-distractor base friction (last value repeats); empty = one base
     fingertip_friction_scale_range: tuple[float, float] = (1.0, 1.0)
     friction_n_buckets: int = 16
+    # A26 realistic deck (11-25): per env a deck friction mu_d ~ U(range), each card mu_i = mu_d x U(1-j, 1+j)
+    # (quantized), set on the top card + every distractor card (overrides the object / distractor scale ranges).
+    deal_deck_mu_range: tuple = ()
+    deal_card_mu_jitter: float = 0.0
 
 
 @configclass
@@ -592,6 +596,8 @@ class TactileCfg:
     flow_obs: bool = False
     flow_scale: float = 0.05
     flow_clip: float = 3.0
+    flow_noise_std: float = 0.0     # A26 11-25: Gaussian noise on every flow value (flow units), before policy_override
+    flow_delay_steps: int = 0       # A26 11-25: flow is this many policy steps old (ring buffer, zero at start)
     pad_compliant_stiffness: float = 280.0     # original: compliant_contact_stiffness on the 5 elastomer prims
     pad_compliant_damping: float = 20.0        # original: compliant_contact_damping
     pad_friction: float = -1.0                 # -1 = keep assets.finger_tip_friction (original: IsaacLab default 0.5)

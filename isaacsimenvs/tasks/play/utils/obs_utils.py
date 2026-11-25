@@ -340,7 +340,18 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             hr = env._tactile_hr.compute().view(-1, r, r)               # (N*5, r, r) in [0, 1]
             env._last_tactile_feat = env._tactile_encoder(hr).view(env.num_envs, -1)
         if getattr(env, "_tactile_flow", None) is not None:
-            obs_clean["tactile_flow"] = env._tactile_flow.compute()
+            _fl = env._tactile_flow.compute()
+            _tc = env.cfg.tactile
+            _ns = float(getattr(_tc, "flow_noise_std", 0.0))
+            if _ns > 0.0:
+                _fl = _fl + torch.randn_like(_fl) * _ns
+            _dl = int(getattr(_tc, "flow_delay_steps", 0))
+            if _dl > 0:   # A26: delayed flow (ring buffer of the last _dl + 1 frames)
+                if getattr(env, "_flow_buf", None) is None or env._flow_buf.shape[1:] != _fl.shape:
+                    env._flow_buf = torch.zeros(_dl + 1, *_fl.shape, device=_fl.device)
+                env._flow_buf = torch.roll(env._flow_buf, 1, 0); env._flow_buf[0] = _fl
+                _fl = env._flow_buf[_dl].clone()
+            obs_clean["tactile_flow"] = _fl
         if getattr(env, "_hand_skin", None) is not None:
             obs_clean["tactile_hand"] = env._hand_skin.compute()
             env._last_tactile_hand = obs_clean["tactile_hand"]

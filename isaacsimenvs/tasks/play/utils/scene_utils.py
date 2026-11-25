@@ -1657,6 +1657,27 @@ def apply_physx_material_properties(env) -> None:
             materials[:] = torch.tensor([d_mu, d_mu, 0.0], dtype=torch.float32)
             view.set_material_properties(materials, env_ids)
 
+    _dm = tuple(getattr(dr, "deal_deck_mu_range", ()) or ())
+    if len(_dm) == 2 and getattr(env, "distractors", ()):
+        # A26 realistic deck: shared per-env deck friction + modest per-card jitter (quantized: material count)
+        g_ = torch.Generator().manual_seed(2468 + int(getattr(env.cfg, "seed", 0) or 0))
+        nb = max(int(dr.friction_n_buckets), 2)
+        deck = torch.linspace(float(_dm[0]), float(_dm[1]), nb)[torch.randint(0, nb, (env.num_envs,), generator=g_)]
+        j = float(getattr(dr, "deal_card_mu_jitter", 0.0))
+        jl = torch.linspace(1.0 - j, 1.0 + j, 5)
+        bodies = [env.object] + list(env.distractors)
+        mus = []
+        for body in bodies:
+            mu_e = deck * jl[torch.randint(0, 5, (env.num_envs,), generator=g_)]
+            view = body.root_physx_view
+            materials = view.get_material_properties()
+            materials[:, :, 0] = mu_e.unsqueeze(-1); materials[:, :, 1] = mu_e.unsqueeze(-1); materials[:, :, 2] = 0.0
+            view.set_material_properties(materials, env_ids)
+            mus.append(mu_e)
+        env._deal_obj_mu = mus[0].clone()
+        env._deal_card_mu = torch.stack(mus, -1).to(env.device)
+        print(f"[scene] A26 realistic deck mu U{_dm} x card jitter +-{j}: {len(mus)} cards", flush=True)
+
     _log_scene_step(t0, "applied PhysX material properties")
 
 

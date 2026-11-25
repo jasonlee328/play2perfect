@@ -83,6 +83,16 @@ class PreciseAssemblyEnv(PlayEnv):
             view.set_masses(m0 * ratio, ids); view.set_inertias(i0 * ratio, ids)
             self._object_mass = (m0[:, 0:1] * ratio).to(self.device)
             print(f"[PreciseAssemblyEnv] object mass {float(m0[0, 0]) * 1e3:.2f} g -> {m_kg * 1e3:.2f} g", flush=True)
+        dmk = float(getattr(cfg.precise_assembly, "deal_card_mass_kg", 0.0))
+        if dmk > 0.0:   # A26 11-25: realistic card mass on every card (inertia scaled alike)
+            ids = torch.arange(self.num_envs, dtype=torch.int32)
+            for body in [self.object] + list(getattr(self, "distractors", ()) or ()):
+                dv = body.root_physx_view
+                dm = dv.get_masses().clone(); di = dv.get_inertias().clone()
+                rt = dmk / dm[:, 0:1].clamp(min=1e-9)
+                dv.set_masses(dm * rt, ids); dv.set_inertias(di * rt, ids)
+            self._object_mass = torch.full((self.num_envs, 1), dmk, device=self.device)
+            print(f"[PreciseAssemblyEnv] A26 every card mass -> {dmk * 1e3:.2f} g", flush=True)
         # A26: hidden per-env object mass scale x log-U(lo, hi) (fixed for the env's life; inertia scaled alike).
         ms = tuple(getattr(cfg.precise_assembly, "object_mass_scale_range", (0.0, 0.0)))
         if ms[0] > 0.0 and ms[1] > 0.0:
