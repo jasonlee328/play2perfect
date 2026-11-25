@@ -461,6 +461,29 @@ def build_observations(env) -> dict[str, torch.Tensor]:
                 x = obs_noisy[f]
                 obs_noisy[f] = x * (1.0 - m).view(-1, *([1] * (x.dim() - 1)))   # fields may be (N, K, 3)
 
+    # A8 real-robot joint sensing: fixed delay of the measured joint positions, then noise in degrees per joint.
+    jd = int(getattr(dr, "joint_position_obs_delay_steps", 0))
+    jdeg = float(getattr(dr, "joint_position_obs_noise_deg", 0.0))
+    if jd > 0 or jdeg > 0:
+        jp = obs_noisy["joint_pos"]
+        if jd > 0:
+            q = getattr(env, "_jp_delay_queue", None)
+            if q is None or q.shape != (jp.shape[0], jd + 1, jp.shape[1]):
+                q = jp.unsqueeze(1).repeat(1, jd + 1, 1)
+            new_ep = env.episode_length_buf <= 1
+            if bool(new_ep.any()):
+                q[new_ep] = jp[new_ep].unsqueeze(1).expand(-1, jd + 1, -1)
+            q = torch.roll(q, shifts=1, dims=1); q[:, 0] = jp
+            env._jp_delay_queue = q
+            jp = q[:, jd]
+        if jdeg > 0:
+            half = 0.5 * (env._joint_upper_canon - env._joint_lower_canon)   # rad -> normalized obs: divide by half range
+            jp = jp + torch.randn_like(jp) * (jdeg * 3.141592653589793 / 180.0) / half.clamp(min=1e-6)
+        obs_noisy["joint_pos"] = jp
+
+    for f in tuple(getattr(env.cfg.obs, "actor_zero_fields", ()) or ()):   # A27: hidden from the actor, layout kept
+        if f in obs_noisy:
+            obs_noisy[f] = torch.zeros_like(obs_noisy[f])
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)
 
