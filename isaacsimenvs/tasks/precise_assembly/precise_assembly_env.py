@@ -1557,6 +1557,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 inb = (self.hand_force >= lo_) & (self.hand_force <= hi_)
                 k_rew = k_rew + kfb * inb.float()
                 self.extras["key_force_inband"] = inb.float().mean()
+            sq = float(getattr(pih_cfg, "squeeze_penalty_scale", 0.0))
+            if sq > 0.0 and hasattr(self, "hand_force"):   # A27 realistic: soft cost on grip force above a free level
+                over_f = (self.hand_force - float(getattr(pih_cfg, "squeeze_free_force", 1.0))).clamp(min=0.0)
+                k_rew = k_rew - sq * over_f
+                self.extras["squeeze_over_mean"] = over_f.mean()
             reward = reward + k_rew
             self._reward_terms["key_reward"] = k_rew
             self._reward_terms["total_reward"] = reward

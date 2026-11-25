@@ -588,6 +588,12 @@ class TactileCfg:
     flow_obs: bool = False
     flow_scale: float = 0.05
     flow_clip: float = 3.0
+    # A27 realistic sensing: per-env random delay U{0..obs_delay_max} policy steps on tactile + tactile_flow, then
+    # additive Gaussian noise (taxel std in [0,1] units, clamped >= 0; flow std in its scaled units). Applied before
+    # policy_override, so a zeroed twin stays exactly zero.
+    obs_delay_max: int = 0
+    obs_noise_std: float = 0.0
+    flow_noise_std: float = 0.0
     pad_compliant_stiffness: float = 280.0     # original: compliant_contact_stiffness on the 5 elastomer prims
     pad_compliant_damping: float = 20.0        # original: compliant_contact_damping
     pad_friction: float = -1.0                 # -1 = keep assets.finger_tip_friction (original: IsaacLab default 0.5)

@@ -241,6 +241,35 @@ def _apply_obs_delay(env, policy_tensor: torch.Tensor) -> torch.Tensor:
     return delayed
 
 
+def _tactile_delay_noise(env, obs_clean):
+    """A27: random per-env delay + Gaussian noise on tactile / tactile_flow (cfg.tactile.obs_delay_max, obs_noise_std,
+    flow_noise_std). Delay buffer is cleared at episode start."""
+    tc = env.cfg.tactile
+    D = int(getattr(tc, "obs_delay_max", 0)); sn = float(getattr(tc, "obs_noise_std", 0.0))
+    fn = float(getattr(tc, "flow_noise_std", 0.0))
+    keys = [k for k in ("tactile", "tactile_flow") if k in obs_clean]
+    if D > 0:
+        buf = getattr(env, "_tac_delay_buf", None)
+        if buf is None:
+            env._tac_delay_buf = {k: obs_clean[k].unsqueeze(1).repeat(1, D + 1, 1) for k in keys}
+            env._tac_delay = torch.randint(0, D + 1, (env.num_envs,), device=env.device)
+            buf = env._tac_delay_buf
+        start = env.episode_length_buf == 0
+        if start.any():
+            env._tac_delay[start] = torch.randint(0, D + 1, (int(start.sum()),), device=env.device)
+        ar = torch.arange(env.num_envs, device=env.device)
+        for k in keys:
+            b = torch.roll(buf[k], 1, dims=1)
+            b[:, 0] = obs_clean[k]
+            b[start] = obs_clean[k][start].unsqueeze(1)
+            buf[k] = b
+            obs_clean[k] = b[ar, env._tac_delay]
+    if sn > 0 and "tactile" in obs_clean:
+        obs_clean["tactile"] = (obs_clean["tactile"] + sn * torch.randn_like(obs_clean["tactile"])).clamp(min=0.0)
+    if fn > 0 and "tactile_flow" in obs_clean:
+        obs_clean["tactile_flow"] = obs_clean["tactile_flow"] + fn * torch.randn_like(obs_clean["tactile_flow"])
+
+
 def build_observations(env) -> dict[str, torch.Tensor]:
     """Assemble actor-critic observations with obs-side DR."""
     dr = env.cfg.domain_randomization
@@ -350,6 +379,7 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         if getattr(env, "_hand_skin", None) is not None:
             obs_clean["tactile_hand"] = env._hand_skin.compute()
             env._last_tactile_hand = obs_clean["tactile_hand"]
+        _tactile_delay_noise(env, obs_clean)
         override = str(getattr(env.cfg.tactile, "policy_override", "none")).lower()
         for k in ("tactile", "tactile_hand", "tactile_flow"):
             if k not in obs_clean:
