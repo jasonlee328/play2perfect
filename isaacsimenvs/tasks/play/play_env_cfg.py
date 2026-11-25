@@ -155,6 +155,7 @@ class ObsCfg:
     actor_zero_fields: tuple[str, ...] = ()
     # A8 doorslip: actor object_rot / keypoints use the unturned knob (position kept, knob angle removed)
     actor_unturned_knob: bool = False
+    actor_unturned_pos: bool = False  # A8 leverslip: also hide the off-axis lever's position change
 
 
 # ----------------------------------------------------------------------------

@@ -283,6 +283,8 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     # so object_rot / keypoints in the policy obs carry no knob angle; critic keeps the real pose.
     if bool(getattr(env.cfg.obs, "actor_unturned_knob", False)) and hasattr(env, "_knob_unturned_quat"):
         noisy_obj_rot = env._knob_unturned_quat()
+        if bool(getattr(env.cfg.obs, "actor_unturned_pos", False)) and hasattr(env, "_knob_unturned_pos"):
+            noisy_obj_pos = env._knob_unturned_pos()
     kp_offsets = env._keypoint_offsets * env._object_scale_multiplier.unsqueeze(1)
     obj_kp = _keypoints_world(obj_pos, obj_rot, kp_offsets)
     goal_kp = _keypoints_world(goal_pos, goal_rot, kp_offsets)

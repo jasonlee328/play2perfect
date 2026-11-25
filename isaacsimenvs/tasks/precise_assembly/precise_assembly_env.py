@@ -841,6 +841,30 @@ class PreciseAssemblyEnv(PlayEnv):
             q_par = quat_mul(self.distractors[kp].data.root_quat_w, quat_conjugate(qp0))
         return quat_mul(q_par, q0)
 
+    def _knob_unturned_pos(self) -> torch.Tensor:
+        """A8 leverslip: env-local position the unlock-joint body would have at joint angle 0 (follows its parent,
+        drops its own turn). Needed when the body's origin is off its axis (lever handle). For actor obs only."""
+        j = self._pih_joints[int(self.cfg.precise_assembly.unlock_joint)]
+        p0 = torch.tensor([self._joint_reset_pose_rel(j)[:3]], device=self.device,
+                          dtype=torch.float32).expand(self.num_envs, 3)
+        hq = self.hole_quat_wxyz
+        par = getattr(j, "parent", "fixture")
+        if par == "fixture":
+            return self.hole_pos + quat_apply(hq, p0)
+        kp = int(par[10:])
+        pp0 = torch.tensor([self._pih_distractor_pose_rel[kp][:3]], device=self.device,
+                           dtype=torch.float32).expand(self.num_envs, 3)
+        qp0 = _xyzw_to_wxyz(torch.tensor([self._pih_distractor_pose_rel[kp][3:7]], device=self.device,
+                                         dtype=torch.float32)).expand(self.num_envs, 4)
+        # parent's current world pose; object world = parent_now * parent0^-1 * (fixture * obj0)
+        par_pos = self.distractors[kp].data.root_pos_w - self.scene.env_origins
+        par_q = self.distractors[kp].data.root_quat_w
+        par0_pos = self.hole_pos + quat_apply(hq, pp0)
+        par0_q = quat_mul(hq, qp0)
+        obj0 = self.hole_pos + quat_apply(hq, p0)
+        rel = quat_apply_inverse(par0_q, obj0 - par0_pos)
+        return par_pos + quat_apply(par_q, rel)
+
     def _update_joint_angles(self) -> None:
         """Signed angle of every jointed body about its axis since reset (rad), self.cb_joint_angle (J, N)."""
         if not self._pih_joints:
