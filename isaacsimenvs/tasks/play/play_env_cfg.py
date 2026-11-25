@@ -500,6 +500,14 @@ class DomainRandomizationCfg:
 
     # Per-step Gaussian noise on joint-velocity obs (legacy env.py:3251).
     joint_velocity_obs_noise_std: float = 0.1
+    # A8: joint-position obs noise (policy only): per-step std (rad) and per-episode per-joint uniform bias half-width (rad)
+    joint_position_obs_noise_std: float = 0.0
+    joint_position_obs_bias: float = 0.0
+    # A8 real-robot joint sensing (master 11-25): measured joint_pos in the policy obs is taken from a fixed number of
+    # control steps back (on top of the generic random obs delay), then per-step Gaussian noise with std given in
+    # DEGREES on every joint (converted per joint into the range-normalized obs). 0 / 0 = off.
+    joint_position_obs_delay_steps: int = 0
+    joint_position_obs_noise_deg: float = 0.0
 
     # Random force/torque impulses on the object body.
     force_scale: float = 20.0
