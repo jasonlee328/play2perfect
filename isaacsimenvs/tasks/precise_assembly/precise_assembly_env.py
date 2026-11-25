@@ -431,7 +431,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.hand_force_last_ep_max[env_ids] = self.hand_force_ep_max[env_ids]
             self.hand_force_ep_max[env_ids] = 0.0
             self._crush_count[env_ids] = 0
-            if getattr(self, "_crush_thr", None) is not None:
+            if getattr(self, "_crush_thr", None) is not None and not getattr(self, "_deal_nlo", None) is not None:
                 self._crush_thr[env_ids] = self._sample_crush_thr(env_ids)
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
@@ -1194,7 +1194,26 @@ class PreciseAssemblyEnv(PlayEnv):
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
         cr = tuple(getattr(self.cfg.precise_assembly, "crush_force_range", (0.0, 0.0)))
-        if float(cr[1]) > 0.0:
+        rr = tuple(getattr(self.cfg.precise_assembly, "crush_ratio_range", ()) or ())
+        if len(rr) == 2 and getattr(self, "_crush_thr", None) is None and hasattr(self, "_deal_card_mu"):
+            # A26: hidden per-env crush limit = r x the press the top card needs to slide over card 2 (pair mu =
+            # average; N_lo = b W / (a - b), a = pad-top, b = top-card2, W = top-card weight), r ~ U(r_lo, r_hi).
+            mu = self._deal_card_mu.float(); pad = float(getattr(self.cfg.assets, "finger_tip_friction", 0.5))
+            a_ = (pad + mu[:, 0]) / 2; b_ = (mu[:, 0] + mu[:, 1]) / 2
+            if getattr(self, "_object_mass", None) is not None:
+                W = self._object_mass[:, 0].float() * 9.81
+            else:
+                W = self.object.root_physx_view.get_masses()[:, 0].to(self.device).float() * 9.81
+            g_ = torch.Generator().manual_seed(777 + int(getattr(self.cfg, "seed", 0) or 0))
+            r_ = (torch.rand(self.num_envs, generator=g_) * (rr[1] - rr[0]) + rr[0]).to(self.device)
+            n_lo = torch.where(a_ > b_ + 1e-3, b_ * W / (a_ - b_).clamp(min=1e-3), torch.full_like(W, 99.0))
+            lim = tuple(getattr(self.cfg.precise_assembly, "crush_ratio_clip", (0.5, 3.0)))
+            self._deal_nlo = n_lo; self._crush_ratio = r_
+            self._crush_thr = (r_ * n_lo).clamp(min=float(lim[0]), max=float(lim[1]))
+            print(f"[PreciseAssemblyEnv] A26 crush = r x N_lo, r~U{rr}: thr median {float(self._crush_thr.median()):.2f} N", flush=True)
+        if len(rr) == 2 and getattr(self, "_crush_thr", None) is not None:
+            over = self.hand_force > self._crush_thr
+        elif float(cr[1]) > 0.0:
             if getattr(self, "_crush_thr", None) is None:
                 self._crush_thr = self._sample_crush_thr(torch.arange(self.num_envs, device=self.device))
             over = self.hand_force > self._crush_thr
@@ -1332,7 +1351,7 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = torch.zeros_like(fall)
         self._hand_force_update()
         crushed = torch.zeros_like(fall)
-        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0) and hasattr(self, "_crush_count"):
+        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0 or len(tuple(getattr(pih_cfg, "crush_ratio_range", ()) or ())) == 2) and hasattr(self, "_crush_count"):
             crushed = (self._crush_count >= int(pih_cfg.crush_steps)) & ~max_successes
         usb_fail = {}
         if pih_cfg.usb_task != "off" and getattr(self, "_usb", None) is not None:
@@ -1453,7 +1472,7 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
-        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0) and "crushed" in getattr(self, "_termination_reasons", {}):
+        if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0 or len(tuple(getattr(pih_cfg, "crush_ratio_range", ()) or ())) == 2) and "crushed" in getattr(self, "_termination_reasons", {}):
             c_pen = float(pih_cfg.crush_penalty) * self._termination_reasons["crushed"].float()
             reward = reward - c_pen
             self._reward_terms["crush_penalty"] = -c_pen
