@@ -355,6 +355,12 @@ class ActionCfg:
     # A12: > 0 = hand actions are velocity deltas (target += scale * dt * a), not absolute [-1, 1] positions
     hand_delta_scale: float = 0.0
     arm_action_scale: float = 1.0     # A13: 0 = arm targets frozen at the episode start (in-hand only)
+    # A27: > 0 = thumb + index fingertips driven in palm-frame Cartesian space (m per step at |a| = 1, before
+    # hand_moving_average): the actions of the first 3 joints of each chain are the tip dx, dy, dz; damped-least-squares
+    # IK on that finger's joints (tip orientation held with weight hand_tip_ik_wrot); other fingers stay relative-joint.
+    hand_tip_ik_scale: float = 0.0
+    hand_tip_ik_wrot: float = 0.02
+    hand_tip_ik_lambda: float = 0.001
 
 
 # ----------------------------------------------------------------------------

@@ -15,6 +15,50 @@ def sample_log_uniform(lo_hi: tuple[float, float], n: int) -> torch.Tensor:
     )
 
 
+def _tip_ik_setup(env):
+    rb = env.robot
+    fixed = bool(rb.is_fixed_base)
+    tips = [rb.find_bodies("left_thumb_DP")[0][0], rb.find_bodies("left_index_DP")[0][0]]
+    J = rb.root_physx_view.get_jacobians()
+    off = 0 if fixed else 6
+    hand_ids = [int(j) for j in env._hand_joint_ids]
+    chains = []
+    for b in tips:
+        row = b - (1 if fixed else 0)
+        cols = (J[0, row].abs().sum(0) > 1e-9).nonzero().reshape(-1).tolist()
+        joints = [c - off for c in cols if (c - off) in hand_ids]
+        joints.sort()
+        chains.append(dict(body=b, row=row, joints=joints, cols=[j + off for j in joints],
+                           hk=[hand_ids.index(j) for j in joints]))
+    env._tip_ik = dict(chains=chains)
+    print("[tip_ik] thumb", [rb.joint_names[j] for j in chains[0]["joints"]],
+          "index", [rb.joint_names[j] for j in chains[1]["joints"]], flush=True)
+
+
+def _tip_ik_targets(env, actions, hand_raw, scale, act_cfg):
+    """A27: thumb / index tip Cartesian deltas (palm frame) -> joint target deltas by damped least squares."""
+    from isaaclab.utils.math import quat_apply
+    if getattr(env, "_tip_ik", None) is None:
+        _tip_ik_setup(env)
+    rb = env.robot
+    J = rb.root_physx_view.get_jacobians()
+    palm_q = rb.data.body_state_w[:, env._palm_body_id, 3:7]
+    wrot = float(getattr(act_cfg, "hand_tip_ik_wrot", 0.02))
+    lam = float(getattr(act_cfg, "hand_tip_ik_lambda", 0.001))
+    eye6 = torch.eye(6, device=env.device)
+    hand_raw = hand_raw.clone()
+    hand_act = actions[:, 7:]
+    for ch in env._tip_ik["chains"]:
+        hk = ch["hk"]
+        d_palm = scale * hand_act[:, hk[:3]]                       # (n, 3) tip delta in the palm frame
+        e = torch.cat([quat_apply(palm_q, d_palm), torch.zeros_like(d_palm)], -1)   # hold tip orientation
+        Jk = J[:, ch["row"]][:, :, ch["cols"]]
+        Jk = torch.cat([Jk[:, :3], wrot * Jk[:, 3:]], 1)
+        dq = Jk.transpose(1, 2) @ torch.linalg.solve(Jk @ Jk.transpose(1, 2) + lam ** 2 * eye6, e.unsqueeze(-1))
+        hand_raw[:, hk] = env._prev_targets[:, ch["joints"]] + dq.squeeze(-1)
+    return hand_raw
+
+
 def apply_action_pipeline(env, actions: torch.Tensor) -> None:
     """Apply delay, canonical-to-Lab mapping, smoothing, and target clamps."""
     # Debug replay path accepts an already Lab-order target.
@@ -67,6 +111,9 @@ def apply_action_pipeline(env, actions: torch.Tensor) -> None:
         hand_raw = env._hand_lower + 0.5 * (hand_action + 1.0) * (
             env._hand_upper - env._hand_lower
         )
+    tip_scale = float(getattr(act_cfg, "hand_tip_ik_scale", 0.0))
+    if tip_scale > 0.0:
+        hand_raw = _tip_ik_targets(env, actions, hand_raw, tip_scale, act_cfg)
     hand_smoothed = (
         act_cfg.hand_moving_average * hand_raw
         + (1.0 - act_cfg.hand_moving_average) * env._prev_targets[:, 7:]
