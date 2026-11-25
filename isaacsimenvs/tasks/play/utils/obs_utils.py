@@ -230,6 +230,21 @@ def _apply_obs_delay(env, policy_tensor: torch.Tensor) -> torch.Tensor:
     return delayed
 
 
+def _joint_obs_delay(env, jp: torch.Tensor, jv: torch.Tensor, lo: int, hi: int):
+    """Per-env fixed delay (lo..hi policy steps) on joint pos / vel (ring buffer)."""
+    f = torch.cat([jp, jv], dim=-1)
+    if getattr(env, "_joint_obs_hist", None) is None or env._joint_obs_hist.shape[1:] != f.shape:
+        env._joint_obs_hist = torch.zeros(hi + 1, *f.shape, device=f.device)
+        env._joint_obs_delay = torch.randint(lo, hi + 1, (env.num_envs,), device=f.device)
+    h = torch.roll(env._joint_obs_hist, 1, 0)
+    h[0] = f
+    fresh = env.episode_length_buf <= 1
+    h[:, fresh] = f[fresh]
+    env._joint_obs_hist = h
+    out = h[env._joint_obs_delay, torch.arange(env.num_envs, device=f.device)]
+    return out[:, : jp.shape[1]], out[:, jp.shape[1]:]
+
+
 def build_observations(env) -> dict[str, torch.Tensor]:
     """Assemble actor-critic observations with obs-side DR."""
     dr = env.cfg.domain_randomization
@@ -393,6 +408,12 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         bias = torch.where(new_ep, (torch.rand_like(joint_pos) * 2.0 - 1.0) * jp_b, bias)
         env._joint_pos_obs_bias = bias
         obs_noisy["joint_pos"] = joint_pos + (bias + torch.randn_like(joint_pos) * jp_std) * scale
+    jd = tuple(getattr(dr, "joint_obs_delay_range", (0, 0)))
+    if int(jd[1]) > 0:  # delay first, then fresh noise (A1: 3 deg error after a 2-step delay)
+        jp_d, jv_d = _joint_obs_delay(env, joint_pos, obs_noisy["joint_vel"], int(jd[0]), int(jd[1]))
+        if jp_std > 0 or jp_b > 0:
+            jp_d = jp_d + (obs_noisy["joint_pos"] - joint_pos)
+        obs_noisy["joint_pos"], obs_noisy["joint_vel"] = jp_d, jv_d
 
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)

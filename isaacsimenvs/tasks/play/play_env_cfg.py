@@ -493,6 +493,9 @@ class DomainRandomizationCfg:
     obs_delay_max: int = 3
     use_action_delay: bool = True
     action_delay_max: int = 3
+    # A1 (from A25 a236333): extra per-env joint_pos / joint_vel obs delay (policy steps, fixed per env), on top of
+    # the obs delay. (0, 0) = off.
+    joint_obs_delay_range: tuple = (0, 0)
 
     # Object state delay + noise on the observed object pose.
     use_object_state_delay_noise: bool = True
