@@ -344,6 +344,10 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "roll_target" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "roll_target"))
+        if bool(getattr(cfg.precise_assembly, "key_hint_obs", False)):   # A27 privileged oracle hint (actor only)
+            OBS_FIELD_SIZES["key_hint"] = 2
+            if "key_hint" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "key_hint")
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
@@ -409,6 +413,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self._crush_count[env_ids] = 0
             if getattr(self, "_crush_thr", None) is not None:
                 self._crush_thr[env_ids] = self._sample_crush_thr(env_ids)
+        if bool(getattr(self.cfg.precise_assembly, "key_hint_obs", False)):
+            self._key_hint_resample(env_ids)
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
@@ -1224,6 +1230,11 @@ class PreciseAssemblyEnv(PlayEnv):
         self.hand_force = F.norm(dim=-1).sum(-1) * float(getattr(self.cfg.precise_assembly, "hand_force_scale", 0.5))
         self.hand_force_ep_max = torch.maximum(self.hand_force_ep_max, self.hand_force)
         thr = float(self.cfg.precise_assembly.crush_force)
+        c0, cn = float(getattr(self.cfg.precise_assembly, "crush_force_start", 0.0)), int(getattr(self.cfg.precise_assembly, "crush_ramp_steps", 0))
+        if thr > 0.0 and c0 > 0.0 and cn > 0:
+            a = min(1.0, float(self.common_step_counter + int(self.cfg.precise_assembly.crush_ramp_offset_steps)) / cn)
+            thr = c0 + a * (thr - c0)
+            self.extras["crush_thr"] = torch.tensor(thr, device=self.device)
         cr = tuple(getattr(self.cfg.precise_assembly, "crush_force_range", (0.0, 0.0)))
         if float(cr[1]) > 0.0:
             if getattr(self, "_crush_thr", None) is None:
@@ -1234,6 +1245,20 @@ class PreciseAssemblyEnv(PlayEnv):
         self._crush_count = torch.where(over, self._crush_count + 1, torch.zeros_like(self._crush_count))
         self.extras["hand_force_mean"] = self.hand_force.mean()
         self.extras["hand_force_max"] = self.hand_force.max()
+
+    def key_hint_p(self) -> float:
+        c = self.cfg.precise_assembly
+        if int(c.key_hint_ramp_steps) <= 0:
+            return float(c.key_hint_final)
+        a = min(1.0, float(self.common_step_counter + int(c.key_hint_offset_steps)) / float(c.key_hint_ramp_steps))
+        return 1.0 + a * (float(c.key_hint_final) - 1.0)
+
+    def _key_hint_resample(self, env_ids) -> None:
+        if not hasattr(self, "key_hint_on"):
+            self.key_hint_on = torch.ones(self.num_envs, dtype=torch.bool, device=self.device)
+        p = self.key_hint_p()
+        self.key_hint_on[env_ids] = torch.rand(len(env_ids), device=self.device) < p
+        self.extras["key_hint_p"] = torch.tensor(p, device=self.device)
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)

@@ -151,6 +151,11 @@ class PreciseAssemblyCfg:
     # A27 roll a pinched stick (key_repose machinery, one goal): per-episode target roll about the object's long axis,
     # |angle| ~ U(lo, hi) deg with a random sign (> 0 enables; key_flip_deg should be one entry, its value unused)
     roll_target_range_deg: tuple = (0.0, 0.0)
+    # A27 oracle: actor field key_hint = [roll error / pi * m, m]; m = 1 for a share p of episodes, p 1 -> key_hint_final
+    key_hint_obs: bool = False
+    key_hint_ramp_steps: int = 0
+    key_hint_final: float = 1.0
+    key_hint_offset_steps: int = 0
     roll_target_obs: bool = False        # actor + critic field "roll_target" = [angle / pi] (the task command)
     roll_twist_only: bool = False        # near goal = twist error <= key_goal_rot_deg, swing <= roll_swing_tol_deg,
     roll_swing_tol_deg: float = 30.0     #   position <= key_goal_pos_m (instead of the full rotation error)
@@ -230,6 +235,10 @@ class PreciseAssemblyCfg:
     # log-uniform in [lo, hi] (object fragility unknown to the policy; replaces crush_force)
     crush_force_range: tuple = (0.0, 0.0)
     crush_steps: int = 3
+    # A27: crush threshold warm-up crush_force_start -> crush_force over crush_ramp_steps env steps (0 = off)
+    crush_force_start: float = 0.0
+    crush_ramp_steps: int = 0
+    crush_ramp_offset_steps: int = 0
     crush_penalty: float = 200.0
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.

@@ -371,6 +371,15 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         k_ = getattr(env, "_key", None)
         obs_clean["roll_target"] = ((k_.target * k_.scale() / math.pi).unsqueeze(-1) if k_ is not None
                                     else torch.zeros(env.num_envs, 1, device=env.device))
+    if "key_hint" in OBS_FIELD_SIZES:   # A27 privileged oracle hint: remaining roll error
+        k_ = getattr(env, "_key", None)
+        if k_ is not None and hasattr(k_, "twist_signed"):
+            if not hasattr(env, "key_hint_on"):
+                env.key_hint_on = torch.ones(env.num_envs, dtype=torch.bool, device=env.device)
+            m = env.key_hint_on.float()
+            obs_clean["key_hint"] = torch.stack([k_.twist_signed / math.pi * m, m], dim=-1)
+        else:
+            obs_clean["key_hint"] = torch.zeros(env.num_envs, 2, device=env.device)
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel
