@@ -94,6 +94,11 @@ class PreciseAssemblyEnv(PlayEnv):
             view.set_masses(m0 * ratio, ids); view.set_inertias(i0 * ratio, ids)
             self._object_mass = (m0[:, 0:1] * ratio).to(self.device)
             self._object_mass_scale = ratio[:, 0].to(self.device)
+            if bool(getattr(cfg.precise_assembly, "object_mass_scale_cards", False)):   # A26: same scale on card 2
+                for body in (getattr(self, "distractors", ()) or ())[:1]:
+                    dv = body.root_physx_view
+                    dm = dv.get_masses().clone(); di = dv.get_inertias().clone()
+                    dv.set_masses(dm * ratio, ids); dv.set_inertias(di * ratio, ids)
             print(f"[PreciseAssemblyEnv] object mass scale log-U{ms}: {float(m0[0, 0]) * 1e3:.2f} g x "
                   f"[{float(ratio.min()):.2f}, {float(ratio.max()):.2f}]", flush=True)
 

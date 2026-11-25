@@ -1624,6 +1624,23 @@ def apply_physx_material_properties(env) -> None:
             _m3 = float(getattr(dr, "deal_lower_over_top", -1.0))   # A26: cards below card 2 at least top + margin
             if _m3 >= 0.0 and k_ >= 1 and hasattr(env, "_deal_obj_mu"):
                 mu_e = torch.maximum(mu_e, env._deal_obj_mu.to(mu_e.device) + _m3)
+            _wr = tuple(getattr(dr, "deal_window_ratio_range", ()) or ())   # A26: hidden two-sided press window
+            if len(_wr) == 2 and k_ >= 1 and hasattr(env, "_deal_obj_mu") and mus:
+                # pair mu = average; W = top weight, rho W = card-2 weight. top slides at N > N_lo = bW/(a-b);
+                # card 2 drags at N > N_hi = (c(1+rho) - b) W / (b-c). pick card-3+ mu so N_hi / N_lo = r ~ U(r_lo, r_hi)
+                # (per env, hidden): k = r b/(a-b), c = b(1+k)/(1+rho+k). rho = deal_window_rho (1 = equal card masses).
+                t_ = env._deal_obj_mu.to(mu_e.device).float(); s_ = mus[0].float()
+                pad = float(getattr(assets_cfg, "finger_tip_friction", 0.5))
+                a_ = (pad + t_) / 2; b_ = (t_ + s_) / 2
+                if k_ == 1:
+                    g_ = torch.Generator().manual_seed(4321 + int(getattr(env.cfg, "seed", 0) or 0))
+                    env._deal_win_r = (torch.rand(env.num_envs, generator=g_) * (_wr[1] - _wr[0]) + _wr[0]).to(mu_e.device)
+                r_ = env._deal_win_r
+                rho = float(getattr(dr, "deal_window_rho", 1.0))
+                k__ = r_ * b_ / (a_ - b_).clamp(min=1e-3)
+                c_ = b_ * (1 + k__) / (1 + rho + k__)
+                m3 = (2 * c_ - s_).clamp(min=0.02)
+                mu_e = torch.where(a_ > b_ + 1e-3, m3, mu_e)
             materials[:, :, 0] = mu_e.unsqueeze(-1); materials[:, :, 1] = mu_e.unsqueeze(-1); materials[:, :, 2] = 0.0
             view.set_material_properties(materials, env_ids)
             mus.append(mu_e)
