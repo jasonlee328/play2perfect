@@ -1450,6 +1450,13 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["crush_penalty"] = -c_pen
             self._reward_terms["total_reward"] = reward
 
+        hfs = float(getattr(pih_cfg, "hand_force_penalty_scale", 0.0))
+        if hfs > 0.0 and hasattr(self, "hand_force"):
+            hf_pen = hfs * (self.hand_force - float(pih_cfg.hand_force_penalty_free)).clamp_min(0.0)
+            reward = reward - hf_pen
+            self._reward_terms["hand_force_penalty"] = -hf_pen
+            self._reward_terms["total_reward"] = reward
+
         usb = getattr(self, "_usb", None)
         if pih_cfg.usb_task == "gate" and usb is not None:
             tr = self._termination_reasons

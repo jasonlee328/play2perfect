@@ -198,9 +198,17 @@ class TactileFlow:
     divided by ``scale`` (m/s) and clipped to +-clip. 0 where no ray of the taxel is in contact. Output
     (N, 5 * res * res * 2), taxel-major then (t1, t2). Rigid-body kinematics only (no gel shear)."""
 
-    def __init__(self, sensor: "TactileSensor", scale: float = 0.05, clip: float = 3.0) -> None:
+    def __init__(self, sensor: "TactileSensor", scale: float = 0.05, clip: float = 3.0, noise_std: float = 0.0,
+                 gain_range: tuple = (1.0, 1.0), delay_range: tuple = (0, 0)) -> None:
         self.s, self.scale, self.clip = sensor, float(scale), float(clip)
         dev = sensor.device
+        n = sensor.env.num_envs
+        self.noise_std = float(noise_std)
+        glo, ghi = (float(v) for v in gain_range)
+        self.gain = (glo + (ghi - glo) * torch.rand(n, 1, device=dev))
+        dlo, dhi = (int(v) for v in delay_range)
+        self.delay = torch.randint(dlo, dhi + 1, (n,), device=dev)
+        self.hist = None                    # (D+1, N, F) ring of past flows, newest at index 0
         F = len(sensor.body_ids)
         self.t1 = torch.zeros(F, 3, device=dev); self.t2 = torch.zeros(F, 3, device=dev)
         for f in range(F):
@@ -242,7 +250,18 @@ class TactileFlow:
                 f2 = torch.stack([(v_t * self.t1[s.finger]).sum(-1), (v_t * self.t2[s.finger]).sum(-1)], -1) * m.unsqueeze(-1)
                 cnt = torch.zeros(len(c), self.T, device=s.device).index_add_(1, s.taxel, m).clamp_min(1.0)
                 out[c] = torch.zeros(len(c), self.T, 2, device=s.device).index_add_(1, s.taxel, f2) / cnt.unsqueeze(-1)
-        return (out / self.scale).clamp(-self.clip, self.clip).reshape(env.num_envs, -1)
+        f = (out / self.scale).reshape(env.num_envs, -1)
+        if self.noise_std > 0.0 or bool((self.gain != 1.0).any()) or int(self.delay.max()) > 0:
+            on = (f != 0.0).float()                       # gel shows flow only where it touches
+            f = f * self.gain + self.noise_std * torch.randn_like(f) * on
+            D = int(self.delay.max())
+            if self.hist is None:
+                self.hist = torch.zeros(D + 1, *f.shape, device=f.device)
+            self.hist = torch.roll(self.hist, 1, 0); self.hist[0] = f
+            fresh = env.episode_length_buf <= 1             # new episode: no stale flow from the last one
+            self.hist[:, fresh] = 0.0; self.hist[0, fresh] = f[fresh]
+            f = self.hist[self.delay.clamp(max=D), torch.arange(env.num_envs, device=f.device)]
+        return f.clamp(-self.clip, self.clip)
 
 
 __all__ = ["FINGERS", "TactileFlow", "TactileSensor", "tactile_obs_dim"]

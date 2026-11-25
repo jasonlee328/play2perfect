@@ -66,7 +66,9 @@ class PlayEnv(DirectRLEnv):
         self._tactile_flow = None
         if self._tactile is not None and bool(getattr(cfg.tactile, "flow_obs", False)):
             from .utils.tactile_utils import TactileFlow
-            self._tactile_flow = TactileFlow(self._tactile, float(cfg.tactile.flow_scale), float(cfg.tactile.flow_clip))
+            self._tactile_flow = TactileFlow(self._tactile, float(cfg.tactile.flow_scale), float(cfg.tactile.flow_clip),
+                noise_std=float(getattr(cfg.tactile, 'flow_noise_std', 0.0)), gain_range=tuple(getattr(cfg.tactile, 'flow_gain_range', (1.0, 1.0))),
+                delay_range=tuple(getattr(cfg.tactile, 'flow_delay_range', (0, 0))))
         self._hand_skin = HandSkinSensor(self, cfg.tactile) if cfg.tactile.enabled and cfg.tactile.whole_hand else None
         self._tactile_hr = self._tactile_encoder = None
         so = getattr(cfg, "student_obs", None)

@@ -584,6 +584,11 @@ class TactileCfg:
     flow_obs: bool = False
     flow_scale: float = 0.05
     flow_clip: float = 3.0
+    # A25 11-25 realistic flow (gel-image optical flow): per-env gain x U(flow_gain_range), additive Gaussian noise
+    # (std, in flow units) on taxels in contact, and a per-env delay of U{flow_delay_range} policy steps. Defaults = exact.
+    flow_noise_std: float = 0.0
+    flow_gain_range: tuple = (1.0, 1.0)
+    flow_delay_range: tuple = (0, 0)
     pad_compliant_stiffness: float = 280.0     # original: compliant_contact_stiffness on the 5 elastomer prims
     pad_compliant_damping: float = 20.0        # original: compliant_contact_damping
     pad_friction: float = -1.0                 # -1 = keep assets.finger_tip_friction (original: IsaacLab default 0.5)

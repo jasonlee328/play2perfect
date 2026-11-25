@@ -239,6 +239,9 @@ class PreciseAssemblyCfg:
     crush_force_range: tuple = (0.0, 0.0)
     crush_steps: int = 3
     crush_penalty: float = 200.0
+    # A25 11-25: soft grip-force penalty instead of a crush fail: -scale x relu(hand_force - free) per step (N)
+    hand_force_penalty_scale: float = 0.0
+    hand_force_penalty_free: float = 2.0
     # Eval: pick bank entry (start_state_offset + env_id) % bank size instead of a random one, so trial i always
     # starts from the same state.
     start_state_sequential: bool = False
