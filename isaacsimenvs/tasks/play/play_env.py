@@ -48,6 +48,10 @@ class PlayEnv(DirectRLEnv):
                 OBS_FIELD_SIZES["tactile_flow"] = 5 * int(cfg.tactile.resolution) ** 2 * 2
                 if cfg.tactile.in_policy and "tactile_flow" not in cfg.obs.obs_list:
                     cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_flow")
+                if bool(getattr(cfg.tactile, "flow_cum_obs", False)):
+                    OBS_FIELD_SIZES["tactile_flow_cum"] = 10
+                    if cfg.tactile.in_policy and "tactile_flow_cum" not in cfg.obs.obs_list:
+                        cfg.obs.obs_list = (*cfg.obs.obs_list, "tactile_flow_cum")
             if cfg.tactile.whole_hand:
                 OBS_FIELD_SIZES["tactile_hand"] = hand_skin_obs_dim(cfg.tactile)
                 if cfg.tactile.in_policy and "tactile_hand" not in cfg.obs.obs_list:

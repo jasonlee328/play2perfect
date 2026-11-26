@@ -270,6 +270,25 @@ def _tactile_delay_noise(env, obs_clean):
         obs_clean["tactile_flow"] = obs_clean["tactile_flow"] + fn * torch.randn_like(obs_clean["tactile_flow"])
 
 
+def _flow_cum(env, obs_clean):
+    """A27: cumulative slip per pad (mm) from the policy's delayed / noisy flow, mean over contact taxels."""
+    tc = env.cfg.tactile
+    n = env.num_envs
+    fl = obs_clean["tactile_flow"].view(n, 5, -1, 2)
+    dep = obs_clean["tactile"].view(n, 5, -1)
+    msk = (dep > 0.05).float().unsqueeze(-1)
+    mean = (fl * msk).sum(2) / msk.sum(2).clamp_min(1.0)                      # (n, 5, 2), flow units
+    dt = float(env.cfg.sim.dt) * int(env.cfg.decimation)
+    inc = mean * float(tc.flow_scale) * dt * 1000.0                         # mm this step
+    acc = getattr(env, "_flow_cum_acc", None)
+    if acc is None or acc.shape[0] != n:
+        acc = torch.zeros(n, 5, 2, device=env.device)
+    acc = torch.where((env.episode_length_buf == 0).view(n, 1, 1), torch.zeros_like(acc), acc) + inc
+    c = float(getattr(tc, "flow_cum_clip_mm", 20.0))
+    env._flow_cum_acc = acc.clamp(-c, c)
+    obs_clean["tactile_flow_cum"] = env._flow_cum_acc.reshape(n, 10) / c * 3.0
+
+
 def build_observations(env) -> dict[str, torch.Tensor]:
     """Assemble actor-critic observations with obs-side DR."""
     dr = env.cfg.domain_randomization
@@ -380,8 +399,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             obs_clean["tactile_hand"] = env._hand_skin.compute()
             env._last_tactile_hand = obs_clean["tactile_hand"]
         _tactile_delay_noise(env, obs_clean)
+        if "tactile_flow_cum" in OBS_FIELD_SIZES and "tactile_flow" in obs_clean:
+            _flow_cum(env, obs_clean)
         override = str(getattr(env.cfg.tactile, "policy_override", "none")).lower()
-        for k in ("tactile", "tactile_hand", "tactile_flow"):
+        for k in ("tactile", "tactile_hand", "tactile_flow", "tactile_flow_cum"):
             if k not in obs_clean:
                 continue
             if override == "zero":

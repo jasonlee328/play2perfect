@@ -599,6 +599,11 @@ class TactileCfg:
     flow_obs: bool = False
     flow_scale: float = 0.05
     flow_clip: float = 3.0
+    # A27: ``tactile_flow_cum`` (5 pads x 2) = the policy's own (delayed, noisy) flow averaged over each pad's contact
+    # taxels, integrated since the episode start = cumulative slip of the object on each pad in mm (flow x flow_scale
+    # x policy dt), clipped to +-flow_cum_clip_mm. Touch-only (zeroed by policy_override). Needs flow_obs.
+    flow_cum_obs: bool = False
+    flow_cum_clip_mm: float = 20.0
     # A27 realistic sensing: per-env random delay U{0..obs_delay_max} policy steps on tactile + tactile_flow, then
     # additive Gaussian noise (taxel std in [0,1] units, clamped >= 0; flow std in its scaled units). Applied before
     # policy_override, so a zeroed twin stays exactly zero.
