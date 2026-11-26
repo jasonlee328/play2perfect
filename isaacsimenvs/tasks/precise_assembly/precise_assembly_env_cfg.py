@@ -163,6 +163,11 @@ class PreciseAssemblyCfg:
     slide_hold_steps: int = 30
     slide_overshoot: float = 0.015
     slide_drop_lateral: float = 0.015
+    slide_max_tilt_deg: float = 0.0     # >0: fail 'slide_tilted' once the stick axis is further than this from vertical
+    slide_tilt_start_deg: float = 0.0   # curriculum: limit at step 0 (ramps down to slide_max_tilt_deg)
+    slide_tilt_ramp_steps: int = 0
+    slide_tilt_ramp_offset_steps: int = 0
+    slide_tilt_pen: float = 0.0         # dense per-step cost x (tilt / 10 deg)^2
     slide_shape_scale: float = 1.0      # x decrease of |error| in cm
     slide_near_speed_pen: float = 0.0   # x exp(-|err|/slide_near_width) x (speed in cm/s)^2 per step
     slide_near_width: float = 0.01

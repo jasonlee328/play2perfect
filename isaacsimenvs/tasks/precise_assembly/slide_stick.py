@@ -33,6 +33,7 @@ class SlideStick:
         self.prot_prev = torch.zeros(N, device=dev)
         self.speed = torch.zeros(N, device=dev)        # m/s, EMA of |d protrusion / dt|
         self.lateral = torch.zeros(N, device=dev)
+        self.tilt = torch.zeros(N, device=dev); self.tilted = torch.zeros(N, dtype=torch.bool, device=dev); self.tilt_lim = 0.0
         self.hold = torch.zeros(N, dtype=torch.long, device=dev)
         self.fresh = torch.ones(N, dtype=torch.bool, device=dev)
         self.draw_on_update = torch.ones(N, dtype=torch.bool, device=dev)
@@ -129,6 +130,19 @@ class SlideStick:
         o = e.object.data
         bottom = o.root_pos_w + quat_apply(o.root_quat_w, torch.tensor([self.x_end, 0.0, 0.0], device=self.dev).expand(self.N, 3))
         self.dropped = (lat > float(c.slide_drop_lateral)) | (xp < self.x_top) | (bottom[:, 2] < top + 0.005)
+        # upright rule: stick axis angle from vertical; fail above the (optionally ramped) limit
+        ax = quat_apply(o.root_quat_w, torch.tensor([1.0, 0.0, 0.0], device=self.dev).expand(self.N, 3))
+        self.tilt = torch.rad2deg(torch.acos(ax[:, 2].abs().clamp(max=1.0)))
+        lim = float(getattr(c, "slide_max_tilt_deg", 0.0))
+        if lim > 0.0:
+            t0, R = float(getattr(c, "slide_tilt_start_deg", 0.0)), int(getattr(c, "slide_tilt_ramp_steps", 0))
+            if t0 > lim and R > 0:
+                f = min(max((self._step + int(getattr(c, "slide_tilt_ramp_offset_steps", 0))) / R, 0.0), 1.0)
+                lim = t0 + f * (lim - t0)
+            self.tilted = self.tilt > lim
+        else:
+            self.tilted = torch.zeros_like(self.dropped)
+        self.tilt_lim = lim
         # shaping potential on the target error (m -> cm units)
         phi = -err.abs() / 0.01
         P = float(getattr(c, "slide_peak_scale", 0.0))
@@ -162,12 +176,20 @@ class SlideStick:
             v = (self.speed / 0.01).clamp(max=50.0)   # cm/s
             r = r - k * near * v * v
         r = r + float(c.slide_success_bonus) * terms["max_successes"].float()
-        r = r - float(c.slide_fail_penalty) * (terms["slide_overshoot"] | terms["slide_dropped"]).float()
+        fail = terms["slide_overshoot"] | terms["slide_dropped"]
+        if "slide_tilted" in terms:
+            fail = fail | terms["slide_tilted"]
+        r = r - float(c.slide_fail_penalty) * fail.float()
+        tp = float(getattr(c, "slide_tilt_pen", 0.0))
+        if tp > 0.0:   # dense: cost per step x (tilt / 10 deg)^2
+            r = r - tp * (self.tilt / 10.0) ** 2
         r = r - float(c.slide_timeout_penalty) * (terms["timeout"] & ~terms["max_successes"]).float()
         return r
 
     def log(self, extras):
         extras["slide/protrusion_mm"] = self.prot.mean() * 1e3
+        extras["slide/tilt_deg"] = self.tilt.mean()
+        extras["slide/tilt_lim_deg"] = torch.tensor(float(self.tilt_lim))
         extras["slide/abs_err_mm"] = (self.prot - self.target).abs().mean() * 1e3
         extras["slide/in_tol"] = self.in_tol.float().mean()
         extras["slide/speed_mm_s"] = self.speed.mean() * 1e3

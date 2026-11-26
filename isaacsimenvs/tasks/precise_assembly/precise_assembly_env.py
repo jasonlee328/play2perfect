@@ -1338,6 +1338,8 @@ class PreciseAssemblyEnv(PlayEnv):
             max_successes = sl.success.clone()
             slide_fail = {"slide_overshoot": sl.overshoot & ~max_successes,
                           "slide_dropped": sl.dropped & ~max_successes & ~sl.overshoot}
+            if float(getattr(self.cfg.precise_assembly, "slide_max_tilt_deg", 0.0)) > 0.0:
+                slide_fail["slide_tilted"] = sl.tilted & ~max_successes & ~sl.overshoot & ~sl.dropped
             crushed = crushed & ~max_successes
             fall = fall & ~max_successes
         terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | key_dropped
