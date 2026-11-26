@@ -559,6 +559,9 @@ class DomainRandomizationCfg:
     deal_card_mu_jitter: float = 0.0
     # A26: sliding (dynamic) friction = ratio x static for every card (paper kinetic/static ~0.7-0.85); 1.0 = old behaviour
     deal_card_dyn_ratio: float = 1.0
+    # A26: realistic deck, cards below the top get mu + bonus (stand-in for static > kinetic, which PhysX does not
+    # reproduce: at rest card 2 sits in static contact while the pushed top card slides); 0 = off
+    deal_lower_mu_bonus: float = 0.0
 
 
 @configclass

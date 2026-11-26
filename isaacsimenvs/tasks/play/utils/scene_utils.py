@@ -1667,8 +1667,9 @@ def apply_physx_material_properties(env) -> None:
         jl = torch.linspace(1.0 - j, 1.0 + j, 5)
         bodies = [env.object] + list(env.distractors)
         mus = []
-        for body in bodies:
-            mu_e = deck * jl[torch.randint(0, 5, (env.num_envs,), generator=g_)]
+        lb = float(getattr(dr, "deal_lower_mu_bonus", 0.0))
+        for bi, body in enumerate(bodies):
+            mu_e = deck * jl[torch.randint(0, 5, (env.num_envs,), generator=g_)] + (lb if bi > 0 else 0.0)
             view = body.root_physx_view
             materials = view.get_material_properties()
             materials[:, :, 0] = mu_e.unsqueeze(-1)
