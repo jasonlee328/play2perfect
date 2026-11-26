@@ -508,6 +508,11 @@ class DomainRandomizationCfg:
     # DEGREES on every joint (converted per joint into the range-normalized obs). 0 / 0 = off.
     joint_position_obs_delay_steps: int = 0
     joint_position_obs_noise_deg: float = 0.0
+    # A8 (A27 leak): rebuild palm_pos / palm_rot / fingertip_pos_rel_palm / keypoints_rel_palm in the actor obs from the
+    # noisy, delayed joint reading (body Jacobians x joint error) instead of exact sim poses
+    pose_obs_from_noisy_joints: bool = False
+    # A8: arm joint encoder noise in deg (>= 0 overrides joint_position_obs_noise_deg for the 7 arm joints; -1 = same)
+    joint_position_obs_noise_deg_arm: float = -1.0
 
     # Random force/torque impulses on the object body.
     force_scale: float = 20.0
