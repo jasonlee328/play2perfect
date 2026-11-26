@@ -445,6 +445,12 @@ class PreciseAssemblyCfg:
     # sampled at reset and not in any obs. Breaks the joint-tracking-error -> grip-force mapping that lets proprio read
     # the fragile-door forces; the tactile reading stays calibrated. (1, 1) = off.
     hand_kp_scale_range: tuple[float, float] = (1.0, 1.0)
+    # A8 grip cap (physical): PhysX drive force limit (N m) on every hand joint ("left_.*"), applied once at the first
+    # reset. One value = all hand joints, else one per hand joint in robot order; () = off. Optional hidden per-env
+    # factor U(lo, hi) on top (fixed for the env's life). The fingers can then only squeeze so hard: past the friction
+    # limit they slide over the object instead of stalling on it.
+    hand_effort_cap_nm: tuple = ()
+    hand_effort_cap_scale_range: tuple[float, float] = (1.0, 1.0)
     # true: the hold reward is potential-based on the run length (scale x delta(run / success_steps)), so it totals
     # latch_cbf_hold_rew_scale at success and a broken run gives it back (the per-step version was farmed, 11-17).
     latch_cbf_hold_potential: bool = False
