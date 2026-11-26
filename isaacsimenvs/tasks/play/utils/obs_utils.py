@@ -401,19 +401,56 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     jp_b = float(getattr(dr, "joint_pos_obs_bias", 0.0))
     if jp_std > 0 or jp_b > 0:
         scale = 2.0 / (env._joint_upper_canon - env._joint_lower_canon)   # rad -> normalised joint_pos units
+        if getattr(env, "_canon_is_arm", None) is None:
+            from .reset_utils import JOINT_NAMES_CANONICAL as _JN
+            env._canon_is_arm = torch.tensor([not n.startswith("left_") for n in _JN], device=joint_pos.device)
+        a_std = float(getattr(dr, "joint_pos_obs_noise_std_arm", -1.0))
+        a_b = float(getattr(dr, "joint_pos_obs_bias_arm", -1.0))
+        std_v = torch.where(env._canon_is_arm, a_std if a_std >= 0 else jp_std, jp_std).to(joint_pos.dtype)
+        b_v = torch.where(env._canon_is_arm, a_b if a_b >= 0 else jp_b, jp_b).to(joint_pos.dtype)
         bias = getattr(env, "_joint_pos_obs_bias", None)
         if bias is None or bias.shape != joint_pos.shape:
-            bias = (torch.rand_like(joint_pos) * 2.0 - 1.0) * jp_b
+            bias = (torch.rand_like(joint_pos) * 2.0 - 1.0) * b_v
         new_ep = (env.episode_length_buf == 0).unsqueeze(-1)
-        bias = torch.where(new_ep, (torch.rand_like(joint_pos) * 2.0 - 1.0) * jp_b, bias)
+        bias = torch.where(new_ep, (torch.rand_like(joint_pos) * 2.0 - 1.0) * b_v, bias)
         env._joint_pos_obs_bias = bias
-        obs_noisy["joint_pos"] = joint_pos + (bias + torch.randn_like(joint_pos) * jp_std) * scale
+        obs_noisy["joint_pos"] = joint_pos + (bias + torch.randn_like(joint_pos) * std_v) * scale
     jd = tuple(getattr(dr, "joint_obs_delay_range", (0, 0)))
     if int(jd[1]) > 0:  # delay first, then fresh noise (A1: 3 deg error after a 2-step delay)
         jp_d, jv_d = _joint_obs_delay(env, joint_pos, obs_noisy["joint_vel"], int(jd[0]), int(jd[1]))
         if jp_std > 0 or jp_b > 0:
             jp_d = jp_d + (obs_noisy["joint_pos"] - joint_pos)
         obs_noisy["joint_pos"], obs_noisy["joint_vel"] = jp_d, jv_d
+
+    # A1 (from A8 66c7788, A27 leak): push the joint error (noisy, delayed reading - true q) through the body Jacobians
+    # and rebuild the actor's palm / fingertip / keypoint-rel-palm poses from it (a real robot only knows its encoders).
+    if bool(getattr(dr, "pose_obs_from_noisy_joints", False)):
+        half = 0.5 * (env._joint_upper_canon - env._joint_lower_canon)
+        dq_c = (obs_noisy["joint_pos"] - joint_pos) * half
+        dq = torch.zeros_like(dq_c)
+        dq[:, env._perm_lab_to_canon] = dq_c
+        J = env.robot.root_physx_view.get_jacobians()
+        off = 1 if env.robot.is_fixed_base else 0
+
+        def _dpose(bid, p_body, p_pt):
+            d = torch.einsum("nij,nj->ni", J[:, int(bid) - off], dq)
+            dw = d[:, 3:6]
+            return d[:, 0:3] + torch.cross(dw, p_pt - p_body, dim=-1), dw
+
+        dpalm, dw_palm = _dpose(env._palm_body_id, palm_pos_w, palm_center_pos_w)
+        dft = torch.stack([_dpose(b, ft_body_pos_w[:, i], ft_pos_w[:, i])[0]
+                           for i, b in enumerate(list(env._fingertip_body_ids))], dim=1)   # (N, 5, 3)
+        ang = dw_palm.norm(dim=-1)
+        axis = dw_palm / ang.clamp(min=1e-9).unsqueeze(-1)
+        palm_rot_n = quat_mul(quat_from_angle_axis(ang, axis), palm_rot)
+        obs_noisy["palm_pos"] = obs_noisy["palm_pos"] + dpalm
+        obs_noisy["palm_rot"] = convert_quat(palm_rot_n, to="xyzw")
+        obs_noisy["fingertip_pos_rel_palm"] = (obs_noisy["fingertip_pos_rel_palm"].reshape(dft.shape)
+                                               + dft - dpalm.unsqueeze(1)).reshape(obs_noisy["fingertip_pos_rel_palm"].shape)
+        obs_noisy["keypoints_rel_palm"] = (obs_noisy["keypoints_rel_palm"].reshape(dpalm.shape[0], -1, 3)
+                                           - dpalm.unsqueeze(1)).reshape(obs_noisy["keypoints_rel_palm"].shape)
+        env._pose_obs_err = dict(palm_mm=1000 * dpalm.norm(dim=-1), tip_mm=1000 * (dft - dpalm.unsqueeze(1)).norm(dim=-1),
+                                 palm_deg=torch.rad2deg(ang))
 
     for f in tuple(getattr(env.cfg.obs, "actor_zero_fields", ()) or ()):   # hidden from the actor, layout kept
         if f in obs_noisy:

@@ -513,6 +513,12 @@ class DomainRandomizationCfg:
     # Joint-position obs noise for the actor (rad; A1 11-17): per-step Gaussian std + a per-episode bias U(+-b) per joint
     # (resampled on the episode's first step). Critic keeps the clean value. 0 = off.
     joint_pos_obs_noise_std: float = 0.0
+    # A1 (from A8 66c7788): arm-joint overrides of joint_pos_obs_noise_std / joint_pos_obs_bias in rad (-1 = same as hand)
+    joint_pos_obs_noise_std_arm: float = -1.0
+    joint_pos_obs_bias_arm: float = -1.0
+    # A1 (from A8 66c7788): rebuild palm_pos / palm_rot / fingertip_pos_rel_palm / keypoints_rel_palm in the actor obs
+    # from the noisy, delayed joint reading (body Jacobians x joint error) instead of exact sim poses
+    pose_obs_from_noisy_joints: bool = False
     joint_pos_obs_bias: float = 0.0
 
     # Random force/torque impulses on the object body.
