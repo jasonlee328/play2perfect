@@ -1671,12 +1671,13 @@ def apply_physx_material_properties(env) -> None:
             mu_e = deck * jl[torch.randint(0, 5, (env.num_envs,), generator=g_)]
             view = body.root_physx_view
             materials = view.get_material_properties()
-            materials[:, :, 0] = mu_e.unsqueeze(-1); materials[:, :, 1] = mu_e.unsqueeze(-1); materials[:, :, 2] = 0.0
+            materials[:, :, 0] = mu_e.unsqueeze(-1)
+            materials[:, :, 1] = (mu_e * float(getattr(dr, "deal_card_dyn_ratio", 1.0))).unsqueeze(-1); materials[:, :, 2] = 0.0
             view.set_material_properties(materials, env_ids)
             mus.append(mu_e)
         env._deal_obj_mu = mus[0].clone()
         env._deal_card_mu = torch.stack(mus, -1).to(env.device)
-        print(f"[scene] A26 realistic deck mu U{_dm} x card jitter +-{j}: {len(mus)} cards", flush=True)
+        print(f"[scene] A26 realistic deck mu U{_dm} x card jitter +-{j}, dynamic x{getattr(dr, 'deal_card_dyn_ratio', 1.0)}: {len(mus)} cards", flush=True)
 
     _log_scene_step(t0, "applied PhysX material properties")
 

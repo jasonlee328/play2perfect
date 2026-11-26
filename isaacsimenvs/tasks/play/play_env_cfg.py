@@ -557,6 +557,8 @@ class DomainRandomizationCfg:
     # (quantized), set on the top card + every distractor card (overrides the object / distractor scale ranges).
     deal_deck_mu_range: tuple = ()
     deal_card_mu_jitter: float = 0.0
+    # A26: sliding (dynamic) friction = ratio x static for every card (paper kinetic/static ~0.7-0.85); 1.0 = old behaviour
+    deal_card_dyn_ratio: float = 1.0
 
 
 @configclass
