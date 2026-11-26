@@ -136,6 +136,7 @@ class PreciseAssemblyCfg:
     deal_force_penalty: float = 0.0         # A26 11-25: reward -= x * relu(hand force - deal_force_free) per step (N)
     deal_force_free: float = 0.5
     deal_card_mass_kg: float = 0.0          # A26 11-25: > 0 -> every card (top + deck) gets this mass (real card ~1.8 g)
+    deal_err_cost: float = 0.0              # A26 11-25: reward -= x * min(|slide-target| in cm, 5) per step (anti-stall)
     deal_progress_scale: float = 2000.0     # potential on -|slide - target| (m)
     deal_others_penalty: float = 0.5
     deal_in_tol_rew: float = 1.0
