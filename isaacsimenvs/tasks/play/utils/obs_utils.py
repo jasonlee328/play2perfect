@@ -401,6 +401,16 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         else:
             obs_clean["latch_cue"] = torch.zeros(n, 3, device=env.device)
 
+    if "grip_hint" in OBS_FIELD_SIZES:
+        n = env.num_envs
+        if hasattr(env, "_grip_need_env") and getattr(env, "_cbf", None):
+            need = env._grip_need_env().float().to(env.device) / 100.0
+            mu = getattr(env, "_object_mu_env", None)
+            mu = torch.full((n,), float(env.cfg.assets.object_friction), device=env.device) if mu is None else mu.float().to(env.device)
+            obs_clean["grip_hint"] = torch.stack([need, mu, torch.ones(n, device=env.device)], dim=-1)
+        else:
+            obs_clean["grip_hint"] = torch.zeros(n, 3, device=env.device)
+
     if "latch_state" in OBS_FIELD_SIZES and getattr(env, "_pih_joints", ()):
         n = env.num_envs
         if getattr(env, "unlock_angle", None) is not None and hasattr(env, "latch_open") and hasattr(env, "cb_joint_angle"):

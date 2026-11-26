@@ -249,6 +249,8 @@ class PreciseAssemblyCfg:
     # hint (needs latch_hint_obs=true for the m schedule). latch_hint_theta=false zeroes theta in latch_hint
     # ([0, m]) so only the cue is privileged. Warm-start with P2P_NEW_OBS_FIELD=latch_cue.
     latch_cue_obs: bool = False
+    # A8 slip oracle: actor field grip_hint = [grip need at the stop / 100 N, hidden knob friction, 1] (privileged)
+    grip_hint_obs: bool = False
     latch_hint_theta: bool = True
     # The door goal (last waypoint) counts only if the latch cleared this episode (latch_open_ep).
     latch_success_requires_open: bool = True
