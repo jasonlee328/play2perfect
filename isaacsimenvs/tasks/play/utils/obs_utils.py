@@ -407,6 +407,65 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             jp = jp + torch.randn_like(jp) * jp_std
         obs_noisy["joint_pos"] = jp
 
+    # A8 real-robot joint sensing: fixed delay of the measured joint positions, then noise in degrees per joint.
+    jd = int(getattr(dr, "joint_position_obs_delay_steps", 0))
+    jdeg = float(getattr(dr, "joint_position_obs_noise_deg", 0.0))
+    if jd > 0 or jdeg > 0:
+        jp = obs_noisy["joint_pos"]
+        if jd > 0:
+            q = getattr(env, "_jp_delay_queue", None)
+            if q is None or q.shape != (jp.shape[0], jd + 1, jp.shape[1]):
+                q = jp.unsqueeze(1).repeat(1, jd + 1, 1)
+            new_ep = env.episode_length_buf <= 1
+            if bool(new_ep.any()):
+                q[new_ep] = jp[new_ep].unsqueeze(1).expand(-1, jd + 1, -1)
+            q = torch.roll(q, shifts=1, dims=1); q[:, 0] = jp
+            env._jp_delay_queue = q
+            jp = q[:, jd]
+        if jdeg > 0:
+            half = 0.5 * (env._joint_upper_canon - env._joint_lower_canon)   # rad -> normalized obs: divide by half range
+            sd = torch.full_like(half, jdeg)
+            adeg = float(getattr(dr, "joint_position_obs_noise_deg_arm", -1.0))
+            if adeg >= 0.0:   # separate (finer) arm encoder noise: arm joints = canonical names without "left_"
+                if getattr(env, "_canon_is_arm", None) is None:
+                    from .reset_utils import JOINT_NAMES_CANONICAL as _JN
+                    env._canon_is_arm = torch.tensor([not n.startswith("left_") for n in _JN], device=jp.device)
+                sd = torch.where(env._canon_is_arm, torch.full_like(sd, adeg), sd)
+            jp = jp + torch.randn_like(jp) * (sd * 3.141592653589793 / 180.0) / half.clamp(min=1e-6)
+        obs_noisy["joint_pos"] = jp
+
+    # A8 (A27 leak): palm / fingertip poses in the actor obs come from the sim exactly, so joint-sensing noise never
+    # reached them. pose_obs_from_noisy_joints: push the same joint error (noisy, delayed reading - true q) through the
+    # body Jacobians (first-order FK; ~exact at degree-scale errors) and rebuild palm_pos / palm_rot /
+    # fingertip_pos_rel_palm / keypoints_rel_palm from it, like a real robot that only knows its joint encoders.
+    if bool(getattr(dr, "pose_obs_from_noisy_joints", False)):
+        half = 0.5 * (env._joint_upper_canon - env._joint_lower_canon)
+        dq_c = (obs_noisy["joint_pos"] - obs_clean["joint_pos"]) * half
+        dq = torch.zeros_like(dq_c)
+        dq[:, env._perm_lab_to_canon] = dq_c
+        J = env.robot.root_physx_view.get_jacobians()
+        off = 1 if env.robot.is_fixed_base else 0
+
+        def _dpose(bid, p_body, p_pt):
+            d = torch.einsum("nij,nj->ni", J[:, int(bid) - off], dq)
+            dw = d[:, 3:6]
+            return d[:, 0:3] + torch.cross(dw, p_pt - p_body, dim=-1), dw
+
+        dpalm, dw_palm = _dpose(env._palm_body_id, palm_pos_w, palm_center_pos_w)
+        dft = torch.stack([_dpose(b, ft_body_pos_w[:, i], ft_pos_w[:, i])[0]
+                           for i, b in enumerate(list(env._fingertip_body_ids))], dim=1)   # (N, 5, 3)
+        ang = dw_palm.norm(dim=-1)
+        axis = dw_palm / ang.clamp(min=1e-9).unsqueeze(-1)
+        palm_rot_n = quat_mul(quat_from_angle_axis(ang, axis), palm_rot)
+        obs_noisy["palm_pos"] = obs_noisy["palm_pos"] + dpalm
+        obs_noisy["palm_rot"] = convert_quat(palm_rot_n, to="xyzw")
+        obs_noisy["fingertip_pos_rel_palm"] = (obs_noisy["fingertip_pos_rel_palm"].reshape(dft.shape)
+                                               + dft - dpalm.unsqueeze(1)).reshape(obs_noisy["fingertip_pos_rel_palm"].shape)
+        obs_noisy["keypoints_rel_palm"] = (obs_noisy["keypoints_rel_palm"].reshape(dpalm.shape[0], -1, 3)
+                                           - dpalm.unsqueeze(1)).reshape(obs_noisy["keypoints_rel_palm"].shape)
+        env._pose_obs_err = dict(palm_mm=1000 * dpalm.norm(dim=-1), tip_mm=1000 * (dft - dpalm.unsqueeze(1)).norm(dim=-1),
+                                 palm_deg=torch.rad2deg(ang))
+
     for f_ in tuple(getattr(env.cfg.obs, "actor_zero_fields", ())):
         obs_noisy[f_] = torch.zeros_like(obs_noisy[f_])
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)

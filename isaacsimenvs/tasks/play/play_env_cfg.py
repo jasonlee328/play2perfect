@@ -513,6 +513,11 @@ class DomainRandomizationCfg:
     joint_velocity_obs_noise_std: float = 0.1
     joint_position_obs_noise_std: float = 0.0   # A26: actor-only white noise on joint_pos (rad)
     joint_position_obs_walk_std: float = 0.0    # A26: actor-only random-walk offset on joint_pos, per-step std (rad), reset per episode
+    # A8 real-robot joint sensing (play2perfect e96b20f / 66c7788, ported by A26): fixed delay + per-step noise in deg
+    joint_position_obs_delay_steps: int = 0
+    joint_position_obs_noise_deg: float = 0.0
+    pose_obs_from_noisy_joints: bool = False
+    joint_position_obs_noise_deg_arm: float = -1.0
 
     # Random force/torque impulses on the object body.
     force_scale: float = 20.0
