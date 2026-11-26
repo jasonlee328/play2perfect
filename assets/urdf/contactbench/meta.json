@@ -761,6 +761,26 @@
    "collision": "coacd 1",
    "variant_of": "chopstick",
    "tip_scale": 0.5
+  },
+  "cube57": {
+   "src": "analytic box (cube_tasks.py)",
+   "extents_mm": [
+    57.0,
+    57.0,
+    57.0
+   ],
+   "mass_g": 80.0,
+   "com_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "object_scale": [
+    1.425,
+    1.425,
+    1.425
+   ],
+   "collision": "box"
   }
  },
  "fixtures": {
@@ -1142,6 +1162,22 @@
     0.0
    ],
    "note": "utensil_bin_h with side walls +45.0 mm per side (make_tray_n10s.py)"
+  },
+  "cube_mat": {
+   "src": [
+    "analytic box (cube_tasks.py)"
+   ],
+   "collision": "box",
+   "extents_mm": [
+    120.0,
+    120.0,
+    1.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ]
   }
  },
  "problems": {
@@ -10673,6 +10709,48 @@
     ]
    ],
    "settled": true
+  },
+  "cb_cube_lift": {
+   "fixture": "cube_mat",
+   "object": "cube57",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.0297,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1297,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "cube_mm": 57.0,
+    "cube_g": 80.0,
+    "mat_mm": [
+     120.0,
+     120.0,
+     1.0
+    ],
+    "lift_mm": 100.0
+   }
   }
  }
 }
