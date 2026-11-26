@@ -160,6 +160,11 @@ class PreciseAssemblyCfg:
     roll_twist_only: bool = False        # near goal = twist error <= key_goal_rot_deg, swing <= roll_swing_tol_deg,
     roll_swing_tol_deg: float = 30.0     #   position <= key_goal_pos_m (instead of the full rotation error)
     roll_still_deg_s: float = 0.0        # > 0: near goal also needs |spin about the long axis| below this
+    # A27 braking: reward -= roll_brake_scale * |spin| (rad/s) while the twist error < roll_brake_zone_deg, and
+    # += roll_dwell_rew per step while the twist error <= key_goal_rot_deg (policies passed the target at ~28 deg/s)
+    roll_brake_scale: float = 0.0
+    roll_brake_zone_deg: float = 25.0
+    roll_dwell_rew: float = 0.0
     # hidden per-env roll resistance (training/eval DR, "stiff stick"): each physics substep a torque
     # -tau * tanh(w_x / roll_drag_w0) about the stick axis, tau log-U(roll_drag_range); roll inertia x roll_inertia_mult
     roll_drag_range: tuple = (0.0, 0.0)

@@ -1562,6 +1562,13 @@ class PreciseAssemblyEnv(PlayEnv):
                 over_f = (self.hand_force - float(getattr(pih_cfg, "squeeze_free_force", 1.0))).clamp(min=0.0)
                 k_rew = k_rew - sq * over_f
                 self.extras["squeeze_over_mean"] = over_f.mean()
+            rb = float(getattr(pih_cfg, "roll_brake_scale", 0.0)); rd = float(getattr(pih_cfg, "roll_dwell_rew", 0.0))
+            if (rb > 0.0 or rd > 0.0) and hasattr(key, "spin") and hasattr(key, "twist_err"):   # A27 braking near the target
+                zone = key.twist_err < float(getattr(pih_cfg, "roll_brake_zone_deg", 25.0))
+                k_rew = k_rew - rb * key.spin.abs() * zone.float()
+                inw = key.twist_err <= float(pih_cfg.key_goal_rot_deg)
+                k_rew = k_rew + rd * inw.float()
+                self.extras["roll_spin_in_zone"] = (key.spin.abs() * zone.float()).sum() / zone.float().sum().clamp_min(1.0)
             reward = reward + k_rew
             self._reward_terms["key_reward"] = k_rew
             self._reward_terms["total_reward"] = reward
