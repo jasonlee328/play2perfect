@@ -386,6 +386,14 @@ class PreciseAssemblyCfg:
     # door_break_pull, for door_break_steps policy steps in a row = termination "broken" (- door_break_penalty)
     door_break_torque: float = 0.0
     door_break_pull: float = 0.0
+    # A8: pull-limit curriculum: the limit starts at door_break_pull_start and ramps linearly to door_break_pull over
+    # door_break_pull_ramp_steps env steps (+ _offset_steps on a resume); 0 = off
+    door_break_pull_start: float = 0.0
+    door_break_pull_ramp_steps: int = 0
+    door_break_pull_offset_steps: int = 0
+    # A8: per-step penalty  scale x relu(pull - frac x current limit) / current limit  (N of pull on the latched door)
+    door_pull_pen_scale: float = 0.0
+    door_pull_pen_frac: float = 0.5
     door_break_steps: int = 3
     door_break_penalty: float = 200.0
     # A1 hand force (ported by A8 from a1-cup 6a76824): PhysX contact report on the object filtered to the robot links,

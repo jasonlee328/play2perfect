@@ -2258,6 +2258,11 @@ class PreciseAssemblyEnv(PlayEnv):
         if hasattr(self, "door_stop_torque"):
             # A1 upper bound (door_break_*): readings = max over this policy step's substeps
             lim_t, lim_f = float(pih_cfg.door_break_torque), float(pih_cfg.door_break_pull)
+            if float(getattr(pih_cfg, "door_break_pull_start", 0.0)) > 0.0 and int(getattr(pih_cfg, "door_break_pull_ramp_steps", 0)) > 0 and lim_f > 0.0:
+                a = min(1.0, float(self.common_step_counter + int(pih_cfg.door_break_pull_offset_steps)) / float(pih_cfg.door_break_pull_ramp_steps))
+                lim_f = float(pih_cfg.door_break_pull_start) + a * (lim_f - float(pih_cfg.door_break_pull_start))
+            self._door_pull_lim_now = lim_f
+            self.extras["door_break_pull_now"] = torch.tensor(lim_f, device=self.device)
             over = torch.zeros_like(fall)
             if lim_t > 0.0:
                 over |= self.door_stop_torque > lim_t
@@ -2579,6 +2584,13 @@ class PreciseAssemblyEnv(PlayEnv):
             self._reward_terms["hs_door_rew"] = dr
             self._reward_terms["total_reward"] = reward
 
+        # A8 pull shaping: - door_pull_pen_scale x relu(pull - frac x limit) / limit while latched (pull force = 0 otherwise)
+        ps = float(getattr(pih_cfg, "door_pull_pen_scale", 0.0))
+        if ps > 0.0 and hasattr(self, "door_pull_force_step") and getattr(self, "_door_pull_lim_now", 0.0) > 0.0:
+            L = float(self._door_pull_lim_now)
+            pp = -ps * torch.relu(self.door_pull_force_step - float(pih_cfg.door_pull_pen_frac) * L) / L
+            reward = reward + pp
+            self._reward_terms["door_pull_pen"] = pp
         # A8 hold shaping (latch_cbf): + latch_cbf_hold_rew_scale per step that counts toward the held-open success run,
         # - latch_cbf_door_vel_pen_scale x door speed (deg/s / 100, capped at 3) while the door is open after the latch.
         if getattr(self, "_cbf", None) is not None and hasattr(self, "_cbf_hold_now"):
