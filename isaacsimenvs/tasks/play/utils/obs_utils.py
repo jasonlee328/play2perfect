@@ -415,6 +415,9 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             jp_d = jp_d + (obs_noisy["joint_pos"] - joint_pos)
         obs_noisy["joint_pos"], obs_noisy["joint_vel"] = jp_d, jv_d
 
+    for f in tuple(getattr(env.cfg.obs, "actor_zero_fields", ()) or ()):   # hidden from the actor, layout kept
+        if f in obs_noisy:
+            obs_noisy[f] = torch.zeros_like(obs_noisy[f])
     state_tensor = _stack_obs_dict(obs_clean, env.cfg.obs.state_list)
     policy_tensor = _stack_obs_dict(obs_noisy, env.cfg.obs.obs_list)
 

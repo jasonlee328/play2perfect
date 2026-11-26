@@ -145,6 +145,8 @@ class ObsCfg:
     )
 
     clamp_abs_observations: float = 10.0
+    # A1 (from A27 c4d1872): obs_list fields fed to the actor as zeros, layout kept
+    actor_zero_fields: tuple[str, ...] = ()
 
 
 # ----------------------------------------------------------------------------
