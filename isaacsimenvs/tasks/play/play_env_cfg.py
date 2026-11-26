@@ -361,6 +361,7 @@ class ActionCfg:
     hand_tip_ik_scale: float = 0.0
     hand_tip_ik_wrot: float = 0.02
     hand_tip_ik_lambda: float = 0.001
+    hand_tip_ik_limit_margin: float = 0.0   # A27: >0 = limit-aware tip IK (drop joints pushed into a limit)
 
 
 # ----------------------------------------------------------------------------

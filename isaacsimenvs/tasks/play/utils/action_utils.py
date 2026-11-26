@@ -45,6 +45,7 @@ def _tip_ik_targets(env, actions, hand_raw, scale, act_cfg):
     palm_q = rb.data.body_state_w[:, env._palm_body_id, 3:7]
     wrot = float(getattr(act_cfg, "hand_tip_ik_wrot", 0.02))
     lam = float(getattr(act_cfg, "hand_tip_ik_lambda", 0.001))
+    lim_margin = float(getattr(act_cfg, "hand_tip_ik_limit_margin", 0.0))
     eye6 = torch.eye(6, device=env.device)
     hand_raw = hand_raw.clone()
     hand_act = actions[:, 7:]
@@ -55,6 +56,19 @@ def _tip_ik_targets(env, actions, hand_raw, scale, act_cfg):
         Jk = J[:, ch["row"]][:, :, ch["cols"]]
         Jk = torch.cat([Jk[:, :3], wrot * Jk[:, 3:]], 1)
         dq = Jk.transpose(1, 2) @ torch.linalg.solve(Jk @ Jk.transpose(1, 2) + lam ** 2 * eye6, e.unsqueeze(-1))
+        if lim_margin > 0.0:
+            # A27: limit-aware IK. A joint whose target sits within lim_margin (share of its range) of a limit and whose
+            # step would push further into it is dropped from the Jacobian, then the step is re-solved so the other
+            # joints of the finger carry the tip motion (plain DLS keeps commanding the saturated joint -> tip stalls).
+            qt = env._prev_targets[:, ch["joints"]]
+            lo = env._hand_lower[:, hk] if env._hand_lower.dim() == 2 else env._hand_lower[hk]
+            hi = env._hand_upper[:, hk] if env._hand_upper.dim() == 2 else env._hand_upper[hk]
+            mg = lim_margin * (hi - lo)
+            d0 = dq.squeeze(-1)
+            block = ((qt <= lo + mg) & (d0 < 0)) | ((qt >= hi - mg) & (d0 > 0))
+            if bool(block.any()):
+                Jm = Jk * (~block).float().unsqueeze(1)
+                dq = Jm.transpose(1, 2) @ torch.linalg.solve(Jm @ Jm.transpose(1, 2) + lam ** 2 * eye6, e.unsqueeze(-1))
         hand_raw[:, hk] = env._prev_targets[:, ch["joints"]] + dq.squeeze(-1)
     return hand_raw
 
