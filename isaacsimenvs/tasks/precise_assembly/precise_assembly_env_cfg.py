@@ -154,6 +154,7 @@ class PreciseAssemblyCfg:
     slide_stick: bool = False
     slide_x_end: float = 0.1096        # m, stick bottom end along object +x (chopstick thin end)
     slide_x_top: float = -0.085        # m, pinch above this object x (near the top end) = dropped
+    slide_hint_obs: bool = False              # A25 oracle: actor field slide_hint = [error/1cm, speed/1cm/s]
     slide_target_range: tuple = (0.04, 0.12)   # m, target protrusion below the pinch
     slide_change_range: tuple = (0.02, 0.08)   # m, requested change (target - start)
     slide_tol: float = 0.005

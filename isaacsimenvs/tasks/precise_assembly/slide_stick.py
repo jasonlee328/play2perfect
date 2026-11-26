@@ -142,6 +142,10 @@ class SlideStick:
     def obs(self):
         return torch.stack([self.target / 0.1, self.change / 0.1], -1)
 
+    def hint(self):
+        err = (self.prot - self.target) / 0.01
+        return torch.stack([err.clamp(-5.0, 5.0), (self.speed / 0.01).clamp(max=5.0)], -1)
+
     def state(self):
         err = self.prot - self.target
         return torch.stack([self.prot / 0.1, err / 0.01, self.speed / 0.01, self.lateral / 0.01,

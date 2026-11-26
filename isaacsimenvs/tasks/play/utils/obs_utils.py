@@ -53,6 +53,7 @@ OBS_FIELD_SIZES: dict[str, int] = {
     "reward": 1,
     "slide_target": 2,   # A25 slide_stick: [target protrusion, requested change] / 0.1 m
     "slide_state": 6,    # A25 critic only: protrusion, error, speed, lateral, hold, max protrusion
+    "slide_hint": 2,     # A25 oracle only (slide_hint_obs): [protrusion error / 1 cm, slide speed / 1 cm/s], clipped +-5
 }
 
 
@@ -375,6 +376,7 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     if getattr(env, "_slide", None) is not None:   # A25
         obs_clean["slide_target"] = env._slide.obs()
         obs_clean["slide_state"] = env._slide.state()
+        obs_clean["slide_hint"] = env._slide.hint()
 
     if "distractor_obs" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
         idx = getattr(env, "_obs_distractor_idx", None)

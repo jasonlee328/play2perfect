@@ -76,6 +76,9 @@ class PreciseAssemblyEnv(PlayEnv):
             for f in ("slide_target", "slide_state"):
                 if f not in cfg.obs.state_list:
                     cfg.obs.state_list = (*cfg.obs.state_list, f)
+            if bool(getattr(cfg.precise_assembly, "slide_hint_obs", False)):   # privileged oracle: actor sees the error
+                if "slide_hint" not in cfg.obs.obs_list:
+                    cfg.obs.obs_list = (*cfg.obs.obs_list, "slide_hint")
 
         super().__init__(cfg, render_mode, **kwargs)
 
