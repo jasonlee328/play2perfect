@@ -194,6 +194,7 @@ def setup_scene(env) -> None:
                 articulation_enabled=False,
             ),
             rest_offset=rest,
+            torsional_patch_radius=float(getattr(pa_cfg, "object_torsional_patch_radius", 0.0)) or None,
         ))
         goalviz_usd_paths.append(_bake_usd(
             object_raw_usd,

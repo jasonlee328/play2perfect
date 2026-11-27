@@ -272,6 +272,9 @@ class PreciseAssemblyCfg:
     # rest offset (m, may be negative) of the object, distractor and receptive shapes (None: play scene_utils
     # _REST_OFFSET = 0). A pair rests at the sum of its two shapes' rest offsets.
     object_solver_position_iterations: int = 4
+    # A31: torsional patch radius (m) on the object's collision shapes (PhysX point contacts give ~no twist friction; a
+    # soft gel pad's contact patch is ~mm wide). 0 = PhysX default.
+    object_torsional_patch_radius: float = 0.0
     object_rest_offset: float = 0.0   # 0.0 = the play default _REST_OFFSET (a None default rejects float overrides)
 
     # Official-style ("strict") success for the last goal, from the ContactBench sim's retrieve_top_cup_from_stack

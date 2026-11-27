@@ -1429,6 +1429,7 @@ def _bake_usd(
     apply_physx_articulation: bool = False,
     collision_enabled: bool | None = None,
     rest_offset: float | None = None,
+    torsional_patch_radius: float | None = None,
 ) -> str:
     """Copy raw USD into bake_root/baked_subdir and pre-author physics props.
 
@@ -1494,6 +1495,9 @@ def _bake_usd(
             px = PhysxSchema.PhysxCollisionAPI(prim) or PhysxSchema.PhysxCollisionAPI.Apply(prim)
             px.CreateContactOffsetAttr().Set(_CONTACT_OFFSET)
             px.CreateRestOffsetAttr().Set(_REST_OFFSET if rest_offset is None else float(rest_offset))
+            if torsional_patch_radius:   # A31: contact-patch torsional friction (m); PhysX default 0 = point contacts
+                px.CreateTorsionalPatchRadiusAttr().Set(float(torsional_patch_radius))
+                px.CreateMinTorsionalPatchRadiusAttr().Set(float(torsional_patch_radius))
             if collision_enabled is not None:
                 ce = UsdPhysics.CollisionAPI(prim)
                 (ce.GetCollisionEnabledAttr() or ce.CreateCollisionEnabledAttr()).Set(
