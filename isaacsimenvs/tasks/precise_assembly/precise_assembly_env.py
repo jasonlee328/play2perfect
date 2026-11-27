@@ -676,6 +676,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self.stick_checked_total = 0
             self.n_lifted = torch.zeros(self.num_envs, **f)
             self.n_lifted_ep_max = torch.zeros(self.num_envs, **f)
+            self.n_lifted_last = torch.full((self.num_envs,), -1.0, **f)       # previous episode (read after reset)
+            self.stick_violation_last = torch.full((self.num_envs,), -1.0, **f)
             if c.stick_bank_file:
                 import numpy as np
                 b = np.load(c.stick_bank_file)["poses"].astype("float32")
@@ -712,6 +714,8 @@ class PreciseAssemblyEnv(PlayEnv):
             q = torch.stack([cy * sr, sy * sr, sy * cr, cy * cr], -1)                         # x y z w
             self._slot_pose[:, env_ids] = torch.cat([torch.stack([px, py, pz], -1), q], -1)
         self._start_shift[:, env_ids] = 0.0
+        self.n_lifted_last[env_ids] = self.n_lifted_ep_max[env_ids]
+        self.stick_violation_last[env_ids] = self.stick_violation[env_ids]
         self.stick_violation[env_ids] = 0.0
         self.n_lifted_ep_max[env_ids] = 0.0
         return True
