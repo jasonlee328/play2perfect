@@ -475,6 +475,13 @@ class PreciseAssemblyCfg:
     dial_press_rew_scale: float = 20000.0
     dial_clear_rew_scale: float = 50.0
     dial_success_bonus: float = 1000.0
+    # push-dial gate curriculum (training aid): the kinematic gate (tooth + peg, distractor dial_gate_idx) is raised by
+    # lift = dial_gate_lift_start_mm x (1 - f), f = clamp((env steps + dial_gate_offset_steps) / dial_gate_ramp_steps)
+    # at each reset; 0 start = the real gate. A lift >= 3 mm = no lock (knob turns free).
+    dial_gate_idx: int = 2
+    dial_gate_lift_start_mm: float = 0.0
+    dial_gate_ramp_steps: float = 32000.0
+    dial_gate_offset_steps: float = 0.0
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
     stiff_distractors: tuple[int, ...] = ()
 

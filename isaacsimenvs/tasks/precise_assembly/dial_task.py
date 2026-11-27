@@ -51,7 +51,23 @@ class DialTask:
         self.checks, self.meas = {}, {}
         self.fail = {}
 
+    def gate_lift(self):
+        c = self.c
+        if not self.push or float(c.dial_gate_lift_start_mm) <= 0.0:
+            return 0.0
+        n = float(getattr(self.env, "common_step_counter", 0)) + float(c.dial_gate_offset_steps)
+        f = min(max(n / max(float(c.dial_gate_ramp_steps), 1.0), 0.0), 1.0)
+        return float(c.dial_gate_lift_start_mm) * 1e-3 * (1.0 - f)
+
     def reset(self, env_ids):
+        lift = self.gate_lift()
+        if lift > 0.0:
+            e = self.env
+            k = int(self.c.dial_gate_idx)
+            pose = list(e._pih_distractor_pose_rel[k]); pose[2] += lift
+            w = e._pose_rel_hole_to_world(env_ids, tuple(pose))
+            e.distractors[k].write_root_pose_to_sim(w, env_ids=env_ids)
+        self.lift_now = lift
         self.step[env_ids] = 0
         self.angle[env_ids] = 0.0
         self.prev_raw[env_ids] = 0.0

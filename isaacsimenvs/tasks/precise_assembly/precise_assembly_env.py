@@ -2474,6 +2474,7 @@ class PreciseAssemblyEnv(PlayEnv):
             for k, v in dial.checks.items():
                 self.extras[f"dial/{k}"] = v.float().mean()
             self.extras["dial/success"] = dial.success.float().mean()
+            self.extras["dial/gate_lift_mm"] = torch.tensor(getattr(dial, "lift_now", 0.0) * 1e3, device=self.device)
             self.extras["dial/err_deg"] = dial.meas["err_deg"].mean()
             if dial.push:
                 self.extras["dial/depth_mm"] = dial.meas["depth_mm"].mean()
