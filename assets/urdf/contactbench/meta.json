@@ -1009,6 +1009,27 @@
     -0.0,
     0.173
    ]
+  },
+  "cube_50": {
+   "src": "generated (cube_task.py)",
+   "extents_mm": [
+    50.0,
+    50.0,
+    50.0
+   ],
+   "mass_g": 50.0,
+   "com_src_mm": [
+    0,
+    0,
+    0
+   ],
+   "object_scale": [
+    1.25,
+    1.25,
+    1.25
+   ],
+   "collision": "box",
+   "mass_model": "solid cube 50 g (A13)"
   }
  },
  "fixtures": {
@@ -10977,6 +10998,34 @@
      -0.0413,
      0.0262
     ]
+   }
+  },
+  "cb_cuberepose": {
+   "object": "cube_50",
+   "fixture": "keychain_mat",
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "layout": {
+    "source": "A13 user 11-26",
+    "task": "cube resting on the palm-up hand; turn to a face-aligned goal orientation in the palm frame, arm frozen"
    }
   }
  },

@@ -121,6 +121,8 @@ class PreciseAssemblyCfg:
     # A13 key repose (key_repose.py): goal = the key's start pose in the palm frame turned about its long axis
     key_repose: bool = False
     key_flip_deg: tuple = (45.0, 90.0, 135.0, 180.0)   # one goal per angle, in order; last = the task
+    key_goal_mode: str = "flip"          # "flip" (key) | "cube24": goal = start pose (palm frame) x a random face-aligned rotation
+    key_cube_set: str = "all"            # cube24 goal set: all (23) | 90 (6 quarter turns) | 90_180 (9)
     key_flip_axis: tuple = (1.0, 0.0, 0.0)   # object-frame axis of the goal rotation (key: long axis x; Allen key pivot: z)
     key_pivot_point: tuple = ()          # object-frame point (m) the goal rotation pivots about (Allen key: the grip); () = origin
     key_flip_ramp_steps: int = 0        # > 0: all angles scaled from key_flip_ramp_start to 1 over this many env steps

@@ -44,6 +44,12 @@ class KeyRepose:
         pv = getattr(c, "key_pivot_point", None)
         self.pivot = torch.tensor([float(v) for v in pv], device=dev) if pv else None   # object frame (m)          # flip axis in the object frame (key: long axis x; Allen key: pinch axis z)
         self._step = 0
+        # A13 cube (key_goal_mode=cube24): per-episode goal = start (palm frame) x one face-aligned rotation R_e
+        self.mode = str(getattr(c, "key_goal_mode", "flip"))
+        if self.mode == "cube24":
+            self.cube_set = _cube_rotations(str(getattr(c, "key_cube_set", "all")), dev)   # (M, 4) wxyz, no identity
+            self.goal_r = torch.zeros(N, 4, device=dev); self.goal_r[:, 0] = 1.0
+            self.goal_id = torch.zeros(N, dtype=torch.long, device=dev)
 
     # ------------------------------------------------------------------ helpers
     def scale(self) -> float:
@@ -56,6 +62,8 @@ class KeyRepose:
         return float(s0 + (1.0 - s0) * min(max(t, 0.0), 1.0))
 
     def _rot(self, env_ids, k):
+        if self.mode == "cube24":
+            return self.goal_r[env_ids]
         ang = self.flip[k.clamp(max=self.flip.numel() - 1)] * self.scale()
         return quat_from_angle_axis(ang, self.x_axis.expand(env_ids.numel(), 3))
 
@@ -99,6 +107,10 @@ class KeyRepose:
         self.far_steps[env_ids] = 0
         self.dropped[env_ids] = False
         self.min_final_rot_err[env_ids] = 180.0
+        if self.mode == "cube24":
+            j = torch.randint(0, self.cube_set.shape[0], (env_ids.numel(),), device=e.device)
+            self.goal_id[env_ids] = j
+            self.goal_r[env_ids] = self.cube_set[j]
 
     def update(self):
         """Start of _get_dones (fresh physics state): fix base_rel for new episodes, rewrite every goal, drop check."""
@@ -147,6 +159,8 @@ class KeyRepose:
         twf = twf / twf.norm(dim=-1, keepdim=True).clamp_min(1e-9)
         ftw = 2.0 * torch.acos(twf[:, 0].abs().clamp(max=1.0))
         fsw = 2.0 * torch.acos(quat_mul(dqf, quat_conjugate(twf))[:, 0].abs().clamp(max=1.0))
+        if self.mode == "cube24":
+            ftw = torch.deg2rad(self.final_rot_err); fsw = torch.zeros_like(ftw)
         phi = -(ftw + float(c.key_shape_swing_w) * fsw + float(getattr(c, "key_shape_pos_w", 0.0)) * (kp - gf[:, 0:3]).norm(dim=-1))
         if not hasattr(self, "phi_prev"):
             self.phi_prev = phi.clone()
@@ -167,6 +181,8 @@ class KeyRepose:
         top = e._table_z_per_env + TABLE_HALF_HEIGHT + e.scene.env_origins[:, 2]
         below = below | (kp[:, 2] < top + float(c.key_drop_table_m))   # key on / near the table = dropped
         far = dmin > float(c.key_drop_dist)
+        if self.mode == "cube24":                  # cube resting on the palm: dropped = > key_drop_dist from its start spot in the palm
+            far = self.pos_err > float(c.key_drop_dist)
         self.far_steps = torch.where(far, self.far_steps + 1, torch.zeros_like(self.far_steps))
         self.dropped = (self.far_steps >= int(c.key_drop_steps)) | below
         self.fingertip_dmin = dmin
@@ -178,3 +194,36 @@ class KeyRepose:
         extras["key_pos_err_mm"] = self.pos_err.mean() * 1e3
         extras["key_final_rot_err_deg"] = self.final_rot_err.mean()
         extras["key_flip_scale"] = self.scale()
+        if self.mode == "cube24":
+            extras["cube_goal_angle_deg"] = (torch.rad2deg(2.0 * torch.acos(self.goal_r[:, 0].abs().clamp(max=1.0)))).mean()
+
+
+def _cube_rotations(which: str, dev):
+    """Face-aligned cube rotations (signed permutation matrices, det +1) as wxyz quats, identity excluded.
+    which: 'all' = the 23 non-identity ones; '90' = the 6 quarter turns about a face axis; '90_180' = + the 3 half
+    turns about face axes (9)."""
+    import itertools
+    import numpy as np
+    from scipy.spatial.transform import Rotation
+    Rs = []
+    for perm in itertools.permutations(range(3)):
+        for sg in itertools.product((1, -1), repeat=3):
+            M = np.zeros((3, 3))
+            for i in range(3):
+                M[i, perm[i]] = sg[i]
+            if np.linalg.det(M) > 0.5 and not np.allclose(M, np.eye(3)):
+                Rs.append(M)
+    out = []
+    for M in Rs:
+        r = Rotation.from_matrix(M)
+        ang = np.degrees(np.linalg.norm(r.as_rotvec()))
+        ax = r.as_rotvec() / max(np.linalg.norm(r.as_rotvec()), 1e-9)
+        face = np.isclose(np.abs(ax).max(), 1.0)
+        if which == "90" and not (face and np.isclose(ang, 90.0)):
+            continue
+        if which == "90_180" and not face:
+            continue
+        x, y, z, w = r.as_quat()
+        out.append([w, x, y, z])
+    assert len(out) == {"all": 23, "90": 6, "90_180": 9}[which], (which, len(out))
+    return torch.tensor(out, dtype=torch.float32, device=dev)
