@@ -1067,6 +1067,10 @@ class PreciseAssemblyEnv(PlayEnv):
                     torch.full_like(tol, float(curriculum_tol)),
                     tol,
                 )
+        inter_tol = float(getattr(pih_cfg, "intermediate_success_tolerance", 0.0))
+        if inter_tol > 0.0:   # A31: looser tolerance on every goal but the last (e.g. a pre-place pose in the air)
+            not_last = (self._successes + 1 < self.env_max_goals) & ~self.is_random_goal_env
+            tol = torch.where(not_last, torch.full_like(tol, inter_tol * keypoint_scale), tol)
         return tol
 
     def _curriculum_eligible_mask(self) -> torch.Tensor | None:
