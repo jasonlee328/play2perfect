@@ -687,8 +687,13 @@ class PreciseAssemblyEnv(PlayEnv):
                 print(f"[PreciseAssemblyEnv] stick bank {c.stick_bank_file}: {b.shape[0]} layouts", flush=True)
         if c.stick_bank_file:
             L = self._stick_bank.shape[0]
-            idx = torch.randint(0, L, (n,), device=self.device)
-            perm = torch.argsort(torch.rand(n, S, device=self.device), dim=1)               # (n, S)
+            seq = getattr(self, "_bank_seq_offset", None)                                   # filter tools only
+            if seq is not None:
+                idx = (env_ids + int(seq)) % L
+                perm = torch.arange(S, device=self.device).unsqueeze(0).expand(n, -1)
+            else:
+                idx = torch.randint(0, L, (n,), device=self.device)
+                perm = torch.argsort(torch.rand(n, S, device=self.device), dim=1)           # (n, S)
             lay = self._stick_bank[idx]                                                      # (n, S, 7)
             lay = torch.gather(lay, 1, perm.unsqueeze(-1).expand(-1, -1, 7))
             self._slot_pose[:, env_ids] = lay.transpose(0, 1)
@@ -749,8 +754,9 @@ class PreciseAssemblyEnv(PlayEnv):
             e = torch.tensor([xe, 0.0, 0.0], device=self.device).expand(S * ids.numel(), 3)
             w = p.reshape(-1, 3) + quat_apply(quat.reshape(-1, 4), e)
             rl = quat_apply_inverse(hq, w - hp).reshape(S, -1, 3)
-            tol, r = 0.001, 0.0033
-            out = (rl[..., 0] - r < box[0] - tol) | (rl[..., 0] + r > box[1] + tol) | \
+            tol, r = 0.001, 0.0031
+            # flat hull ends: the end point is the extreme along the stick (x); the section radius only sideways / up
+            out = (rl[..., 0] < box[0] - tol) | (rl[..., 0] > box[1] + tol) | \
                   (rl[..., 1] - r < box[2] - tol) | (rl[..., 1] + r > box[3] + tol) | (rl[..., 2] + r > box[4] + tol)
             bad |= out.any(0)
         self.stick_violation[ids] = bad.float()

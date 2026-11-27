@@ -163,7 +163,7 @@ class PreciseAssemblyCfg:
     stick_drop_dz_m: float = 0.009
     stick_drop_inner_m: tuple[float, ...] = (0.120, 0.035)   # tray inner half length / half width (receptive x / y)
     stick_drop_margin_m: float = 0.004
-    stick_hull_x_m: tuple[float, ...] = (-0.0904, 0.1096)    # stick collision hull ends along its long axis (object x)
+    stick_hull_x_m: tuple[float, ...] = (-0.0892, 0.1088)    # chopstick64 hull ends along its long axis (object x)
     # stick_bank_file: npz with 'poses' (L, S, 7) = verified settled layouts (receptive xyz + quat xyzw); each reset
     # draws a random layout and a random slot permutation (which stick is "the object" is arbitrary: identical bodies).
     stick_bank_file: str = ""
