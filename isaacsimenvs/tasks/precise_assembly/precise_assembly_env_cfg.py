@@ -174,6 +174,11 @@ class PreciseAssemblyCfg:
     # damping alike) and hand joint friction U(0, hand_joint_friction_max) (dynamic 0.8x)
     hand_gain_log_range: tuple = (1.0, 1.0)
     hand_joint_friction_max: float = 0.0
+    # A8 grip cap (physical): PhysX drive force limit (N m) on every hand joint ("left_.*"), applied once at the first
+    # reset. One value = all hand joints, else one per hand joint in robot order; () = off. Optional hidden per-env
+    # factor U(lo, hi) on top (fixed for the env's life).
+    hand_effort_cap_nm: tuple = ()
+    hand_effort_cap_scale_range: tuple[float, float] = (1.0, 1.0)
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
     key_force_band_rew: float = 0.0     # A27: per step while hand_force in key_force_band (N)
     key_force_band: tuple = (0.6, 1.1)

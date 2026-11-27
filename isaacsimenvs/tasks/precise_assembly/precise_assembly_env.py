@@ -406,6 +406,7 @@ class PreciseAssemblyEnv(PlayEnv):
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self.device)
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        self._hand_effort_cap_once()
         if hasattr(self, "hand_force_ep_max"):
             if not hasattr(self, "hand_force_last_ep_max"):
                 self.hand_force_last_ep_max = torch.zeros_like(self.hand_force_ep_max)
@@ -441,6 +442,22 @@ class PreciseAssemblyEnv(PlayEnv):
                 from .usb_task import UsbTask
                 self._usb = usb = UsbTask(self)
             usb.reset(env_ids)
+
+    def _hand_effort_cap_once(self) -> None:
+        """A8 grip cap: hand joint drive force limit (PhysX max force of the implicit PD drive), applied once."""
+        cap = tuple(float(v) for v in tuple(getattr(self.cfg.precise_assembly, "hand_effort_cap_nm", ()) or ()))
+        if not cap or getattr(self, "_hand_effort_cap_done", False):
+            return
+        ids, names = self.robot.find_joints("left_.*")
+        n = self.num_envs
+        c = torch.tensor(cap if len(cap) > 1 else cap * len(ids), device=self.device, dtype=torch.float32)
+        assert c.numel() == len(ids), f"hand_effort_cap_nm: {c.numel()} values for {len(ids)} hand joints"
+        lo, hi = (float(v) for v in getattr(self.cfg.precise_assembly, "hand_effort_cap_scale_range", (1.0, 1.0)))
+        self.hand_effort_scale = lo + (hi - lo) * torch.rand(n, device=self.device)
+        lim = c[None, :] * self.hand_effort_scale[:, None]
+        self.robot.write_joint_effort_limit_to_sim(lim, joint_ids=ids)
+        self._hand_effort_cap_done = True
+        print(f"[a8] hand effort cap: {len(ids)} joints, base {c.tolist()} N m x U({lo},{hi})", flush=True)
 
     def _hand_motor_dr(self, env_ids: torch.Tensor) -> None:
         """A27: hidden per-env hand motor randomization (resampled each reset): PD gains x log-U(range), joint friction
