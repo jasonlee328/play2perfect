@@ -231,6 +231,15 @@ class PreciseAssemblyCfg:
     distractor_curriculum_offset_steps: int = 0  # added to common_step_counter (set on resume)
     # One-time reward subtracted when an episode ends because a distractor left the box / moved too far.
     distractor_disturb_terminal_penalty: float = 0.0
+    # A29 nonprehensile box flip: the box must always keep an edge / face on the mat (no picking it up).
+    # lifted = lowest box corner > mat top + nonprehensile_lift_tol_m for nonprehensile_lift_steps steps (0 = off)
+    nonprehensile_lift_tol_m: float = 0.0
+    nonprehensile_lift_steps: int = 3
+    nonprehensile_half_extents: tuple = (0.06, 0.045, 0.03)
+    nonprehensile_mat_top_m: float = 0.002     # mat top above the fixture root
+    nonprehensile_lift_penalty: float = 0.0
+    # goal / keypoint target xy follow the object (rolling moves the box ~15 cm; direction is the policy's choice)
+    goal_xy_follow_object: bool = False
     # A1 hand force (physical, PhysX contact report on the object filtered to the robot's links): hand_force = sum over
     # robot links of |contact force on the object| (N; a two-finger pinch at N each reads 2N), every policy step, last
     # substep. Logged as extras hand_force_{mean,max}; per-episode max in self.hand_force_ep_max (evals). Upper-bound

@@ -161,6 +161,10 @@ def compute_intermediate_values(env) -> None:
     obj_pos = env.object.data.root_pos_w - env_origins
     obj_rot = env.object.data.root_quat_w
     goal_pos = env.goal_viz.data.root_pos_w - env_origins
+    _pc_f = getattr(env.cfg, "precise_assembly", None)
+    if _pc_f is not None and bool(getattr(_pc_f, "goal_xy_follow_object", False)):
+        goal_pos = goal_pos.clone()
+        goal_pos[:, :2] = env.object.data.root_pos_w[:, :2] - env_origins[:, :2]
     goal_rot = env.goal_viz.data.root_quat_w
 
     ft_state = env.robot.data.body_state_w[:, env._fingertip_body_ids, :]
@@ -324,6 +328,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     obj_vel = torch.cat([obj_linvel, obj_angvel], dim=-1)
 
     goal_pos = env.goal_viz.data.root_pos_w - env_origins
+    _pc_f = getattr(env.cfg, "precise_assembly", None)
+    if _pc_f is not None and bool(getattr(_pc_f, "goal_xy_follow_object", False)):
+        goal_pos = goal_pos.clone()
+        goal_pos[:, :2] = env.object.data.root_pos_w[:, :2] - env_origins[:, :2]
     goal_rot = env.goal_viz.data.root_quat_w  # wxyz
 
     if dr.use_object_state_delay_noise:

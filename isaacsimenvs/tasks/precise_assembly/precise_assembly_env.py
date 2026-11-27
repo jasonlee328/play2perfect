@@ -1079,6 +1079,8 @@ class PreciseAssemblyEnv(PlayEnv):
         seat_q = quat_mul(hq, self._insert_quat_wxyz[-1].unsqueeze(0).expand(N, 4))
         axis = quat_apply(hq, torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(N, 3))
         d = obj_pos - seat
+        if bool(getattr(self.cfg.precise_assembly, "goal_xy_follow_object", False)):
+            d = d.clone(); d[:, :2] = 0.0
         height = (d * axis).sum(-1)
         lateral = (d - height.unsqueeze(-1) * axis).norm(dim=-1)
         body_axis = quat_apply_inverse(seat_q, axis)          # peg-frame direction that is along the hole axis when seated
@@ -1401,7 +1403,23 @@ class PreciseAssemblyEnv(PlayEnv):
         key_dropped = torch.zeros_like(fall)
         if getattr(self, "_key", None) is not None:
             key_dropped = self._key.dropped & ~max_successes
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | key_dropped
+        lifted = torch.zeros_like(fall)
+        if float(getattr(pih_cfg, "nonprehensile_lift_tol_m", 0.0)) > 0.0:
+            he = torch.tensor(tuple(pih_cfg.nonprehensile_half_extents), device=self.device, dtype=torch.float32)
+            q = self.object.data.root_quat_w
+            # world-z component of each body axis: |R[2,i]|; lowest corner = centre z - sum_i |R[2,i]| h_i
+            ex = torch.eye(3, device=self.device).unsqueeze(0).expand(self.num_envs, 3, 3)
+            rz = torch.stack([quat_apply(q, ex[:, i])[:, 2] for i in range(3)], -1).abs()
+            low = object_z_local - (rz * he).sum(-1)
+            mat_top = self.hole_pos[:, 2] + float(pih_cfg.nonprehensile_mat_top_m)
+            self._np_low_above = low - mat_top
+            up = self._np_low_above > float(pih_cfg.nonprehensile_lift_tol_m)
+            if not hasattr(self, "_np_lift_count"):
+                self._np_lift_count = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+            self._np_lift_count = torch.where(up, self._np_lift_count + 1, torch.zeros_like(self._np_lift_count))
+            lifted = (self._np_lift_count >= int(pih_cfg.nonprehensile_lift_steps)) & ~max_successes
+            self.extras["np_low_above_mean"] = self._np_low_above.mean()
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | key_dropped | lifted
         for v in usb_fail.values():
             terminated = terminated | v
         truncated = self.episode_length_buf >= self.max_episode_length
@@ -1414,6 +1432,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "disturbed": disturbed,
             "crushed": crushed,
             "key_dropped": key_dropped,
+            "lifted": lifted,
             **{f"usb_{k}": v for k, v in usb_fail.items()},
             "timeout": truncated,
         }
@@ -1505,6 +1524,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["distractor_disp_mean"] = self.distractor_disp.mean()
             self.extras["distractor_rise_mean"] = self.distractor_rise.mean()
             self.extras["distractor_disturb_tol"] = torch.tensor(self._distractor_curriculum()[0], device=self.device)
+        if float(getattr(pih_cfg, "nonprehensile_lift_penalty", 0.0)) > 0.0 and "lifted" in getattr(self, "_termination_reasons", {}):
+            l_pen = float(pih_cfg.nonprehensile_lift_penalty) * self._termination_reasons["lifted"].float()
+            reward = reward - l_pen
+            self._reward_terms["nonprehensile_lift_penalty"] = -l_pen
+            self._reward_terms["total_reward"] = reward
         if (float(getattr(pih_cfg, "crush_force", 0.0)) > 0.0 or float(tuple(getattr(pih_cfg, "crush_force_range", (0.0, 0.0)))[1]) > 0.0) and "crushed" in getattr(self, "_termination_reasons", {}):
             c_pen = float(pih_cfg.crush_penalty) * self._termination_reasons["crushed"].float()
             reward = reward - c_pen
