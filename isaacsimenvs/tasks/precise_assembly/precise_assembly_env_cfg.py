@@ -128,6 +128,7 @@ class PreciseAssemblyCfg:
     key_cube_recradle_w: float = 1.0     # shaping weight on that hand error while aligned with an intermediate waypoint
     key_cube_cradle_file: str = ""       # npz (palm bank): re-cradle reference = its mean hand joint pose (else each start pose)
     key_cube_regrip_frac: float = 0.0    # share of episodes whose goal = hold the current orientation + hand back to the cradle
+    key_cube_chain: int = 0              # training: after the final goal, N more goals from the reached orientation (same episode)
     key_cube_set: str = "all"            # cube24 goal set: all (23) | quarter (6 quarter turns) | face (9)
     key_flip_axis: tuple = (1.0, 0.0, 0.0)   # object-frame axis of the goal rotation (key: long axis x; Allen key pivot: z)
     key_pivot_point: tuple = ()          # object-frame point (m) the goal rotation pivots about (Allen key: the grip); () = origin

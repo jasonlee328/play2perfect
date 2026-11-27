@@ -1305,6 +1305,14 @@ class PreciseAssemblyEnv(PlayEnv):
                 self._clear_goal_trackers(next_goal_ids)
                 self._write_goal_pose(next_goal_ids, is_first_goal=False)
 
+        if getattr(self, "_key", None) is not None and int(getattr(pih_cfg, "key_cube_chain", 0)) > 0 \
+                and hasattr(self._key, "chain_left"):
+            ch = ((self._successes >= self.env_max_goals) & (self._key.chain_left > 0)).nonzero(as_tuple=False).squeeze(-1)
+            if ch.numel() > 0:   # A13 cube: chained goals (training) - new goal from the reached orientation
+                self._key.chain(ch)
+                self._successes[ch] = 0
+                self._clear_goal_trackers(ch)
+                self._write_goal_pose(ch, is_first_goal=False)
         object_z_local = self.object.data.root_pos_w[:, 2] - self.scene.env_origins[:, 2]
         fall = object_z_local < 0.1
         if pih_cfg.enable_retract:

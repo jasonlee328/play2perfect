@@ -135,6 +135,9 @@ class KeyRepose:
             self.hand0[env_ids] = self.cradle                       # re-cradle reference = the cradle, not this start
         if not hasattr(self, "regrip"):
             self.regrip = torch.zeros(e.num_envs, dtype=torch.bool, device=e.device)
+        if not hasattr(self, "chain_left"):
+            self.chain_left = torch.zeros(e.num_envs, dtype=torch.long, device=e.device)
+        self.chain_left[env_ids] = int(getattr(c, "key_cube_chain", 0))
         if self.mode == "cube24":
             j = torch.randint(0, self.cube_set.shape[0], (env_ids.numel(),), device=e.device)
             self.goal_id[env_ids] = j
@@ -156,6 +159,24 @@ class KeyRepose:
                 if self.cube_path:
                     self.goal_path[ri] = 0.0; self.goal_path[ri, :, 0] = 1.0
                     self.path_len[ri] = 1
+
+    def chain(self, ids):
+        """key_cube_chain: the final goal was reached -> keep the episode going with a new goal relative to the
+        orientation just reached (practise turning again from a turned grip, in the policy's own states)."""
+        e = self.env
+        last = self.goal_path[ids, -1] if self.cube_path else self.goal_r[ids]
+        self.base_q[ids] = quat_mul(self.base_q[ids], last)
+        j = torch.randint(0, self.cube_set.shape[0], (ids.numel(),), device=e.device)
+        self.goal_id[ids] = j
+        self.goal_r[ids] = self.cube_set[j]
+        if self.cube_path:
+            self.goal_path[ids] = self.path_set[j]
+            self.path_len[ids] = self.path_len_set[j]
+        self.regrip[ids] = False
+        self.chain_left[ids] -= 1
+        self.min_final_rot_err[ids] = 180.0
+        if hasattr(self, "fresh"):
+            self.fresh[ids] = True          # shaping potential restarts (no jump at the goal switch)
 
     def update(self):
         """Start of _get_dones (fresh physics state): fix base_rel for new episodes, rewrite every goal, drop check."""
