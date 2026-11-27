@@ -3062,6 +3062,19 @@
     "chamfer": 1.5
    },
    "note": "A31 key socket, exact convex ring sectors + floor"
+  },
+  "kc_plate": {
+   "extents_mm": [
+    80.0,
+    80.0,
+    10.0
+   ],
+   "origin_src_mm": [
+    0,
+    0,
+    0
+   ],
+   "note": "A31 flat target plate, box collision, red 6 mm mark at the centre (visual only)"
   }
  },
  "problems": {
@@ -15128,6 +15141,63 @@
     "socket_top_z_m": 0.02,
     "bore_radius_m": 0.004,
     "tip_depth_m": 0.008
+   }
+  },
+  "cb_keytouch": {
+   "object": "kc_key",
+   "fixture": "kc_plate",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.21000000000000002,
+    0.0,
+    -0.7071067811865476,
+    0.0,
+    0.7071067811865476
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.01,
+    0.0,
+    -0.7071067811865476,
+    0.0,
+    0.7071067811865476
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.035,
+     0.0,
+     -0.7071067811865476,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.01,
+     0.0,
+     -0.7071067811865476,
+     0.0,
+     0.7071067811865476
+    ]
+   ],
+   "layout": {
+    "source": "A31 (ours): carry a pinched Allen key, hidden push, touch the tip to a marked point",
+    "grip_point_key_frame_m": [
+     0.048,
+     0.0,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     0.0,
+     0.0675
+    ],
+    "socket_top_z_m": 0.01,
+    "bore_radius_m": 0.0,
+    "tip_depth_m": 0.0
    }
   }
  },
