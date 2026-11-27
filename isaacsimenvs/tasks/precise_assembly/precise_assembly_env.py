@@ -687,22 +687,39 @@ class PreciseAssemblyEnv(PlayEnv):
             self.stick_violation_last = torch.full((self.num_envs,), -1.0, **f)
             if c.stick_bank_file:
                 import numpy as np
-                b = np.load(c.stick_bank_file)["poses"].astype("float32")
-                if b.shape[1] != S:
-                    raise ValueError(f"stick_bank_file has {b.shape[1]} sticks per layout, env has {S}")
-                self._stick_bank = torch.as_tensor(b, **f)
-                print(f"[PreciseAssemblyEnv] stick bank {c.stick_bank_file}: {b.shape[0]} layouts", flush=True)
+                files = [p.strip() for p in str(c.stick_bank_file).split(":") if p.strip()]
+                self._stick_banks = []
+                for fn in files:
+                    b = np.load(fn)["poses"].astype("float32")
+                    if b.shape[1] != S:
+                        raise ValueError(f"stick bank {fn} has {b.shape[1]} sticks per layout, env has {S}")
+                    self._stick_banks.append(torch.as_tensor(b, **f))
+                    print(f"[PreciseAssemblyEnv] stick bank {fn}: {b.shape[0]} layouts", flush=True)
+                self._stick_bank = self._stick_banks[0]
+                if len(files) > 1:
+                    npb = len(getattr(self, "_pih_problem_names", None) or [0])
+                    if len(files) != npb:
+                        raise ValueError(f"{len(files)} stick banks for {npb} multi_problems (one per problem, same order)")
         if c.stick_bank_file:
-            L = self._stick_bank.shape[0]
             seq = getattr(self, "_bank_seq_offset", None)                                   # filter tools only
-            if seq is not None:
-                idx = (env_ids + int(seq)) % L
-                perm = torch.arange(S, device=self.device).unsqueeze(0).expand(n, -1)
+            if len(self._stick_banks) > 1:
+                prob = self._object_asset_index_per_env[env_ids]
             else:
-                idx = torch.randint(0, L, (n,), device=self.device)
+                prob = torch.zeros(n, dtype=torch.long, device=self.device)
+            lay = torch.empty(n, S, 7, **f)
+            for pb, bank in enumerate(self._stick_banks):
+                m = prob == pb
+                if not m.any():
+                    continue
+                L = bank.shape[0]
+                if seq is not None:
+                    idx = (env_ids[m] + int(seq)) % L
+                else:
+                    idx = torch.randint(0, L, (int(m.sum()),), device=self.device)
+                lay[m] = bank[idx]
+            if seq is None:
                 perm = torch.argsort(torch.rand(n, S, device=self.device), dim=1)           # (n, S)
-            lay = self._stick_bank[idx]                                                      # (n, S, 7)
-            lay = torch.gather(lay, 1, perm.unsqueeze(-1).expand(-1, -1, 7))
+                lay = torch.gather(lay, 1, perm.unsqueeze(-1).expand(-1, -1, 7))
             self._slot_pose[:, env_ids] = lay.transpose(0, 1)
         else:
             yaw = (torch.rand(S, n, **f) * 2 - 1) * math.radians(c.stick_drop_yaw_deg)
@@ -761,6 +778,13 @@ class PreciseAssemblyEnv(PlayEnv):
             vs = [[float(x) for x in ln.split()[1:4]] for ln in open(hf) if ln.startswith("v ")]
             self._stick_hull_v = torch.tensor(vs, device=self.device, dtype=torch.float32)      # (V, 3) body frame
         V = self._stick_hull_v.shape[0]
+        hs = tuple(c.stick_hull_scales)
+        if len(hs) > 1:                       # per-problem cross-section scale (hidden diameter): y, z of the hull
+            sc = torch.tensor(hs, device=self.device, dtype=torch.float32)[self._object_asset_index_per_env[ids]]
+            hv = self._stick_hull_v.view(1, 1, V, 3).expand(S, ids.numel(), -1, -1).clone()
+            hv[..., 1:] = hv[..., 1:] * sc.view(1, -1, 1, 1)
+        else:
+            hv = self._stick_hull_v.view(1, 1, V, 3).expand(S, ids.numel(), -1, -1)
         quat = torch.stack([b.data.root_quat_w[ids] for b in bodies])                        # (S, n, 4) wxyz
         p = pos[:, ids]
         n = ids.numel()
@@ -768,7 +792,7 @@ class PreciseAssemblyEnv(PlayEnv):
         hp = (self.hole_pos[ids] + self.scene.env_origins[ids]).unsqueeze(0).unsqueeze(2).expand(S, -1, V, -1).reshape(-1, 3)
         q = quat.unsqueeze(2).expand(-1, -1, V, -1).reshape(-1, 4)
         w = p.unsqueeze(2).expand(-1, -1, V, -1).reshape(-1, 3) + \
-            quat_apply(q, self._stick_hull_v.view(1, 1, V, 3).expand(S, n, -1, -1).reshape(-1, 3))
+            quat_apply(q, hv.reshape(-1, 3))
         rl = quat_apply_inverse(hq, w - hp).reshape(S, n, V, 3)
         tol = float(c.stick_check_tol_m)          # exact hull vertices, same geometry as tools/contactbench/one10_verify.py
         out = (rl[..., 0] < box[0] - tol) | (rl[..., 0] > box[1] + tol) | \
@@ -1068,7 +1092,10 @@ class PreciseAssemblyEnv(PlayEnv):
                 if self._slot_mode() and hasattr(self, "_slot_pose"):
                     # one-of-10: goal = the object's own rest pose + the problem's lift offset, same orientation
                     sp = self._slot_pose[0, tail_ids]
-                    nom = torch.tensor(self._pih_object_start_rel[:3], device=self.device, dtype=torch.float32)
+                    if getattr(self, "_multi_clutter", False):
+                        nom = self._object_start_rel_env[tail_ids, :3]
+                    else:
+                        nom = torch.tensor(self._pih_object_start_rel[:3], device=self.device, dtype=torch.float32)
                     insert_pos = sp[:, :3] + (insert_pos - nom)
                     insert_q = _xyzw_to_wxyz(sp[:, 3:7])
                 elif hasattr(self, "_start_shift"):     # start_shift_m: the goals move with the object

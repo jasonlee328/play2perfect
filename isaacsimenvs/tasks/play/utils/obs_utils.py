@@ -421,7 +421,7 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             x = obs_noisy["fixture_pose_rel_palm"].clone()                           # [pos - palm (3), quat (4)]
             x[:, :3] += off * f                                                      # ramps in with the fade
             obs_noisy["fixture_pose_rel_palm"] = x
-    if getattr(env, "_multi_clutter", False):
+    if getattr(env, "_multi_clutter", False) and not (hasattr(env, "_slot_mode") and env._slot_mode()):
         # multi clutter (e.g. stick thicknesses): actor sees the canonical problem's layout (see mc_obs_offset)
         mo = env.mc_obs_offset()                                                       # (S, N, 3)
         if "keypoints_rel_palm" in obs_noisy:

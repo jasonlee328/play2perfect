@@ -166,7 +166,8 @@ class PreciseAssemblyCfg:
     stick_hull_x_m: tuple[float, ...] = (-0.0892, 0.1088)    # chopstick64 hull ends along its long axis (object x)
     # stick_bank_file: npz with 'poses' (L, S, 7) = verified settled layouts (receptive xyz + quat xyzw); each reset
     # draws a random layout and a random slot permutation (which stick is "the object" is arbitrary: identical bodies).
-    stick_bank_file: str = ""
+    stick_bank_file: str = ""                 # ":"-separated: one bank per multi_problems entry (hidden diameter)
+    stick_hull_scales: tuple[float, ...] = ()   # per multi_problems entry: hull cross-section scale for the check
     # Per-episode layout check (logged as success/stick_violation): at episode step stick_check_step, any vertex of any
     # stick's exact collision hull outside stick_check_box [xmin, xmax, ymin, ymax, zmax] (receptive, m) by > tol = violation.
     stick_check_box: tuple[float, ...] = ()

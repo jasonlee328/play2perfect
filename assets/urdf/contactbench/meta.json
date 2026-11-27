@@ -801,6 +801,111 @@
     0.1624
    ],
    "collision": "convex hull 64 vertices (one10_stick64.py)"
+  },
+  "chopstick64_d45": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 1.76,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "chopstick64 frustum, cross-section x0.6934",
+   "diameter_mm": 4.5
+  },
+  "chopstick64_d55": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 2.629,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "chopstick64 frustum, cross-section x0.8475",
+   "diameter_mm": 5.5
+  },
+  "chopstick64_d65": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 3.672,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "chopstick64 frustum, cross-section x1.0015",
+   "diameter_mm": 6.5
+  },
+  "chopstick64_d75": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 4.889,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "chopstick64 frustum, cross-section x1.1556",
+   "diameter_mm": 7.5
+  },
+  "chopstick64_d85": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 6.28,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "chopstick64 frustum, cross-section x1.3097",
+   "diameter_mm": 8.5
   }
  },
  "fixtures": {
@@ -10941,6 +11046,766 @@
     "train_overrides": [
      "env.precise_assembly.enable_retract=false"
     ]
+   },
+   "settled": false
+  },
+  "cb_one10_lift_d45": {
+   "object": "chopstick64_d45",
+   "fixture": "stick_tray_240x70",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/chopstick64_d45/chopstick64_d45.urdf",
+     [
+      0.0,
+      -0.03105,
+      0.0036494607087827428,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d45/chopstick64_d45.urdf",
+     [
+      0.0,
+      -0.024149999999999998,
+      0.0036494607087827428,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d45/chopstick64_d45.urdf",
+     [
+      0.0,
+      -0.01725,
+      0.0036494607087827428,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d45/chopstick64_d45.urdf",
+     [
+      0.0,
+      -0.01035,
+      0.0036494607087827428,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d45/chopstick64_d45.urdf",
+     [
+      0.0,
+      -0.00345,
+      0.0036494607087827428,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d45/chopstick64_d45.urdf",
+     [
+      0.0,
+      0.01035,
+      0.0036494607087827428,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d45/chopstick64_d45.urdf",
+     [
+      0.0,
+      0.01725,
+      0.0036494607087827428,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d45/chopstick64_d45.urdf",
+     [
+      0.0,
+      0.024149999999999998,
+      0.0036494607087827428,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d45/chopstick64_d45.urdf",
+     [
+      0.0,
+      0.03105,
+      0.0036494607087827428,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ]
+   ],
+   "object_start_pose": [
+    0.0,
+    0.00345,
+    0.0036494607087827428,
+    0.04970282316207886,
+    0.0015432214131578803,
+    0.00037491321563720703,
+    0.9987627863883972
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.00345,
+     0.10364946070878275,
+     0.04970282316207886,
+     0.0015432214131578803,
+     0.00037491321563720703,
+     0.9987627863883972
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "chopsticks": 10,
+    "target": "any (swap_lifted_distractor)",
+    "goals": "lift only",
+    "note": "nominal row only; per-episode random dropped layout from precise_assembly.stick_bank_file",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ],
+    "diameter_mm": 4.5
+   },
+   "settled": false
+  },
+  "cb_one10_lift_d55": {
+   "object": "chopstick64_d55",
+   "fixture": "stick_tray_240x70",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/chopstick64_d55/chopstick64_d55.urdf",
+     [
+      0.0,
+      -0.03105,
+      0.004127118644067796,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d55/chopstick64_d55.urdf",
+     [
+      0.0,
+      -0.024149999999999998,
+      0.004127118644067796,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d55/chopstick64_d55.urdf",
+     [
+      0.0,
+      -0.01725,
+      0.004127118644067796,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d55/chopstick64_d55.urdf",
+     [
+      0.0,
+      -0.01035,
+      0.004127118644067796,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d55/chopstick64_d55.urdf",
+     [
+      0.0,
+      -0.00345,
+      0.004127118644067796,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d55/chopstick64_d55.urdf",
+     [
+      0.0,
+      0.01035,
+      0.004127118644067796,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d55/chopstick64_d55.urdf",
+     [
+      0.0,
+      0.01725,
+      0.004127118644067796,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d55/chopstick64_d55.urdf",
+     [
+      0.0,
+      0.024149999999999998,
+      0.004127118644067796,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d55/chopstick64_d55.urdf",
+     [
+      0.0,
+      0.03105,
+      0.004127118644067796,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ]
+   ],
+   "object_start_pose": [
+    0.0,
+    0.00345,
+    0.004127118644067796,
+    0.04970282316207886,
+    0.0015432214131578803,
+    0.00037491321563720703,
+    0.9987627863883972
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.00345,
+     0.1041271186440678,
+     0.04970282316207886,
+     0.0015432214131578803,
+     0.00037491321563720703,
+     0.9987627863883972
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "chopsticks": 10,
+    "target": "any (swap_lifted_distractor)",
+    "goals": "lift only",
+    "note": "nominal row only; per-episode random dropped layout from precise_assembly.stick_bank_file",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ],
+    "diameter_mm": 5.5
+   },
+   "settled": false
+  },
+  "cb_one10_lift_d65": {
+   "object": "chopstick64_d65",
+   "fixture": "stick_tray_240x70",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/chopstick64_d65/chopstick64_d65.urdf",
+     [
+      0.0,
+      -0.031050000000000005,
+      0.00460477657935285,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d65/chopstick64_d65.urdf",
+     [
+      0.0,
+      -0.02415,
+      0.00460477657935285,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d65/chopstick64_d65.urdf",
+     [
+      0.0,
+      -0.01725,
+      0.00460477657935285,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d65/chopstick64_d65.urdf",
+     [
+      0.0,
+      -0.010350000000000002,
+      0.00460477657935285,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d65/chopstick64_d65.urdf",
+     [
+      0.0,
+      -0.0034500000000000004,
+      0.00460477657935285,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d65/chopstick64_d65.urdf",
+     [
+      0.0,
+      0.010350000000000002,
+      0.00460477657935285,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d65/chopstick64_d65.urdf",
+     [
+      0.0,
+      0.01725,
+      0.00460477657935285,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d65/chopstick64_d65.urdf",
+     [
+      0.0,
+      0.02415,
+      0.00460477657935285,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d65/chopstick64_d65.urdf",
+     [
+      0.0,
+      0.031050000000000005,
+      0.00460477657935285,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ]
+   ],
+   "object_start_pose": [
+    0.0,
+    0.0034500000000000004,
+    0.00460477657935285,
+    0.04970282316207886,
+    0.0015432214131578803,
+    0.00037491321563720703,
+    0.9987627863883972
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0034500000000000004,
+     0.10460477657935285,
+     0.04970282316207886,
+     0.0015432214131578803,
+     0.00037491321563720703,
+     0.9987627863883972
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "chopsticks": 10,
+    "target": "any (swap_lifted_distractor)",
+    "goals": "lift only",
+    "note": "nominal row only; per-episode random dropped layout from precise_assembly.stick_bank_file",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ],
+    "diameter_mm": 6.5
+   },
+   "settled": false
+  },
+  "cb_one10_lift_d75": {
+   "object": "chopstick64_d75",
+   "fixture": "stick_tray_240x70",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/chopstick64_d75/chopstick64_d75.urdf",
+     [
+      0.0,
+      -0.035550000000000005,
+      0.005082434514637904,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d75/chopstick64_d75.urdf",
+     [
+      0.0,
+      -0.02765,
+      0.005082434514637904,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d75/chopstick64_d75.urdf",
+     [
+      0.0,
+      -0.019750000000000004,
+      0.005082434514637904,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d75/chopstick64_d75.urdf",
+     [
+      0.0,
+      -0.011850000000000001,
+      0.005082434514637904,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d75/chopstick64_d75.urdf",
+     [
+      0.0,
+      -0.00395,
+      0.005082434514637904,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d75/chopstick64_d75.urdf",
+     [
+      0.0,
+      0.011850000000000001,
+      0.005082434514637904,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d75/chopstick64_d75.urdf",
+     [
+      0.0,
+      0.019750000000000004,
+      0.005082434514637904,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d75/chopstick64_d75.urdf",
+     [
+      0.0,
+      0.02765,
+      0.005082434514637904,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d75/chopstick64_d75.urdf",
+     [
+      0.0,
+      0.035550000000000005,
+      0.005082434514637904,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ]
+   ],
+   "object_start_pose": [
+    0.0,
+    0.00395,
+    0.005082434514637904,
+    0.04970282316207886,
+    0.0015432214131578803,
+    0.00037491321563720703,
+    0.9987627863883972
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.00395,
+     0.1050824345146379,
+     0.04970282316207886,
+     0.0015432214131578803,
+     0.00037491321563720703,
+     0.9987627863883972
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "chopsticks": 10,
+    "target": "any (swap_lifted_distractor)",
+    "goals": "lift only",
+    "note": "nominal row only; per-episode random dropped layout from precise_assembly.stick_bank_file",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ],
+    "diameter_mm": 7.5
+   },
+   "settled": false
+  },
+  "cb_one10_lift_d85": {
+   "object": "chopstick64_d85",
+   "fixture": "stick_tray_240x70",
+   "distractors": [
+    [
+     "urdf/contactbench/objects/chopstick64_d85/chopstick64_d85.urdf",
+     [
+      0.0,
+      -0.04005,
+      0.005560092449922957,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d85/chopstick64_d85.urdf",
+     [
+      0.0,
+      -0.03115,
+      0.005560092449922957,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d85/chopstick64_d85.urdf",
+     [
+      0.0,
+      -0.02225,
+      0.005560092449922957,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d85/chopstick64_d85.urdf",
+     [
+      0.0,
+      -0.01335,
+      0.005560092449922957,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d85/chopstick64_d85.urdf",
+     [
+      0.0,
+      -0.00445,
+      0.005560092449922957,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d85/chopstick64_d85.urdf",
+     [
+      0.0,
+      0.01335,
+      0.005560092449922957,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d85/chopstick64_d85.urdf",
+     [
+      0.0,
+      0.02225,
+      0.005560092449922957,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d85/chopstick64_d85.urdf",
+     [
+      0.0,
+      0.03115,
+      0.005560092449922957,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ],
+    [
+     "urdf/contactbench/objects/chopstick64_d85/chopstick64_d85.urdf",
+     [
+      0.0,
+      0.04005,
+      0.005560092449922957,
+      0.04970282316207886,
+      0.0015432214131578803,
+      0.00037491321563720703,
+      0.9987627863883972
+     ]
+    ]
+   ],
+   "object_start_pose": [
+    0.0,
+    0.00445,
+    0.005560092449922957,
+    0.04970282316207886,
+    0.0015432214131578803,
+    0.00037491321563720703,
+    0.9987627863883972
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.00445,
+     0.10556009244992297,
+     0.04970282316207886,
+     0.0015432214131578803,
+     0.00037491321563720703,
+     0.9987627863883972
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "chopsticks": 10,
+    "target": "any (swap_lifted_distractor)",
+    "goals": "lift only",
+    "note": "nominal row only; per-episode random dropped layout from precise_assembly.stick_bank_file",
+    "train_overrides": [
+     "env.precise_assembly.enable_retract=false"
+    ],
+    "diameter_mm": 8.5
    },
    "settled": false
   }
