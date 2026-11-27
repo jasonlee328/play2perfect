@@ -781,6 +781,26 @@
     1.425
    ],
    "collision": "box"
+  },
+  "chopstick64": {
+   "src": "utensils/chopstick.stl",
+   "extents_mm": [
+    200.0,
+    6.49,
+    6.49
+   ],
+   "mass_g": 3.66,
+   "com_src_mm": [
+    -4.266,
+    -0.122,
+    -0.021
+   ],
+   "object_scale": [
+    5.0,
+    0.1624,
+    0.1624
+   ],
+   "collision": "convex hull 64 vertices (one10_stick64.py)"
   }
  },
  "fixtures": {
@@ -10774,11 +10794,11 @@
    }
   },
   "cb_one10_lift": {
-   "object": "chopstick",
+   "object": "chopstick64",
    "fixture": "stick_tray_240x70",
    "distractors": [
     [
-     "urdf/contactbench/objects/chopstick/chopstick.urdf",
+     "urdf/contactbench/objects/chopstick64/chopstick64.urdf",
      [
       0.0,
       -0.03105,
@@ -10790,7 +10810,7 @@
      ]
     ],
     [
-     "urdf/contactbench/objects/chopstick/chopstick.urdf",
+     "urdf/contactbench/objects/chopstick64/chopstick64.urdf",
      [
       0.0,
       -0.024149999999999998,
@@ -10802,7 +10822,7 @@
      ]
     ],
     [
-     "urdf/contactbench/objects/chopstick/chopstick.urdf",
+     "urdf/contactbench/objects/chopstick64/chopstick64.urdf",
      [
       0.0,
       -0.01725,
@@ -10814,7 +10834,7 @@
      ]
     ],
     [
-     "urdf/contactbench/objects/chopstick/chopstick.urdf",
+     "urdf/contactbench/objects/chopstick64/chopstick64.urdf",
      [
       0.0,
       -0.01035,
@@ -10826,7 +10846,7 @@
      ]
     ],
     [
-     "urdf/contactbench/objects/chopstick/chopstick.urdf",
+     "urdf/contactbench/objects/chopstick64/chopstick64.urdf",
      [
       0.0,
       -0.00345,
@@ -10838,7 +10858,7 @@
      ]
     ],
     [
-     "urdf/contactbench/objects/chopstick/chopstick.urdf",
+     "urdf/contactbench/objects/chopstick64/chopstick64.urdf",
      [
       0.0,
       0.01035,
@@ -10850,7 +10870,7 @@
      ]
     ],
     [
-     "urdf/contactbench/objects/chopstick/chopstick.urdf",
+     "urdf/contactbench/objects/chopstick64/chopstick64.urdf",
      [
       0.0,
       0.01725,
@@ -10862,7 +10882,7 @@
      ]
     ],
     [
-     "urdf/contactbench/objects/chopstick/chopstick.urdf",
+     "urdf/contactbench/objects/chopstick64/chopstick64.urdf",
      [
       0.0,
       0.024149999999999998,
@@ -10874,7 +10894,7 @@
      ]
     ],
     [
-     "urdf/contactbench/objects/chopstick/chopstick.urdf",
+     "urdf/contactbench/objects/chopstick64/chopstick64.urdf",
      [
       0.0,
       0.03105,
