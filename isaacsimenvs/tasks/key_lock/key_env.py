@@ -201,6 +201,15 @@ class KeyLockCfg:
     hand_stiff_range: tuple[float, float] = (1.0, 1.0)   # per-episode log-uniform scale of the hand PD stiffness (damping
                                          # x sqrt): domain randomization so the policy learns to turn with a light grip too
     p2_slip_ema: float = -1.0            # > 0: slip uses its own (faster) EMA of the pad force; break keeps p2_force_ema
+    # A32 (11-27): REAL physical detent in the lock joint (no touch-only cue): an explicit torque about the lock axis on
+    # the key (equal and opposite on the door leaf), applied every physics substep, as a hill centred at the detent
+    # angle theta_d: tau = -h sin(pi d / w) for |d| < w (d = key angle - theta_d, + = clockwise/forward), i.e. it
+    # resists turning over [theta_d - w, theta_d] and snaps the key forward over [theta_d, theta_d + w] (a click).
+    # theta_d = the pull target (_kp_target) unless key_detent_range_deg = (lo, hi) > 0 draws its own per episode.
+    key_detent_torque: float = 0.0       # h (N m), 0 = off
+    key_detent_width_deg: float = 2.0    # w (deg): half the bump width
+    key_detent_range_deg: tuple[float, float] = (0.0, 0.0)
+    key_detent_shape: str = "hill"       # "hill" (resist then snap) | "notch" (snap in then resist: a well at theta_d)
     p2_ema_seed_onset: bool = False      # seed the smoothed force with the raw force at each contact onset (else it ramps
                                          # up from 0 and every fresh grasp reads as a slip whatever F_min is)
 
@@ -553,8 +562,54 @@ class KeyLockEnv(PreciseAssemblyEnv):
         axis_w = quat_apply(self.hole_quat_wxyz, torch.tensor(jd.axis, device=self.device,
                                                               dtype=torch.float32).expand(self.num_envs, 3))
         tq = (on.float() * float(kl.probe_torque)).unsqueeze(-1) * axis_w
+        dtq = self._key_detent_torque_w()
+        if dtq is not None:
+            tq = tq - dtq          # reaction on the door leaf (the lock housing is fused into it)
         body.set_external_force_and_torque(torch.zeros(self.num_envs, 1, 3, device=self.device), tq.unsqueeze(1),
                                            is_global=True)
+
+    def _key_detent_theta(self):
+        kl = self.cfg.key_lock
+        N = self.num_envs
+        lo, hi = (float(v) for v in kl.key_detent_range_deg)
+        if hi > 0.0:
+            if not hasattr(self, "_kd_theta"):
+                self._kd_theta = torch.deg2rad(lo + (hi - lo) * torch.rand(N, device=self.device))
+            return self._kd_theta
+        return getattr(self, "_kp_target", None)
+
+    def _key_detent_torque_w(self):
+        """A32: world torque (N, 3) of the physical detent on the key, or None when off. Also stores the scalar torque
+        (key_detent_tau, N m) for probes."""
+        kl = self.cfg.key_lock
+        h = float(kl.key_detent_torque)
+        if h <= 0.0:
+            return None
+        th = self._key_detent_theta()
+        if th is None:
+            return None
+        k = int(self.cfg.precise_assembly.unlock_joint)
+        d = self.cb_joint_angle[k] - th
+        w = math.radians(float(kl.key_detent_width_deg))
+        inside = d.abs() < w
+        sg = -1.0 if str(kl.key_detent_shape) == "hill" else 1.0
+        tau = torch.where(inside, sg * h * torch.sin(math.pi * d / w), torch.zeros_like(d))
+        self.key_detent_tau = tau
+        j = self._pih_joints[k]
+        door = self.distractors[int(j.parent[10:])]
+        kp = int(j.parent[10:])
+        from isaaclab.utils.math import quat_conjugate, quat_mul
+        qp0 = torch.tensor([self._pih_distractor_pose_rel[kp][6], *self._pih_distractor_pose_rel[kp][3:6]],
+                           device=self.device, dtype=torch.float32).expand(self.num_envs, 4)
+        q_par = quat_mul(door.data.root_quat_w, quat_conjugate(qp0))
+        ax = quat_apply(q_par, torch.tensor(j.axis, device=self.device, dtype=torch.float32).expand(self.num_envs, 3))
+        tw = tau.unsqueeze(-1) * ax
+        f = getattr(self, "_object_forces", None)
+        t = getattr(self, "_object_torques", None)
+        zero = torch.zeros(self.num_envs, 1, 3, device=self.device)
+        self.object.set_external_force_and_torque(zero if f is None else f, (zero if t is None else t) + tw.unsqueeze(1),
+                                                  is_global=True)
+        return tw
 
     # ---- success condition of the clear goal: the key is past its clear angle ----------------------------------
     def _latch_cbf_success_now(self, door: torch.Tensor) -> torch.Tensor:
@@ -987,6 +1042,9 @@ class KeyLockEnv(PreciseAssemblyEnv):
                 self._kp_target[env_ids] = torch.deg2rad(lo + (hi - lo) * torch.rand(len(env_ids), device=self.device))
             if hasattr(self, "_kp_prog"):
                 self._kp_prog[env_ids] = 0.0
+        if hasattr(self, "_kd_theta"):
+            lo, hi = (float(v) for v in self.cfg.key_lock.key_detent_range_deg)
+            self._kd_theta[env_ids] = torch.deg2rad(lo + (hi - lo) * torch.rand(len(env_ids), device=self.device))
         if hasattr(self, "_kw_n"):
             self._kw_n[env_ids] = 0.0; self._kw_ok[env_ids] = 0.0
             self._kw_on[env_ids] = False; self._kw_end[env_ids] = False
