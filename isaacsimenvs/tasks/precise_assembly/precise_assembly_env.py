@@ -424,6 +424,9 @@ class PreciseAssemblyEnv(PlayEnv):
         super()._reset_idx(env_ids)
         self._reset_hand_kp(env_ids)
         self._reset_force_limit(env_ids)
+        if hasattr(self, "_cov_seen"):
+            self._cov_seen[env_ids] = False
+            self._cov_rose[env_ids] = False
         self._reset_peg_episode(env_ids)
 
     def _reset_force_limit(self, env_ids: torch.Tensor) -> None:
@@ -433,6 +436,31 @@ class PreciseAssemblyEnv(PlayEnv):
             self._force_th = torch.full((self.num_envs,), lo, device=self.device)
         u = torch.rand(len(env_ids), device=self.device)
         self._force_th[env_ids] = torch.exp(math.log(lo) + u * (math.log(hi) - math.log(lo)))
+
+    def _search_coverage(self) -> torch.Tensor:
+        """A30: reward for fingertips visiting new low cells of the search area before the object first rises."""
+        pa = self.cfg.precise_assembly
+        sx, sy = float(pa.start_shift_m[0]) + pa.search_cov_margin_m, float(pa.start_shift_m[1]) + pa.search_cov_margin_m
+        c = float(pa.search_cov_cell_m); nx, ny = max(1, int(round(2 * sx / c))), max(1, int(round(2 * sy / c)))
+        if not hasattr(self, "_cov_seen"):
+            self._cov_seen = torch.zeros(self.num_envs, nx * ny, dtype=torch.bool, device=self.device)
+            self._cov_rose = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        org = self.scene.env_origins
+        obj_z = self.object.data.root_pos_w[:, 2] - org[:, 2]
+        self._cov_rose |= obj_z > self._object_init_z + 0.01
+        ft = self.robot.data.body_pos_w[:, self._fingertip_body_ids] - org.unsqueeze(1)      # (N, 5, 3)
+        rel = ft[..., :2] - self.hole_pos[:, None, :2]
+        ix = ((rel[..., 0] + sx) / c).floor().long(); iy = ((rel[..., 1] + sy) / c).floor().long()
+        ok = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny) & (ft[..., 2] < self._object_init_z.unsqueeze(1) + pa.search_cov_z_m)
+        ok &= ~self._cov_rose.unsqueeze(1)
+        idx = (iy.clamp(0, ny - 1) * nx + ix.clamp(0, nx - 1))
+        before = self._cov_seen.sum(-1)
+        hit = torch.zeros(self._cov_seen.shape, device=self.device)
+        hit.scatter_add_(1, idx, ok.float())
+        self._cov_seen |= hit > 0
+        new = (self._cov_seen.sum(-1) - before).float()
+        self.extras["search_cov_frac"] = self._cov_seen.float().mean()
+        return new
 
     def _hand_object_force(self) -> torch.Tensor:
         """Total hand-object contact force (N, last physics substep), via a PhysX rigid contact view."""
@@ -1437,6 +1465,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.extras["multi_lift_last_ep_max_mean"] = self.multi_lift_last_ep_max[done_m].mean()
         log_step_metrics(self)
         self._log_peg_metrics()
+        if float(getattr(pih_cfg, "search_cov_rew", 0.0)) > 0.0:
+            cov = float(pih_cfg.search_cov_rew) * self._search_coverage()
+            reward = reward + cov
+            self._reward_terms["search_cov_rew"] = cov
+            self._reward_terms["total_reward"] = reward
         beta = float(getattr(pih_cfg, "force_pen_beta", 0.0))
         if beta > 0.0:
             if not hasattr(self, "_force_th"):

@@ -188,6 +188,14 @@ class PreciseAssemblyCfg:
     force_pen_beta: float = 0.0
     force_pen_th_range: tuple = (1.0, 1.0)
     force_pen_obs: bool = False
+    # A30 search coverage reward (reward only): fingertips within search_cov_z_m above the object's rest height
+    # visit cells of search_cov_cell_m over hole_pos +- (start_shift_m + search_cov_margin_m); each new cell pays
+    # search_cov_rew, only until the object first rises 1 cm (search phase). Pushes the policy to keep searching
+    # after a miss instead of hovering.
+    search_cov_rew: float = 0.0
+    search_cov_cell_m: float = 0.02
+    search_cov_margin_m: float = 0.02
+    search_cov_z_m: float = 0.03
     # Privileged teacher (A17 clean test): actor field priv_sticks = EXACT keypoints_rel_palm (12) + exact
     # distractor_obs (6 K) + the env's stick-diameter offset (1, (d - 6.49 mm) / 1.5 mm, from the problem name).
     # Not affected by blind_offset_m / multi-clutter canonicalisation / obs noise. Students mask it
