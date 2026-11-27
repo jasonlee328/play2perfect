@@ -384,6 +384,10 @@ class CollectManager:
         d = (ft.unsqueeze(2) - pos.unsqueeze(1)).norm(dim=-1)                      # (N, 5, K)
         d = torch.where(self.active.unsqueeze(1), d, torch.full_like(d, 9.0))
         self.ft_min = d.min(1).values                                              # (N, K)
+        if not hasattr(self, "_ti_idx"):
+            bn = [env.robot.body_names[int(b)] for b in env._fingertip_body_ids]
+            self._ti_idx = [next(i for i, n in enumerate(bn) if "thumb" in n), next(i for i, n in enumerate(bn) if "index" in n)]
+        self.pinch_d = d[:, self._ti_idx[0]] + d[:, self._ti_idx[1]]               # (N, K) thumb + index tip distance
         self.ft_min_all = self.ft_min.min(1).values
         out = self.active & ~self.in_bin
         self.ft_min_out = torch.where(out, self.ft_min, torch.full_like(self.ft_min, 9.0)).min(1).values
@@ -521,6 +525,12 @@ class CollectManager:
         app = (palm - cen).norm(dim=-1).clamp(max=0.4)
         if bool(getattr(c, "collect_target_nearest", False)):
             app = self.ft_min_out.clamp(max=0.4)          # nearest fingertip to the nearest part still out
+        wp = float(getattr(c, "collect_w_pinch_app", 0.0))
+        if wp > 0.0:
+            # A19 pick-1: thumb AND index tip approach the same part still out (pinch shaping; the single-nearest-tip
+            # term above is met by a flat palm-down sweep over the pile)
+            pin = torch.where(out, self.pinch_d, torch.full_like(self.pinch_d, 9.0)).min(1).values.clamp(max=0.8)
+            app = app + (wp / max(float(c.collect_w_scoop_app), 1e-6)) * pin
         pour = torch.zeros(N, device=self.dev)
         if float(c.collect_w_pour) > 0.0:
             # pour shaping: parts in the hand over the bin opening x how far the palm faces down (0 up .. 1 down)
