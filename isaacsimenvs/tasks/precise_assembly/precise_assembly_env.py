@@ -128,12 +128,14 @@ class PreciseAssemblyEnv(PlayEnv):
         # fingertip joints are ~10x softer than the official gripper's fingers: under the USB jaws' side load the pinched
         # stick tilts and wedges 2-8 mm short. k = 3 holds the pinch at ~11 N per pad (official 12 N).
         kp_s = float(getattr(cfg.precise_assembly, "hand_stiffness_scale", 1.0))
-        if kp_s != 1.0:
+        kd_s = float(getattr(cfg.precise_assembly, "hand_damping_scale", -1.0))
+        kd_s = kp_s if kd_s < 0.0 else kd_s
+        if kp_s != 1.0 or kd_s != 1.0:
             hid = [i for i, n in enumerate(self.robot.joint_names) if n.startswith("left_")]
             k0 = self.robot.data.joint_stiffness[:, hid].clone(); d0 = self.robot.data.joint_damping[:, hid].clone()
             self.robot.write_joint_stiffness_to_sim(k0 * kp_s, joint_ids=hid)
-            self.robot.write_joint_damping_to_sim(d0 * kp_s, joint_ids=hid)
-            print(f"[PreciseAssemblyEnv] hand stiffness x{kp_s} on {len(hid)} joints", flush=True)
+            self.robot.write_joint_damping_to_sim(d0 * kd_s, joint_ids=hid)
+            print(f"[PreciseAssemblyEnv] hand stiffness x{kp_s} damping x{kd_s} on {len(hid)} joints", flush=True)
 
         # When student_obs is enabled, the env exposes three obs groups via
         # `_get_observations`: "policy" = student obs (image+proprio, what
