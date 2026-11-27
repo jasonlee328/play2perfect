@@ -459,6 +459,22 @@ class PreciseAssemblyCfg:
     latch_cbf_grasp_grace_steps: int = 0
     # Distractor indices baked kinematic (no gravity; posed only by resets / the env), e.g. the latch keeper.
     kinematic_distractors: tuple[int, ...] = ()
+    # A28 dial (ContactBench task 30, dial_task.py): "off" | "report" (checks only) | "gate" (success = the official
+    # verdict). dial_kind push | standard | snap; dial_target_deg (official 90 / 90 / 120); thresholds = official.
+    dial_task: str = "off"
+    dial_kind: str = "standard"
+    dial_target_deg: float = 90.0
+    dial_target_tol_deg: float = 7.5
+    dial_snap_tol_deg: float = 3.0
+    dial_snap_seat_mm: float = 0.15
+    dial_release_force: float = 0.05
+    dial_clear_dist: float = 0.04
+    dial_still_steps: int = 60
+    dial_drift_deg: float = 2.0
+    dial_turn_rew_scale: float = 200.0
+    dial_press_rew_scale: float = 20000.0
+    dial_clear_rew_scale: float = 50.0
+    dial_success_bonus: float = 1000.0
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
     stiff_distractors: tuple[int, ...] = ()
 

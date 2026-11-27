@@ -556,6 +556,20 @@ class PreciseAssemblyEnv(PlayEnv):
         super()._reset_idx(env_ids)
         self._reset_hand_kp(env_ids)
         self._reset_peg_episode(env_ids)
+        if self.cfg.precise_assembly.dial_task != "off":   # A28
+            dial = getattr(self, "_dial", None)
+            if dial is not None and dial.checks:
+                if not hasattr(self, "dial_last"):
+                    self.dial_last = {k: torch.zeros(self.num_envs, device=self.device)
+                                      for k in list(dial.checks) + list(dial.meas) + ["success"]}
+                for k, v in list(dial.checks.items()) + list(dial.meas.items()):
+                    if k in self.dial_last:
+                        self.dial_last[k][env_ids] = v[env_ids].float()
+                self.dial_last["success"][env_ids] = dial.success[env_ids].float()
+            if dial is None:
+                from .dial_task import DialTask
+                self._dial = dial = DialTask(self)
+            dial.reset(env_ids)
         if self.cfg.precise_assembly.usb_task != "off":
             if usb is None:
                 from .usb_task import UsbTask
@@ -2296,6 +2310,10 @@ class PreciseAssemblyEnv(PlayEnv):
                 max_successes = self._usb.success.clone()
                 if pih_cfg.usb_terminate_on_fail:
                     usb_fail = {k: v & ~max_successes for k, v in self._usb.fail.items()}
+        if pih_cfg.dial_task != "off" and getattr(self, "_dial", None) is not None:   # A28
+            self._dial.update()
+            if pih_cfg.dial_task == "gate":
+                max_successes = self._dial.success.clone()
         key_dropped = torch.zeros_like(fall)
         if getattr(self, "_key", None) is not None:
             key_dropped = self._key.dropped & ~max_successes
@@ -2447,6 +2465,18 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["usb/success"] = usb.success.float().mean()
             self.extras["usb/pushing"] = usb.pushing.float().mean()
             self.extras["usb/released"] = usb.released.float().mean()
+        dial = getattr(self, "_dial", None)
+        if pih_cfg.dial_task == "gate" and dial is not None:   # A28
+            d_rew = dial.reward()
+            reward = reward + d_rew
+            self._reward_terms["dial_reward"] = d_rew
+            self._reward_terms["total_reward"] = reward
+            for k, v in dial.checks.items():
+                self.extras[f"dial/{k}"] = v.float().mean()
+            self.extras["dial/success"] = dial.success.float().mean()
+            self.extras["dial/err_deg"] = dial.meas["err_deg"].mean()
+            if dial.push:
+                self.extras["dial/depth_mm"] = dial.meas["depth_mm"].mean()
         key = getattr(self, "_key", None)
         if key is not None:   # A13
             k_rew = -pih_cfg.key_drop_penalty * self._termination_reasons["key_dropped"].float()
