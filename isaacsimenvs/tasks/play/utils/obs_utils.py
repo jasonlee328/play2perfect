@@ -277,6 +277,14 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     kp_offsets = env._keypoint_offsets * env._object_scale_multiplier.unsqueeze(1)
     obj_kp = _keypoints_world(obj_pos, obj_rot, kp_offsets)
     goal_kp = _keypoints_world(goal_pos, goal_rot, kp_offsets)
+    # A30 blind-search evals: the actor sees the object (and its lift goal) at a scripted guess pose
+    # env._actor_obj_override = (N, 7) env-frame pos + quat wxyz (None = off); critic / physics unchanged.
+    ovr = getattr(env, "_actor_obj_override", None)
+    if ovr is not None:
+        noisy_obj_pos, noisy_obj_rot = ovr[:, :3], ovr[:, 3:7]
+        noisy_obj_vel = torch.zeros_like(noisy_obj_vel)
+        g_ovr = torch.cat([ovr[:, :2], goal_pos[:, 2:3]], -1)
+        goal_pos_actor, goal_rot_actor = g_ovr, goal_rot
     noisy_obj_kp = _keypoints_world(noisy_obj_pos, noisy_obj_rot, kp_offsets)
 
     # Optional per-env yaw noise on the observed goal (world +Z about goal_pos).
@@ -295,6 +303,8 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     keypoints_rel_palm_noisy = noisy_obj_kp - palm_pos.unsqueeze(1)
     keypoints_rel_goal_clean = obj_kp - goal_kp
     keypoints_rel_goal_noisy = noisy_obj_kp - noisy_goal_kp
+    if ovr is not None:
+        keypoints_rel_goal_noisy = noisy_obj_kp - _keypoints_world(goal_pos_actor, goal_rot_actor, kp_offsets)
 
     fingertip_pos_rel_palm = (
         (ft_pos_w - env_origins.unsqueeze(1)) - palm_pos.unsqueeze(1)
