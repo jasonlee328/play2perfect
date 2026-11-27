@@ -145,6 +145,9 @@ class KeyRepose:
             # regrip episodes: goal = hold the current orientation; success also needs the hand back in the cradle
             fr = float(getattr(c, "key_cube_regrip_frac", 0.0))
             rg = torch.rand(env_ids.numel(), device=e.device) < fr
+            if hasattr(self, "cradle"):   # only starts whose hand is NOT already in the cradle (else a free success)
+                st = (e.robot.data.joint_pos[env_ids][:, e._hand_joint_ids] - self.cradle).abs().mean(-1)
+                rg = rg & (st > float(getattr(c, "key_cube_recradle_tol", 0.0)))
             self.regrip[env_ids] = rg
             if rg.any():
                 ri = env_ids[rg]
