@@ -139,6 +139,13 @@ class PreciseAssemblyCfg:
     # steps where the object centre is farther than this from the palm centre (no credit for a flicked object).
     goal_follow_object_xy: bool = False
     goal_follow_hand_m: float = 0.0
+    # A30 probe scripts: contact report API on the object (rigid contact views of hand-on-object force)
+    object_contact_report: bool = False
+    # A30 round rod: URDF <cylinder> collisions -> native PhysX capsules (exactly round, rolls); and an object
+    # angular damping (1/s, PhysX physxRigidBody:angularDamping; -1 = USD default) as a rolling-resistance proxy.
+    object_cylinders_as_capsules: bool = False
+    object_angular_damping: float = -1.0
+    object_sleep_threshold: float = -1.0
     # Same as start_shift_m but ONE offset per env shared by the object and every distractor (moves the whole row,
     # e.g. sideways in the tray: (0, 0.006, 0)); added to the independent start_shift_m offsets.
     start_shift_group_m: tuple[float, ...] = ()

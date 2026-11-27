@@ -136,19 +136,26 @@ def setup_scene(env) -> None:
     object_usd_paths, goalviz_usd_paths, hole_usd_paths = [], [], []
     for k, (obj_urdf, hole_urdf) in enumerate(zip(obj_urdfs, hole_urdfs)):
         sfx = f"_{k}" if multi else ""
-        object_raw_usd = _convert_urdf_to_usd(_asset_path(obj_urdf), usd_work_dir, fix_base=False)
-        object_usd_paths.append(_bake_usd(
-            object_raw_usd,
-            bake_root,
-            "object" + sfx,
-            props=dict(
+        _pa = env.cfg.precise_assembly
+        object_raw_usd = _convert_urdf_to_usd(_asset_path(obj_urdf), usd_work_dir, fix_base=False,
+                                              replace_cylinders_with_capsules=bool(getattr(_pa, "object_cylinders_as_capsules", False)))
+        _oprops = dict(
                 kinematic_enabled=False,
                 disable_gravity=False,
                 max_depenetration_velocity=1000.0,
                 rb_solver_position_iterations=4,
                 rb_solver_velocity_iterations=0,
                 articulation_enabled=False,
-            ),
+            )
+        if float(getattr(_pa, "object_angular_damping", -1.0)) >= 0.0:   # A30: rolling-resistance proxy for a round rod
+            _oprops["angular_damping"] = float(_pa.object_angular_damping)
+        if float(getattr(_pa, "object_sleep_threshold", -1.0)) >= 0.0:    # A30: mass-normalized KE (m^2/s^2) below which it sleeps
+            _oprops["sleep_threshold"] = float(_pa.object_sleep_threshold)
+        object_usd_paths.append(_bake_usd(
+            object_raw_usd,
+            bake_root,
+            "object" + sfx,
+            props=_oprops,
         ))
         goalviz_usd_paths.append(_bake_usd(
             object_raw_usd,
@@ -253,7 +260,10 @@ def setup_scene(env) -> None:
         env.goal_viz = RigidObject(build_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths))
     else:
         env.hole = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Hole", hole_usd_paths[0]))
-        env.object = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0]))
+        _ocfg = _pih_rigid_object_cfg("/World/envs/env_.*/Object", object_usd_paths[0])
+        if bool(getattr(env.cfg.precise_assembly, "object_contact_report", False)):
+            _ocfg.spawn.activate_contact_sensors = True   # A30 probes: PhysxContactReportAPI on the object
+        env.object = RigidObject(_ocfg)
         env.goal_viz = RigidObject(_pih_rigid_object_cfg("/World/envs/env_.*/GoalViz", goalviz_usd_paths[0]))
     env.distractors = tuple(
         RigidObject(build_rigid_object_cfg(f"/World/envs/env_.*/Distractor{k}", usd) if len(usd) > 1

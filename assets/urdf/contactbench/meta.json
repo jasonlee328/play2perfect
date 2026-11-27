@@ -800,7 +800,7 @@
     0.125,
     0.125
    ],
-   "collision": "exact convex 96-gon prism"
+   "collision": "exact convex 32-gon prism"
   },
   "pen_d40": {
    "src": "analytic 96-gon rod (pen_tasks.py)",
@@ -820,7 +820,7 @@
     0.1,
     0.1
    ],
-   "collision": "exact convex 96-gon prism"
+   "collision": "exact convex 32-gon prism"
   },
   "pen_d60": {
    "src": "analytic 96-gon rod (pen_tasks.py)",
@@ -840,7 +840,7 @@
     0.15,
     0.15
    ],
-   "collision": "exact convex 96-gon prism"
+   "collision": "exact convex 32-gon prism"
   },
   "pen_d50_m10": {
    "src": "analytic 96-gon rod (pen_tasks.py)",
@@ -860,7 +860,7 @@
     0.125,
     0.125
    ],
-   "collision": "exact convex 96-gon prism"
+   "collision": "exact convex 32-gon prism"
   }
  },
  "fixtures": {
@@ -10854,7 +10854,7 @@
    "object_start_pose": [
     0.0,
     0.0,
-    0.0037,
+    0.0035,
     0.0,
     0.0,
     0.0,
@@ -10865,7 +10865,7 @@
     [
      0.0,
      0.0,
-     0.1037,
+     0.10350000000000001,
      0.0,
      0.0,
      0.0,
@@ -10899,7 +10899,7 @@
    "object_start_pose": [
     0.0,
     0.0,
-    0.0032,
+    0.003,
     0.0,
     0.0,
     0.0,
@@ -10910,7 +10910,7 @@
     [
      0.0,
      0.0,
-     0.1032,
+     0.10300000000000001,
      0.0,
      0.0,
      0.0,
@@ -10944,7 +10944,7 @@
    "object_start_pose": [
     0.0,
     0.0,
-    0.0042,
+    0.004,
     0.0,
     0.0,
     0.0,
@@ -10955,7 +10955,7 @@
     [
      0.0,
      0.0,
-     0.1042,
+     0.10400000000000001,
      0.0,
      0.0,
      0.0,
@@ -10989,7 +10989,7 @@
    "object_start_pose": [
     0.0,
     0.0,
-    0.0037,
+    0.0035,
     0.0,
     0.0,
     0.0,
@@ -11000,7 +11000,7 @@
     [
      0.0,
      0.0,
-     0.1037,
+     0.10350000000000001,
      0.0,
      0.0,
      0.0,
