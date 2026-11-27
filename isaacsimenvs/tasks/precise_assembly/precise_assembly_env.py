@@ -371,6 +371,11 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "fixture_pose_rel_palm" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "fixture_pose_rel_palm"))
+        if getattr(cfg.precise_assembly, "force_pen_obs", False):
+            OBS_FIELD_SIZES["force_limit"] = 1
+            for lst in ("obs_list", "state_list"):
+                if "force_limit" not in getattr(cfg.obs, lst):
+                    setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "force_limit"))
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)
@@ -418,7 +423,27 @@ class PreciseAssemblyEnv(PlayEnv):
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
         super()._reset_idx(env_ids)
         self._reset_hand_kp(env_ids)
+        self._reset_force_limit(env_ids)
         self._reset_peg_episode(env_ids)
+
+    def _reset_force_limit(self, env_ids: torch.Tensor) -> None:
+        """A30 FORGE force limit: per-episode F_th, log-uniform in force_pen_th_range (N)."""
+        lo, hi = (float(v) for v in getattr(self.cfg.precise_assembly, "force_pen_th_range", (1.0, 1.0)))
+        if not hasattr(self, "_force_th"):
+            self._force_th = torch.full((self.num_envs,), lo, device=self.device)
+        u = torch.rand(len(env_ids), device=self.device)
+        self._force_th[env_ids] = torch.exp(math.log(lo) + u * (math.log(hi) - math.log(lo)))
+
+    def _hand_object_force(self) -> torch.Tensor:
+        """Total hand-object contact force (N, last physics substep), via a PhysX rigid contact view."""
+        if getattr(self, "_hof_view", None) is None:
+            import re as _re
+            g = lambda q: _re.sub(r"env_\d+", "env_*", q)
+            links = [g(q) for q in self.robot.root_physx_view.link_paths[0]]
+            self._hof_view = self.object._physics_sim_view.create_rigid_contact_view(
+                g(self.object.root_physx_view.prim_paths[0]), filter_patterns=links)
+        F = self._hof_view.get_contact_force_matrix(float(self.physics_dt)).to(self.device)
+        return F.norm(dim=-1).sum(-1)
 
     def _reset_hand_kp(self, env_ids: torch.Tensor) -> None:
         """A8 hand_kp_scale_range: hidden per-episode hand PD gain scale (stiffness x s, damping x sqrt(s))."""
@@ -1412,6 +1437,17 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.extras["multi_lift_last_ep_max_mean"] = self.multi_lift_last_ep_max[done_m].mean()
         log_step_metrics(self)
         self._log_peg_metrics()
+        beta = float(getattr(pih_cfg, "force_pen_beta", 0.0))
+        if beta > 0.0:
+            if not hasattr(self, "_force_th"):
+                self._reset_force_limit(torch.arange(self.num_envs, device=self.device))
+            F = self._hand_object_force()
+            fpen = beta * torch.clamp(F - self._force_th, min=0.0)
+            reward = reward - fpen
+            self._reward_terms["force_penalty"] = -fpen
+            self._reward_terms["total_reward"] = reward
+            self.extras["force_hand_obj_mean"] = F.mean()
+            self.extras["force_over_limit_frac"] = (F > self._force_th).float().mean()
         return reward
 
     def _log_peg_metrics(self) -> None:

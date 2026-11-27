@@ -368,6 +368,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         fpos = env.hole_pos + getattr(env, "_fixture_obs_noise", 0.0)      # fixture_obs_noise_m (per episode)
         obs_clean["fixture_pose_rel_palm"] = torch.cat([fpos - palm_pos, env.hole_quat_wxyz], dim=-1)
 
+    if "force_limit" in OBS_FIELD_SIZES:
+        th = getattr(env, "_force_th", None)
+        obs_clean["force_limit"] = (th if th is not None else torch.ones(env.num_envs, device=env.device)).unsqueeze(-1)
+
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel

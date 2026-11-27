@@ -181,6 +181,13 @@ class PreciseAssemblyCfg:
     # Privileged-free teacher obs: field "fixture_pose_rel_palm" (fixture position relative to the palm + its
     # quaternion wxyz, 7), added to obs_list and state_list.
     obs_fixture: bool = False
+    # A30 FORGE-style force limit (arXiv 2408.04587): reward -= force_pen_beta * max(0, F - F_th) per step, F = true
+    # total hand-object contact force (N, last physics substep; needs object_contact_report=true), F_th per episode
+    # log-uniform in force_pen_th_range (N). force_pen_obs adds actor + critic field "force_limit" = [F_th] (warm start:
+    # P2P_NEW_OBS_FIELD=force_limit). Reward only: no termination. Eval at a fixed limit: force_pen_th_range=[x,x].
+    force_pen_beta: float = 0.0
+    force_pen_th_range: tuple = (1.0, 1.0)
+    force_pen_obs: bool = False
     # Privileged teacher (A17 clean test): actor field priv_sticks = EXACT keypoints_rel_palm (12) + exact
     # distractor_obs (6 K) + the env's stick-diameter offset (1, (d - 6.49 mm) / 1.5 mm, from the problem name).
     # Not affected by blind_offset_m / multi-clutter canonicalisation / obs noise. Students mask it
