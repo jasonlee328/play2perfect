@@ -171,6 +171,7 @@ class PreciseAssemblyCfg:
     # stick's exact collision hull outside stick_check_box [xmin, xmax, ymin, ymax, zmax] (receptive, m) by > tol = violation.
     stick_check_box: tuple[float, ...] = ()
     stick_check_step: int = 3
+    stick_check_move_m: float = 0.005         # a stick > this far from its bank pose at the check step = invalid layout
     stick_check_tol_m: float = 0.001          # hull vertices may be this far past a wall / the rim (PhysX resting sink ~0.6 mm)
     stick_hull_file: str = "assets/urdf/contactbench/objects/chopstick64/coll_00.obj"   # exact collision hull (body frame)
     # Count of sticks lifted (logged as success/n_lifted_max): sticks whose root is >= stick_lift_count_m above its

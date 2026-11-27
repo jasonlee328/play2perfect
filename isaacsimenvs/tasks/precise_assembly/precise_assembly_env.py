@@ -744,6 +744,10 @@ class PreciseAssemblyEnv(PlayEnv):
         self.n_lifted = (pos[..., 2] - rest[..., 2] >= float(c.stick_lift_count_m)).float().sum(0)
         self.n_lifted_ep_max = torch.maximum(self.n_lifted_ep_max, self.n_lifted)
         box = tuple(c.stick_check_box)
+        if not hasattr(self, "stick_invalid"):
+            self.stick_invalid = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+            self.stick_invalid_total = 0
+        self.stick_invalid[:] = False
         if len(box) < 5:
             return
         chk = self.episode_length_buf == int(c.stick_check_step)
@@ -771,6 +775,12 @@ class PreciseAssemblyEnv(PlayEnv):
               (rl[..., 1] < box[2] - tol) | (rl[..., 1] > box[3] + tol) | (rl[..., 2] > box[4] + tol)
         bad = out.any(-1).any(0)
         self.stick_violation[ids] = bad.float()
+        # a PhysX reset glitch (rare: a stick jumps right after the reset) or a violation = invalid layout: the episode
+        # ends at once as 'invalid_layout' (no reward / penalty; evals exclude + report these episodes)
+        moved = (pos[:, ids] - rest[:, ids]).norm(dim=-1).max(0).values > float(c.stick_check_move_m)
+        inv = bad | moved
+        self.stick_invalid[ids] = inv
+        self.stick_invalid_total += int(inv.sum())
         self.stick_violation_total += int(bad.sum())
         self.stick_checked_total += int(ids.numel())
 
@@ -1393,9 +1403,16 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
+        inv = getattr(self, "stick_invalid", None)
+        if inv is not None and self._slot_mode():
+            fall, max_successes, hand_far, dropped, disturbed = (x & ~inv for x in (fall, max_successes, hand_far,
+                                                                                    dropped, disturbed))
+        else:
+            inv = torch.zeros_like(fall)
         terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
-        truncated = self.episode_length_buf >= self.max_episode_length
+        truncated = (self.episode_length_buf >= self.max_episode_length) | inv
         self._termination_reasons = {
+            "invalid_layout": inv,
             "fall": fall,
             "max_successes": max_successes,
             "retract_fail": retract_fail,
