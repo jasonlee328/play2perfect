@@ -621,6 +621,7 @@ class PreciseAssemblyEnv(PlayEnv):
         self._sample_start_shift(env_ids, len(dists))
         if not dists:
             return
+        slots = self._sample_slot_poses(env_ids, len(dists) + 1)
         if not hasattr(self, "_distractor_reset_pos"):
             self._distractor_reset_pos = torch.zeros(len(dists), self.num_envs, 3, device=self.device)
             self.distractor_disp = torch.zeros(self.num_envs, device=self.device)
@@ -634,6 +635,8 @@ class PreciseAssemblyEnv(PlayEnv):
         for k, (body, pose) in enumerate(zip(dists, self._pih_distractor_pose_rel)):
             if mc:
                 pose = self._distractor_pose_rel_env[k, env_ids]
+            if slots:
+                pose = self._slot_pose[k + 1, env_ids]
             w = self._pose_rel_hole_to_world(env_ids, pose, self._start_shift[k + 1, env_ids])
             body.write_root_pose_to_sim(w, env_ids=env_ids)
             body.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
@@ -653,6 +656,102 @@ class PreciseAssemblyEnv(PlayEnv):
         self.distractor_disp_ep_max[env_ids] = 0.0
         self.distractor_moved_ep_max[env_ids] = 0.0
         self.distractor_rise[env_ids] = 0.0
+
+    def _slot_mode(self) -> bool:
+        c = self.cfg.precise_assembly
+        return bool(c.stick_drop_reset or c.stick_bank_file)
+
+    def _sample_slot_poses(self, env_ids: torch.Tensor, S: int) -> bool:
+        """A17 one-of-10: per-episode receptive poses (xyz + quat xyzw) of every stick -> self._slot_pose (S, N, 7)."""
+        if not self._slot_mode():
+            return False
+        c = self.cfg.precise_assembly
+        n = env_ids.numel()
+        f = dict(device=self.device, dtype=torch.float32)
+        if not hasattr(self, "_slot_pose"):
+            self._slot_pose = torch.zeros(S, self.num_envs, 7, **f)
+            self._slot_pose[..., 6] = 1.0
+            self.stick_violation = torch.zeros(self.num_envs, **f)
+            self.stick_violation_total = 0
+            self.stick_checked_total = 0
+            self.n_lifted = torch.zeros(self.num_envs, **f)
+            self.n_lifted_ep_max = torch.zeros(self.num_envs, **f)
+            if c.stick_bank_file:
+                import numpy as np
+                b = np.load(c.stick_bank_file)["poses"].astype("float32")
+                if b.shape[1] != S:
+                    raise ValueError(f"stick_bank_file has {b.shape[1]} sticks per layout, env has {S}")
+                self._stick_bank = torch.as_tensor(b, **f)
+                print(f"[PreciseAssemblyEnv] stick bank {c.stick_bank_file}: {b.shape[0]} layouts", flush=True)
+        if c.stick_bank_file:
+            L = self._stick_bank.shape[0]
+            idx = torch.randint(0, L, (n,), device=self.device)
+            perm = torch.argsort(torch.rand(n, S, device=self.device), dim=1)               # (n, S)
+            lay = self._stick_bank[idx]                                                      # (n, S, 7)
+            lay = torch.gather(lay, 1, perm.unsqueeze(-1).expand(-1, -1, 7))
+            self._slot_pose[:, env_ids] = lay.transpose(0, 1)
+        else:
+            yaw = (torch.rand(S, n, **f) * 2 - 1) * math.radians(c.stick_drop_yaw_deg)
+            yaw = yaw + math.pi * (torch.rand(S, n, **f) < 0.5).float()                     # random end flip
+            roll = torch.rand(S, n, **f) * 2 * math.pi                                       # random facet
+            hl, hw = (float(v) for v in c.stick_drop_inner_m)
+            x0, x1 = (float(v) for v in c.stick_hull_x_m)
+            half, mid = (x1 - x0) / 2, (x1 + x0) / 2
+            r, mg = 0.0038, float(c.stick_drop_margin_m)
+            ca, sa = yaw.cos().abs(), yaw.sin().abs()
+            mx = (hl - half * ca - r * sa - mg).clamp_min(0.0)
+            my = (hw - half * sa - r * ca - mg).clamp_min(0.0)
+            m = torch.stack([(torch.rand(S, n, **f) * 2 - 1) * mx, (torch.rand(S, n, **f) * 2 - 1) * my], -1)
+            # hull midpoint m -> root (COM) = m - R(yaw) (mid, 0)
+            px = m[..., 0] - yaw.cos() * mid
+            py = m[..., 1] - yaw.sin() * mid
+            layer = torch.argsort(torch.rand(n, S, device=self.device), dim=1).transpose(0, 1).float()  # (S, n)
+            pz = float(c.stick_drop_z0_m) + layer * float(c.stick_drop_dz_m)
+            # q = Rz(yaw) * Rx(roll), as xyzw
+            cy, sy, cr, sr = (yaw / 2).cos(), (yaw / 2).sin(), (roll / 2).cos(), (roll / 2).sin()
+            q = torch.stack([cy * sr, sy * sr, sy * cr, cy * cr], -1)                         # x y z w
+            self._slot_pose[:, env_ids] = torch.cat([torch.stack([px, py, pz], -1), q], -1)
+        self._start_shift[:, env_ids] = 0.0
+        self.stick_violation[env_ids] = 0.0
+        self.n_lifted_ep_max[env_ids] = 0.0
+        return True
+
+    def _update_stick_checks(self) -> None:
+        """One-of-10: per-episode layout check at step stick_check_step + count of lifted sticks."""
+        if not self._slot_mode() or not hasattr(self, "_slot_pose") or not hasattr(self, "_object_rest_pos"):
+            return
+        c = self.cfg.precise_assembly
+        dists = getattr(self, "distractors", ())
+        bodies = [self.object] + list(dists)
+        pos = torch.stack([b.data.root_pos_w for b in bodies])                               # (S, N, 3)
+        rest = torch.cat([self._object_rest_pos.unsqueeze(0), self._distractor_reset_pos], 0)
+        self.n_lifted = (pos[..., 2] - rest[..., 2] >= float(c.stick_lift_count_m)).float().sum(0)
+        self.n_lifted_ep_max = torch.maximum(self.n_lifted_ep_max, self.n_lifted)
+        box = tuple(c.stick_check_box)
+        if len(box) < 5:
+            return
+        chk = self.episode_length_buf == int(c.stick_check_step)
+        if not chk.any():
+            return
+        ids = chk.nonzero().squeeze(-1)
+        S = len(bodies)
+        quat = torch.stack([b.data.root_quat_w[ids] for b in bodies])                        # (S, n, 4) wxyz
+        p = pos[:, ids]
+        x0, x1 = (float(v) for v in c.stick_hull_x_m)
+        hq = self.hole_quat_wxyz[ids].unsqueeze(0).expand(S, -1, -1).reshape(-1, 4)
+        hp = (self.hole_pos[ids] + self.scene.env_origins[ids]).unsqueeze(0).expand(S, -1, -1).reshape(-1, 3)
+        bad = torch.zeros(ids.numel(), dtype=torch.bool, device=self.device)
+        for xe in (x0, x1):
+            e = torch.tensor([xe, 0.0, 0.0], device=self.device).expand(S * ids.numel(), 3)
+            w = p.reshape(-1, 3) + quat_apply(quat.reshape(-1, 4), e)
+            rl = quat_apply_inverse(hq, w - hp).reshape(S, -1, 3)
+            tol, r = 0.001, 0.0033
+            out = (rl[..., 0] - r < box[0] - tol) | (rl[..., 0] + r > box[1] + tol) | \
+                  (rl[..., 1] - r < box[2] - tol) | (rl[..., 1] + r > box[3] + tol) | (rl[..., 2] + r > box[4] + tol)
+            bad |= out.any(0)
+        self.stick_violation[ids] = bad.float()
+        self.stick_violation_total += int(bad.sum())
+        self.stick_checked_total += int(ids.numel())
 
     def _sample_start_shift(self, env_ids: torch.Tensor, n_dist: int) -> None:
         """start_shift_m: fresh U(-d, d) receptive-frame offsets for the object (row 0) and each distractor."""
@@ -743,6 +842,9 @@ class PreciseAssemblyEnv(PlayEnv):
             if getattr(self, "_multi_clutter", False):
                 so, sd = self._mc_slot[0, ids].clone(), self._mc_slot[kk + 1, ids].clone()
                 self._mc_slot[0, ids], self._mc_slot[kk + 1, ids] = sd, so
+            if hasattr(self, "_slot_pose") and self._slot_mode():
+                so, sd = self._slot_pose[0, ids].clone(), self._slot_pose[kk + 1, ids].clone()
+                self._slot_pose[0, ids], self._slot_pose[kk + 1, ids] = sd, so
             hq = self.hole_quat_wxyz[ids]
             self._start_shift[0, ids] += quat_apply_inverse(hq, new_rest - old_rest)   # goals follow the object
             self._object_init_z[ids] = new_rest[:, 2] - self.scene.env_origins[ids, 2]
@@ -827,6 +929,8 @@ class PreciseAssemblyEnv(PlayEnv):
         if getattr(self, "_multi_clutter", False):
             self._mc_tables()
             pose = self._object_start_rel_env[env_ids]
+        if self._slot_mode() and hasattr(self, "_slot_pose"):
+            pose = self._slot_pose[0, env_ids]
         w = self._pose_rel_hole_to_world(env_ids, pose, self._start_shift[0, env_ids])
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
@@ -930,7 +1034,13 @@ class PreciseAssemblyEnv(PlayEnv):
                 else:
                     insert_pos = self._insert_pos_rel[tail_idx]
                     insert_q = self._insert_quat_wxyz[tail_idx]
-                if hasattr(self, "_start_shift"):     # start_shift_m: the goals move with the object
+                if self._slot_mode() and hasattr(self, "_slot_pose"):
+                    # one-of-10: goal = the object's own rest pose + the problem's lift offset, same orientation
+                    sp = self._slot_pose[0, tail_ids]
+                    nom = torch.tensor(self._pih_object_start_rel[:3], device=self.device, dtype=torch.float32)
+                    insert_pos = sp[:, :3] + (insert_pos - nom)
+                    insert_q = _xyzw_to_wxyz(sp[:, 3:7])
+                elif hasattr(self, "_start_shift"):     # start_shift_m: the goals move with the object
                     insert_pos = insert_pos + self._start_shift[0, tail_ids]
                 ins_pos_local[in_tail] = (
                     self.hole_pos[tail_ids] + quat_apply(hole_q, insert_pos)
@@ -1145,6 +1255,7 @@ class PreciseAssemblyEnv(PlayEnv):
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
         update_tolerance_curriculum(self)
         self._swap_lifted_distractor()
+        self._update_stick_checks()
         compute_intermediate_values(self)
 
         pih_cfg = self.cfg.precise_assembly
@@ -1393,6 +1504,12 @@ class PreciseAssemblyEnv(PlayEnv):
         sf = {"task": task, "all_goals": all_goals, "any_goal": (self._successes >= 1).float(),
               "goals_reached": self._successes.float(), "goals_total": self.env_max_goals.float(),
               "goals_frac": success_ratio}
+        if hasattr(self, "stick_violation"):
+            sf["stick_violation"] = self.stick_violation.clone()
+            sf["n_lifted_max"] = self.n_lifted_ep_max.clone()
+            sf["lifted_0"] = (self.n_lifted_ep_max < 0.5).float()
+            sf["lifted_1"] = ((self.n_lifted_ep_max > 0.5) & (self.n_lifted_ep_max < 1.5)).float()
+            sf["lifted_2plus"] = (self.n_lifted_ep_max > 1.5).float()
         if hasattr(self, "distractor_disp_ep_max"):
             sf["neighbours_moved_cm"] = self.distractor_moved_ep_max * 100.0
             sf["neighbours_out_of_box_cm"] = self.distractor_disp_ep_max * 100.0

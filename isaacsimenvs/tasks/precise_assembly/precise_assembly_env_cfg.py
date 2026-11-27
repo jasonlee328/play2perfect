@@ -150,6 +150,30 @@ class PreciseAssemblyCfg:
     multi_lift_hold_rew: float = 0.5
     multi_lift_new_bonus: float = 200.0
     stick_spread_min_pitch_m: float = 0.0085
+    # A17 one-of-10 (user 11-27): random DROPPED stick layouts. Both modes give every stick (slot 0 = object, 1.. =
+    # distractors) a per-episode pose (receptive frame) and replace start_shift_*; the object's goals follow its pose
+    # (position + orientation) and swap_lifted_distractor swaps the slots.
+    # stick_drop_reset: every reset spawns the sticks at random poses ABOVE the floor (one stick per height layer,
+    # stick_drop_z0_m + k * stick_drop_dz_m, layer order random, so no initial overlap; random yaw +-stick_drop_yaw_deg,
+    # random end flip, random roll about the long axis, hull midpoint inside the tray by stick_drop_margin_m) and lets
+    # physics drop + settle them. Used only to BUILD the bank (tools/contactbench/one10_bank.py).
+    stick_drop_reset: bool = False
+    stick_drop_yaw_deg: float = 15.0
+    stick_drop_z0_m: float = 0.012
+    stick_drop_dz_m: float = 0.009
+    stick_drop_inner_m: tuple[float, ...] = (0.120, 0.035)   # tray inner half length / half width (receptive x / y)
+    stick_drop_margin_m: float = 0.004
+    stick_hull_x_m: tuple[float, ...] = (-0.0904, 0.1096)    # stick collision hull ends along its long axis (object x)
+    # stick_bank_file: npz with 'poses' (L, S, 7) = verified settled layouts (receptive xyz + quat xyzw); each reset
+    # draws a random layout and a random slot permutation (which stick is "the object" is arbitrary: identical bodies).
+    stick_bank_file: str = ""
+    # Per-episode layout check (logged as success/stick_violation): at episode step stick_check_step, any stick end
+    # (hull ends +- radius) outside stick_check_box [xmin, xmax, ymin, ymax, zmax] (receptive, m) by > 1 mm = violation.
+    stick_check_box: tuple[float, ...] = ()
+    stick_check_step: int = 3
+    # Count of sticks lifted (logged as success/n_lifted_max): sticks whose root is >= stick_lift_count_m above its
+    # reset height, max over the episode (0 / 1 / >= 2 breakdown for one-of-10).
+    stick_lift_count_m: float = 0.03
     # "Any one of identical objects" tasks (blind chopstick search): > 0 = once a distractor has risen this far (m)
     # above its reset pose while the object is still within 5 mm of its own, the two swap states (pose, velocity and
     # reset pose; the goals move to the new object), so lifting any one stick is lifting "the object". Identical
