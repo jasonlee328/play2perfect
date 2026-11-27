@@ -349,6 +349,10 @@ class PreciseAssemblyEnv(PlayEnv):
             OBS_FIELD_SIZES["key_hint"] = 2
             if "key_hint" not in cfg.obs.obs_list:
                 cfg.obs.obs_list = (*cfg.obs.obs_list, "key_hint")
+        if bool(getattr(cfg.precise_assembly, "kc_oracle_obs", False)):   # A31 privileged oracle: true in-hand key pose
+            OBS_FIELD_SIZES["kc_inhand"] = 7
+            if "kc_inhand" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "kc_inhand")
         if len(problem_names) > 1 and any(PROBLEM_REGISTRY[n].joints for n in problem_names):
             raise ValueError("Problem.joints need a single problem")
         self._pih_joints = tuple(problem.joints)

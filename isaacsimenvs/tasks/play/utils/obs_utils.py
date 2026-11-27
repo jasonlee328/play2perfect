@@ -431,6 +431,14 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             obs_clean["key_hint"] = torch.stack([k_.twist_signed / math.pi * m, m], dim=-1)
         else:
             obs_clean["key_hint"] = torch.zeros(env.num_envs, 2, device=env.device)
+    if "kc_inhand" in OBS_FIELD_SIZES:   # A31 privileged oracle: exact key pose in the palm frame
+        kc = getattr(env, "_kc", None)
+        if kc is not None:
+            p, q = kc.rel_palm()
+            q = q * torch.where(q[:, :1] < 0, -1.0, 1.0)
+            obs_clean["kc_inhand"] = torch.cat([p * 10.0, q], dim=-1)
+        else:
+            obs_clean["kc_inhand"] = torch.zeros(env.num_envs, 7, device=env.device)
     obs_noisy = dict(obs_clean)
     obs_noisy["object_rot"] = noisy_obj_rot_xyzw
     obs_noisy["object_vel"] = noisy_obj_vel
