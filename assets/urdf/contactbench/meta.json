@@ -1546,30 +1546,30 @@
     },
     "dial_push_plate_mx": {
       "src": "official dial.py _build_push bump sector",
-      "mass_g": 10.0,
+      "mass_g": 100.0,
       "object_scale": [
         1.0,
         1.0,
         1.0
       ],
-      "collision": "convex sector pieces",
+      "collision": "SDF 256 of the bump half ring (official: SDF)",
       "extents_mm": [
-        21.06,
+        21.04,
         43.2,
         1.5
       ]
     },
     "dial_push_plate_px": {
       "src": "official dial.py _build_push bump sector",
-      "mass_g": 10.0,
+      "mass_g": 100.0,
       "object_scale": [
         1.0,
         1.0,
         1.0
       ],
-      "collision": "convex sector pieces",
+      "collision": "SDF 256 of the bump half ring (official: SDF)",
       "extents_mm": [
-        21.06,
+        21.04,
         43.2,
         1.5
       ]
@@ -1582,7 +1582,7 @@
         1.0,
         1.0
       ],
-      "collision": "convex sector pieces",
+      "collision": "SDF 256 of the tooth + peg sectors (official: SDF)",
       "extents_mm": [
         60.0,
         11.32,
@@ -1641,6 +1641,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1656,6 +1657,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1671,6 +1673,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1686,6 +1689,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1701,6 +1705,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1716,6 +1721,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1773,6 +1779,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1788,6 +1795,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1803,6 +1811,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1818,6 +1827,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1833,6 +1843,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -1848,6 +1859,7 @@
         1.0
       ],
       "collision": "convex CAD-section prism",
+      "collision_comp_inward_mm": 0.04,
       "extents_mm": [
         2.72,
         20.173,
@@ -16720,6 +16732,7 @@
       }
     },
     "cb_dial": {
+      "distractor_friction": 0.2,
       "object": "dial_push_knob_flat",
       "fixture": "dial_push_housing",
       "object_start_pose": [
@@ -16802,9 +16815,9 @@
           "kind": "prismatic",
           "lower": -0.00450000000000001,
           "upper": 0.00019999999999998936,
-          "stiffness": 3940.0,
+          "stiffness": 3715.4199999999996,
           "damping": 6.0,
-          "target": 0.0
+          "target": 0.00026403475246405527
         },
         {
           "body": "distractor1",
@@ -16821,9 +16834,9 @@
           "kind": "prismatic",
           "lower": -0.00450000000000001,
           "upper": 0.00019999999999998936,
-          "stiffness": 3940.0,
+          "stiffness": 3715.4199999999996,
           "damping": 6.0,
-          "target": 0.0
+          "target": 0.00026403475246405527
         }
       ],
       "waypoints": [
@@ -16873,6 +16886,7 @@
       }
     },
     "cb_dial_round": {
+      "distractor_friction": 0.2,
       "object": "dial_push_knob_round",
       "fixture": "dial_push_housing",
       "object_start_pose": [
@@ -16955,9 +16969,9 @@
           "kind": "prismatic",
           "lower": -0.00450000000000001,
           "upper": 0.00019999999999998936,
-          "stiffness": 3940.0,
+          "stiffness": 3715.4199999999996,
           "damping": 6.0,
-          "target": 0.0
+          "target": 0.00026403475246405527
         },
         {
           "body": "distractor1",
@@ -16974,9 +16988,9 @@
           "kind": "prismatic",
           "lower": -0.00450000000000001,
           "upper": 0.00019999999999998936,
-          "stiffness": 3940.0,
+          "stiffness": 3715.4199999999996,
           "damping": 6.0,
-          "target": 0.0
+          "target": 0.00026403475246405527
         }
       ],
       "waypoints": [
@@ -17026,6 +17040,7 @@
       }
     },
     "cb_dial_standard": {
+      "distractor_friction": 0.7,
       "object": "dial_standard_knob_flat",
       "fixture": "dial_standard_housing",
       "object_start_pose": [
@@ -17297,6 +17312,7 @@
       }
     },
     "cb_dial_standard_round": {
+      "distractor_friction": 0.7,
       "object": "dial_standard_knob_round",
       "fixture": "dial_standard_housing",
       "object_start_pose": [
@@ -17568,6 +17584,7 @@
       }
     },
     "cb_dial_snap": {
+      "distractor_friction": 0.7,
       "object": "dial_snap_knob_flat",
       "fixture": "dial_snap_housing",
       "object_start_pose": [
@@ -17839,6 +17856,7 @@
       }
     },
     "cb_dial_snap_round": {
+      "distractor_friction": 0.7,
       "object": "dial_snap_knob_round",
       "fixture": "dial_snap_housing",
       "object_start_pose": [
