@@ -401,12 +401,12 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     f = 1.0
     if fade:
         ramp = int(getattr(pa, "blind_fade_ramp_steps", 0))
-        f = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter + int(getattr(pa, "blind_fade_offset_steps", 0))) / ramp)
+        f = 1.0 if ramp <= 0 else max(0.0, min(1.0, float(env.common_step_counter + int(getattr(pa, "blind_fade_offset_steps", 0))) / ramp))
         env.blind_fade_frac = f
     bo = tuple(getattr(pa, "blind_offset_m", ())) if pa is not None else ()
     if bo and hasattr(env, "_blind_offset_u"):
         ramp = int(getattr(pa, "blind_offset_ramp_steps", 0))
-        s = 1.0 if ramp <= 0 else min(1.0, float(env.common_step_counter + int(getattr(pa, "blind_offset_offset_steps", 0))) / ramp)
+        s = 1.0 if ramp <= 0 else max(0.0, min(1.0, float(env.common_step_counter + int(getattr(pa, "blind_offset_offset_steps", 0))) / ramp))
         env.blind_offset_frac = s
         half = torch.tensor((bo + (0.0, 0.0, 0.0))[:3], device=env.device, dtype=torch.float32)
         off = env._blind_offset_u * half * s                                          # (N, 3)
