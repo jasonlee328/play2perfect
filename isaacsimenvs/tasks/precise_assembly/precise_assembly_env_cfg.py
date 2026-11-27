@@ -192,6 +192,14 @@ class PreciseAssemblyCfg:
     # visit cells of search_cov_cell_m over hole_pos +- (start_shift_m + search_cov_margin_m); each new cell pays
     # search_cov_rew, only until the object first rises 1 cm (search phase). Pushes the policy to keep searching
     # after a miss instead of hovering.
+    # A30 FRAGILE-PEN added rule (not physical): hand-object force above F_th (force_pen_th_range, per episode) for
+    # force_crush_steps consecutive policy steps = fail "crushed" (-force_crush_penalty). Ramped in: the crush limit is
+    # F_th x m, m going force_crush_start_mult -> 1 over force_crush_ramp_steps env steps (+ _offset_steps on resume).
+    force_crush_steps: int = 0
+    force_crush_penalty: float = 0.0
+    force_crush_start_mult: float = 10.0
+    force_crush_ramp_steps: int = 0
+    force_crush_ramp_offset_steps: int = 0
     search_cov_rew: float = 0.0
     search_cov_cell_m: float = 0.02
     search_cov_margin_m: float = 0.02

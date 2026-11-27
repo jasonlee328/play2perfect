@@ -424,6 +424,8 @@ class PreciseAssemblyEnv(PlayEnv):
         super()._reset_idx(env_ids)
         self._reset_hand_kp(env_ids)
         self._reset_force_limit(env_ids)
+        if hasattr(self, "_crush_streak"):
+            self._crush_streak[env_ids] = 0
         if hasattr(self, "_cov_seen"):
             self._cov_seen[env_ids] = False
             self._cov_rose[env_ids] = False
@@ -1353,7 +1355,23 @@ class PreciseAssemblyEnv(PlayEnv):
             disturbed = self.distractor_disp > self._distractor_curriculum()[0]
         else:
             disturbed = torch.zeros_like(fall)
-        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed
+        crushed = torch.zeros_like(fall)
+        k_cr = int(getattr(pih_cfg, "force_crush_steps", 0))
+        if k_cr > 0:
+            if not hasattr(self, "_force_th"):
+                self._reset_force_limit(torch.arange(self.num_envs, device=self.device))
+            F = self._hand_object_force()
+            self._hof_cache = (int(self.common_step_counter), F)
+            ramp = int(pih_cfg.force_crush_ramp_steps)
+            a_ = 1.0 if ramp <= 0 else min(1.0, float(self.common_step_counter + int(pih_cfg.force_crush_ramp_offset_steps)) / ramp)
+            mult = float(pih_cfg.force_crush_start_mult) + (1.0 - float(pih_cfg.force_crush_start_mult)) * a_
+            if not hasattr(self, "_crush_streak"):
+                self._crush_streak = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+            over = F > self._force_th * mult
+            self._crush_streak = torch.where(over, self._crush_streak + 1, torch.zeros_like(self._crush_streak))
+            crushed = (self._crush_streak >= k_cr) & ~max_successes
+            self.extras["force_crush_mult"] = torch.tensor(mult, device=self.device)
+        terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed
         truncated = self.episode_length_buf >= self.max_episode_length
         self._termination_reasons = {
             "fall": fall,
@@ -1362,6 +1380,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "hand_far": hand_far,
             "dropped": dropped,
             "disturbed": disturbed,
+            "crushed": crushed,
             "timeout": truncated,
         }
         return terminated, truncated
@@ -1465,6 +1484,11 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.extras["multi_lift_last_ep_max_mean"] = self.multi_lift_last_ep_max[done_m].mean()
         log_step_metrics(self)
         self._log_peg_metrics()
+        if float(getattr(pih_cfg, "force_crush_penalty", 0.0)) > 0.0 and "crushed" in self._termination_reasons:
+            cpen = float(pih_cfg.force_crush_penalty) * self._termination_reasons["crushed"].float()
+            reward = reward - cpen
+            self._reward_terms["crush_penalty"] = -cpen
+            self._reward_terms["total_reward"] = reward
         if float(getattr(pih_cfg, "search_cov_rew", 0.0)) > 0.0:
             cov = float(pih_cfg.search_cov_rew) * self._search_coverage()
             reward = reward + cov
@@ -1474,7 +1498,8 @@ class PreciseAssemblyEnv(PlayEnv):
         if beta > 0.0:
             if not hasattr(self, "_force_th"):
                 self._reset_force_limit(torch.arange(self.num_envs, device=self.device))
-            F = self._hand_object_force()
+            hc = getattr(self, "_hof_cache", None)
+            F = hc[1] if hc is not None and hc[0] == int(self.common_step_counter) else self._hand_object_force()
             fpen = beta * torch.clamp(F - self._force_th, min=0.0)
             reward = reward - fpen
             self._reward_terms["force_penalty"] = -fpen
