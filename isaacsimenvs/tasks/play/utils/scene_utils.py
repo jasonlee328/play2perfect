@@ -1574,8 +1574,14 @@ def apply_physx_material_properties(env) -> None:
         view = getattr(env, name).root_physx_view
         materials = view.get_material_properties()
         materials[:] = default
+        if getattr(assets_cfg, "per_body_frictions", False):
+            f = float(assets_cfg.object_friction if name == "object" else assets_cfg.table_friction)
+            if name in ("object", "table", "hole"):
+                materials[..., 0] = f
+                materials[..., 1] = f
         if name == "object" and obj_active:
-            obj_base = float(assets_cfg.robot_friction)
+            obj_base = float(assets_cfg.object_friction if getattr(assets_cfg, "per_body_frictions", False)
+                             else assets_cfg.robot_friction)
             bucket_vals = torch.linspace(obj_lo, obj_hi, n_buckets) * obj_base
             bucket_idx = torch.randint(0, n_buckets, (env.num_envs,))
             per_env_obj = bucket_vals[bucket_idx]  # (N_envs,)

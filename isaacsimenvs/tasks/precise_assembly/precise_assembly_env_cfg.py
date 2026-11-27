@@ -131,6 +131,14 @@ class PreciseAssemblyCfg:
     # object and each distractor are shifted independently by U(-d, d) per axis from their receptive-frame poses
     # (sticks along their length: (0.02, 0, 0)); the object's goal poses move with it. () = off (old behaviour).
     start_shift_m: tuple[float, ...] = ()
+    # A30 pen search: fresh U(-d, d) yaw (deg, about world z) of the object's start pose every reset (goals keep
+    # their orientation; use with a position-only goal).
+    object_start_yaw_range_deg: float = 0.0
+    # A30 lift-height success: the goal follows the object's current xy every step (z stays the waypoint height),
+    # so a goal = "object >= lift height, held"; with goal_follow_hand_m > 0 the goal is unreachable (z - 1 m) in
+    # steps where the object centre is farther than this from the palm centre (no credit for a flicked object).
+    goal_follow_object_xy: bool = False
+    goal_follow_hand_m: float = 0.0
     # Same as start_shift_m but ONE offset per env shared by the object and every distractor (moves the whole row,
     # e.g. sideways in the tray: (0, 0.006, 0)); added to the independent start_shift_m offsets.
     start_shift_group_m: tuple[float, ...] = ()

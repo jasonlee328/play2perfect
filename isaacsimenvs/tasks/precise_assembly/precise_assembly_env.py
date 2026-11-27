@@ -821,6 +821,21 @@ class PreciseAssemblyEnv(PlayEnv):
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
         super()._pre_physics_step(actions)
         self._apply_joint_detents()
+        self._apply_goal_follow()
+
+    def _apply_goal_follow(self) -> None:
+        c = self.cfg.precise_assembly
+        if not c.goal_follow_object_xy or not hasattr(self, "_goal_base_pose"):
+            return
+        p = self._goal_base_pose.clone()
+        p[:, :2] = self.object.data.root_pos_w[:, :2]
+        if float(c.goal_follow_hand_m) > 0:
+            st = self.robot.data.body_state_w[:, self._palm_body_id, :]
+            from isaacsimenvs.tasks.play.utils.obs_utils import PALM_CENTER_OFFSET, _apply_local_offset
+            palm = _apply_local_offset(st[:, 0:3], st[:, 3:7], PALM_CENTER_OFFSET, (self.num_envs,))
+            far = (self.object.data.root_pos_w - palm).norm(dim=-1) > float(c.goal_follow_hand_m)
+            p[far, 2] -= 1.0
+        self.goal_viz.write_root_pose_to_sim(p)
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         pose = self._pih_object_start_rel
@@ -828,6 +843,11 @@ class PreciseAssemblyEnv(PlayEnv):
             self._mc_tables()
             pose = self._object_start_rel_env[env_ids]
         w = self._pose_rel_hole_to_world(env_ids, pose, self._start_shift[0, env_ids])
+        yr = float(self.cfg.precise_assembly.object_start_yaw_range_deg)
+        if yr > 0:
+            yaw = (torch.rand(env_ids.numel(), device=self.device) * 2 - 1) * yr * (math.pi / 180.0)
+            z_axis = torch.tensor([0.0, 0.0, 1.0], device=self.device).expand(env_ids.numel(), -1)
+            w[:, 3:7] = quat_mul(quat_from_angle_axis(yaw, z_axis), w[:, 3:7])
         self.object.write_root_pose_to_sim(w, env_ids=env_ids)
         self.object.write_root_velocity_to_sim(torch.zeros(env_ids.numel(), 6, device=self.device), env_ids=env_ids)
         # The table-drop reset set _object_init_z to the drop height (table + 0.25 m above its centre), so "lifted"
@@ -988,6 +1008,11 @@ class PreciseAssemblyEnv(PlayEnv):
 
         pose = torch.cat([pos_local + env_origins, quat], dim=-1)
         self.goal_viz.write_root_pose_to_sim(pose, env_ids=env_ids)
+        if self.cfg.precise_assembly.goal_follow_object_xy:
+            if not hasattr(self, "_goal_base_pose"):
+                self._goal_base_pose = torch.zeros(self.num_envs, 7, device=self.device)
+                self._goal_base_pose[:, 3] = 1.0
+            self._goal_base_pose[env_ids] = pose
         self.goal_viz.write_root_velocity_to_sim(
             torch.zeros(n, 6, device=self.device), env_ids=env_ids
         )

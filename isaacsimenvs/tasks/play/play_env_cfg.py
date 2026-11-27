@@ -101,6 +101,9 @@ class AssetsCfg:
     finger_tip_friction: float = 1.5
     object_friction: float = 0.5
     table_friction: float = 0.5
+    # A30: True = the object uses object_friction and the table + fixture use table_friction (default: every
+    # non-fingertip material = robot_friction, object_friction / table_friction unused).
+    per_body_frictions: bool = False
 
 # ----------------------------------------------------------------------------
 # obs

@@ -781,6 +781,86 @@
     1.425
    ],
    "collision": "box"
+  },
+  "pen_d50": {
+   "src": "analytic 96-gon rod (pen_tasks.py)",
+   "extents_mm": [
+    150.0,
+    5.0,
+    5.0
+   ],
+   "mass_g": 3.5,
+   "com_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "object_scale": [
+    3.75,
+    0.125,
+    0.125
+   ],
+   "collision": "exact convex 96-gon prism"
+  },
+  "pen_d40": {
+   "src": "analytic 96-gon rod (pen_tasks.py)",
+   "extents_mm": [
+    150.0,
+    4.0,
+    4.0
+   ],
+   "mass_g": 3.5,
+   "com_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "object_scale": [
+    3.75,
+    0.1,
+    0.1
+   ],
+   "collision": "exact convex 96-gon prism"
+  },
+  "pen_d60": {
+   "src": "analytic 96-gon rod (pen_tasks.py)",
+   "extents_mm": [
+    150.0,
+    6.0,
+    6.0
+   ],
+   "mass_g": 3.5,
+   "com_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "object_scale": [
+    3.75,
+    0.15,
+    0.15
+   ],
+   "collision": "exact convex 96-gon prism"
+  },
+  "pen_d50_m10": {
+   "src": "analytic 96-gon rod (pen_tasks.py)",
+   "extents_mm": [
+    150.0,
+    5.0,
+    5.0
+   ],
+   "mass_g": 10.0,
+   "com_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "object_scale": [
+    3.75,
+    0.125,
+    0.125
+   ],
+   "collision": "exact convex 96-gon prism"
   }
  },
  "fixtures": {
@@ -1171,6 +1251,22 @@
    "extents_mm": [
     120.0,
     120.0,
+    1.0
+   ],
+   "origin_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  "pen_mat": {
+   "src": [
+    "analytic box (pen_tasks.py)"
+   ],
+   "collision": "box",
+   "extents_mm": [
+    400.0,
+    400.0,
     1.0
    ],
    "origin_src_mm": [
@@ -10747,6 +10843,186 @@
     "mat_mm": [
      120.0,
      120.0,
+     1.0
+    ],
+    "lift_mm": 100.0
+   }
+  },
+  "cb_pen_find": {
+   "fixture": "pen_mat",
+   "object": "pen_d50",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.0037,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1037,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "rod_mm": [
+     150.0,
+     5.0
+    ],
+    "rod_g": 3.5,
+    "mat_mm": [
+     400.0,
+     400.0,
+     1.0
+    ],
+    "lift_mm": 100.0
+   }
+  },
+  "cb_pen_find_d4": {
+   "fixture": "pen_mat",
+   "object": "pen_d40",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.0032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1032,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "rod_mm": [
+     150.0,
+     4.0
+    ],
+    "rod_g": 3.5,
+    "mat_mm": [
+     400.0,
+     400.0,
+     1.0
+    ],
+    "lift_mm": 100.0
+   }
+  },
+  "cb_pen_find_d6": {
+   "fixture": "pen_mat",
+   "object": "pen_d60",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.0042,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1042,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "rod_mm": [
+     150.0,
+     6.0
+    ],
+    "rod_g": 3.5,
+    "mat_mm": [
+     400.0,
+     400.0,
+     1.0
+    ],
+    "lift_mm": 100.0
+   }
+  },
+  "cb_pen_find_m10": {
+   "fixture": "pen_mat",
+   "object": "pen_d50_m10",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.0037,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.1037,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "rod_mm": [
+     150.0,
+     5.0
+    ],
+    "rod_g": 10.0,
+    "mat_mm": [
+     400.0,
+     400.0,
      1.0
     ],
     "lift_mm": 100.0
