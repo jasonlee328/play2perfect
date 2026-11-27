@@ -71,6 +71,13 @@ class PreciseAssemblyEnv(PlayEnv):
         self._configure_problem(cfg)
 
         super().__init__(cfg, render_mode, **kwargs)
+        # Resume-safe step-based schedules (blind offset / fade, curricula): teacher/run_train_p2p.sh sets
+        # P2P_STEP_OFFSET = resumed epoch x horizon_length, so a resumed run continues its schedules instead of replaying.
+        import os as _os
+        _off = int(_os.environ.get("P2P_STEP_OFFSET", "0") or 0)
+        if _off > 0:
+            self.common_step_counter = _off
+            print(f"[PreciseAssemblyEnv] common_step_counter starts at {_off} (P2P_STEP_OFFSET, resume)", flush=True)
 
         # When student_obs is enabled, the env exposes three obs groups via
         # `_get_observations`: "policy" = student obs (image+proprio, what
