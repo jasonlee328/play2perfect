@@ -55,6 +55,9 @@ class DialTask:
         self.f_lo, self.f_hi = fr
         self.f_th = torch.full((N,), fr[1], device=d) if self.force_on else None
         self.force_pen = z()
+        self.tf_steps = int(getattr(c, "dial_turn_fail_steps", 0))
+        self.tf_count = z(torch.long)
+        self.tf_fail = z(torch.bool)
 
     def gate_lift(self):
         c = self.c
@@ -85,6 +88,8 @@ class DialTask:
         self.released[env_ids] = False
         self.still[env_ids] = 0
         self.success[env_ids] = False
+        self.tf_count[env_ids] = 0
+        self.tf_fail[env_ids] = False
         self.just_success[env_ids] = False
 
     def update(self):
@@ -130,6 +135,16 @@ class DialTask:
             self.checks["held_down_off_zero"] = depth >= 0.0025
         self.meas.update(angle_deg=torch.rad2deg(self.angle), err_deg=torch.rad2deg(err), depth_mm=depth * 1e3,
                          hand_force=f, palm_from_release=away)
+        if self.force_on and self.tf_steps > 0 and self.push:
+            n = float(getattr(e, "common_step_counter", 0)) + float(c.dial_turn_fail_offset_steps)
+            fr = min(max(n / max(float(c.dial_turn_fail_ramp_steps), 1.0), 0.0), 1.0)
+            lim = self.f_th + (float(c.dial_turn_fail_start_N) - self.f_th) * (1.0 - fr)
+            tp = (depth >= 0.0025) & (torch.rad2deg(self.angle).abs() > 10.0) & ~at_t & ~self.success
+            self.tf_count = torch.where(tp & (f > lim), self.tf_count + 1, torch.zeros_like(self.tf_count))
+            self.tf_fail = (self.tf_count >= self.tf_steps) & ~self.success
+            self.fail["dial_force"] = self.tf_fail
+            self.meas["turn_lim"] = lim
+            self.tf_ramp = fr
         if self.force_on:
             self.meas["force_over"] = f > self.f_th
             self.meas["f_th"] = self.f_th
@@ -150,6 +165,8 @@ class DialTask:
             r = r + float(c.dial_clear_rew_scale) * (self.at_t & self.released).float() \
                 * self.away.clamp(max=float(c.dial_clear_dist))
         r = r + float(c.dial_success_bonus) * self.just_success.float()
+        if self.tf_steps > 0:
+            r = r - float(c.dial_turn_fail_penalty) * self.tf_fail.float()
         if self.force_on and float(c.dial_force_pen_scale) > 0.0:
             self.force_pen = float(c.dial_force_pen_scale) * (self.force - self.f_th).clamp(min=0.0)
             r = r - self.force_pen

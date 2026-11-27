@@ -489,6 +489,15 @@ class PreciseAssemblyCfg:
     dial_force_th_range: tuple = (0.0, 0.0)
     dial_force_pen_scale: float = 0.0
     dial_force_obs: bool = False
+    # turning-phase force fail (master 11-27): while pressed (>= 2.5 mm), past the gate tooth (|angle| > 10 deg) and not
+    # yet at target, hand_force > limit for dial_turn_fail_steps steps in a row = termination "dial_force" (- penalty).
+    # limit = F_th (dial_force_th_range) + (dial_turn_fail_start_N - F_th) x (1 - ramp), ramp over
+    # dial_turn_fail_ramp_steps env steps (+ offset). 0 steps = off.
+    dial_turn_fail_steps: int = 0
+    dial_turn_fail_start_N: float = 100.0
+    dial_turn_fail_ramp_steps: float = 8000.0
+    dial_turn_fail_offset_steps: float = 0.0
+    dial_turn_fail_penalty: float = 500.0
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
     stiff_distractors: tuple[int, ...] = ()
 

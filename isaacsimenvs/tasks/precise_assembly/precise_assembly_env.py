@@ -2318,6 +2318,8 @@ class PreciseAssemblyEnv(PlayEnv):
             self._dial.update()
             if pih_cfg.dial_task == "gate":
                 max_successes = self._dial.success.clone()
+                for k, v in self._dial.fail.items():   # A28 turning-phase force fail
+                    usb_fail[k] = v & ~max_successes
         key_dropped = torch.zeros_like(fall)
         if getattr(self, "_key", None) is not None:
             key_dropped = self._key.dropped & ~max_successes
@@ -2343,7 +2345,7 @@ class PreciseAssemblyEnv(PlayEnv):
             "broken": broken,
             "crushed": crushed,
             "key_dropped": key_dropped,
-            **{f"usb_{k}": v for k, v in usb_fail.items()},
+            **{(k if k.startswith("dial_") else f"usb_{k}"): v for k, v in usb_fail.items()},
             "timeout": truncated,
         }
         return terminated, truncated
@@ -2482,6 +2484,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["dial/err_deg"] = dial.meas["err_deg"].mean()
             if dial.push:
                 self.extras["dial/depth_mm"] = dial.meas["depth_mm"].mean()
+            if dial.tf_steps > 0:
+                self.extras["dial/turn_fail"] = dial.tf_fail.float().mean()
+                self.extras["dial/turn_fail_ramp"] = torch.tensor(getattr(dial, "tf_ramp", 0.0), device=self.device)
             if dial.force_on:
                 self.extras["dial/force_over_frac"] = dial.meas["force_over"].float().mean()
                 self.extras["dial/force_pen"] = dial.force_pen.mean()
