@@ -1225,6 +1225,8 @@ class PreciseAssemblyEnv(PlayEnv):
             is_success = torch.where(inter, self._near_goal_steps >= hold_wp, is_success)
             if float(getattr(pih_cfg, "key_cube_recradle_tol", 0.0)) > 0 and hasattr(self._key, "hand_ok"):
                 is_success = torch.where(inter, is_success & self._key.hand_ok, is_success)
+            if hasattr(self._key, "regrip") and hasattr(self._key, "hand_ok"):
+                is_success = is_success & (~self._key.regrip | self._key.hand_ok)   # regrip episodes: cradle reached
         if bool(getattr(pih_cfg, "key_goal_skip", False)) and getattr(self, "_key", None) is not None:
             self._key_goal_skip(~is_success)
         if pih_cfg.enable_retract:

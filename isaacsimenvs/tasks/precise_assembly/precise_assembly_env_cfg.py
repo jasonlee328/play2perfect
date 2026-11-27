@@ -126,6 +126,8 @@ class PreciseAssemblyCfg:
     key_cube_path_shape: bool = False    # key_cube_path: shaping potential on the current waypoint + quarter turns left
     key_cube_recradle_tol: float = 0.0   # key_cube_path: > 0 = intermediate waypoints also need mean |hand q - start| <= this (rad)
     key_cube_recradle_w: float = 1.0     # shaping weight on that hand error while aligned with an intermediate waypoint
+    key_cube_cradle_file: str = ""       # npz (palm bank): re-cradle reference = its mean hand joint pose (else each start pose)
+    key_cube_regrip_frac: float = 0.0    # share of episodes whose goal = hold the current orientation + hand back to the cradle
     key_cube_set: str = "all"            # cube24 goal set: all (23) | quarter (6 quarter turns) | face (9)
     key_flip_axis: tuple = (1.0, 0.0, 0.0)   # object-frame axis of the goal rotation (key: long axis x; Allen key pivot: z)
     key_pivot_point: tuple = ()          # object-frame point (m) the goal rotation pivots about (Allen key: the grip); () = origin

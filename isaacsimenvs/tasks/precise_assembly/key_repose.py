@@ -125,6 +125,16 @@ class KeyRepose:
             self.hand_err = torch.zeros(e.num_envs, device=e.device)
             self.hand_ok = torch.ones(e.num_envs, dtype=torch.bool, device=e.device)
         self.hand0[env_ids] = e.robot.data.joint_pos[env_ids][:, e._hand_joint_ids]   # start (cradle) hand pose
+        c = e.cfg.precise_assembly
+        cf = str(getattr(c, "key_cube_cradle_file", "") or "")
+        if cf and not hasattr(self, "cradle"):
+            import numpy as _np
+            jp = torch.tensor(_np.load(cf)["joint_pos"], device=e.device).float()
+            self.cradle = jp[:, e._hand_joint_ids].mean(0)          # fixed cradle hand pose (mean of the palm bank)
+        if hasattr(self, "cradle"):
+            self.hand0[env_ids] = self.cradle                       # re-cradle reference = the cradle, not this start
+        if not hasattr(self, "regrip"):
+            self.regrip = torch.zeros(e.num_envs, dtype=torch.bool, device=e.device)
         if self.mode == "cube24":
             j = torch.randint(0, self.cube_set.shape[0], (env_ids.numel(),), device=e.device)
             self.goal_id[env_ids] = j
@@ -132,6 +142,17 @@ class KeyRepose:
             if self.cube_path:
                 self.goal_path[env_ids] = self.path_set[j]
                 self.path_len[env_ids] = self.path_len_set[j]
+            # regrip episodes: goal = hold the current orientation; success also needs the hand back in the cradle
+            fr = float(getattr(c, "key_cube_regrip_frac", 0.0))
+            rg = torch.rand(env_ids.numel(), device=e.device) < fr
+            self.regrip[env_ids] = rg
+            if rg.any():
+                ri = env_ids[rg]
+                self.goal_id[ri] = -1
+                self.goal_r[ri] = torch.tensor([1.0, 0.0, 0.0, 0.0], device=e.device)
+                if self.cube_path:
+                    self.goal_path[ri] = 0.0; self.goal_path[ri, :, 0] = 1.0
+                    self.path_len[ri] = 1
 
     def update(self):
         """Start of _get_dones (fresh physics state): fix base_rel for new episodes, rewrite every goal, drop check."""
@@ -188,6 +209,10 @@ class KeyRepose:
                 left = (self.path_len - 1 - k).clamp(min=0).float()
                 ftw = torch.deg2rad(self.rot_err) + left * (math.pi / 2)
             tol = float(getattr(c, "key_cube_recradle_tol", 0.0))
+            if tol > 0 and hasattr(self, "hand0") and hasattr(self, "regrip"):
+                rg_err = (e.robot.data.joint_pos[:, e._hand_joint_ids] - self.hand0).abs().mean(-1)
+                self.hand_err = rg_err; self.hand_ok = rg_err <= tol
+                ftw = ftw + float(getattr(c, "key_cube_recradle_w", 1.0)) * rg_err * self.regrip.float()
             if self.cube_path and tol > 0 and hasattr(self, "hand0"):
                 # re-cradle: an intermediate waypoint only counts once the fingers are back near the start hand pose
                 # (so the next quarter turn starts from the grip the policy can turn from); dense pull while aligned
@@ -227,6 +252,8 @@ class KeyRepose:
         extras["key_twist_err_deg"] = self.twist_err.mean()
         extras["key_swing_err_deg"] = self.swing_err.mean()
         extras["key_pos_err_mm"] = self.pos_err.mean() * 1e3
+        if hasattr(self, "hand_err"):
+            extras["key_cube_hand_err"] = self.hand_err.mean()
         extras["key_final_rot_err_deg"] = self.final_rot_err.mean()
         extras["key_flip_scale"] = self.scale()
         if self.mode == "cube24":
