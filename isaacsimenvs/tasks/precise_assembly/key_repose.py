@@ -200,7 +200,7 @@ class KeyRepose:
 
 def _cube_rotations(which: str, dev):
     """Face-aligned cube rotations (signed permutation matrices, det +1) as wxyz quats, identity excluded.
-    which: 'all' = the 23 non-identity ones; '90' = the 6 quarter turns about a face axis; '90_180' = + the 3 half
+    which: 'all' = the 23 non-identity ones; 'quarter' = the 6 quarter turns about a face axis; 'face' = + the 3 half
     turns about face axes (9)."""
     import itertools
     import numpy as np
@@ -219,11 +219,11 @@ def _cube_rotations(which: str, dev):
         ang = np.degrees(np.linalg.norm(r.as_rotvec()))
         ax = r.as_rotvec() / max(np.linalg.norm(r.as_rotvec()), 1e-9)
         face = np.isclose(np.abs(ax).max(), 1.0)
-        if which == "90" and not (face and np.isclose(ang, 90.0)):
+        if which == "quarter" and not (face and np.isclose(ang, 90.0)):
             continue
-        if which == "90_180" and not face:
+        if which == "face" and not face:
             continue
         x, y, z, w = r.as_quat()
         out.append([w, x, y, z])
-    assert len(out) == {"all": 23, "90": 6, "90_180": 9}[which], (which, len(out))
+    assert len(out) == {"all": 23, "quarter": 6, "face": 9}[which], (which, len(out))
     return torch.tensor(out, dtype=torch.float32, device=dev)
