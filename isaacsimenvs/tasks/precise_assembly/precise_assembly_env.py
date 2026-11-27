@@ -1552,6 +1552,35 @@ class PreciseAssemblyEnv(PlayEnv):
                 both = (tp[:, 0] > 0.02) & (tp[:, 1] > 0.02)                      # thumb + index pads on the key
                 k_rew = k_rew + pih_cfg.key_pad_rew * both.float()
                 self.extras["key_pads_both"] = both.float().mean()
+            if getattr(self, "_last_tactile", None) is not None:   # A24: touch-use stats (real taxels, logging only)
+                tx = self._last_tactile.reshape(self.num_envs, 5, -1)
+                on = tx > 0.02
+                pad_on = on.any(-1)
+                for i, nm in enumerate(("thumb", "index", "middle", "ring", "pinky")):
+                    self.extras[f"touch/pad_rate_{nm}"] = pad_on[:, i].float().mean()
+                self.extras["touch/ge2_pads"] = (pad_on.sum(-1) >= 2).float().mean()
+                self.extras["touch/active_taxels"] = on.flatten(1).sum(-1).float().mean()
+                self.extras["touch/taxel_std"] = tx.flatten(1).std(0).mean()
+                cnt = on.flatten(1).float().sum(0)
+                p = cnt / cnt.sum().clamp_min(1.0)
+                ent = -(p * (p + 1e-12).log()).sum() / torch.log(torch.tensor(float(p.numel()), device=p.device))
+                self.extras["touch/contact_entropy"] = ent
+                # contact steps before the stick has rolled 5 deg (|spin| integrated) in this episode
+                if not hasattr(self, "_a24_roll"):
+                    self._a24_roll = torch.zeros(self.num_envs, device=self.device)
+                    self._a24_cst = torch.zeros(self.num_envs, device=self.device)
+                    self._a24_done = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+                fresh = self.episode_length_buf <= 1
+                self._a24_roll[fresh] = 0.0; self._a24_cst[fresh] = 0.0; self._a24_done[fresh] = False
+                if hasattr(key, "spin"):
+                    dt = float(self.cfg.sim.dt) * float(self.cfg.decimation)
+                    self._a24_roll += torch.rad2deg(key.spin.abs()) * dt
+                live = ~self._a24_done
+                self._a24_cst += (pad_on.any(-1) & live).float()
+                cross = live & (self._a24_roll >= 5.0)
+                if bool(cross.any()):
+                    self.extras["touch/contact_steps_pre_roll"] = self._a24_cst[cross].mean()
+                self._a24_done |= cross
             kfb = getattr(pih_cfg, "key_force_band_rew", 0.0)
             if kfb > 0.0 and hasattr(self, "hand_force"):   # A27: grip force kept inside a band (privileged reward)
                 lo_, hi_ = (float(v) for v in pih_cfg.key_force_band)
