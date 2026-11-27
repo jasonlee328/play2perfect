@@ -50,6 +50,11 @@ class DialTask:
         self.success = z(torch.bool); self.just_success = z(torch.bool)
         self.checks, self.meas = {}, {}
         self.fail = {}
+        fr = tuple(float(v) for v in getattr(c, "dial_force_th_range", (0.0, 0.0)))
+        self.force_on = fr[1] > 0.0
+        self.f_lo, self.f_hi = fr
+        self.f_th = torch.full((N,), fr[1], device=d) if self.force_on else None
+        self.force_pen = z()
 
     def gate_lift(self):
         c = self.c
@@ -68,6 +73,10 @@ class DialTask:
             w = e._pose_rel_hole_to_world(env_ids, tuple(pose))
             e.distractors[k].write_root_pose_to_sim(w, env_ids=env_ids)
         self.lift_now = lift
+        if self.force_on:
+            u = torch.rand(len(env_ids), device=self.dev) if not torch.is_tensor(env_ids) else \
+                torch.rand(env_ids.numel(), device=self.dev)
+            self.f_th[env_ids] = self.f_lo + u * (self.f_hi - self.f_lo)
         self.step[env_ids] = 0
         self.angle[env_ids] = 0.0
         self.prev_raw[env_ids] = 0.0
@@ -121,6 +130,10 @@ class DialTask:
             self.checks["held_down_off_zero"] = depth >= 0.0025
         self.meas.update(angle_deg=torch.rad2deg(self.angle), err_deg=torch.rad2deg(err), depth_mm=depth * 1e3,
                          hand_force=f, palm_from_release=away)
+        if self.force_on:
+            self.meas["force_over"] = f > self.f_th
+            self.meas["f_th"] = self.f_th
+            self.force = f
 
     def reward(self):
         c = self.c
@@ -137,4 +150,7 @@ class DialTask:
             r = r + float(c.dial_clear_rew_scale) * (self.at_t & self.released).float() \
                 * self.away.clamp(max=float(c.dial_clear_dist))
         r = r + float(c.dial_success_bonus) * self.just_success.float()
+        if self.force_on and float(c.dial_force_pen_scale) > 0.0:
+            self.force_pen = float(c.dial_force_pen_scale) * (self.force - self.f_th).clamp(min=0.0)
+            r = r - self.force_pen
         return r

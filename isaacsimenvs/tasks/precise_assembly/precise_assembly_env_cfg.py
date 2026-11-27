@@ -482,6 +482,13 @@ class PreciseAssemblyCfg:
     dial_gate_lift_start_mm: float = 0.0
     dial_gate_ramp_steps: float = 32000.0
     dial_gate_offset_steps: float = 0.0
+    # FORGE-style force limit (master 11-27): per-episode threshold F_th ~ U(dial_force_th_range) N (fixed when lo == hi;
+    # off when hi <= 0); reward -= dial_force_pen_scale * max(0, hand_force - F_th) every step (hand_force = sim contact
+    # report on the knob, reward only). dial_force_obs=true gives the actor F_th / 10 N as obs field "dial_force_th"
+    # (warm start: P2P_NEW_OBS_FIELD=dial_force_th).
+    dial_force_th_range: tuple = (0.0, 0.0)
+    dial_force_pen_scale: float = 0.0
+    dial_force_obs: bool = False
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
     stiff_distractors: tuple[int, ...] = ()
 

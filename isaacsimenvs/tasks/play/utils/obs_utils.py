@@ -382,6 +382,13 @@ def build_observations(env) -> dict[str, torch.Tensor]:
         d = torch.stack([b.data.root_pos_w for b in bodies], dim=1) - env_origins.unsqueeze(1)  # (N, K, 3)
         obs_clean["distractor_obs"] = torch.cat([d - palm_pos.unsqueeze(1), d - obj_pos.unsqueeze(1)], dim=-1)
 
+    if "dial_force_th" in OBS_FIELD_SIZES:   # A28 force limit: F_th / 10 N
+        dl = getattr(env, "_dial", None)
+        if dl is not None and getattr(dl, "f_th", None) is not None:
+            obs_clean["dial_force_th"] = (dl.f_th / 10.0).unsqueeze(-1)
+        else:
+            obs_clean["dial_force_th"] = torch.zeros(env.num_envs, 1, device=env.device)
+
     if "latch_hint" in OBS_FIELD_SIZES:
         n = env.num_envs
         if getattr(env, "unlock_angle", None) is not None and hasattr(env, "latch_hint_on"):

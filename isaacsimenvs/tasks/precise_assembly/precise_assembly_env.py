@@ -391,6 +391,10 @@ class PreciseAssemblyEnv(PlayEnv):
             for lst in ("obs_list", "state_list"):
                 if "distractor_obs" not in getattr(cfg.obs, lst):
                     setattr(cfg.obs, lst, (*getattr(cfg.obs, lst), "distractor_obs"))
+        if bool(getattr(cfg.precise_assembly, "dial_force_obs", False)):   # A28 force limit
+            OBS_FIELD_SIZES["dial_force_th"] = 1
+            if "dial_force_th" not in cfg.obs.obs_list:
+                cfg.obs.obs_list = (*cfg.obs.obs_list, "dial_force_th")
         if cfg.precise_assembly.latch_hint_obs and int(cfg.precise_assembly.latch_door_joint) >= 0:
             OBS_FIELD_SIZES["latch_hint"] = 2
             if "latch_hint" not in cfg.obs.obs_list:
@@ -2478,6 +2482,9 @@ class PreciseAssemblyEnv(PlayEnv):
             self.extras["dial/err_deg"] = dial.meas["err_deg"].mean()
             if dial.push:
                 self.extras["dial/depth_mm"] = dial.meas["depth_mm"].mean()
+            if dial.force_on:
+                self.extras["dial/force_over_frac"] = dial.meas["force_over"].float().mean()
+                self.extras["dial/force_pen"] = dial.force_pen.mean()
         key = getattr(self, "_key", None)
         if key is not None:   # A13
             k_rew = -pih_cfg.key_drop_penalty * self._termination_reasons["key_dropped"].float()
