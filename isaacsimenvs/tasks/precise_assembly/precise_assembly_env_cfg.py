@@ -190,6 +190,7 @@ class PreciseAssemblyCfg:
     kc_drop_dist: float = 0.06                   # m, key COM from every fingertip body
     kc_drop_steps: int = 5
     kc_drop_table_m: float = 0.01
+    kc_actor_pose_from_grasp: bool = False       # actor key pose = palm x start in-hand pose (+ noise): in-hand slip unseen by the 'camera'
     kc_oracle_obs: bool = False                  # actor field kc_inhand = exact key tip pos in the palm frame x10 + quat (w>=0)
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
     key_force_band_rew: float = 0.0     # A27: per step while hand_force in key_force_band (N)

@@ -326,9 +326,19 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     goal_pos = env.goal_viz.data.root_pos_w - env_origins
     goal_rot = env.goal_viz.data.root_quat_w  # wxyz
 
+    seen_pos, seen_rot = obj_pos, obj_rot
+    kc_ = getattr(env, "_kc", None)
+    if kc_ is not None and bool(getattr(env.cfg.precise_assembly, "kc_actor_pose_from_grasp", False)):
+        # A31: the actor's key pose = the palm pose x the key's in-hand pose at the episode start (a camera that cannot
+        # resolve an in-hand slip); the noise / delay below then act on that. Exact pose stays in the critic.
+        pb = env.robot.data.body_pos_w[:, env._palm_body_id]; pqb = env.robot.data.body_quat_w[:, env._palm_body_id]
+        g_pos = pb + quat_apply(pqb, kc_.base_p) - env_origins
+        g_rot = quat_mul(pqb, kc_.base_q)
+        rdy = kc_.ready.unsqueeze(-1)
+        seen_pos = torch.where(rdy, g_pos, obj_pos); seen_rot = torch.where(rdy, g_rot, obj_rot)
     if dr.use_object_state_delay_noise:
         noisy_obj_pos, noisy_obj_rot, noisy_obj_vel = _apply_object_state_dr(
-            env, obj_pos, obj_rot, obj_linvel, obj_angvel
+            env, seen_pos, seen_rot, obj_linvel, obj_angvel
         )
     else:
         noisy_obj_pos, noisy_obj_rot, noisy_obj_vel = obj_pos, obj_rot, obj_vel
