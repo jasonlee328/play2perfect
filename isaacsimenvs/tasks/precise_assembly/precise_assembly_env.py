@@ -437,6 +437,11 @@ class PreciseAssemblyEnv(PlayEnv):
             lo, hi = (float(v) for v in self.cfg.precise_assembly.roll_drag_range)
             self._roll_tau[env_ids] = torch.exp(torch.empty(env_ids.numel(), device=self.device).uniform_(math.log(lo), math.log(hi)))
         self._reset_peg_episode(env_ids)
+        if bool(getattr(self.cfg.precise_assembly, "key_carry", False)):
+            if getattr(self, "_kc", None) is None:
+                from .key_carry import KeyCarry
+                self._kc = KeyCarry(self)
+            self._kc.reset(env_ids)
         if self.cfg.precise_assembly.usb_task != "off":
             if usb is None:
                 from .usb_task import UsbTask
@@ -815,6 +820,8 @@ class PreciseAssemblyEnv(PlayEnv):
         self._key_assist()
         if getattr(self, "_usb", None) is not None:
             self._usb._set_push()   # after the wrench-DR write (it overwrites the object's external force)
+        if getattr(self, "_kc", None) is not None:
+            self._kc.apply_push()   # A31 hidden push (overwrites the object's external wrench)
 
     def _apply_object_start_pose(self, env_ids: torch.Tensor) -> None:
         w = self._pose_rel_hole_to_world(env_ids, self._pih_object_start_rel)
@@ -1418,6 +1425,10 @@ class PreciseAssemblyEnv(PlayEnv):
         key_dropped = torch.zeros_like(fall)
         if getattr(self, "_key", None) is not None:
             key_dropped = self._key.dropped & ~max_successes
+        if getattr(self, "_kc", None) is not None:
+            self._kc.update()
+            self._kc.log(self.extras)
+            key_dropped = key_dropped | (self._kc.dropped & ~max_successes)
         terminated = fall | max_successes | hand_far | dropped | retract_fail | disturbed | crushed | key_dropped
         for v in usb_fail.values():
             terminated = terminated | v

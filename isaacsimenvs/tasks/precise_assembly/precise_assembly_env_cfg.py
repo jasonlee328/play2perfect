@@ -179,6 +179,16 @@ class PreciseAssemblyCfg:
     # factor U(lo, hi) on top (fixed for the env's life).
     hand_effort_cap_nm: tuple = ()
     hand_effort_cap_scale_range: tuple[float, float] = (1.0, 1.0)
+    # A31 key carry (key_carry.py): hidden one-shot push / torque on the pinched key + dropped rule. Off unless key_carry.
+    key_carry: bool = False
+    kc_push_prob: float = 1.0
+    kc_push_start_range: tuple = (30, 150)       # policy steps after reset
+    kc_push_steps_range: tuple = (3, 10)         # duration, policy steps
+    kc_push_force_range: tuple = (0.0, 0.0)      # N, random direction
+    kc_push_torque_range: tuple = (0.0, 0.0)     # N m, random axis
+    kc_drop_dist: float = 0.06                   # m, key COM from every fingertip body
+    kc_drop_steps: int = 5
+    kc_drop_table_m: float = 0.01
     key_pad_rew: float = 0.0            # per step while both thumb and index pads touch the key (real taxels)
     key_force_band_rew: float = 0.0     # A27: per step while hand_force in key_force_band (N)
     key_force_band: tuple = (0.6, 1.1)

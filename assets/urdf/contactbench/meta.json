@@ -2597,6 +2597,28 @@
    ],
    "collision": "box primitive",
    "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "kc_key": {
+   "src": "allen_key (ContactBench kit allen_key.stl)",
+   "extents_mm": [
+    67.5,
+    30.0,
+    5.0
+   ],
+   "mass_g": 2.73,
+   "origin": "long-leg end-face centre (tip); +x tip->bend, +y toward the short leg",
+   "com_mm": [
+    41.3,
+    4.2,
+    -0.0
+   ],
+   "object_scale": [
+    1.6875,
+    0.75,
+    0.125
+   ],
+   "collision": "coacd 4 (kit)",
+   "note": "A31 key carry; mass = official _allen_key.py PLA 1240 kg/m^3 (2.73 g), inertia kit x mass ratio"
   }
  },
  "fixtures": {
@@ -3021,6 +3043,25 @@
     0
    ],
    "note": "A29 flat mat, box collision"
+  },
+  "kc_socket": {
+   "extents_mm": [
+    40.0,
+    40.0,
+    20.0
+   ],
+   "origin_src_mm": [
+    0,
+    0,
+    0
+   ],
+   "bore_mm": {
+    "dia": 8.0,
+    "depth": 12.0,
+    "mouth_dia": 14.0,
+    "chamfer": 3.0
+   },
+   "note": "A31 key socket, exact convex ring sectors + floor"
   }
  },
  "problems": {
@@ -15030,6 +15071,63 @@
      0.09,
      0.06
     ]
+   }
+  },
+  "cb_keycarry": {
+   "object": "kc_key",
+   "fixture": "kc_socket",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.22,
+    0.0,
+    -0.7071067811865476,
+    0.0,
+    0.7071067811865476
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.012,
+    0.0,
+    -0.7071067811865476,
+    0.0,
+    0.7071067811865476
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.045,
+     0.0,
+     -0.7071067811865476,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.012,
+     0.0,
+     -0.7071067811865476,
+     0.0,
+     0.7071067811865476
+    ]
+   ],
+   "layout": {
+    "source": "A31 (ours): carry a pinched Allen key, hidden push, place the long-leg tip in a socket",
+    "grip_point_key_frame_m": [
+     0.048,
+     0.0,
+     0.0
+    ],
+    "x_range_key_frame_m": [
+     0.0,
+     0.0675
+    ],
+    "socket_top_z_m": 0.02,
+    "bore_radius_m": 0.004,
+    "tip_depth_m": 0.008
    }
   }
  },
