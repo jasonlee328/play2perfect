@@ -931,7 +931,7 @@ class PreciseAssemblyEnv(PlayEnv):
         # prismatic joints: displacement along the axis since reset (m), self.cb_joint_disp (J, N); 0 for revolute
         disp = []
         for j, body in zip(self._pih_joints, self._joint_bodies()):
-            if getattr(j, "kind", "revolute") != "prismatic":
+            if getattr(j, "kind", "revolute") not in ("prismatic", "slide_revolute"):
                 disp.append(torch.zeros(self.num_envs, device=self.device)); continue
             p0 = torch.tensor(self._joint_reset_pose_rel(j)[:3], device=self.device, dtype=torch.float32)
             rel = quat_apply_inverse(hq, body.data.root_pos_w - self.scene.env_origins - self.hole_pos) - p0

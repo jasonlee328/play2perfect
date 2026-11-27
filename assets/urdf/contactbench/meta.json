@@ -1543,6 +1543,358 @@
       "hull_zmax_mm": 77.5,
       "hull_rmax_mm": 107.5,
       "hull_vertices": 901
+    },
+    "dial_push_plate_mx": {
+      "src": "official dial.py _build_push bump sector",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex sector pieces",
+      "extents_mm": [
+        21.06,
+        43.2,
+        1.5
+      ]
+    },
+    "dial_push_plate_px": {
+      "src": "official dial.py _build_push bump sector",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex sector pieces",
+      "extents_mm": [
+        21.06,
+        43.2,
+        1.5
+      ]
+    },
+    "dial_push_gate": {
+      "src": "official dial.py _build_push gate (tooth 180 deg, peg 0 deg)",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex sector pieces",
+      "extents_mm": [
+        60.0,
+        11.32,
+        2.9
+      ],
+      "kinematic": true
+    },
+    "dial_push_knob_flat": {
+      "src": "official_sim/assets/kit/dial-push-down-to-turn/dial_push_knob_flat.stl + dial_arrow.stl",
+      "mass_g": 15.479,
+      "com_src_mm": [
+        0.066,
+        0.0,
+        29.214
+      ],
+      "extents_mm": [
+        64.42,
+        65.0,
+        33.0
+      ],
+      "object_scale": [
+        3.220781993865967,
+        3.2499572753906247,
+        1.6500000000000001
+      ],
+      "collision": "SDF 384 of the knob mesh (arrow drawn only)",
+      "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), 0.8 mm walls (kit/catalog.py:216)"
+    },
+    "dial_push_knob_round": {
+      "src": "official_sim/assets/kit/dial-push-down-to-turn/dial_push_knob_round.stl + dial_arrow.stl",
+      "mass_g": 23.01,
+      "com_src_mm": [
+        0.025,
+        0.01,
+        34.617
+      ],
+      "extents_mm": [
+        64.42,
+        65.0,
+        33.0
+      ],
+      "object_scale": [
+        3.220781993865967,
+        3.2499572753906247,
+        1.6500000000000001
+      ],
+      "collision": "SDF 384 of the knob mesh (arrow drawn only)",
+      "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), 0.8 mm walls (kit/catalog.py:216)"
+    },
+    "dial_standard_pad0": {
+      "src": "official dial.py _build_pads pad 0",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_standard_pad1": {
+      "src": "official dial.py _build_pads pad 1",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_standard_pad2": {
+      "src": "official dial.py _build_pads pad 2",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_standard_pad3": {
+      "src": "official dial.py _build_pads pad 3",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_standard_pad4": {
+      "src": "official dial.py _build_pads pad 4",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_standard_pad5": {
+      "src": "official dial.py _build_pads pad 5",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_standard_knob_flat": {
+      "src": "official_sim/assets/kit/dial/dial_knob_flat.stl + dial_arrow.stl",
+      "mass_g": 15.113,
+      "com_src_mm": [
+        0.015,
+        -0.006,
+        26.831
+      ],
+      "extents_mm": [
+        50.0,
+        50.0,
+        44.5
+      ],
+      "object_scale": [
+        2.5,
+        2.5,
+        2.2249999999999996
+      ],
+      "collision": "SDF 384 of the knob mesh (arrow drawn only)",
+      "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), 0.8 mm walls (kit/catalog.py:216)"
+    },
+    "dial_standard_knob_round": {
+      "src": "official_sim/assets/kit/dial/dial_knob_round.stl + dial_arrow.stl",
+      "mass_g": 22.52,
+      "com_src_mm": [
+        0.005,
+        -0.0,
+        33.059
+      ],
+      "extents_mm": [
+        50.0,
+        50.0,
+        44.5
+      ],
+      "object_scale": [
+        2.5,
+        2.5,
+        2.2249999999999996
+      ],
+      "collision": "SDF 384 of the knob mesh (arrow drawn only)",
+      "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), 0.8 mm walls (kit/catalog.py:216)"
+    },
+    "dial_snap_pad0": {
+      "src": "official dial.py _build_pads pad 0",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_snap_pad1": {
+      "src": "official dial.py _build_pads pad 1",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_snap_pad2": {
+      "src": "official dial.py _build_pads pad 2",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_snap_pad3": {
+      "src": "official dial.py _build_pads pad 3",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_snap_pad4": {
+      "src": "official dial.py _build_pads pad 4",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_snap_pad5": {
+      "src": "official dial.py _build_pads pad 5",
+      "mass_g": 10.0,
+      "object_scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "collision": "convex CAD-section prism",
+      "extents_mm": [
+        2.72,
+        20.173,
+        10.0
+      ]
+    },
+    "dial_snap_knob_flat": {
+      "src": "official_sim/assets/kit/dial-snap-to-position/dial_snap_knob_flat.stl + dial_arrow.stl",
+      "mass_g": 15.117,
+      "com_src_mm": [
+        0.015,
+        -0.006,
+        26.835
+      ],
+      "extents_mm": [
+        49.99,
+        49.99,
+        44.5
+      ],
+      "object_scale": [
+        2.499740409851074,
+        2.499480819702148,
+        2.2249999999999996
+      ],
+      "collision": "SDF 384 of the knob mesh (arrow drawn only)",
+      "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), 0.8 mm walls (kit/catalog.py:216)"
+    },
+    "dial_snap_knob_round": {
+      "src": "official_sim/assets/kit/dial-snap-to-position/dial_snap_knob_round.stl + dial_arrow.stl",
+      "mass_g": 22.524,
+      "com_src_mm": [
+        0.005,
+        -0.0,
+        33.062
+      ],
+      "extents_mm": [
+        49.99,
+        49.99,
+        44.5
+      ],
+      "object_scale": [
+        2.499740409851074,
+        2.499480819702148,
+        2.2249999999999996
+      ],
+      "collision": "SDF 384 of the knob mesh (arrow drawn only)",
+      "mass_model": "print: 1240 kg/m^3 x (shell + 0.2 x (V - shell)), 0.8 mm walls (kit/catalog.py:216)"
     }
   },
   "fixtures": {
@@ -2194,6 +2546,54 @@
         52.0,
         28.0,
         22.0
+      ],
+      "origin_src_mm": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "dial_push_housing": {
+      "src": [
+        "official_sim/assets/kit/dial-push-down-to-turn/dial_push_{bottom,top,grid}.stl"
+      ],
+      "collision": "SDF 256 of bottom + top (grid drawn only)",
+      "extents_mm": [
+        75.0,
+        75.0,
+        27.0
+      ],
+      "origin_src_mm": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "dial_standard_housing": {
+      "src": [
+        "official_sim/assets/kit/dial/dial_{bottom,top,grid}.stl"
+      ],
+      "collision": "SDF 256 of bottom + top (grid drawn only)",
+      "extents_mm": [
+        75.0,
+        75.0,
+        27.0
+      ],
+      "origin_src_mm": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "dial_snap_housing": {
+      "src": [
+        "official_sim/assets/kit/dial-snap-to-position/dial_snap_{bottom,top,grid}.stl"
+      ],
+      "collision": "SDF 256 of bottom + top (grid drawn only)",
+      "extents_mm": [
+        75.0,
+        75.0,
+        27.0
       ],
       "origin_src_mm": [
         0.0,
@@ -16317,6 +16717,1396 @@
         "knob_mass_g": 22.03,
         "door_mass_g": 388.65,
         "note": "A8 faithful ContactBench task 28 (contactbench-sim turn_doorknob_open_door_flat): A1's latch_cbf door with the official grip hull and per-variant pinion / spring / latch masses. Needs precise_assembly.latch_cbf=true latch_door_joint=0 unlock_joint=1 latch_keeper=-1 kinematic_distractors=[] + layout.overrides."
+      }
+    },
+    "cb_dial": {
+      "object": "dial_push_knob_flat",
+      "fixture": "dial_push_housing",
+      "object_start_pose": [
+        6.634366756422429e-05,
+        1.5942215479816134e-08,
+        0.02971405838239262,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "distractors": [
+        [
+          "urdf/contactbench/objects/dial_push_plate_mx/dial_push_plate_mx.urdf",
+          [
+            0.0,
+            0.0,
+            0.0205,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_push_plate_px/dial_push_plate_px.urdf",
+          [
+            0.0,
+            0.0,
+            0.0205,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_push_gate/dial_push_gate.urdf",
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      ],
+      "joints": [
+        {
+          "body": "object",
+          "anchor": [
+            0.0,
+            0.0,
+            0.02971405838239262
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "slide_revolute",
+          "lower": -0.0035000000000000035,
+          "upper": 0.0,
+          "damping": 0.0002
+        },
+        {
+          "body": "distractor0",
+          "anchor": [
+            0.0,
+            0.0,
+            0.0205
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.00450000000000001,
+          "upper": 0.00019999999999998936,
+          "stiffness": 3940.0,
+          "damping": 6.0,
+          "target": 0.0
+        },
+        {
+          "body": "distractor1",
+          "anchor": [
+            0.0,
+            0.0,
+            0.0205
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.00450000000000001,
+          "upper": 0.00019999999999998936,
+          "stiffness": 3940.0,
+          "damping": 6.0,
+          "target": 0.0
+        }
+      ],
+      "waypoints": [
+        [
+          6.634366756422429e-05,
+          1.5942215479816134e-08,
+          0.02671405838239262,
+          0.0,
+          0.0,
+          0.7071067811865475,
+          0.7071067811865476
+        ]
+      ],
+      "layout": {
+        "source": "contactbench-sim force_bench/kit/mechanisms/dial.py, appendix_tasks/turn_dial_to_target.py",
+        "official_row": "turn_dial_to_target",
+        "kind": "push",
+        "knob": "flat",
+        "target_deg": 90.0,
+        "tick_deg": 15.0,
+        "mu": 0.5,
+        "knob_mass_g": 15.479,
+        "k_pad": 29000.0,
+        "k_push_half": 3940.0,
+        "knob_joint": 0,
+        "up_gap_mm": 0.5,
+        "engage_mm": 3.0000000000000036,
+        "stroke_mm": 3.5000000000000036,
+        "tooth": {
+          "r_in": 27.89029884338379,
+          "r_out": 32.6,
+          "half_ang": 0.17453292675053408,
+          "z0": 21.49999999999999,
+          "z1": 24.39999999999999
+        },
+        "peg": {
+          "r_in": 22.792671649797562,
+          "r_out": 27.400003505610236,
+          "half_ang": 0.17453291997030626,
+          "z0": 21.49999999999999,
+          "z1": 24.39999999999999
+        },
+        "notch_half_ang": 0.19079211625237089,
+        "window_half_ang": 0.19408333745252251,
+        "knob_bottom_mm": 20.0,
+        "gate_distractor": 2
+      }
+    },
+    "cb_dial_round": {
+      "object": "dial_push_knob_round",
+      "fixture": "dial_push_housing",
+      "object_start_pose": [
+        2.4866136991589573e-05,
+        9.767937185777297e-06,
+        0.035116849175333885,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "distractors": [
+        [
+          "urdf/contactbench/objects/dial_push_plate_mx/dial_push_plate_mx.urdf",
+          [
+            0.0,
+            0.0,
+            0.0205,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_push_plate_px/dial_push_plate_px.urdf",
+          [
+            0.0,
+            0.0,
+            0.0205,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_push_gate/dial_push_gate.urdf",
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      ],
+      "joints": [
+        {
+          "body": "object",
+          "anchor": [
+            0.0,
+            0.0,
+            0.035116849175333885
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "slide_revolute",
+          "lower": -0.0035000000000000035,
+          "upper": 0.0,
+          "damping": 0.0002
+        },
+        {
+          "body": "distractor0",
+          "anchor": [
+            0.0,
+            0.0,
+            0.0205
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.00450000000000001,
+          "upper": 0.00019999999999998936,
+          "stiffness": 3940.0,
+          "damping": 6.0,
+          "target": 0.0
+        },
+        {
+          "body": "distractor1",
+          "anchor": [
+            0.0,
+            0.0,
+            0.0205
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.00450000000000001,
+          "upper": 0.00019999999999998936,
+          "stiffness": 3940.0,
+          "damping": 6.0,
+          "target": 0.0
+        }
+      ],
+      "waypoints": [
+        [
+          2.4866136991589573e-05,
+          9.767937185777297e-06,
+          0.03211684917533388,
+          0.0,
+          0.0,
+          0.7071067811865475,
+          0.7071067811865476
+        ]
+      ],
+      "layout": {
+        "source": "contactbench-sim force_bench/kit/mechanisms/dial.py, appendix_tasks/turn_dial_to_target.py",
+        "official_row": "turn_dial_to_target_round",
+        "kind": "push",
+        "knob": "round",
+        "target_deg": 90.0,
+        "tick_deg": 15.0,
+        "mu": 0.5,
+        "knob_mass_g": 23.01,
+        "k_pad": 29000.0,
+        "k_push_half": 3940.0,
+        "knob_joint": 0,
+        "up_gap_mm": 0.5,
+        "engage_mm": 3.0000000000000036,
+        "stroke_mm": 3.5000000000000036,
+        "tooth": {
+          "r_in": 27.89029884338379,
+          "r_out": 32.6,
+          "half_ang": 0.17453292675053408,
+          "z0": 21.49999999999999,
+          "z1": 24.39999999999999
+        },
+        "peg": {
+          "r_in": 22.792671649797562,
+          "r_out": 27.400003505610236,
+          "half_ang": 0.17453291997030626,
+          "z0": 21.49999999999999,
+          "z1": 24.39999999999999
+        },
+        "notch_half_ang": 0.19079211625237089,
+        "window_half_ang": 0.19408333745252251,
+        "knob_bottom_mm": 20.0,
+        "gate_distractor": 2
+      }
+    },
+    "cb_dial_standard": {
+      "object": "dial_standard_knob_flat",
+      "fixture": "dial_standard_housing",
+      "object_start_pose": [
+        1.4555968730786949e-05,
+        -6.419238054197832e-06,
+        0.026831131426668382,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "distractors": [
+        [
+          "urdf/contactbench/objects/dial_standard_pad0/dial_standard_pad0.urdf",
+          [
+            -0.013855540435147234,
+            -0.007999499999999998,
+            0.0135,
+            0.0,
+            0.0,
+            -0.9659258262890683,
+            0.25881904510252074
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad1/dial_standard_pad1.urdf",
+          [
+            9.796562069779252e-19,
+            -0.015999,
+            0.0135,
+            0.0,
+            0.0,
+            -0.7071067811865475,
+            0.7071067811865476
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad2/dial_standard_pad2.urdf",
+          [
+            0.013847746206513174,
+            -0.007995000000000002,
+            0.0135,
+            0.0,
+            0.0,
+            -0.25881904510252085,
+            0.9659258262890683
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad3/dial_standard_pad3.urdf",
+          [
+            0.013855540435147234,
+            0.007999499999999998,
+            0.0135,
+            0.0,
+            0.0,
+            0.25881904510252074,
+            0.9659258262890683
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad4/dial_standard_pad4.urdf",
+          [
+            9.796562069779252e-19,
+            0.015999,
+            0.0135,
+            0.0,
+            0.0,
+            0.7071067811865475,
+            0.7071067811865476
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad5/dial_standard_pad5.urdf",
+          [
+            -0.013847746206513176,
+            0.007994999999999999,
+            0.0135,
+            0.0,
+            0.0,
+            0.9659258262890683,
+            0.25881904510252074
+          ]
+        ]
+      ],
+      "joints": [
+        {
+          "body": "object",
+          "anchor": [
+            0.0,
+            0.0,
+            0.026831131426668382
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "damping": 0.0002
+        },
+        {
+          "body": "distractor0",
+          "anchor": [
+            -0.013855540435147234,
+            -0.007999499999999998,
+            0.0135
+          ],
+          "axis": [
+            -0.8660254037844387,
+            -0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010490001407589765,
+          "upper": 0.0012509998592410234,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007490001407589766
+        },
+        {
+          "body": "distractor1",
+          "anchor": [
+            9.796562069779252e-19,
+            -0.015999,
+            0.0135
+          ],
+          "axis": [
+            6.123233995736766e-17,
+            -1.0,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010490001407589765,
+          "upper": 0.0012509998592410234,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007490001407589766
+        },
+        {
+          "body": "distractor2",
+          "anchor": [
+            0.013847746206513174,
+            -0.007995000000000002,
+            0.0135
+          ],
+          "axis": [
+            0.8660254037844386,
+            -0.5000000000000001,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010400001407589762,
+          "upper": 0.0012599998592410237,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007400001407589763
+        },
+        {
+          "body": "distractor3",
+          "anchor": [
+            0.013855540435147234,
+            0.007999499999999998,
+            0.0135
+          ],
+          "axis": [
+            0.8660254037844387,
+            0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010490001407589765,
+          "upper": 0.0012509998592410234,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007490001407589766
+        },
+        {
+          "body": "distractor4",
+          "anchor": [
+            9.796562069779252e-19,
+            0.015999,
+            0.0135
+          ],
+          "axis": [
+            6.123233995736766e-17,
+            1.0,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010490001407589765,
+          "upper": 0.0012509998592410234,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007490001407589766
+        },
+        {
+          "body": "distractor5",
+          "anchor": [
+            -0.013847746206513176,
+            0.007994999999999999,
+            0.0135
+          ],
+          "axis": [
+            -0.8660254037844387,
+            0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010400001407589762,
+          "upper": 0.0012599998592410237,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007400001407589763
+        }
+      ],
+      "waypoints": [
+        [
+          1.4555968730786949e-05,
+          -6.419238054197832e-06,
+          0.026831131426668382,
+          0.0,
+          0.0,
+          0.7071067811865475,
+          0.7071067811865476
+        ]
+      ],
+      "layout": {
+        "source": "contactbench-sim force_bench/kit/mechanisms/dial.py, appendix_tasks/turn_dial_to_target.py",
+        "official_row": "turn_dial_to_target_standard",
+        "kind": "standard",
+        "knob": "flat",
+        "target_deg": 90.0,
+        "tick_deg": 15.0,
+        "mu": 0.5,
+        "knob_mass_g": 15.113,
+        "k_pad": 29000.0,
+        "k_push_half": 3940.0,
+        "knob_joint": 0,
+        "r_face_mm": 15.249999859241024,
+        "hub_support": {
+          "-150.0": 15.999,
+          "-90.0": 15.999,
+          "-30.0": 15.99,
+          "30.0": 15.999,
+          "90.0": 15.999,
+          "150.0": 15.99
+        },
+        "hub_r": [
+          15.989353490584932,
+          15.999999036856131
+        ],
+        "pad_angles_deg": [
+          -150.0,
+          -90.0,
+          -30.0,
+          30.0,
+          90.0,
+          150.0
+        ],
+        "pad_preload_mm": [
+          0.749,
+          0.749,
+          0.74,
+          0.749,
+          0.749,
+          0.74
+        ],
+        "pad_preload_force_N": 21.63
+      }
+    },
+    "cb_dial_standard_round": {
+      "object": "dial_standard_knob_round",
+      "fixture": "dial_standard_housing",
+      "object_start_pose": [
+        4.835243547421965e-06,
+        -3.429631071163595e-12,
+        0.03305916341630486,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "distractors": [
+        [
+          "urdf/contactbench/objects/dial_standard_pad0/dial_standard_pad0.urdf",
+          [
+            -0.013855540435147234,
+            -0.007999499999999998,
+            0.0135,
+            0.0,
+            0.0,
+            -0.9659258262890683,
+            0.25881904510252074
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad1/dial_standard_pad1.urdf",
+          [
+            9.796562069779252e-19,
+            -0.015999,
+            0.0135,
+            0.0,
+            0.0,
+            -0.7071067811865475,
+            0.7071067811865476
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad2/dial_standard_pad2.urdf",
+          [
+            0.013847746206513174,
+            -0.007995000000000002,
+            0.0135,
+            0.0,
+            0.0,
+            -0.25881904510252085,
+            0.9659258262890683
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad3/dial_standard_pad3.urdf",
+          [
+            0.013855540435147234,
+            0.007999499999999998,
+            0.0135,
+            0.0,
+            0.0,
+            0.25881904510252074,
+            0.9659258262890683
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad4/dial_standard_pad4.urdf",
+          [
+            9.796562069779252e-19,
+            0.015999,
+            0.0135,
+            0.0,
+            0.0,
+            0.7071067811865475,
+            0.7071067811865476
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_standard_pad5/dial_standard_pad5.urdf",
+          [
+            -0.013847746206513176,
+            0.007994999999999999,
+            0.0135,
+            0.0,
+            0.0,
+            0.9659258262890683,
+            0.25881904510252074
+          ]
+        ]
+      ],
+      "joints": [
+        {
+          "body": "object",
+          "anchor": [
+            0.0,
+            0.0,
+            0.03305916341630486
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "damping": 0.0002
+        },
+        {
+          "body": "distractor0",
+          "anchor": [
+            -0.013855540435147234,
+            -0.007999499999999998,
+            0.0135
+          ],
+          "axis": [
+            -0.8660254037844387,
+            -0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010490001407589765,
+          "upper": 0.0012509998592410234,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007490001407589766
+        },
+        {
+          "body": "distractor1",
+          "anchor": [
+            9.796562069779252e-19,
+            -0.015999,
+            0.0135
+          ],
+          "axis": [
+            6.123233995736766e-17,
+            -1.0,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010490001407589765,
+          "upper": 0.0012509998592410234,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007490001407589766
+        },
+        {
+          "body": "distractor2",
+          "anchor": [
+            0.013847746206513174,
+            -0.007995000000000002,
+            0.0135
+          ],
+          "axis": [
+            0.8660254037844386,
+            -0.5000000000000001,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010400001407589762,
+          "upper": 0.0012599998592410237,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007400001407589763
+        },
+        {
+          "body": "distractor3",
+          "anchor": [
+            0.013855540435147234,
+            0.007999499999999998,
+            0.0135
+          ],
+          "axis": [
+            0.8660254037844387,
+            0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010490001407589765,
+          "upper": 0.0012509998592410234,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007490001407589766
+        },
+        {
+          "body": "distractor4",
+          "anchor": [
+            9.796562069779252e-19,
+            0.015999,
+            0.0135
+          ],
+          "axis": [
+            6.123233995736766e-17,
+            1.0,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010490001407589765,
+          "upper": 0.0012509998592410234,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007490001407589766
+        },
+        {
+          "body": "distractor5",
+          "anchor": [
+            -0.013847746206513176,
+            0.007994999999999999,
+            0.0135
+          ],
+          "axis": [
+            -0.8660254037844387,
+            0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.0010400001407589762,
+          "upper": 0.0012599998592410237,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.0007400001407589763
+        }
+      ],
+      "waypoints": [
+        [
+          4.835243547421965e-06,
+          -3.429631071163595e-12,
+          0.03305916341630486,
+          0.0,
+          0.0,
+          0.7071067811865475,
+          0.7071067811865476
+        ]
+      ],
+      "layout": {
+        "source": "contactbench-sim force_bench/kit/mechanisms/dial.py, appendix_tasks/turn_dial_to_target.py",
+        "official_row": "turn_dial_to_target_standard_round",
+        "kind": "standard",
+        "knob": "round",
+        "target_deg": 90.0,
+        "tick_deg": 15.0,
+        "mu": 0.5,
+        "knob_mass_g": 22.52,
+        "k_pad": 29000.0,
+        "k_push_half": 3940.0,
+        "knob_joint": 0,
+        "r_face_mm": 15.249999859241024,
+        "hub_support": {
+          "-150.0": 15.999,
+          "-90.0": 15.999,
+          "-30.0": 15.99,
+          "30.0": 15.999,
+          "90.0": 15.999,
+          "150.0": 15.99
+        },
+        "hub_r": [
+          15.989353490584932,
+          15.999999036856131
+        ],
+        "pad_angles_deg": [
+          -150.0,
+          -90.0,
+          -30.0,
+          30.0,
+          90.0,
+          150.0
+        ],
+        "pad_preload_mm": [
+          0.749,
+          0.749,
+          0.74,
+          0.749,
+          0.749,
+          0.74
+        ],
+        "pad_preload_force_N": 21.63
+      }
+    },
+    "cb_dial_snap": {
+      "object": "dial_snap_knob_flat",
+      "fixture": "dial_snap_housing",
+      "object_start_pose": [
+        1.4563685506388922e-05,
+        -6.4219274372705396e-06,
+        0.02683506078933104,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "distractors": [
+        [
+          "urdf/contactbench/objects/dial_snap_pad0/dial_snap_pad0.urdf",
+          [
+            -0.0134233937586588,
+            -0.007749999999999999,
+            0.0135,
+            0.0,
+            0.0,
+            -0.9659258262890683,
+            0.25881904510252074
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad1/dial_snap_pad1.urdf",
+          [
+            9.491012693391988e-19,
+            -0.0155,
+            0.0135,
+            0.0,
+            0.0,
+            -0.7071067811865475,
+            0.7071067811865476
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad2/dial_snap_pad2.urdf",
+          [
+            0.013423393758658798,
+            -0.007750000000000002,
+            0.0135,
+            0.0,
+            0.0,
+            -0.25881904510252085,
+            0.9659258262890683
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad3/dial_snap_pad3.urdf",
+          [
+            0.0134233937586588,
+            0.007749999999999999,
+            0.0135,
+            0.0,
+            0.0,
+            0.25881904510252074,
+            0.9659258262890683
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad4/dial_snap_pad4.urdf",
+          [
+            9.491012693391988e-19,
+            0.0155,
+            0.0135,
+            0.0,
+            0.0,
+            0.7071067811865475,
+            0.7071067811865476
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad5/dial_snap_pad5.urdf",
+          [
+            -0.0134233937586588,
+            0.007749999999999999,
+            0.0135,
+            0.0,
+            0.0,
+            0.9659258262890683,
+            0.25881904510252074
+          ]
+        ]
+      ],
+      "joints": [
+        {
+          "body": "object",
+          "anchor": [
+            0.0,
+            0.0,
+            0.02683506078933104
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "damping": 0.0002
+        },
+        {
+          "body": "distractor0",
+          "anchor": [
+            -0.0134233937586588,
+            -0.007749999999999999,
+            0.0135
+          ],
+          "axis": [
+            -0.8660254037844387,
+            -0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor1",
+          "anchor": [
+            9.491012693391988e-19,
+            -0.0155,
+            0.0135
+          ],
+          "axis": [
+            6.123233995736766e-17,
+            -1.0,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor2",
+          "anchor": [
+            0.013423393758658798,
+            -0.007750000000000002,
+            0.0135
+          ],
+          "axis": [
+            0.8660254037844386,
+            -0.5000000000000001,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor3",
+          "anchor": [
+            0.0134233937586588,
+            0.007749999999999999,
+            0.0135
+          ],
+          "axis": [
+            0.8660254037844387,
+            0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor4",
+          "anchor": [
+            9.491012693391988e-19,
+            0.0155,
+            0.0135
+          ],
+          "axis": [
+            6.123233995736766e-17,
+            1.0,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor5",
+          "anchor": [
+            -0.0134233937586588,
+            0.007749999999999999,
+            0.0135
+          ],
+          "axis": [
+            -0.8660254037844387,
+            0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        }
+      ],
+      "waypoints": [
+        [
+          1.4563685506388922e-05,
+          -6.4219274372705396e-06,
+          0.02683506078933104,
+          0.0,
+          0.0,
+          0.8660254037844386,
+          0.5000000000000001
+        ]
+      ],
+      "layout": {
+        "source": "contactbench-sim force_bench/kit/mechanisms/dial.py, appendix_tasks/turn_dial_to_target.py",
+        "official_row": "turn_dial_to_target_snap",
+        "kind": "snap",
+        "knob": "flat",
+        "target_deg": 120.0,
+        "tick_deg": 60.0,
+        "mu": 0.5,
+        "knob_mass_g": 15.117,
+        "k_pad": 29000.0,
+        "k_push_half": 3940.0,
+        "knob_joint": 0,
+        "r_face_mm": 15.249999859241024,
+        "hub_support": {
+          "-150.0": 15.5,
+          "-90.0": 15.5,
+          "-30.0": 15.5,
+          "30.0": 15.5,
+          "90.0": 15.5,
+          "150.0": 15.5
+        },
+        "hub_r": [
+          15.500000308655952,
+          16.428203582763672
+        ],
+        "pad_angles_deg": [
+          -150.0,
+          -90.0,
+          -30.0,
+          30.0,
+          90.0,
+          150.0
+        ],
+        "pad_preload_mm": [
+          0.25,
+          0.25,
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ],
+        "pad_preload_force_N": 7.25
+      }
+    },
+    "cb_dial_snap_round": {
+      "object": "dial_snap_knob_round",
+      "fixture": "dial_snap_housing",
+      "object_start_pose": [
+        4.836244444864502e-06,
+        -4.4009330666314114e-10,
+        0.0330622386244497,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "distractors": [
+        [
+          "urdf/contactbench/objects/dial_snap_pad0/dial_snap_pad0.urdf",
+          [
+            -0.0134233937586588,
+            -0.007749999999999999,
+            0.0135,
+            0.0,
+            0.0,
+            -0.9659258262890683,
+            0.25881904510252074
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad1/dial_snap_pad1.urdf",
+          [
+            9.491012693391988e-19,
+            -0.0155,
+            0.0135,
+            0.0,
+            0.0,
+            -0.7071067811865475,
+            0.7071067811865476
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad2/dial_snap_pad2.urdf",
+          [
+            0.013423393758658798,
+            -0.007750000000000002,
+            0.0135,
+            0.0,
+            0.0,
+            -0.25881904510252085,
+            0.9659258262890683
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad3/dial_snap_pad3.urdf",
+          [
+            0.0134233937586588,
+            0.007749999999999999,
+            0.0135,
+            0.0,
+            0.0,
+            0.25881904510252074,
+            0.9659258262890683
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad4/dial_snap_pad4.urdf",
+          [
+            9.491012693391988e-19,
+            0.0155,
+            0.0135,
+            0.0,
+            0.0,
+            0.7071067811865475,
+            0.7071067811865476
+          ]
+        ],
+        [
+          "urdf/contactbench/objects/dial_snap_pad5/dial_snap_pad5.urdf",
+          [
+            -0.0134233937586588,
+            0.007749999999999999,
+            0.0135,
+            0.0,
+            0.0,
+            0.9659258262890683,
+            0.25881904510252074
+          ]
+        ]
+      ],
+      "joints": [
+        {
+          "body": "object",
+          "anchor": [
+            0.0,
+            0.0,
+            0.0330622386244497
+          ],
+          "axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "damping": 0.0002
+        },
+        {
+          "body": "distractor0",
+          "anchor": [
+            -0.0134233937586588,
+            -0.007749999999999999,
+            0.0135
+          ],
+          "axis": [
+            -0.8660254037844387,
+            -0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor1",
+          "anchor": [
+            9.491012693391988e-19,
+            -0.0155,
+            0.0135
+          ],
+          "axis": [
+            6.123233995736766e-17,
+            -1.0,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor2",
+          "anchor": [
+            0.013423393758658798,
+            -0.007750000000000002,
+            0.0135
+          ],
+          "axis": [
+            0.8660254037844386,
+            -0.5000000000000001,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor3",
+          "anchor": [
+            0.0134233937586588,
+            0.007749999999999999,
+            0.0135
+          ],
+          "axis": [
+            0.8660254037844387,
+            0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor4",
+          "anchor": [
+            9.491012693391988e-19,
+            0.0155,
+            0.0135
+          ],
+          "axis": [
+            6.123233995736766e-17,
+            1.0,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        },
+        {
+          "body": "distractor5",
+          "anchor": [
+            -0.0134233937586588,
+            0.007749999999999999,
+            0.0135
+          ],
+          "axis": [
+            -0.8660254037844387,
+            0.49999999999999994,
+            0.0
+          ],
+          "kind": "prismatic",
+          "lower": -0.000550000140758976,
+          "upper": 0.001749999859241024,
+          "stiffness": 29000.0,
+          "damping": 15.0,
+          "target": -0.00025000014075897604
+        }
+      ],
+      "waypoints": [
+        [
+          4.836244444864502e-06,
+          -4.4009330666314114e-10,
+          0.0330622386244497,
+          0.0,
+          0.0,
+          0.8660254037844386,
+          0.5000000000000001
+        ]
+      ],
+      "layout": {
+        "source": "contactbench-sim force_bench/kit/mechanisms/dial.py, appendix_tasks/turn_dial_to_target.py",
+        "official_row": "turn_dial_to_target_snap_round",
+        "kind": "snap",
+        "knob": "round",
+        "target_deg": 120.0,
+        "tick_deg": 60.0,
+        "mu": 0.5,
+        "knob_mass_g": 22.524,
+        "k_pad": 29000.0,
+        "k_push_half": 3940.0,
+        "knob_joint": 0,
+        "r_face_mm": 15.249999859241024,
+        "hub_support": {
+          "-150.0": 15.5,
+          "-90.0": 15.5,
+          "-30.0": 15.5,
+          "30.0": 15.5,
+          "90.0": 15.5,
+          "150.0": 15.5
+        },
+        "hub_r": [
+          15.500000308655952,
+          16.428203582763672
+        ],
+        "pad_angles_deg": [
+          -150.0,
+          -90.0,
+          -30.0,
+          30.0,
+          90.0,
+          150.0
+        ],
+        "pad_preload_mm": [
+          0.25,
+          0.25,
+          0.25,
+          0.25,
+          0.25,
+          0.25
+        ],
+        "pad_preload_force_N": 7.25
       }
     }
   },

@@ -99,6 +99,10 @@ class JointSpec:
     kind: str = "revolute"
     lower: float | None = None
     upper: float | None = None
+    # Drive target (m for prismatic, deg for revolute) relative to the reset pose: a spring that rests away from the
+    # reset pose, e.g. a preloaded dial pad (A28). "slide_revolute" (A28 push dial): a D6 joint that slides along
+    # ``axis`` in [lower, upper] m and rotates freely about it (``damping`` = angular, ``lower_deg/upper_deg`` limits).
+    target: float = 0.0
 
 
 @dataclass(frozen=True)

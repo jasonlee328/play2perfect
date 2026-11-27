@@ -134,7 +134,32 @@ def _create_fixture_joints(env) -> None:
         for i in range(env.num_envs):
             b0 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{parent_root}").GetPath()
             b1 = _rigid_body_prim(stage, f"/World/envs/env_{i}/{body_root}").GetPath()
-            pris = getattr(j, "kind", "revolute") == "prismatic"
+            kind = getattr(j, "kind", "revolute")
+            if kind == "slide_revolute":
+                # A28 push dial: D6 joint (generic UsdPhysics.Joint): free translation along the joint frame's z in
+                # [lower, upper] m, free rotation about z, every other axis locked; light angular damping.
+                from pxr import PhysxSchema  # noqa: F401
+                jp = UsdPhysics.Joint.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
+                jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
+                jp.CreateLocalPos0Attr(pos0); jp.CreateLocalRot0Attr(rot0)
+                jp.CreateLocalPos1Attr(Gf.Vec3f(*pos1)); jp.CreateLocalRot1Attr(Gf.Quatf(q1))
+                prim = jp.GetPrim()
+                for ax in ("transX", "transY", "rotX", "rotY"):
+                    lim = UsdPhysics.LimitAPI.Apply(prim, ax)
+                    lim.CreateLowAttr(1.0); lim.CreateHighAttr(-1.0)          # low > high = locked
+                lim = UsdPhysics.LimitAPI.Apply(prim, "transZ")
+                lim.CreateLowAttr(float(j.lower)); lim.CreateHighAttr(float(j.upper))
+                if j.lower_deg is not None or j.upper_deg is not None:
+                    lim = UsdPhysics.LimitAPI.Apply(prim, "rotZ")
+                    lim.CreateLowAttr(float(j.lower_deg if j.lower_deg is not None else -1e6))
+                    lim.CreateHighAttr(float(j.upper_deg if j.upper_deg is not None else 1e6))
+                if j.damping:
+                    drive = UsdPhysics.DriveAPI.Apply(prim, "rotZ")
+                    drive.CreateTypeAttr("force")
+                    drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
+                    drive.CreateDampingAttr(float(j.damping) * math.pi / 180.0); drive.CreateStiffnessAttr(0.0)
+                continue
+            pris = kind == "prismatic"
             jcls = UsdPhysics.PrismaticJoint if pris else UsdPhysics.RevoluteJoint
             jp = jcls.Define(stage, f"/World/envs/env_{i}/FixtureJoint{k}")
             jp.CreateBody0Rel().SetTargets([b0]); jp.CreateBody1Rel().SetTargets([b1])
@@ -150,14 +175,14 @@ def _create_fixture_joints(env) -> None:
                 if j.damping or j.stiffness:
                     drive = UsdPhysics.DriveAPI.Apply(jp.GetPrim(), "linear")
                     drive.CreateTypeAttr("force")
-                    drive.CreateTargetPositionAttr(0.0); drive.CreateTargetVelocityAttr(0.0)
+                    drive.CreateTargetPositionAttr(float(getattr(j, "target", 0.0))); drive.CreateTargetVelocityAttr(0.0)
                     drive.CreateDampingAttr(float(j.damping)); drive.CreateStiffnessAttr(float(j.stiffness))
                 continue
             if j.lower_deg is not None:
                 jp.CreateLowerLimitAttr(float(j.lower_deg))
             unlock = getattr(env, "_unlock_deg_np", None)
             cbf = getattr(env, "_cbf", None)
-            stiff, target = float(j.stiffness), 0.0
+            stiff, target = float(j.stiffness), float(getattr(j, "target", 0.0))
             if cbf is not None and k == int(env.cfg.precise_assembly.unlock_joint):
                 # faithful door: end stop = this env's pinion stop; spring tau = tau0 + K theta toward the rest stop
                 # (the lower limit) = a drive with stiffness K and its target tau0 / K beyond the rest stop
