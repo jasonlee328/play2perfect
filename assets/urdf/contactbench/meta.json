@@ -901,6 +901,26 @@
     0.375
    ],
    "collision": "exact convex 32-gon prism"
+  },
+  "pen_d75": {
+   "src": "analytic 96-gon rod (pen_tasks.py)",
+   "extents_mm": [
+    150.0,
+    7.5,
+    7.5
+   ],
+   "mass_g": 4.5,
+   "com_src_mm": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "object_scale": [
+    3.75,
+    0.1875,
+    0.1875
+   ],
+   "collision": "exact convex 32-gon prism"
   }
  },
  "fixtures": {
@@ -11150,6 +11170,51 @@
      15.0
     ],
     "rod_g": 10.0,
+    "mat_mm": [
+     400.0,
+     400.0,
+     1.0
+    ],
+    "lift_mm": 100.0
+   }
+  },
+  "cb_pen_find_d75": {
+   "fixture": "pen_mat",
+   "object": "pen_d75",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.00475,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "distractors": [],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.10475000000000001,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ]
+   ],
+   "goal_offsets_mm": [
+    [
+     0.0,
+     0.0,
+     100.0
+    ]
+   ],
+   "layout": {
+    "rod_mm": [
+     150.0,
+     7.5
+    ],
+    "rod_g": 4.5,
     "mat_mm": [
      400.0,
      400.0,

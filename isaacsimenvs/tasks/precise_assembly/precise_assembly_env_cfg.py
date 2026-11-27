@@ -116,6 +116,14 @@ class PreciseAssemblyCfg:
     # the hole frame, and the goal index reached. Each reset samples one entry;
     # the episode then continues from that goal. "" keeps the normal reset.
     start_state_file: str = ""
+    # A30 mixed reverse curriculum: share of resets taken from start_state_file, ramping start_state_frac ->
+    # start_state_frac_end over start_state_frac_ramp_steps env steps (+ offset on resume); the rest reset normally.
+    start_state_frac: float = 1.0
+    start_state_frac_end: float = 1.0
+    start_state_frac_ramp_steps: int = 0
+    start_state_frac_offset_steps: int = 0
+    # A30: move the fixture to the bank entry's recorded hole_pos (instead of raising when they differ)
+    start_state_bank_hole: bool = False
     # Clutter problems (Problem.distractors): per-step reward -= distractor_penalty_scale * the largest distractor
     # displacement from its reset pose (m); with terminate_on_disturb the episode ends once it exceeds
     # distractor_disturb_tol. Both off by default (and no effect on problems without distractors).

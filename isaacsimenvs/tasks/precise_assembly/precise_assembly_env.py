@@ -561,7 +561,16 @@ class PreciseAssemblyEnv(PlayEnv):
             self._apply_object_start_pose(env_ids[insertion_mask])
 
         if pih_cfg.start_state_file and insertion_mask.any():
-            self._apply_start_states(env_ids[insertion_mask])
+            sid = env_ids[insertion_mask]
+            f0, f1 = float(pih_cfg.start_state_frac), float(pih_cfg.start_state_frac_end)
+            ramp = int(pih_cfg.start_state_frac_ramp_steps)
+            if f0 < 1.0 or f1 < 1.0:
+                a = 1.0 if ramp <= 0 else min(1.0, float(self.common_step_counter + int(pih_cfg.start_state_frac_offset_steps)) / ramp)
+                frac = f0 + (f1 - f0) * a
+                self.start_state_frac_now = frac
+                sid = sid[torch.rand(sid.numel(), device=self.device) < frac]
+            if sid.numel() > 0:
+                self._apply_start_states(sid)
 
         self._clear_goal_trackers(env_ids)
         self._write_goal_pose(env_ids, is_first_goal=True)
@@ -881,6 +890,11 @@ class PreciseAssemblyEnv(PlayEnv):
             k = (int(self.cfg.precise_assembly.start_state_offset) + env_ids.long()) % b["successes"].numel()
         else:
             k = torch.randint(0, b["successes"].numel(), (n,), device=self.device)
+        if self._start_bank_hole_pos is not None and self.cfg.precise_assembly.start_state_bank_hole:
+            # A30: put the fixture where the bank entry was recorded (the entry's joints are absolute)
+            self.hole_pos[env_ids] = self._start_bank_hole_pos[k].float()
+            hp = torch.cat([self.hole_pos[env_ids] + self.scene.env_origins[env_ids], self.hole_quat_wxyz[env_ids]], -1)
+            self.hole.write_root_pose_to_sim(hp, env_ids=env_ids)
         if self._start_bank_hole_pos is not None:
             err = (self._start_bank_hole_pos[k] - self.hole_pos[env_ids]).norm(dim=-1).max().item()
             if err > 0.005:
