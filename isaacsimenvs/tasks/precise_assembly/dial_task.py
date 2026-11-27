@@ -144,6 +144,7 @@ class DialTask:
             self.tf_fail = (self.tf_count >= self.tf_steps) & ~self.success
             self.fail["dial_force"] = self.tf_fail
             self.meas["turn_lim"] = lim
+            self.tf_tp, self.tf_lim = tp, lim
             self.tf_ramp = fr
         if self.force_on:
             self.meas["force_over"] = f > self.f_th
@@ -168,6 +169,9 @@ class DialTask:
         if self.tf_steps > 0:
             r = r - float(c.dial_turn_fail_penalty) * self.tf_fail.float()
         if self.force_on and float(c.dial_force_pen_scale) > 0.0:
-            self.force_pen = float(c.dial_force_pen_scale) * (self.force - self.f_th).clamp(min=0.0)
+            if bool(getattr(c, "dial_force_pen_turn_only", False)) and hasattr(self, "tf_tp"):
+                self.force_pen = float(c.dial_force_pen_scale) * (self.force - self.tf_lim).clamp(min=0.0) * self.tf_tp.float()
+            else:
+                self.force_pen = float(c.dial_force_pen_scale) * (self.force - self.f_th).clamp(min=0.0)
             r = r - self.force_pen
         return r

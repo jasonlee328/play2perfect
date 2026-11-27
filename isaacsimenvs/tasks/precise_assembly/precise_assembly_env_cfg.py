@@ -500,6 +500,7 @@ class PreciseAssemblyCfg:
     dial_turn_fail_ramp_steps: float = 8000.0
     dial_turn_fail_offset_steps: float = 0.0
     dial_turn_fail_penalty: float = 500.0
+    dial_force_pen_turn_only: bool = False   # penalty only in the turning phase, against the (ramped) turning limit
     # Distractor indices whose position / iteration count also use object_position_iterations (e.g. the door).
     stiff_distractors: tuple[int, ...] = ()
 
