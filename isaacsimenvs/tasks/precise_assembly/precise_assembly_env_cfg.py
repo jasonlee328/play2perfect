@@ -186,6 +186,7 @@ class PreciseAssemblyCfg:
     kc_push_steps_range: tuple = (3, 10)         # duration, policy steps
     kc_push_force_range: tuple = (0.0, 0.0)      # N, random direction
     kc_push_torque_range: tuple = (0.0, 0.0)     # N m, random axis
+    kc_push_pivot_range: tuple = (0.0, 0.0)      # N m about the key z axis (pinch axis): pivots the key in the pinch, random sign
     kc_drop_dist: float = 0.06                   # m, key COM from every fingertip body
     kc_drop_steps: int = 5
     kc_drop_table_m: float = 0.01

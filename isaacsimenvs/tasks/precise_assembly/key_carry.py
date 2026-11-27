@@ -63,6 +63,10 @@ class KeyCarry:
         on = (torch.rand(n, device=dev) < float(c.kc_push_prob)).float().unsqueeze(-1)
         self.F[env_ids] = _unit(n, dev) * _u(*c.kc_push_force_range, n, dev).unsqueeze(-1) * on
         self.T[env_ids] = _unit(n, dev) * _u(*c.kc_push_torque_range, n, dev).unsqueeze(-1) * on
+        self.T_pivot = getattr(self, "T_pivot", torch.zeros(self.env.num_envs, device=dev))
+        # key_z: torque about the key's own z axis (the pinch axis of the bank grasp) = pivot in the pinch, random sign
+        sgn = torch.where(torch.rand(n, device=dev) < 0.5, -1.0, 1.0)
+        self.T_pivot[env_ids] = sgn * _u(*getattr(c, "kc_push_pivot_range", (0.0, 0.0)), n, dev) * on.squeeze(-1)
         self.ready[env_ids] = False
         self.far_steps[env_ids] = 0
         self.dropped[env_ids] = False
@@ -85,12 +89,15 @@ class KeyCarry:
     def apply_push(self):
         env = self.env
         k = env.episode_length_buf
-        self.pushing = (k >= self.t0) & (k < self.t0 + self.dur) & (self.F.norm(dim=-1) + self.T.norm(dim=-1) > 0)
+        self.pushing = (k >= self.t0) & (k < self.t0 + self.dur) & (self.F.norm(dim=-1) + self.T.norm(dim=-1) + getattr(self, 'T_pivot', torch.zeros_like(self.t0, dtype=torch.float)).abs() > 0)
         m = self.pushing.float().unsqueeze(-1)
         q = env.object.data.root_quat_w
         # body frame (A7: IsaacLab caches the orientation of global wrenches)
         f_b = quat_apply_inverse(q, self.F * m).unsqueeze(1)
-        t_b = quat_apply_inverse(q, self.T * m).unsqueeze(1)
+        t_b = quat_apply_inverse(q, self.T * m)
+        if hasattr(self, "T_pivot"):
+            t_b[:, 2] = t_b[:, 2] + self.T_pivot * m.squeeze(-1)
+        t_b = t_b.unsqueeze(1)
         env.object.set_external_force_and_torque(f_b, t_b, is_global=False)
 
     # ------------------------------------------------------------------ bookkeeping (in _get_dones)
