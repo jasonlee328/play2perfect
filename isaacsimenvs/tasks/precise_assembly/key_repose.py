@@ -57,6 +57,9 @@ class KeyRepose:
                 L = len(c.key_flip_deg)
                 self.path_set = _cube_paths(self.cube_set, L, dev)            # (M, L, 4)
                 self.goal_path = torch.zeros(N, L, 4, device=dev); self.goal_path[..., 0] = 1.0
+                d = (self.path_set[:, 1:] * self.path_set[:, :-1]).sum(-1).abs() < 0.9999   # distinct consecutive waypoints
+                self.path_len_set = 1 + d.long().sum(-1)                                   # (M,) quarter turns per goal
+                self.path_len = torch.ones(N, dtype=torch.long, device=dev)
 
     # ------------------------------------------------------------------ helpers
     def scale(self) -> float:
@@ -123,6 +126,7 @@ class KeyRepose:
             self.goal_r[env_ids] = self.cube_set[j]
             if self.cube_path:
                 self.goal_path[env_ids] = self.path_set[j]
+                self.path_len[env_ids] = self.path_len_set[j]
 
     def update(self):
         """Start of _get_dones (fresh physics state): fix base_rel for new episodes, rewrite every goal, drop check."""
@@ -173,6 +177,11 @@ class KeyRepose:
         fsw = 2.0 * torch.acos(quat_mul(dqf, quat_conjugate(twf))[:, 0].abs().clamp(max=1.0))
         if self.mode == "cube24":
             ftw = torch.deg2rad(self.final_rot_err); fsw = torch.zeros_like(ftw)
+            if self.cube_path and bool(getattr(c, "key_cube_path_shape", False)):
+                # shape toward the CURRENT waypoint (what the actor sees) + pi/2 per distinct quarter turn still to go;
+                # continuous at a waypoint switch (err 0 + n pi/2 -> pi/2 + (n-1) pi/2)
+                left = (self.path_len - 1 - k).clamp(min=0).float()
+                ftw = torch.deg2rad(self.rot_err) + left * (math.pi / 2)
         phi = -(ftw + float(c.key_shape_swing_w) * fsw + float(getattr(c, "key_shape_pos_w", 0.0)) * (kp - gf[:, 0:3]).norm(dim=-1))
         if not hasattr(self, "phi_prev"):
             self.phi_prev = phi.clone()
