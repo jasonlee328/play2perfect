@@ -50,6 +50,13 @@ class KeyRepose:
             self.cube_set = _cube_rotations(str(getattr(c, "key_cube_set", "all")), dev)   # (M, 4) wxyz, no identity
             self.goal_r = torch.zeros(N, 4, device=dev); self.goal_r[:, 0] = 1.0
             self.goal_id = torch.zeros(N, dtype=torch.long, device=dev)
+            # key_cube_path: each goal = a shortest sequence of quarter turns (object frame); waypoint k = prefix k,
+            # padded with the final goal to len(key_flip_deg) waypoints (intermediate ones pass through)
+            self.cube_path = bool(getattr(c, "key_cube_path", False))
+            if self.cube_path:
+                L = len(c.key_flip_deg)
+                self.path_set = _cube_paths(self.cube_set, L, dev)            # (M, L, 4)
+                self.goal_path = torch.zeros(N, L, 4, device=dev); self.goal_path[..., 0] = 1.0
 
     # ------------------------------------------------------------------ helpers
     def scale(self) -> float:
@@ -63,6 +70,9 @@ class KeyRepose:
 
     def _rot(self, env_ids, k):
         if self.mode == "cube24":
+            if self.cube_path:
+                kk = k.clamp(max=self.goal_path.shape[1] - 1)
+                return self.goal_path[env_ids, kk]
             return self.goal_r[env_ids]
         ang = self.flip[k.clamp(max=self.flip.numel() - 1)] * self.scale()
         return quat_from_angle_axis(ang, self.x_axis.expand(env_ids.numel(), 3))
@@ -111,6 +121,8 @@ class KeyRepose:
             j = torch.randint(0, self.cube_set.shape[0], (env_ids.numel(),), device=e.device)
             self.goal_id[env_ids] = j
             self.goal_r[env_ids] = self.cube_set[j]
+            if self.cube_path:
+                self.goal_path[env_ids] = self.path_set[j]
 
     def update(self):
         """Start of _get_dones (fresh physics state): fix base_rel for new episodes, rewrite every goal, drop check."""
@@ -226,4 +238,37 @@ def _cube_rotations(which: str, dev):
         x, y, z, w = r.as_quat()
         out.append([w, x, y, z])
     assert len(out) == {"all": 23, "quarter": 6, "face": 9}[which], (which, len(out))
+    return torch.tensor(out, dtype=torch.float32, device=dev)
+
+
+def _cube_paths(goals, L, dev):
+    """Shortest quarter-turn words (object-frame right multiplication) for each goal quat; prefixes padded to L."""
+    import numpy as np
+    from scipy.spatial.transform import Rotation
+    gens = [Rotation.from_rotvec(np.array(a) * np.pi / 2) for a in
+            ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1))]
+    key = lambda r: tuple(np.round(r.as_matrix()).astype(int).flatten())
+    start = Rotation.identity()
+    seen = {key(start): []}
+    frontier = [(start, [])]
+    while frontier:
+        nxt = []
+        for r, w in frontier:
+            for gi, g in enumerate(gens):
+                r2 = r * g
+                k2 = key(r2)
+                if k2 not in seen:
+                    seen[k2] = w + [gi]; nxt.append((r2, w + [gi]))
+        frontier = nxt
+    out = []
+    for q in goals.cpu().numpy():
+        r = Rotation.from_quat([q[1], q[2], q[3], q[0]])
+        w = seen[key(r)]
+        assert 1 <= len(w) <= L, (len(w), L)
+        pre, cur = [], Rotation.identity()
+        for gi in w:
+            cur = cur * gens[gi]
+            x, y, z, ww = cur.as_quat(); pre.append([ww, x, y, z])
+        pre += [pre[-1]] * (L - len(pre))
+        out.append(pre)
     return torch.tensor(out, dtype=torch.float32, device=dev)

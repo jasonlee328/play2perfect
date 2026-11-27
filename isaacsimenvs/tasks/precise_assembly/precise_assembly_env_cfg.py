@@ -122,6 +122,7 @@ class PreciseAssemblyCfg:
     key_repose: bool = False
     key_flip_deg: tuple = (45.0, 90.0, 135.0, 180.0)   # one goal per angle, in order; last = the task
     key_goal_mode: str = "flip"          # "flip" (key) | "cube24": goal = start pose (palm frame) x a random face-aligned rotation
+    key_cube_path: bool = False          # cube24: goal reached via quarter-turn waypoints (len(key_flip_deg) of them)
     key_cube_set: str = "all"            # cube24 goal set: all (23) | quarter (6 quarter turns) | face (9)
     key_flip_axis: tuple = (1.0, 0.0, 0.0)   # object-frame axis of the goal rotation (key: long axis x; Allen key pivot: z)
     key_pivot_point: tuple = ()          # object-frame point (m) the goal rotation pivots about (Allen key: the grip); () = origin
