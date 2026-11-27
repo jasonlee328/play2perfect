@@ -120,6 +120,11 @@ class KeyRepose:
         self.far_steps[env_ids] = 0
         self.dropped[env_ids] = False
         self.min_final_rot_err[env_ids] = 180.0
+        if not hasattr(self, "hand0"):
+            self.hand0 = torch.zeros(e.num_envs, len(e._hand_joint_ids), device=e.device)
+            self.hand_err = torch.zeros(e.num_envs, device=e.device)
+            self.hand_ok = torch.ones(e.num_envs, dtype=torch.bool, device=e.device)
+        self.hand0[env_ids] = e.robot.data.joint_pos[env_ids][:, e._hand_joint_ids]   # start (cradle) hand pose
         if self.mode == "cube24":
             j = torch.randint(0, self.cube_set.shape[0], (env_ids.numel(),), device=e.device)
             self.goal_id[env_ids] = j
@@ -182,6 +187,15 @@ class KeyRepose:
                 # continuous at a waypoint switch (err 0 + n pi/2 -> pi/2 + (n-1) pi/2)
                 left = (self.path_len - 1 - k).clamp(min=0).float()
                 ftw = torch.deg2rad(self.rot_err) + left * (math.pi / 2)
+            tol = float(getattr(c, "key_cube_recradle_tol", 0.0))
+            if self.cube_path and tol > 0 and hasattr(self, "hand0"):
+                # re-cradle: an intermediate waypoint only counts once the fingers are back near the start hand pose
+                # (so the next quarter turn starts from the grip the policy can turn from); dense pull while aligned
+                self.hand_err = (e.robot.data.joint_pos[:, e._hand_joint_ids] - self.hand0).abs().mean(-1)
+                self.hand_ok = self.hand_err <= tol
+                left2 = (self.path_len - 1 - k).clamp(min=0)
+                aligned = (self.rot_err <= 20.0) & (left2 > 0)
+                ftw = ftw + float(getattr(c, "key_cube_recradle_w", 1.0)) * self.hand_err * aligned.float()
         phi = -(ftw + float(c.key_shape_swing_w) * fsw + float(getattr(c, "key_shape_pos_w", 0.0)) * (kp - gf[:, 0:3]).norm(dim=-1))
         if not hasattr(self, "phi_prev"):
             self.phi_prev = phi.clone()
@@ -216,6 +230,8 @@ class KeyRepose:
         extras["key_final_rot_err_deg"] = self.final_rot_err.mean()
         extras["key_flip_scale"] = self.scale()
         if self.mode == "cube24":
+            if hasattr(self, "hand_err"):
+                extras["cube_hand_err_rad"] = self.hand_err.mean()
             extras["cube_goal_angle_deg"] = (torch.rad2deg(2.0 * torch.acos(self.goal_r[:, 0].abs().clamp(max=1.0)))).mean()
 
 

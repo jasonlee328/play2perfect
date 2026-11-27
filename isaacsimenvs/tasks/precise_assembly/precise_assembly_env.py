@@ -1223,6 +1223,8 @@ class PreciseAssemblyEnv(PlayEnv):
             # needs termination.success_steps (a flat key cannot rest at 45 deg in a pinch)
             inter = (self._successes + 1 < self.env_max_goals) & ~self.is_random_goal_env
             is_success = torch.where(inter, self._near_goal_steps >= hold_wp, is_success)
+            if float(getattr(pih_cfg, "key_cube_recradle_tol", 0.0)) > 0 and hasattr(self._key, "hand_ok"):
+                is_success = torch.where(inter, is_success & self._key.hand_ok, is_success)
         if bool(getattr(pih_cfg, "key_goal_skip", False)) and getattr(self, "_key", None) is not None:
             self._key_goal_skip(~is_success)
         if pih_cfg.enable_retract:
