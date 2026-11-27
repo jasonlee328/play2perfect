@@ -167,10 +167,12 @@ class PreciseAssemblyCfg:
     # stick_bank_file: npz with 'poses' (L, S, 7) = verified settled layouts (receptive xyz + quat xyzw); each reset
     # draws a random layout and a random slot permutation (which stick is "the object" is arbitrary: identical bodies).
     stick_bank_file: str = ""
-    # Per-episode layout check (logged as success/stick_violation): at episode step stick_check_step, any stick end
-    # (hull ends +- radius) outside stick_check_box [xmin, xmax, ymin, ymax, zmax] (receptive, m) by > 1 mm = violation.
+    # Per-episode layout check (logged as success/stick_violation): at episode step stick_check_step, any vertex of any
+    # stick's exact collision hull outside stick_check_box [xmin, xmax, ymin, ymax, zmax] (receptive, m) by > tol = violation.
     stick_check_box: tuple[float, ...] = ()
     stick_check_step: int = 3
+    stick_check_tol_m: float = 0.001          # hull vertices may be this far past a wall / the rim (PhysX resting sink ~0.6 mm)
+    stick_hull_file: str = "assets/urdf/contactbench/objects/chopstick64/coll_00.obj"   # exact collision hull (body frame)
     # Count of sticks lifted (logged as success/n_lifted_max): sticks whose root is >= stick_lift_count_m above its
     # reset height, max over the episode (0 / 1 / >= 2 breakdown for one-of-10).
     stick_lift_count_m: float = 0.03

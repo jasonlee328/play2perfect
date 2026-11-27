@@ -744,21 +744,25 @@ class PreciseAssemblyEnv(PlayEnv):
             return
         ids = chk.nonzero().squeeze(-1)
         S = len(bodies)
+        if not hasattr(self, "_stick_hull_v"):
+            hf = c.stick_hull_file
+            hf = hf if Path(hf).is_absolute() else str(REPO_ROOT / hf)
+            vs = [[float(x) for x in ln.split()[1:4]] for ln in open(hf) if ln.startswith("v ")]
+            self._stick_hull_v = torch.tensor(vs, device=self.device, dtype=torch.float32)      # (V, 3) body frame
+        V = self._stick_hull_v.shape[0]
         quat = torch.stack([b.data.root_quat_w[ids] for b in bodies])                        # (S, n, 4) wxyz
         p = pos[:, ids]
-        x0, x1 = (float(v) for v in c.stick_hull_x_m)
-        hq = self.hole_quat_wxyz[ids].unsqueeze(0).expand(S, -1, -1).reshape(-1, 4)
-        hp = (self.hole_pos[ids] + self.scene.env_origins[ids]).unsqueeze(0).expand(S, -1, -1).reshape(-1, 3)
-        bad = torch.zeros(ids.numel(), dtype=torch.bool, device=self.device)
-        for xe in (x0, x1):
-            e = torch.tensor([xe, 0.0, 0.0], device=self.device).expand(S * ids.numel(), 3)
-            w = p.reshape(-1, 3) + quat_apply(quat.reshape(-1, 4), e)
-            rl = quat_apply_inverse(hq, w - hp).reshape(S, -1, 3)
-            tol, r = 0.001, 0.0031
-            # flat hull ends: the end point is the extreme along the stick (x); the section radius only sideways / up
-            out = (rl[..., 0] < box[0] - tol) | (rl[..., 0] > box[1] + tol) | \
-                  (rl[..., 1] - r < box[2] - tol) | (rl[..., 1] + r > box[3] + tol) | (rl[..., 2] + r > box[4] + tol)
-            bad |= out.any(0)
+        n = ids.numel()
+        hq = self.hole_quat_wxyz[ids].unsqueeze(0).unsqueeze(2).expand(S, -1, V, -1).reshape(-1, 4)
+        hp = (self.hole_pos[ids] + self.scene.env_origins[ids]).unsqueeze(0).unsqueeze(2).expand(S, -1, V, -1).reshape(-1, 3)
+        q = quat.unsqueeze(2).expand(-1, -1, V, -1).reshape(-1, 4)
+        w = p.unsqueeze(2).expand(-1, -1, V, -1).reshape(-1, 3) + \
+            quat_apply(q, self._stick_hull_v.view(1, 1, V, 3).expand(S, n, -1, -1).reshape(-1, 3))
+        rl = quat_apply_inverse(hq, w - hp).reshape(S, n, V, 3)
+        tol = float(c.stick_check_tol_m)          # exact hull vertices, same geometry as tools/contactbench/one10_verify.py
+        out = (rl[..., 0] < box[0] - tol) | (rl[..., 0] > box[1] + tol) | \
+              (rl[..., 1] < box[2] - tol) | (rl[..., 1] > box[3] + tol) | (rl[..., 2] > box[4] + tol)
+        bad = out.any(-1).any(0)
         self.stick_violation[ids] = bad.float()
         self.stick_violation_total += int(bad.sum())
         self.stick_checked_total += int(ids.numel())
