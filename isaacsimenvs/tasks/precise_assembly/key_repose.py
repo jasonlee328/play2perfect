@@ -192,6 +192,9 @@ class KeyRepose:
             if pre is not None:
                 self.base_q[new] = quat_mul(self.base_q[new], quat_from_angle_axis(-pre[new], self.x_axis.expand(new.numel(), 3)))
             self.ready[new] = True
+            if not hasattr(self, "fresh_drop"):
+                self.fresh_drop = torch.zeros_like(self.ready)
+            self.fresh_drop[new] = True
             if not hasattr(self, "fresh"):
                 self.fresh = torch.zeros_like(self.ready)
             self.fresh[new] = True
@@ -267,8 +270,24 @@ class KeyRepose:
         far = dmin > float(c.key_drop_dist)
         if self.mode == "cube24":                  # cube resting on the palm: dropped = > key_drop_dist from its start spot in the palm
             far = self.pos_err > float(c.key_drop_dist)
+            if str(getattr(c, "key_cube_drop_mode", "spot")) == "palm":
+                # the goal's rule: > key_drop_dist from the palm (lifted off along the palm normal) or off the hand
+                # (lateral > key_cube_drop_lat, or sunk below the start height by > key_drop_dist = fell over an edge).
+                # A quarter roll of a 5 cm cube moves its centre ~5 cm, which the start-spot rule counted as a drop.
+                rel = quat_apply_inverse(pq, kp - pp) - self.base_p
+                if not hasattr(self, "palm_n"):
+                    self.palm_n = torch.zeros(e.num_envs, 3, device=e.device); self.palm_n[:, 2] = 1.0
+                up = torch.zeros(e.num_envs, 3, device=e.device); up[:, 2] = 1.0
+                n_now = quat_apply_inverse(pq, up)                  # world up in the palm frame (palm-up hand: palm normal)
+                self.palm_n = torch.where(self.fresh_drop.unsqueeze(-1), n_now, self.palm_n) if hasattr(self, "fresh_drop") else n_now
+                h = (rel * self.palm_n).sum(-1)
+                lat = (rel - h.unsqueeze(-1) * self.palm_n).norm(dim=-1)
+                dd = float(c.key_drop_dist)
+                far = (h > dd) | (h < -dd) | (lat > float(getattr(c, "key_cube_drop_lat", 0.07)))
         self.far_steps = torch.where(far, self.far_steps + 1, torch.zeros_like(self.far_steps))
         self.dropped = (self.far_steps >= int(c.key_drop_steps)) | below
+        if hasattr(self, "fresh_drop"):
+            self.fresh_drop[:] = False
         self.fingertip_dmin = dmin
 
     def log(self, extras):
