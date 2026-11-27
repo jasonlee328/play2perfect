@@ -319,10 +319,11 @@ class PreciseAssemblyEnv(PlayEnv):
         )
 
         # Clutter: distractor bodies + an optional object start pose, both in the receptive frame (single problem).
-        if len(problem_names) > 1 and any(
-                PROBLEM_REGISTRY[n].distractors or PROBLEM_REGISTRY[n].object_start_pose_rel_receptive
-                for n in problem_names):
-            raise ValueError("distractors / object_start_pose_rel_receptive need a single problem")
+        # A29: multi-problem envs may share ONE object start pose (e.g. box variants that differ only in mass / COM).
+        if len(problem_names) > 1 and (
+                any(PROBLEM_REGISTRY[n].distractors for n in problem_names)
+                or len({tuple(PROBLEM_REGISTRY[n].object_start_pose_rel_receptive) for n in problem_names}) > 1):
+            raise ValueError("distractors / differing object_start_pose_rel_receptive need a single problem")
         self._pih_distractor_urdf_abs = tuple(str(_resolve_asset_path(u)) for u, _ in problem.distractors)
         self._pih_distractor_pose_rel = tuple(tuple(float(v) for v in pose) for _, pose in problem.distractors)
         self._pih_object_start_rel = tuple(float(v) for v in problem.object_start_pose_rel_receptive)

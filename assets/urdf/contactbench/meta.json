@@ -2297,6 +2297,306 @@
     -18.0
    ],
    "note": "A27 round roll stick (96-gon frustum, ends r 3.221 / 2.956 mm), make_round_stick.py"
+  },
+  "boxflip_m75_cm20": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 75.0,
+   "com_offset_mm": [
+    -20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m75_c0": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 75.0,
+   "com_offset_mm": [
+    0,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m75_cp20": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 75.0,
+   "com_offset_mm": [
+    20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m150_cm20": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 150.0,
+   "com_offset_mm": [
+    -20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m150_c0": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 150.0,
+   "com_offset_mm": [
+    0,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m150_cp20": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 150.0,
+   "com_offset_mm": [
+    20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m300_cm20": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 300.0,
+   "com_offset_mm": [
+    -20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m300_c0": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 300.0,
+   "com_offset_mm": [
+    0,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m300_cp20": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 300.0,
+   "com_offset_mm": [
+    20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_big_m150_cm20": {
+   "extents_mm": [
+    150.0,
+    110.0,
+    70.0
+   ],
+   "mass_g": 150.0,
+   "com_offset_mm": [
+    -20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.75,
+    2.75,
+    1.75
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_big_m150_c0": {
+   "extents_mm": [
+    150.0,
+    110.0,
+    70.0
+   ],
+   "mass_g": 150.0,
+   "com_offset_mm": [
+    0,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.75,
+    2.75,
+    1.75
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_big_m150_cp20": {
+   "extents_mm": [
+    150.0,
+    110.0,
+    70.0
+   ],
+   "mass_g": 150.0,
+   "com_offset_mm": [
+    20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.75,
+    2.75,
+    1.75
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m450_cm20": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 450.0,
+   "com_offset_mm": [
+    -20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m450_c0": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 450.0,
+   "com_offset_mm": [
+    0,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
+  },
+  "boxflip_m450_cp20": {
+   "extents_mm": [
+    120.0,
+    90.0,
+    60.0
+   ],
+   "mass_g": 450.0,
+   "com_offset_mm": [
+    20,
+    0,
+    0
+   ],
+   "object_scale": [
+    3.0,
+    2.25,
+    1.5
+   ],
+   "collision": "box primitive",
+   "note": "A29 box flip (boxflip_tasks.py)"
   }
  },
  "fixtures": {
@@ -2708,6 +3008,19 @@
     0.0,
     0.0
    ]
+  },
+  "boxflip_mat": {
+   "extents_mm": [
+    300.0,
+    300.0,
+    2.0
+   ],
+   "origin_src_mm": [
+    0,
+    0,
+    0
+   ],
+   "note": "A29 flat mat, box collision"
   }
  },
  "problems": {
@@ -13967,6 +14280,756 @@
      0.035
     ],
     "diameter_scale": 1.3
+   }
+  },
+  "cb_boxflip_m75_cm20": {
+   "object": "boxflip_m75_cm20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m75_c0": {
+   "object": "boxflip_m75_c0",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m75_cp20": {
+   "object": "boxflip_m75_cp20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m150_cm20": {
+   "object": "boxflip_m150_cm20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m150_c0": {
+   "object": "boxflip_m150_c0",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m150_cp20": {
+   "object": "boxflip_m150_cp20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m300_cm20": {
+   "object": "boxflip_m300_cm20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m300_c0": {
+   "object": "boxflip_m300_c0",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m300_cp20": {
+   "object": "boxflip_m300_cp20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_big_m150_cm20": {
+   "object": "boxflip_big_m150_cm20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.037000000000000005,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.037000000000000005,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.057,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.037000000000000005,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.15,
+     0.11,
+     0.07
+    ]
+   }
+  },
+  "cb_boxflip_big_m150_c0": {
+   "object": "boxflip_big_m150_c0",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.037000000000000005,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.037000000000000005,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.057,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.037000000000000005,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.15,
+     0.11,
+     0.07
+    ]
+   }
+  },
+  "cb_boxflip_big_m150_cp20": {
+   "object": "boxflip_big_m150_cp20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.037000000000000005,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.037000000000000005,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.057,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.037000000000000005,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.15,
+     0.11,
+     0.07
+    ]
+   }
+  },
+  "cb_boxflip_m450_cm20": {
+   "object": "boxflip_m450_cm20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m450_c0": {
+   "object": "boxflip_m450_c0",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
+   }
+  },
+  "cb_boxflip_m450_cp20": {
+   "object": "boxflip_m450_cp20",
+   "fixture": "boxflip_mat",
+   "object_start_pose": [
+    0.0,
+    0.0,
+    0.032,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "seated_pose": [
+    0.0,
+    0.0,
+    0.032,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "waypoints": [
+    [
+     0.0,
+     0.0,
+     0.047,
+     0.7071067811865476,
+     0.0,
+     0.0,
+     0.7071067811865476
+    ],
+    [
+     0.0,
+     0.0,
+     0.032,
+     1.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   ],
+   "layout": {
+    "source": "A29 (ours): flip a box over about its long axis",
+    "size_m": [
+     0.12,
+     0.09,
+     0.06
+    ]
    }
   }
  },
