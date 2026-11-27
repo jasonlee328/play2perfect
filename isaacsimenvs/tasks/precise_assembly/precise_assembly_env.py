@@ -470,10 +470,27 @@ class PreciseAssemblyEnv(PlayEnv):
                 raise ValueError("tactile.original_pads and precise_assembly.finger_compliant_stiffness are exclusive")
             self._tacmap_pads_info = _pads_finish()
 
+    def _hand_effort_cap_once(self) -> None:
+        """A8 grip cap (a13a473): hand joint drive force limit (PhysX max force of the implicit PD drive), applied once."""
+        cap = tuple(float(v) for v in tuple(getattr(self.cfg.precise_assembly, "hand_effort_cap_nm", ()) or ()))
+        if not cap or getattr(self, "_hand_effort_cap_done", False):
+            return
+        ids, names = self.robot.find_joints("left_.*")
+        n = self.num_envs
+        c = torch.tensor(cap if len(cap) > 1 else cap * len(ids), device=self.device, dtype=torch.float32)
+        assert c.numel() == len(ids), f"hand_effort_cap_nm: {c.numel()} values for {len(ids)} hand joints"
+        lo, hi = (float(v) for v in getattr(self.cfg.precise_assembly, "hand_effort_cap_scale_range", (1.0, 1.0)))
+        self.hand_effort_scale = lo + (hi - lo) * torch.rand(n, device=self.device)
+        lim = c[None, :] * self.hand_effort_scale[:, None]
+        self.robot.write_joint_effort_limit_to_sim(lim, joint_ids=ids)
+        self._hand_effort_cap_done = True
+        print(f"[a8] hand effort cap: {len(ids)} joints, base {c.tolist()} N m x U({lo},{hi})", flush=True)
+
     def _reset_idx(self, env_ids) -> None:
         if env_ids is None:
             env_ids = torch.arange(self.num_envs, device=self.device)
         env_ids = torch.as_tensor(env_ids, device=self.device, dtype=torch.long)
+        self._hand_effort_cap_once()
         if hasattr(self, "prev_episode_env_max_goals"):
             self.prev_episode_env_max_goals[env_ids] = self.env_max_goals[env_ids]
             self.prev_episode_is_random_goal[env_ids] = self.is_random_goal_env[env_ids]
