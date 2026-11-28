@@ -1637,6 +1637,12 @@ class PreciseAssemblyEnv(PlayEnv):
                 self.extras["roll_spin_in_zone"] = (key.spin.abs() * zone.float()).sum() / zone.float().sum().clamp_min(1.0)
             reward = reward + k_rew
             self._reward_terms["key_reward"] = k_rew
+        if getattr(self, "_kc", None) is not None and float(getattr(pih_cfg, "kc_drop_penalty", 0.0)) > 0.0:
+            # A31: one-time penalty when the carried key is dropped (dropping already ends the episode; without a cost
+            # an early drop beats the per-step action penalties, and 2 of 3 fresh seeds collapsed into dropping)
+            kc_pen = -float(pih_cfg.kc_drop_penalty) * self._termination_reasons["key_dropped"].float()
+            reward = reward + kc_pen
+            self._reward_terms["kc_drop_penalty"] = kc_pen
             self._reward_terms["total_reward"] = reward
             key.log(self.extras)
 
