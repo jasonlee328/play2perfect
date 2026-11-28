@@ -419,8 +419,16 @@ def build_observations(env) -> dict[str, torch.Tensor]:
                 obs_clean[k] = torch.zeros_like(obs_clean[k])
             elif override == "random":
                 obs_clean[k] = torch.rand_like(obs_clean[k])
+            elif override == "padmean":
+                # A31 point-contact ablation: each fingertip pad's image -> one scalar (mean taxel depth, a
+                # normal-force proxy), broadcast over that pad's taxels (same width + scale, no location info).
+                if k == "tactile":
+                    t = obs_clean[k].view(env.num_envs, 5, -1)
+                    obs_clean[k] = t.mean(-1, keepdim=True).expand_as(t).reshape(env.num_envs, -1).contiguous()
+                else:
+                    obs_clean[k] = torch.zeros_like(obs_clean[k])
             elif override != "none":
-                raise ValueError(f"tactile.policy_override must be none|zero|random, got {override!r}")
+                raise ValueError(f"tactile.policy_override must be none|zero|random|padmean, got {override!r}")
 
     if "distractor_obs" in OBS_FIELD_SIZES and getattr(env, "distractors", ()):
         idx = getattr(env, "_obs_distractor_idx", None)
