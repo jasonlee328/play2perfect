@@ -446,6 +446,11 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             env._priv_diam_env = pd = pd.reshape(-1, 1).clone()
         obs_noisy["priv_sticks"] = torch.cat([obs_clean["keypoints_rel_palm"].reshape(env.num_envs, -1),
                                               obs_clean["distractor_obs"].reshape(env.num_envs, -1), pd], dim=-1)
+        if pa is not None and getattr(pa, "obs_priv_full", False):
+            obs_noisy["priv_sticks"] = torch.cat([obs_noisy["priv_sticks"],
+                                                  obs_clean["keypoints_rel_goal"].reshape(env.num_envs, -1),
+                                                  obs_clean["object_rot"].reshape(env.num_envs, -1),
+                                                  obs_clean["fixture_pose_rel_palm"].reshape(env.num_envs, -1)], dim=-1)
     if fade:
         for k in fade:
             if k in obs_noisy:

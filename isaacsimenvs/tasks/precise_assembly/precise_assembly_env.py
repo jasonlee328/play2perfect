@@ -368,6 +368,10 @@ class PreciseAssemblyEnv(PlayEnv):
             if "distractor_obs" not in OBS_FIELD_SIZES:
                 raise ValueError("obs_priv needs obs_distractors=true")
             OBS_FIELD_SIZES["priv_sticks"] = 12 + OBS_FIELD_SIZES["distractor_obs"] + 1
+            if cfg.precise_assembly.obs_priv_full:
+                if not cfg.precise_assembly.obs_fixture:
+                    raise ValueError("obs_priv_full needs obs_fixture=true")
+                OBS_FIELD_SIZES["priv_sticks"] += 12 + 4 + 7
             if "priv_sticks" not in cfg.obs.obs_list:
                 cfg.obs.obs_list = (*cfg.obs.obs_list, "priv_sticks")
             dmap = {"dm15": 4.99, "dm1": 5.49, "dm05": 5.99, "dp1": 7.49}

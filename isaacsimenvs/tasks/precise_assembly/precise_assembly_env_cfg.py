@@ -195,6 +195,9 @@ class PreciseAssemblyCfg:
     # Not affected by blind_offset_m / multi-clutter canonicalisation / obs noise. Students mask it
     # (P2P_STUDENT_MASK_FIELDS=priv_sticks). Needs obs_distractors=true.
     obs_priv: bool = False
+    # obs_priv_full: priv_sticks also carries EXACT keypoints_rel_goal (12) + object_rot (4) + fixture_pose_rel_palm (7)
+    # (everything the blind fade / fixture offset hides), appended after the 67 base priv values.
+    obs_priv_full: bool = False
     # obs_fixture: per-episode constant error on the observed fixture position, U(-d, d) per axis (m, world), so the
     # tray is only roughly known and the sticks must be found by contact. () = exact.
     fixture_obs_noise_m: tuple[float, ...] = ()
