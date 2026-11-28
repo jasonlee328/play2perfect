@@ -60,8 +60,20 @@ class KeyRepose:
                 d = (self.path_set[:, 1:] * self.path_set[:, :-1]).sum(-1).abs() < 0.9999   # distinct consecutive waypoints
                 self.path_len_set = 1 + d.long().sum(-1)                                   # (M,) quarter turns per goal
                 self.path_len = torch.ones(N, dtype=torch.long, device=dev)
+            # key_cube_len_weights [w1, w2, ...]: goal sampling weight by number of quarter turns (training only)
+            lw = list(getattr(c, "key_cube_len_weights", []) or [])
+            self.goal_w = None
+            if lw and self.cube_path:
+                w = torch.tensor([float(lw[min(int(k), len(lw)) - 1]) for k in self.path_len_set], device=dev)
+                self.goal_w = w / w.sum()
 
     # ------------------------------------------------------------------ helpers
+    def _draw_goal(self, n: int):
+        dev = self.cube_set.device
+        if self.goal_w is None:
+            return torch.randint(0, self.cube_set.shape[0], (n,), device=dev)
+        return torch.multinomial(self.goal_w, n, replacement=True)
+
     def scale(self) -> float:
         c = self.env.cfg.precise_assembly
         n = int(c.key_flip_ramp_steps)
@@ -139,7 +151,7 @@ class KeyRepose:
             self.chain_left = torch.zeros(e.num_envs, dtype=torch.long, device=e.device)
         self.chain_left[env_ids] = int(getattr(c, "key_cube_chain", 0))
         if self.mode == "cube24":
-            j = torch.randint(0, self.cube_set.shape[0], (env_ids.numel(),), device=e.device)
+            j = self._draw_goal(env_ids.numel())
             self.goal_id[env_ids] = j
             self.goal_r[env_ids] = self.cube_set[j]
             if self.cube_path:
@@ -166,7 +178,7 @@ class KeyRepose:
         e = self.env
         last = self.goal_path[ids, -1] if self.cube_path else self.goal_r[ids]
         self.base_q[ids] = quat_mul(self.base_q[ids], last)
-        j = torch.randint(0, self.cube_set.shape[0], (ids.numel(),), device=e.device)
+        j = self._draw_goal(ids.numel())
         self.goal_id[ids] = j
         self.goal_r[ids] = self.cube_set[j]
         if self.cube_path:
