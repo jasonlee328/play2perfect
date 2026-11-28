@@ -30,6 +30,11 @@ class KeyRepose:
         self.flip = torch.tensor([float(v) for v in c.key_flip_deg], device=dev) * (math.pi / 180.0)
         self.base_p = torch.zeros(N, 3, device=dev)
         self.base_q = torch.zeros(N, 4, device=dev); self.base_q[:, 0] = 1.0
+        # key_cube_canon: actor sees the cube in the cube-symmetry frame closest to its start pose (palm frame),
+        # re-picked at the start and whenever a waypoint is credited, so every quarter turn looks like the first.
+        self.canon_q = self.base_q.clone()                       # palm-frame reference = start pose (fresh only)
+        self.canon_s = self.base_q.clone()                       # current symmetry element (object frame, wxyz)
+        self.canon_n = torch.full((N,), -1, dtype=torch.long, device=dev)   # successes when canon_s was picked
         self.key0_p = torch.zeros(N, 3, device=dev)
         self.key0_q = torch.zeros(N, 4, device=dev); self.key0_q[:, 0] = 1.0
         self.ready = torch.zeros(N, dtype=torch.bool, device=dev)
@@ -68,6 +73,25 @@ class KeyRepose:
                 self.goal_w = w / w.sum()
 
     # ------------------------------------------------------------------ helpers
+    def canon(self, obj_q_w):
+        """(N,4) object-frame cube symmetry s (wxyz) for the actor obs; re-picked on fresh / new waypoint."""
+        e = self.env
+        if not hasattr(self, "_sym"):
+            I = torch.tensor([[1.0, 0.0, 0.0, 0.0]], device=obj_q_w.device)
+            self._sym = torch.cat([I, _cube_rotations("all", obj_q_w.device)], 0)          # (24, 4)
+        upd = (e._successes != self.canon_n)
+        if upd.any():
+            ids = upd.nonzero(as_tuple=False).squeeze(-1)
+            _, pq = self._palm(ids)
+            ref = quat_mul(pq, self.canon_q[ids])                                            # (n, 4) world
+            n, M = ids.numel(), self._sym.shape[0]
+            cand = quat_mul(obj_q_w[ids].unsqueeze(1).expand(n, M, 4).reshape(-1, 4),
+                            self._sym.unsqueeze(0).expand(n, M, 4).reshape(-1, 4)).view(n, M, 4)
+            dot = (cand * ref.unsqueeze(1)).sum(-1).abs()
+            self.canon_s[ids] = self._sym[dot.argmax(-1)]
+            self.canon_n[ids] = e._successes[ids]
+        return self.canon_s
+
     def _draw_goal(self, n: int):
         dev = self.cube_set.device
         if self.goal_w is None:
@@ -203,6 +227,8 @@ class KeyRepose:
             pre = getattr(e, "_key_pre_flip", None)   # bank start already turned by pre: base = start * Rx(-pre)
             if pre is not None:
                 self.base_q[new] = quat_mul(self.base_q[new], quat_from_angle_axis(-pre[new], self.x_axis.expand(new.numel(), 3)))
+            self.canon_q[new] = self.base_q[new]
+            self.canon_n[new] = -1
             self.ready[new] = True
             if not hasattr(self, "fresh_drop"):
                 self.fresh_drop = torch.zeros_like(self.ready)

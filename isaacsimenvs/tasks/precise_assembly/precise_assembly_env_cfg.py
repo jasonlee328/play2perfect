@@ -133,6 +133,7 @@ class PreciseAssemblyCfg:
     key_cube_drop_lat: float = 0.07      # m, palm-mode 'off the hand' lateral limit
     key_cube_set: str = "all"            # cube24 goal set: all (23) | quarter (6 quarter turns) | face (9)
     key_cube_len_weights: tuple = ()  # training: goal weight by quarter-turn count [w1,w2,...]; () = uniform
+    key_cube_canon: bool = False  # actor obs: cube relabelled by the nearest cube symmetry to its start pose (re-picked per waypoint)
     key_flip_axis: tuple = (1.0, 0.0, 0.0)   # object-frame axis of the goal rotation (key: long axis x; Allen key pivot: z)
     key_pivot_point: tuple = ()          # object-frame point (m) the goal rotation pivots about (Allen key: the grip); () = origin
     key_flip_ramp_steps: int = 0        # > 0: all angles scaled from key_flip_ramp_start to 1 over this many env steps

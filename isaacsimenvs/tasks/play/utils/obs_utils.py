@@ -282,6 +282,16 @@ def build_observations(env) -> dict[str, torch.Tensor]:
     kp_offsets = env._keypoint_offsets * env._object_scale_multiplier.unsqueeze(1)
     obj_kp = _keypoints_world(obj_pos, obj_rot, kp_offsets)
     goal_kp = _keypoints_world(goal_pos, goal_rot, kp_offsets)
+    # A13 key_cube_canon: actor-only relabel of the cube by the cube-symmetry element closest to its start pose
+    # (object and goal rotated by the same s, so the goal error is unchanged); critic / reward keep the true frame.
+    _pc_canon = getattr(env.cfg, "precise_assembly", None)
+    if _pc_canon is not None and bool(getattr(_pc_canon, "key_cube_canon", False)) \
+            and getattr(env, "_key", None) is not None:
+        _s = env._key.canon(noisy_obj_rot)
+        noisy_obj_rot = quat_mul(noisy_obj_rot, _s)
+        goal_rot_obs = quat_mul(goal_rot, _s)
+    else:
+        goal_rot_obs = goal_rot
     noisy_obj_kp = _keypoints_world(noisy_obj_pos, noisy_obj_rot, kp_offsets)
 
     # Optional per-env yaw noise on the observed goal (world +Z about goal_pos).
@@ -291,10 +301,10 @@ def build_observations(env) -> dict[str, torch.Tensor]:
             [0.0, 0.0, 1.0], device=goal_rot.device, dtype=goal_rot.dtype
         ).unsqueeze(0).expand(env.num_envs, -1)
         yaw_q = quat_from_angle_axis(goal_yaw_obs_noise, z_axis)
-        noisy_goal_rot = quat_mul(yaw_q, goal_rot)
+        noisy_goal_rot = quat_mul(yaw_q, goal_rot_obs)
         noisy_goal_kp = _keypoints_world(goal_pos, noisy_goal_rot, kp_offsets)
     else:
-        noisy_goal_kp = goal_kp
+        noisy_goal_kp = goal_kp if goal_rot_obs is goal_rot else _keypoints_world(goal_pos, goal_rot_obs, kp_offsets)
 
     keypoints_rel_palm_clean = obj_kp - palm_pos.unsqueeze(1)
     keypoints_rel_palm_noisy = noisy_obj_kp - palm_pos.unsqueeze(1)
