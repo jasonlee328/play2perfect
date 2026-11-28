@@ -88,6 +88,13 @@ def prim_mesh(root_path: str, env_id: int = 0, keep: tuple[str, ...] | None = No
     return np.concatenate(pts_all), np.concatenate(tris_all)
 
 
+def _collision_key(urdf_path) -> str:
+    """The URDF's <collision> blocks, whitespace-normalised (mass / inertia / visuals ignored)."""
+    import re
+    txt = open(urdf_path).read()
+    return " ".join(" ".join(re.findall(r"<collision.*?</collision>", txt, re.S)).split())
+
+
 class HandSkinSensor:
     """(num_envs, len(HAND_LINKS) * grid^2) whole-hand taxel readings in [0, 1]."""
 
@@ -95,8 +102,9 @@ class HandSkinSensor:
         import trimesh
         from isaaclab.utils.warp import convert_to_warp_mesh
 
-        if len(env._object_urdf_paths) > 1:
-            raise NotImplementedError("whole-hand tactile supports a single object asset")
+        if len(env._object_urdf_paths) > 1 and len({_collision_key(u) for u in env._object_urdf_paths}) > 1:
+            raise NotImplementedError("whole-hand tactile supports a single object geometry")
+        # several assets with identical collision geometry (e.g. boxes differing only in mass / COM): one mesh is exact
         self.env, self.device = env, env.device
         g, sp = int(tactile_cfg.whole_hand_grid), float(tactile_cfg.whole_hand_spacing_mm)
         skin = float(tactile_cfg.whole_hand_skin_mm) * 1e-3
