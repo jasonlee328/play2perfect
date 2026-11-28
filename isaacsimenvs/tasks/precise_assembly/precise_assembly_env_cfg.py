@@ -168,6 +168,10 @@ class PreciseAssemblyCfg:
     # draws a random layout and a random slot permutation (which stick is "the object" is arbitrary: identical bodies).
     stick_bank_file: str = ""                 # ":"-separated: one bank per multi_problems entry (hidden diameter)
     stick_hull_scales: tuple[float, ...] = ()   # per multi_problems entry: hull cross-section scale for the check
+    # per-stick hidden diameter (cb_one10_lift_mix*): hull cross-section scale per (problem, slot), K*S floats in
+    # multi_problems order, slot 0 = the object. Set = per-slot hull in the layout check and NO slot permutation of bank
+    # layouts (a layout was settled with these exact sticks in these slots).
+    stick_slot_scales: tuple[float, ...] = ()
     # Per-episode layout check (logged as success/stick_violation): at episode step stick_check_step, any vertex of any
     # stick's exact collision hull outside stick_check_box [xmin, xmax, ymin, ymax, zmax] (receptive, m) by > tol = violation.
     stick_check_box: tuple[float, ...] = ()

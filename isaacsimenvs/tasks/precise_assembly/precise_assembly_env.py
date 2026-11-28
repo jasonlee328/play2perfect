@@ -717,7 +717,7 @@ class PreciseAssemblyEnv(PlayEnv):
                 else:
                     idx = torch.randint(0, L, (int(m.sum()),), device=self.device)
                 lay[m] = bank[idx]
-            if seq is None:
+            if seq is None and not tuple(c.stick_slot_scales):
                 perm = torch.argsort(torch.rand(n, S, device=self.device), dim=1)           # (n, S)
                 lay = torch.gather(lay, 1, perm.unsqueeze(-1).expand(-1, -1, 7))
             self._slot_pose[:, env_ids] = lay.transpose(0, 1)
@@ -779,7 +779,14 @@ class PreciseAssemblyEnv(PlayEnv):
             self._stick_hull_v = torch.tensor(vs, device=self.device, dtype=torch.float32)      # (V, 3) body frame
         V = self._stick_hull_v.shape[0]
         hs = tuple(c.stick_hull_scales)
-        if len(hs) > 1:                       # per-problem cross-section scale (hidden diameter): y, z of the hull
+        ss = tuple(c.stick_slot_scales)
+        if ss:                                # per-stick diameter: scale per (problem, slot)
+            sc = torch.tensor(ss, device=self.device, dtype=torch.float32).view(-1, S)       # (K, S)
+            pi = self._object_asset_index_per_env[ids] if sc.shape[0] > 1 else torch.zeros_like(ids)
+            sc = sc[pi].transpose(0, 1)                                                      # (S, n)
+            hv = self._stick_hull_v.view(1, 1, V, 3).expand(S, ids.numel(), -1, -1).clone()
+            hv[..., 1:] = hv[..., 1:] * sc.view(S, -1, 1, 1)
+        elif len(hs) > 1:                       # per-problem cross-section scale (hidden diameter): y, z of the hull
             sc = torch.tensor(hs, device=self.device, dtype=torch.float32)[self._object_asset_index_per_env[ids]]
             hv = self._stick_hull_v.view(1, 1, V, 3).expand(S, ids.numel(), -1, -1).clone()
             hv[..., 1:] = hv[..., 1:] * sc.view(1, -1, 1, 1)
